@@ -10,6 +10,9 @@ pub struct NodeList {
     pub nodes: Vec<NodeInfo>,
 }
 
+/// Limit maximum number of IDs in the queue.
+const MAX_NEW_IDS: usize = 10;
+
 impl NodeList {
     pub fn new() -> NodeList {
         NodeList {
@@ -18,12 +21,21 @@ impl NodeList {
         }
     }
 
+    pub fn clear_nodes(&mut self) {
+        println!("Clearing all nodes");
+        self.nodes.clear();
+    }
+
     pub fn get_nodes(&self) -> Vec<NodeInfo> {
         return (&self.nodes).into_iter().map(|x| x.clone()).collect();
     }
 
     pub fn get_new_idle(&mut self) -> U256 {
         let u: U256 = rand::random();
+        // let u = [1u8; 32];
+        while self.idle_ids.len() >= MAX_NEW_IDS {
+            self.idle_ids.pop();
+        }
         self.idle_ids.push(u);
         return u;
     }
@@ -43,12 +55,12 @@ impl NodeList {
             return Err("bad id".to_string());
         }
 
-        if (&self
-            .nodes)
+        if (&self.nodes)
             .into_iter()
             .find(|x| x.public == p.node.public)
             .is_none()
         {
+            println!("Adding node {:?}", p.node);
             self.nodes.push(p.node);
         }
 
@@ -60,7 +72,7 @@ impl NodeList {
 mod tests {
 
     use super::NodeList;
-    use crate::config::NodeInfo;
+    use crate::{config::NodeInfo, rest::PostWebRTC};
 
     #[test]
     fn get_new_idle() {
@@ -78,10 +90,104 @@ mod tests {
         assert_eq!(false, i1 == i2);
     }
 
+    /// Check all ways to fail and succeed to add a node.
     #[test]
     fn add_node() {
-        let nl = NodeList::new();
+        // Refuse to add a node without a list_id
+        let mut nl = NodeList::new();
         let n1 = NodeInfo::new();
+        assert_eq!(
+            true,
+            nl.add_node(PostWebRTC {
+                list_id: [0u8; 32],
+                node: n1.clone(),
+            })
+            .is_err()
+        );
+        assert_eq!(0, nl.nodes.len());
+
+        // Create a list_id, but don't use it
+        let id1 = nl.get_new_idle();
+        assert_eq!(
+            true,
+            nl.add_node(PostWebRTC {
+                list_id: [0u8; 32],
+                node: n1.clone(),
+            })
+            .is_err()
+        );
+        assert_eq!(0, nl.nodes.len());
+
+        // Use the list_id to add a node
+        assert_eq!(
+            true,
+            nl.add_node(PostWebRTC {
+                list_id: id1,
+                node: n1.clone(),
+            })
+            .is_ok()
+        );
+        assert_eq!(1, nl.nodes.len());
+
+        // Cannot add a node or a new node with an existing list_id
+        assert_eq!(
+            false,
+            nl.add_node(PostWebRTC {
+                list_id: id1,
+                node: n1.clone(),
+            })
+            .is_ok()
+        );
+        assert_eq!(1, nl.nodes.len());
         let n2 = NodeInfo::new();
+        assert_eq!(
+            false,
+            nl.add_node(PostWebRTC {
+                list_id: id1,
+                node: n2.clone(),
+            })
+            .is_ok()
+        );
+        assert_eq!(1, nl.nodes.len());
+
+        // Cannot add the same node twice - add_node returns true, but doesn't add it.
+        let id2 = nl.get_new_idle();
+        assert_eq!(
+            true,
+            nl.add_node(PostWebRTC {
+                list_id: id2,
+                node: n1.clone(),
+            })
+            .is_ok()
+        );
+        assert_eq!(1, nl.nodes.len());
+
+        // Now id2 is used up, and node2 cannot be added
+        assert_eq!(
+            false,
+            nl.add_node(PostWebRTC {
+                list_id: id2,
+                node: n2.clone(),
+            })
+            .is_ok()
+        );
+        assert_eq!(1, nl.nodes.len());
+
+        // Add a second node
+        let id3 = nl.get_new_idle();
+        assert_eq!(
+            true,
+            nl.add_node(PostWebRTC {
+                list_id: id3,
+                node: n2.clone(),
+            })
+            .is_ok()
+        );
+        assert_eq!(2, nl.nodes.len());
+
+        // Verify nodes are correct
+        let nodes = nl.get_nodes();
+        assert_eq!(&n1, nodes.get(0).unwrap());
+        assert_eq!(&n2, nodes.get(1).unwrap());
     }
 }

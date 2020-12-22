@@ -13,13 +13,13 @@ pub struct Server {
     storage: Box<dyn Storage>,
 }
 
-// pub fn StartNode(net: impl Network, st: impl Storage) -> Result<Server, &'static str> {
-//     let config = st.load(&"nodeConfig")?;
-//     let toml_config = match parse_config(config){
-//         Ok(i) => i,
-//         Err(err) => return Err(err.to_string().as_str())
-//     };
-//     Ok(Server{
-//         info: toml_config.our_node,
-//     })
-// }
+pub fn StartNode(net: impl Network, st: impl Storage) -> Result<Server, &'static str> {
+    let config = st.load(&"nodeConfig")?;
+    let toml_config = match parse_config(config){
+        Ok(i) => i,
+        Err(err) => return Err(err.to_string().as_str())
+    };
+    Ok(Server{
+        info: toml_config.our_node,
+    })
+}

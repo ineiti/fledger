@@ -3,6 +3,9 @@ use yew::prelude::*;
 
 mod logs;
 mod webrtc;
+mod rest;
+mod rtc_node;
+mod peer_conn;
 
 struct Model {
     link: ComponentLink<Self>,

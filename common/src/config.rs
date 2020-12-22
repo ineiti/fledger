@@ -1,12 +1,12 @@
 
-use rand::random;
-use serde_derive::{Deserialize, Serialize};
+
+use rand::random;use serde_derive::{Deserialize, Serialize};
 use crate::types::U256;
 
-pub struct NodeConfig {
-    our_node: NodeInfo,
-    ledger: Ledger,
-}
+// pub struct NodeConfig {
+//     our_node: NodeInfo,
+//     ledger: Ledger,
+// }
 
 // TODO: find good name, add private key
 #[derive(Debug, Deserialize)]
@@ -16,7 +16,7 @@ pub struct Toml {
 }
 
 // TODO: add public key and an optional private key
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct NodeInfo {
     pub public: U256,
     pub info: String,
@@ -24,22 +24,9 @@ pub struct NodeInfo {
     pub webrtc_address: String,
 }
 
-// impl Clone for NodeInfo {
-//     fn clone(&self) -> NodeInfo {
-        // NodeInfo{
-            // public: self.public.clone(),
-            // info: self.info.clone(),
-            // ip: self.ip.clone(),
-            // webrtc_address: self.webrtc_address.clone(),
-        // }
-//         NodeInfo::new()
-//     }
-// }
-
-// impl Copy for NodeInfo {
-// }
-
 impl NodeInfo {
+    /// Creates a new NodeInfo with a random public key.
+    /// TODO: actually implement something useful.
     pub fn new() -> NodeInfo {
         NodeInfo{
             public: random(),
@@ -59,21 +46,21 @@ pub struct Ledger {
 
 // Parses the string as a config for the node. If the ledger is not available, it returns an error.
 // If the our_node is missing, it is created.
-pub fn parse_config(file: String) -> Result<NodeConfig, toml::de::Error> {
-    let t: Toml = toml::from_str(file.as_str())?;
-
-    let our_node = match t.our_node {
-        Some(n) => n,
-        None => NodeInfo {
-            info: "New Node".to_string(),
-            ip: "".to_string(),
-            webrtc_address: "".to_string(),
-            public: random(),
-        }
-    };
-
-    Ok(NodeConfig{
-        our_node,
-        ledger: t.ledger,
-    })
-}
+// pub fn parse_config(file: String) -> Result<NodeConfig, toml::de::Error> {
+//     let t: Toml = toml::from_str(file.as_str())?;
+//
+//     let our_node = match t.our_node {
+//         Some(n) => n,
+//         None => NodeInfo {
+//             info: "New Node".to_string(),
+//             ip: "".to_string(),
+//             webrtc_address: "".to_string(),
+//             public: [0u8;32],
+//         }
+//     };
+//
+//     Ok(NodeConfig{
+//         our_node,
+//         ledger: t.ledger,
+//     })
+// }

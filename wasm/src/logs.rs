@@ -16,3 +16,8 @@ extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     pub fn warn(s: &str);
 }
+
+#[wasm_bindgen(inline_js = "export function wait_ms(ms) { return new Promise((r) => setTimeout(r, ms)); }")]
+extern "C" {
+    pub async fn wait_ms(ms: u32);
+}
