@@ -14,3 +14,15 @@ The goal is to be able to:
   - loops
     - retrieves all other wasm clients
     - contacts all other clients
+
+# Running it
+
+First run the cli:
+
+```
+cd cli
+cargo build
+./cli --server
+```
+
+Then use the IP of the server in the 
