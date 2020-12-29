@@ -9,6 +9,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
+use web_sys::RtcDataChannelState;
 use web_sys::{
     MessageEvent, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate, RtcIceCandidateInit,
     RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit,
@@ -83,7 +84,7 @@ impl RtcNode {
         let rp_conn = RtcPeerConnection::new()?;
         let (ch_msg_send, ch_msg) = mpsc::sync_channel::<String>(1);
         let ch_dc = match nt {
-            RtcNodeState::Initializer => dc_create_init(&rp_conn, &ch_msg_send),
+            RtcNodeState::Initializer => dc_create_init(&rp_conn, &ch_msg_send)?,
             RtcNodeState::Follower => dc_create_follow(&rp_conn, &ch_msg_send),
         };
         let ch_ice = ice_start(&rp_conn);
@@ -121,7 +122,13 @@ impl RtcNode {
         let srd_promise = self.rp_conn.set_remote_description(&offer_obj);
         JsFuture::from(srd_promise).await?;
 
-        let answer = JsFuture::from(self.rp_conn.create_answer()).await?;
+        let answer = match JsFuture::from(self.rp_conn.create_answer()).await {
+            Ok(f) => f,
+            Err(e) => {
+                console_log!("Error answer: %{:?}", e);
+                return Err(e);
+            }
+        };
         let answer_sdp = Reflect::get(&answer, &JsValue::from_str("sdp"))?
             .as_string()
             .unwrap();
@@ -183,7 +190,7 @@ impl RtcNode {
     /// Waits for a message to arrive. If no message arrives within 10 * 100ms,
     /// an error is returned.
     pub async fn msg_receive(&mut self) -> Result<String, JsValue> {
-        self.is_setup().await?;
+        self.is_open().await?;
         for _ in 0..10 {
             match self.ch_msg.try_iter().next() {
                 Some(s) => {
@@ -201,7 +208,7 @@ impl RtcNode {
     /// it needs to wait for it to happen. If the setup doesn't happen within 10 * 1s,
     /// an error is returned.
     pub async fn msg_send(&mut self, s: &str) -> Result<(), JsValue> {
-        self.is_setup().await?;
+        self.is_open().await?;
         console_log!("Sending: {}", s);
         match &self.dc {
             Some(dc) => dc.send_with_str(s),
@@ -229,79 +236,99 @@ impl RtcNode {
         Ok(())
     }
 
-    fn is_not_setup(&self) -> Result<(), JsValue>{
+    fn is_not_setup(&self) -> Result<(), JsValue> {
         if self.dc.is_some() {
-            return Err(JsValue::from_str("This method is only available before setup is complete"));
+            return Err(JsValue::from_str(
+                "This method is only available before setup is complete",
+            ));
         }
         Ok(())
     }
 
-    async fn is_setup(&mut self) -> Result<(), JsValue>{
+    async fn is_setup(&mut self) -> Result<(), JsValue> {
         if self.dc.is_none() {
             self.is_not_setup()?;
             console_log!("Waiting for RtcDataChannel");
-            for _ in 0..10 {
+            for _ in 0u8..10 {
+                console_log!("ch_dc.try_iter");
                 match self.ch_dc.try_iter().next() {
                     Some(dc) => {
+                        console_log!("Found RDC: {:?}", dc.ready_state());
                         self.dc = Some(dc);
-                        return Ok(())
+                        return Ok(());
                     }
                     None => wait_ms(1000).await,
                 }
+                console_log!("ch_dc.try_iter loop");
             }
-            Err(JsValue::from_str("This method is only available once setup is complete"))
-        } else {
-            Ok(())
+            return Err(JsValue::from_str(
+                "This method is only available once setup is complete",
+            ));
         }
+        Ok(())
+    }
+
+    async fn is_open(&mut self) -> Result<(), JsValue> {
+        self.is_setup().await?;
+        for _ in 0u8..10 {
+            match &self.dc {
+                Some(dc) => {
+                    if dc.ready_state() == RtcDataChannelState::Open {
+                        return Ok(());
+                    }
+                }
+                None => return Err(JsValue::from_str("DataChannel should be set by now!")),
+            }
+            wait_ms(1000).await;
+        }
+        Err(JsValue::from_str(
+            "DataChannelState is not going into 'Open'",
+        ))
     }
 }
 
 fn ice_start(rp_conn: &RtcPeerConnection) -> Receiver<String> {
     let (s1, r1) = mpsc::sync_channel::<String>(1);
 
-    let onicecandidate_callback1 =
-        Closure::wrap(
-            Box::new(move |ev: RtcPeerConnectionIceEvent| match ev.candidate() {
-                Some(candidate) => {
-                    let cand = format!(
-                        "{}::{}::{}",
-                        candidate.candidate(),
-                        candidate.sdp_mid().unwrap(),
-                        candidate.sdp_m_line_index().unwrap()
-                    );
-                    match s1.send(cand) {
-                        Ok(_) => (),
-                        Err(e) => console_log!("Couldn't transmit ICE string: {:?}", e),
-                    }
+    let onicecandidate_callback1 = Closure::wrap(Box::new(move |ev: RtcPeerConnectionIceEvent| {
+        console_log!("Going for ICE: {:?}", ev);
+        match ev.candidate() {
+            Some(candidate) => {
+                let cand = format!(
+                    "{}::{}::{}",
+                    candidate.candidate(),
+                    candidate.sdp_mid().unwrap(),
+                    candidate.sdp_m_line_index().unwrap()
+                );
+                match s1.try_send(cand) {
+                    Ok(_) => (),
+                    Err(e) => console_log!("Couldn't transmit ICE string: {:?}", e),
                 }
-                None => {}
-            }) as Box<dyn FnMut(RtcPeerConnectionIceEvent)>,
-        );
+            }
+            None => {}
+        }
+    })
+        as Box<dyn FnMut(RtcPeerConnectionIceEvent)>);
     rp_conn.set_onicecandidate(Some(onicecandidate_callback1.as_ref().unchecked_ref()));
     onicecandidate_callback1.forget();
     r1
 }
 
-fn dc_onmessage(dc: &RtcDataChannel, s: &SyncSender<String>, mut drop: i32) {
+fn dc_onmessage(dc: &RtcDataChannel, s: &SyncSender<String>) {
     let sender = s.clone();
-    let onmessage_callback =
-        Closure::wrap(
-            Box::new(move |ev: MessageEvent| match ev.data().as_string() {
-                Some(message) => {
-                    console_log!("got: {:?}", message);
-                    if drop > 0 {
-                        drop -= 1;
-                        console_log!("Dropping initial message");
-                        return;
-                    }
-                    match sender.send(message) {
-                        Ok(()) => (),
-                        Err(e) => console_log!("Error while sending: {}", e),
-                    }
+    let onmessage_callback = Closure::wrap(Box::new(move |ev: MessageEvent| {
+        console_log!("New event: {:?}", ev);
+        match ev.data().as_string() {
+            Some(message) => {
+                console_log!("got: {:?}", message);
+                match sender.send(message) {
+                    Ok(()) => (),
+                    Err(e) => console_log!("Error while sending: {}", e),
                 }
-                None => {}
-            }) as Box<dyn FnMut(MessageEvent)>,
-        );
+            }
+            None => {}
+        }
+    }) as Box<dyn FnMut(MessageEvent)>);
     dc.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
     onmessage_callback.forget();
 }
@@ -309,12 +336,14 @@ fn dc_onmessage(dc: &RtcDataChannel, s: &SyncSender<String>, mut drop: i32) {
 fn dc_create_init(
     rp_conn: &RtcPeerConnection,
     send: &SyncSender<String>,
-) -> Receiver<RtcDataChannel> {
+) -> Result<Receiver<RtcDataChannel>, JsValue> {
     let dc = rp_conn.create_data_channel("data-channel");
-    dc_onmessage(&dc.clone(), send, 1);
+    dc_onmessage(&dc.clone(), send);
     let (dc_send, dc_rcv) = mpsc::sync_channel::<RtcDataChannel>(1);
-    dc_send.send(dc).unwrap();
-    dc_rcv
+    dc_send
+        .send(dc)
+        .map_err(|e| JsValue::from_str(e.to_string().as_str()))?;
+    Ok(dc_rcv)
 }
 
 fn dc_create_follow(
@@ -325,12 +354,11 @@ fn dc_create_follow(
     let send = s.clone();
     let ondatachannel_callback = Closure::wrap(Box::new(move |ev: RtcDataChannelEvent| {
         let dc = ev.channel();
-        console_log!("ondatachannel!: {:?}", dc.label());
-        dc_onmessage(&dc, &send, 0);
-        dc.send_with_str("Initial message").unwrap();
-        match dc_send.send(dc){
+        console_log!("ondatachannel: {:?} in state {:?}", dc.label(), dc.ready_state());
+        dc_onmessage(&dc, &send);
+        match dc_send.send(dc) {
             Err(e) => console_warn!("Error while sending dc: {}", e),
-            _ => ()
+            _ => (),
         };
     }) as Box<dyn FnMut(RtcDataChannelEvent)>);
     rp_conn.set_ondatachannel(Some(ondatachannel_callback.as_ref().unchecked_ref()));

@@ -45,4 +45,5 @@ features = [
   "RtcIceCandidateInit",
   "RtcDataChannel",
   "RtcDataChannelEvent",
+  "RtcDataChannelState",
 ]
