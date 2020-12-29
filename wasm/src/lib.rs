@@ -5,7 +5,6 @@ mod logs;
 mod webrtc;
 mod rest;
 mod rtc_node;
-mod peer_conn;
 
 struct Model {
     link: ComponentLink<Self>,
@@ -26,11 +25,18 @@ async fn wrap_short<F: std::future::Future>(f: F) {
     f.await;
 }
 
+async fn rtc_demo() {
+    match rtc_node::demo().await {
+        Err(e) => console_warn!("Couldn't finish task: {:?}", e),
+        Ok(_) => (),
+    };
+}
+
 impl Component for Model {
     type Message = Msg;
     type Properties = ();
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        wasm_bindgen_futures::spawn_local(wrap_short(webrtc::start()));
+        wasm_bindgen_futures::spawn_local(wrap_short(rtc_demo()));
         Self {
             link,
             value: 0,
@@ -43,7 +49,7 @@ impl Component for Model {
             Msg::AddOne => {
                 self.value += 1;
                 wasm_bindgen_futures::spawn_local(wrap(
-                    webrtc::start(),
+                    rtc_demo(),
                     self.link.callback(|_| Msg::WebRTCDone),
                 ));
             }
@@ -78,6 +84,7 @@ impl Component for Model {
 // #[macro_use]
 #[wasm_bindgen(start)]
 pub async fn run_app() {
+    console_error_panic_hook::set_once();
     App::<Model>::new().mount_to_body();
     console_log!("starting app for now!");
 }
