@@ -9,10 +9,10 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
-use web_sys::RtcDataChannelState;
 use web_sys::{
-    MessageEvent, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate, RtcIceCandidateInit,
-    RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit,
+    MessageEvent, RtcDataChannel, RtcDataChannelEvent, RtcDataChannelState, RtcIceCandidate,
+    RtcIceCandidateInit, RtcIceGatheringState, RtcPeerConnection, RtcPeerConnectionIceEvent,
+    RtcSdpType, RtcSessionDescriptionInit,
 };
 
 pub async fn demo() -> Result<(), JsValue> {
@@ -26,6 +26,10 @@ pub async fn demo() -> Result<(), JsValue> {
     let offer = pc1.make_offer().await?;
     let answer = pc2.make_answer(offer).await?;
     pc1.use_answer(answer).await?;
+
+    // Now both nodes need to wait for the messages to be exchanged.
+    pc1.wait_gathering().await?;
+    pc2.wait_gathering().await?;
 
     // Same thing for the ICE information that is converted to strings here and must be passed
     // through a signnalling server.
@@ -60,7 +64,7 @@ pub struct RtcNode {
 }
 
 /// What type of node this is
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum RtcNodeState {
     Initializer,
     Follower,
@@ -150,6 +154,17 @@ impl RtcNode {
         Ok(())
     }
 
+    pub async fn wait_gathering(&self) -> Result<(), JsValue> {
+        self.is_not_setup()?;
+        for _ in 0u8..10 {
+            match self.rp_conn.ice_gathering_state() {
+                RtcIceGatheringState::New => wait_ms(1000).await,
+                _ => return Ok(()),
+            }
+        }
+        Err(JsValue::from_str("Didn't reach IceGatheringState"))
+    }
+
     /// Waits for the ICE string to be avaialble.
     pub async fn ice_string(&self) -> Result<String, JsValue> {
         self.is_not_setup()?;
@@ -214,6 +229,16 @@ impl RtcNode {
             Some(dc) => dc.send_with_str(s),
             None => Err(JsValue::from_str("Didn't get a DataChannel")),
         }
+    }
+
+    pub fn print_states(&self) {
+        console_log!(
+            "{:?}: rpc_conn state is: {:?} / {:?} / {:?}",
+            self.nt,
+            self.rp_conn.signaling_state(),
+            self.rp_conn.ice_gathering_state(),
+            self.rp_conn.ice_connection_state()
+        );
     }
 
     // Making sure the struct is in correct state
@@ -354,7 +379,11 @@ fn dc_create_follow(
     let send = s.clone();
     let ondatachannel_callback = Closure::wrap(Box::new(move |ev: RtcDataChannelEvent| {
         let dc = ev.channel();
-        console_log!("ondatachannel: {:?} in state {:?}", dc.label(), dc.ready_state());
+        console_log!(
+            "ondatachannel: {:?} in state {:?}",
+            dc.label(),
+            dc.ready_state()
+        );
         dc_onmessage(&dc, &send);
         match dc_send.send(dc) {
             Err(e) => console_warn!("Error while sending dc: {}", e),
