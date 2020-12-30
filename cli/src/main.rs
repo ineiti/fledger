@@ -7,10 +7,10 @@ extern crate rocket;
 ///
 /// TODO: use the `newID` endpoint to authentify the nodes' public key
 
-use common::node_list::NodeList;
+mod node_list;
+
+use node_list::NodeList;
 use common::rest::*;
-
-
 
 use rocket::Request;use rocket::Response;
 use rocket::fairing::Fairing;

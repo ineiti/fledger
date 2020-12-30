@@ -154,6 +154,7 @@ impl RtcNode {
         Ok(())
     }
 
+    /// Waits for the ICE to move on from the 'New' state
     pub async fn wait_gathering(&self) -> Result<(), JsValue> {
         self.is_not_setup()?;
         for _ in 0u8..10 {

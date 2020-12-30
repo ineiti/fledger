@@ -56,6 +56,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d3a45e77e34375a7923b1e8febb049bb011f064714a8e17a1a616fef01da13d"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.54",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -153,6 +164,7 @@ name = "cli"
 version = "0.1.0"
 dependencies = [
  "common",
+ "rand 0.8.0",
  "rocket",
  "rocket_contrib",
  "serde",
@@ -164,6 +176,7 @@ dependencies = [
 name = "common"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "rand 0.8.0",
  "serde",
  "serde_derive",

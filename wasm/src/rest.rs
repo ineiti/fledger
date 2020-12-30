@@ -1,82 +1,70 @@
-
-
-use super::logs;
-
 use common::config::NodeInfo;
-use common::rest::GetListID;
 
-use common::rest::PostWebRTC;
-use common::types::U256;
+use common::ext_interface::RestMethod;
+
+use common::rest::RestClient;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
 use web_sys::{Request, RequestInit, RequestMode, Response};
 
-pub async fn do_test() -> Result<(), JsValue>{
-    /*
-     * Connect to the signaling serve to fetch a new id
-     */
-    let base = "http://localhost:8000";
-    clear_nodes(base).await?;
-    let id1 = new_id(base).await?;
-    let ni1 = NodeInfo::new();
-    add_id(base, id1.new_id, ni1).await?;
-    console_log!("Added new node");
-
-    Ok(())
-}
-
-async fn clear_nodes(base: &str) -> Result<(), JsValue> {
+pub async fn rest_func(
+    method: RestMethod,
+    path: &str,
+    data: Option<String>,
+) -> Result<String, String> {
     let mut opts = RequestInit::new();
-    opts.method("DELETE");
+    opts.method(match method {
+        RestMethod::GET => "GET",
+        RestMethod::PUT => "PUT",
+        RestMethod::DELETE => "DELETE",
+        RestMethod::POST => "POST",
+    });
     opts.mode(RequestMode::Cors);
-    let url = format!("{}/clearNodes", base);
-    let request = Request::new_with_str_and_init(&url, &opts)?;
-    let window = web_sys::window().unwrap();
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-    assert!(resp_value.is_instance_of::<Response>());
-    return Ok(());
-}
-
-async fn new_id(base: &str) -> Result<GetListID, JsValue> {
-    let mut opts = RequestInit::new();
-    opts.method("GET");
-    opts.mode(RequestMode::Cors);
-    let url = format!("{}/newID", base);
-    let request = Request::new_with_str_and_init(&url, &opts)?;
-    request.headers().set("Accept", "application/json")?;
-    let window = web_sys::window().unwrap();
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-    assert!(resp_value.is_instance_of::<Response>());
-    let resp: Response = resp_value.dyn_into().unwrap();
-    let json = JsFuture::from(resp.json()?).await?;
-    let new_id: GetListID = json.into_serde().unwrap();
-    return Ok(new_id);
-}
-
-async fn add_id(base: &str, id: U256, ni: NodeInfo) -> Result<(), JsValue> {
-    let mut opts = RequestInit::new();
-    opts.method("POST");
-    opts.mode(RequestMode::Cors);
-    let pw = match serde_json::to_string(&PostWebRTC {
-        list_id: id,
-        node: ni,
-    }) {
-        Ok(j) => j,
-        Err(e) => return Err(JsValue::from_str(e.to_string().as_str())),
-    };
-    opts.body(Some(&JsValue::from_str(&pw)));
-    let url = format!("{}/addNode", base);
-    let request = Request::new_with_str_and_init(&url, &opts)?;
-    // request.headers().set("CT", "application/json")?;
-    request.headers().delete("Content-Type")?;
+    if data.is_some() {
+        opts.body(Some(&JsValue::from_str(&data.unwrap())));
+    }
+    let url = format!("{}/{}", "http://localhost:8000", path);
+    let request =
+        Request::new_with_str_and_init(&url, &opts).map_err(|e| e.as_string().unwrap())?;
     request
         .headers()
-        .append("Content-Type", "application/json")?;
-    request.headers().set("Accept", "application/json")?;
+        .set("Accept", "application/json")
+        .map_err(|e| e.as_string().unwrap())?;
+    request
+        .headers()
+        .set("Content-Type", "application/json")
+        .map_err(|e| e.as_string().unwrap())?;
+
     let window = web_sys::window().unwrap();
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-    assert!(resp_value.is_instance_of::<Response>());
-    return Ok(());
+    match JsFuture::from(window.fetch_with_request(&request)).await {
+        Ok(res) => {
+            if !res.is_instance_of::<Response>() {
+                return Err("Didn't get Response instance".to_string());
+            }
+            let resp: Response = res.into();
+            let text = resp.text().unwrap();
+            match JsFuture::from(text).await {
+                Ok(s) => Ok(s.as_string().unwrap()),
+                Err(_) => Err("something went wrong".to_string()),
+            }
+        }
+        Err(_) => Err("something else went wrong".to_string()),
+    }
+}
+
+/// Runs all calls to test the REST interface
+pub async fn demo() -> Result<(), JsValue> {
+    // let base = "http://localhost:8000";
+    console_log!("Starting REST-test");
+    let mut rest = RestClient::new(rest_func);
+    rest.clear_nodes().await?;
+    let id1 = rest.new_id().await?;
+    let ni1 = NodeInfo::new();
+    rest.add_id(id1, ni1).await?;
+    console_log!("Added new node");
+    console_log!("IDs: {:?}", rest.list_ids().await?);
+
+    Ok(())
 }

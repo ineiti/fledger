@@ -3,16 +3,10 @@
 use rand::random;use serde_derive::{Deserialize, Serialize};
 use crate::types::U256;
 
-// pub struct NodeConfig {
-//     our_node: NodeInfo,
-//     ledger: Ledger,
-// }
-
-// TODO: find good name, add private key
-#[derive(Debug, Deserialize)]
-pub struct Toml {
-    our_node: Option<NodeInfo>,
-    ledger: Ledger,
+#[derive(Debug)]
+pub struct NodeConfig {
+    pub our_node: NodeInfo,
+    pub ledger: Ledger,
 }
 
 // TODO: add public key and an optional private key
@@ -44,23 +38,25 @@ pub struct Ledger {
     root: NodeInfo,
 }
 
+// TODO: find good name, add private key
+#[derive(Debug, Deserialize)]
+pub struct Toml {
+    our_node: Option<NodeInfo>,
+    ledger: Ledger,
+}
+
 // Parses the string as a config for the node. If the ledger is not available, it returns an error.
 // If the our_node is missing, it is created.
-// pub fn parse_config(file: String) -> Result<NodeConfig, toml::de::Error> {
-//     let t: Toml = toml::from_str(file.as_str())?;
-//
-//     let our_node = match t.our_node {
-//         Some(n) => n,
-//         None => NodeInfo {
-//             info: "New Node".to_string(),
-//             ip: "".to_string(),
-//             webrtc_address: "".to_string(),
-//             public: [0u8;32],
-//         }
-//     };
-//
-//     Ok(NodeConfig{
-//         our_node,
-//         ledger: t.ledger,
-//     })
-// }
+pub fn parse_config(file: String) -> Result<NodeConfig, String> {
+    let t: Toml = toml::from_str(file.as_str()).map_err(|e| e.to_string())?;
+
+    let our_node = match t.our_node {
+        Some(n) => n,
+        None => NodeInfo::new()
+    };
+
+    Ok(NodeConfig{
+        our_node,
+        ledger: t.ledger,
+    })
+}

@@ -1,6 +1,9 @@
-use crate::{config::NodeInfo, rest::PostWebRTC};
 
-use crate::types::U256;
+
+
+use common::config::NodeInfo;
+use common::rest::PostWebRTC;use common::types::U256;
+use rand;
 
 /// Information held by the REST service to allow other nodes to connect.
 /// TODO: allow to connect to any node.

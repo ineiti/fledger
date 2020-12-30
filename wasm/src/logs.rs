@@ -1,12 +1,10 @@
-#![macro_use]
-
 use wasm_bindgen::prelude::*;
 
 macro_rules! console_log {
-    ($($t:tt)*) => (logs::log(&format_args!($($t)*).to_string()))
+    ($($t:tt)*) => (crate::logs::log(&format_args!($($t)*).to_string()))
 }
 macro_rules! console_warn {
-    ($($t:tt)*) => (logs::warn(&format_args!($($t)*).to_string()))
+    ($($t:tt)*) => (crate::logs::warn(&format_args!($($t)*).to_string()))
 }
 
 #[wasm_bindgen]

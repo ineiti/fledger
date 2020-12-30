@@ -1,19 +1,22 @@
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 
+#[macro_use]
 mod logs;
-mod webrtc;
 mod rest;
 mod rtc_node;
+mod webrtc;
 
 struct Model {
     link: ComponentLink<Self>,
-    value: i64,
     log: String,
 }
 
 enum Msg {
-    AddOne,
+    ClearNodes,
+    SendID,
+    Reset,
+    Connect,
     WebRTCDone,
 }
 
@@ -26,7 +29,7 @@ async fn wrap_short<F: std::future::Future>(f: F) {
 }
 
 async fn rtc_demo() {
-    match rtc_node::demo().await {
+    match rest::demo().await {
         Err(e) => console_warn!("Couldn't finish task: {:?}", e),
         Ok(_) => (),
     };
@@ -39,21 +42,22 @@ impl Component for Model {
         wasm_bindgen_futures::spawn_local(wrap_short(rtc_demo()));
         Self {
             link,
-            value: 0,
             log: "".to_string(),
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::AddOne => {
-                self.value += 1;
+            Msg::SendID => {
                 wasm_bindgen_futures::spawn_local(wrap(
                     rtc_demo(),
                     self.link.callback(|_| Msg::WebRTCDone),
                 ));
             }
-            Msg::WebRTCDone => self.value += 10,
+            Msg::WebRTCDone => {}
+            Msg::ClearNodes => {}
+            Msg::Reset => {}
+            Msg::Connect => {}
         }
         true
     }
@@ -71,8 +75,7 @@ impl Component for Model {
             <div class="main">
                 <div class="ui">
                     <div>
-                        <button onclick=self.link.callback(|_| Msg::AddOne)>{ "+1" }</button>
-                        <p>{ self.value }</p>
+                        <button onclick=self.link.callback(|_| Msg::SendID)>{ "+1" }</button>
                         <p>{"log:"}{ log_str }</p>
                     </div>
                 </div>
@@ -81,7 +84,6 @@ impl Component for Model {
     }
 }
 
-// #[macro_use]
 #[wasm_bindgen(start)]
 pub async fn run_app() {
     console_error_panic_hook::set_once();
