@@ -92,11 +92,15 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "js-sys",
  "rand",
  "serde",
  "serde_derive",
  "serde_json",
  "toml",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

@@ -4,8 +4,10 @@ use yew::prelude::*;
 #[macro_use]
 mod logs;
 mod rest;
-mod rtc_node;
-mod webrtc;
+mod web_rtc;
+
+// use rest::demo;
+use web_rtc::demo;
 
 struct Model {
     link: ComponentLink<Self>,
@@ -29,7 +31,7 @@ async fn wrap_short<F: std::future::Future>(f: F) {
 }
 
 async fn rtc_demo() {
-    match rest::demo().await {
+    match demo().await {
         Err(e) => console_warn!("Couldn't finish task: {:?}", e),
         Ok(_) => (),
     };

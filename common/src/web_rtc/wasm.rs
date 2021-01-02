@@ -1,61 +1,35 @@
-use super::logs;
-
-use crate::logs::wait_ms;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, SyncSender};
+use std::sync::Arc;
 
+use crate::web_rtc::WebRTCMethod;
+use crate::web_rtc::WebRTCClient;
 use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
+use super::WebRTCCallerState;
+
 use web_sys::{
+    console::{log_1},
     MessageEvent, RtcDataChannel, RtcDataChannelEvent, RtcDataChannelState, RtcIceCandidate,
     RtcIceCandidateInit, RtcIceGatheringState, RtcPeerConnection, RtcPeerConnectionIceEvent,
     RtcSdpType, RtcSessionDescriptionInit,
 };
 
-pub async fn demo() -> Result<(), JsValue> {
-    // Set up two PCs - one needs to have init == true, the other init == false
-    let mut pc1 = RtcNode::new(RtcNodeState::Initializer)?;
-    let mut pc2 = RtcNode::new(RtcNodeState::Follower)?;
+#[wasm_bindgen(inline_js = "export function wait_ms_rtc(ms) { return new Promise((r) => setTimeout(r, ms)); }")]
+extern "C" {
+    pub async fn wait_ms_rtc(ms: u32);
+}
 
-    // Exchange SDP info - 'offer' and 'answer' are strings that need to be exchanged over a
-    // signalling server.
-    console_log!("Sending out offer and answer");
-    let offer = pc1.make_offer().await?;
-    let answer = pc2.make_answer(offer).await?;
-    pc1.use_answer(answer).await?;
-
-    // Now both nodes need to wait for the messages to be exchanged.
-    pc1.wait_gathering().await?;
-    pc2.wait_gathering().await?;
-
-    // Same thing for the ICE information that is converted to strings here and must be passed
-    // through a signnalling server.
-    console_log!("Pass ICE back and forth");
-    let r1_str = pc1.ice_string().await?;
-    pc2.ice_put(r1_str)?;
-    let r2_str = pc2.ice_string().await?;
-    pc1.ice_put(r2_str)?;
-
-    // Finally the two nodes are set up and can exchange messages.
-    console_log!("Sending something through the channel");
-    for i in 0..2 {
-        console_log!("Doing iteration {}", i);
-        pc1.msg_send("1 -> 2").await?;
-        console_log!("PC2 receives: {}", pc2.msg_receive().await?);
-        pc2.msg_send("2 -> 1").await?;
-        console_log!("PC1 receives: {}", pc1.msg_receive().await?);
-    }
-
-    console_log!("Going away - all done");
-    Ok(())
+fn log(s: &str){
+    log_1(&JsValue::from_str(s));
 }
 
 /// Structure for easy WebRTC handling without all the hassle of JS-internals.
-pub struct RtcNode {
-    nt: RtcNodeState,
+pub struct WebRTCCaller {
+    nt: WebRTCCallerState,
     rp_conn: RtcPeerConnection,
     ch_msg: Receiver<String>,
     ch_dc: Receiver<RtcDataChannel>,
@@ -63,15 +37,8 @@ pub struct RtcNode {
     dc: Option<RtcDataChannel>,
 }
 
-/// What type of node this is
-#[derive(PartialEq, Debug)]
-pub enum RtcNodeState {
-    Initializer,
-    Follower,
-}
-
-impl RtcNode {
-    /// Returns a new RtcNode in either init or follower mode.
+impl WebRTCCaller{
+    /// Returns a new WebRTCCaller in either init or follower mode.
     /// One of the nodes connecting must be an init node, the other a follower node.
     /// There is no error handling if both are init nodes or both are follower nodes.
     ///
@@ -84,15 +51,15 @@ impl RtcNode {
     /// Once two nodes are set up, they need to exchang the offer and the answer string.
     /// Followed by that they need to exchange the ice strings, in either order.
     /// Only after exchanging this information can the msg_send and msg_receive methods be used.
-    pub fn new(nt: RtcNodeState) -> Result<RtcNode, JsValue> {
-        let rp_conn = RtcPeerConnection::new()?;
+    pub fn new(nt: WebRTCCallerState) -> Result<WebRTCCaller, String> {
+        let rp_conn = RtcPeerConnection::new().map_err(|e| e.as_string().unwrap())?;
         let (ch_msg_send, ch_msg) = mpsc::sync_channel::<String>(1);
         let ch_dc = match nt {
-            RtcNodeState::Initializer => dc_create_init(&rp_conn, &ch_msg_send)?,
-            RtcNodeState::Follower => dc_create_follow(&rp_conn, &ch_msg_send),
+            WebRTCCallerState::Initializer => dc_create_init(&rp_conn, &ch_msg_send)?,
+            WebRTCCallerState::Follower => dc_create_follow(&rp_conn, &ch_msg_send),
         };
         let ch_ice = ice_start(&rp_conn);
-        let rn = RtcNode {
+        let rn = WebRTCCaller {
             nt,
             rp_conn,
             ch_msg,
@@ -101,6 +68,28 @@ impl RtcNode {
             dc: None,
         };
         Ok(rn)
+    }
+
+    pub async fn call(
+        &mut self,
+        call: WebRTCMethod,
+        input: Option<String>,
+    ) -> Result<Option<String>, String> {
+        match call {
+            WebRTCMethod::MakeOffer => self.make_offer().await.map(|s| Some(s)),
+            WebRTCMethod::MakeAnswer => self.make_answer(input.unwrap()).await.map(|s| Some(s)),
+            WebRTCMethod::UseAnswer => self.use_answer(input.unwrap()).await.map(|_| None),
+            WebRTCMethod::WaitGathering => self.wait_gathering().await.map(|_| None),
+            WebRTCMethod::IceString => self.ice_string().await.map(|s| Some(s)),
+            WebRTCMethod::IcePut => self.ice_put(input.unwrap()).map(|_| None),
+            WebRTCMethod::MsgReceive => self.msg_receive().await.map(|s| Some(s)),
+            WebRTCMethod::MsgSend => self.msg_send(&input.unwrap()).await.map(|_| None),
+            WebRTCMethod::PrintStates => {
+                self.print_states();
+                Ok(None)
+            }
+        }
+        .map_err(|e| e.as_string().unwrap())
     }
 
     /// Returns the offer string that needs to be sent to the `Follower` node.
@@ -129,7 +118,7 @@ impl RtcNode {
         let answer = match JsFuture::from(self.rp_conn.create_answer()).await {
             Ok(f) => f,
             Err(e) => {
-                console_log!("Error answer: %{:?}", e);
+                log(&format!("Error answer: {:?}", e));
                 return Err(e);
             }
         };
@@ -159,7 +148,7 @@ impl RtcNode {
         self.is_not_setup()?;
         for _ in 0u8..10 {
             match self.rp_conn.ice_gathering_state() {
-                RtcIceGatheringState::New => wait_ms(1000).await,
+                RtcIceGatheringState::New => wait_ms_rtc(1000).await,
                 _ => return Ok(()),
             }
         }
@@ -176,7 +165,7 @@ impl RtcNode {
                 }
                 None => (),
             };
-            wait_ms(1000).await;
+            wait_ms_rtc(1000).await;
         }
         Err(JsValue::from_str("Didn't get ICE in time"))
     }
@@ -210,12 +199,12 @@ impl RtcNode {
         for _ in 0..10 {
             match self.ch_msg.try_iter().next() {
                 Some(s) => {
-                    console_log!("Got message: {}", s);
+                    log(&format!("Got message: {:?}", s));
                     return Ok(s);
                 }
                 None => (),
             };
-            wait_ms(100).await;
+            wait_ms_rtc(100).await;
         }
         Err(JsValue::from_str("Couldn't get string in time"))
     }
@@ -225,7 +214,7 @@ impl RtcNode {
     /// an error is returned.
     pub async fn msg_send(&mut self, s: &str) -> Result<(), JsValue> {
         self.is_open().await?;
-        console_log!("Sending: {}", s);
+        log(&format!("Sending: {:?}", s));
         match &self.dc {
             Some(dc) => dc.send_with_str(s),
             None => Err(JsValue::from_str("Didn't get a DataChannel")),
@@ -233,19 +222,19 @@ impl RtcNode {
     }
 
     pub fn print_states(&self) {
-        console_log!(
+        log(&format!(
             "{:?}: rpc_conn state is: {:?} / {:?} / {:?}",
             self.nt,
             self.rp_conn.signaling_state(),
             self.rp_conn.ice_gathering_state(),
             self.rp_conn.ice_connection_state()
-        );
+        ));
     }
 
     // Making sure the struct is in correct state
 
     fn is_initializer(&self) -> Result<(), JsValue> {
-        if self.nt != RtcNodeState::Initializer {
+        if self.nt != WebRTCCallerState::Initializer {
             return Err(JsValue::from_str(
                 "This method is only available to the Initializer",
             ));
@@ -254,7 +243,7 @@ impl RtcNode {
     }
 
     fn is_follower(&self) -> Result<(), JsValue> {
-        if self.nt != RtcNodeState::Follower {
+        if self.nt != WebRTCCallerState::Follower {
             return Err(JsValue::from_str(
                 "This method is only available to the Follower",
             ));
@@ -274,18 +263,18 @@ impl RtcNode {
     async fn is_setup(&mut self) -> Result<(), JsValue> {
         if self.dc.is_none() {
             self.is_not_setup()?;
-            console_log!("Waiting for RtcDataChannel");
+            log("Waiting for RtcDataChannel");
             for _ in 0u8..10 {
-                console_log!("ch_dc.try_iter");
+                log("ch_dc.try_iter");
                 match self.ch_dc.try_iter().next() {
                     Some(dc) => {
-                        console_log!("Found RDC: {:?}", dc.ready_state());
+                        log(&format!("Found RDC: {:?}", dc.ready_state()));
                         self.dc = Some(dc);
                         return Ok(());
                     }
-                    None => wait_ms(1000).await,
+                    None => wait_ms_rtc(1000).await,
                 }
-                console_log!("ch_dc.try_iter loop");
+                log("ch_dc.try_iter loop");
             }
             return Err(JsValue::from_str(
                 "This method is only available once setup is complete",
@@ -305,7 +294,7 @@ impl RtcNode {
                 }
                 None => return Err(JsValue::from_str("DataChannel should be set by now!")),
             }
-            wait_ms(1000).await;
+            wait_ms_rtc(1000).await;
         }
         Err(JsValue::from_str(
             "DataChannelState is not going into 'Open'",
@@ -317,7 +306,7 @@ fn ice_start(rp_conn: &RtcPeerConnection) -> Receiver<String> {
     let (s1, r1) = mpsc::sync_channel::<String>(1);
 
     let onicecandidate_callback1 = Closure::wrap(Box::new(move |ev: RtcPeerConnectionIceEvent| {
-        console_log!("Going for ICE: {:?}", ev);
+        log(&format!("Going for ICE: {:?}", ev));
         match ev.candidate() {
             Some(candidate) => {
                 let cand = format!(
@@ -328,7 +317,7 @@ fn ice_start(rp_conn: &RtcPeerConnection) -> Receiver<String> {
                 );
                 match s1.try_send(cand) {
                     Ok(_) => (),
-                    Err(e) => console_log!("Couldn't transmit ICE string: {:?}", e),
+                    Err(e) => log(&format!("Couldn't transmit ICE string: {:?}", e)),
                 }
             }
             None => {}
@@ -343,13 +332,13 @@ fn ice_start(rp_conn: &RtcPeerConnection) -> Receiver<String> {
 fn dc_onmessage(dc: &RtcDataChannel, s: &SyncSender<String>) {
     let sender = s.clone();
     let onmessage_callback = Closure::wrap(Box::new(move |ev: MessageEvent| {
-        console_log!("New event: {:?}", ev);
+        log(&format!("New event: {:?}", ev));
         match ev.data().as_string() {
             Some(message) => {
-                console_log!("got: {:?}", message);
+                log(&format!("got: {:?}", message));
                 match sender.send(message) {
                     Ok(()) => (),
-                    Err(e) => console_log!("Error while sending: {}", e),
+                    Err(e) => log(&format!("Error while sending: {:?}", e)),
                 }
             }
             None => {}
@@ -362,13 +351,11 @@ fn dc_onmessage(dc: &RtcDataChannel, s: &SyncSender<String>) {
 fn dc_create_init(
     rp_conn: &RtcPeerConnection,
     send: &SyncSender<String>,
-) -> Result<Receiver<RtcDataChannel>, JsValue> {
+) -> Result<Receiver<RtcDataChannel>, String> {
     let dc = rp_conn.create_data_channel("data-channel");
     dc_onmessage(&dc.clone(), send);
     let (dc_send, dc_rcv) = mpsc::sync_channel::<RtcDataChannel>(1);
-    dc_send
-        .send(dc)
-        .map_err(|e| JsValue::from_str(e.to_string().as_str()))?;
+    dc_send.send(dc);
     Ok(dc_rcv)
 }
 
@@ -380,14 +367,14 @@ fn dc_create_follow(
     let send = s.clone();
     let ondatachannel_callback = Closure::wrap(Box::new(move |ev: RtcDataChannelEvent| {
         let dc = ev.channel();
-        console_log!(
+        log(&format!(
             "ondatachannel: {:?} in state {:?}",
             dc.label(),
             dc.ready_state()
-        );
+        ));
         dc_onmessage(&dc, &send);
         match dc_send.send(dc) {
-            Err(e) => console_warn!("Error while sending dc: {}", e),
+            Err(e) => log(&format!("Error while sending dc: {:?}", e)),
             _ => (),
         };
     }) as Box<dyn FnMut(RtcDataChannelEvent)>);

@@ -13,3 +13,31 @@ serde_derive = "1.0"
 toml = "0.5"
 rand = "0.8.0"
 async-trait = "0.1.42"
+
+wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
+js-sys = "0.3.46"
+wasm-bindgen-futures = "0.4.19"
+
+[dependencies.web-sys]
+version = "0.3.46"
+features = [
+
+  'Request',
+  'RequestInit',
+  'RequestMode',
+  'Response',
+
+  "MessageEvent",
+  "RtcPeerConnection",
+  "RtcSignalingState",
+  "RtcSdpType",
+  "RtcSessionDescriptionInit",
+  "RtcPeerConnectionIceEvent",
+  "RtcIceCandidate",
+  "RtcIceCandidateInit",
+  "RtcIceConnectionState",
+  "RtcIceGatheringState",
+  "RtcDataChannel",
+  "RtcDataChannelEvent",
+  "RtcDataChannelState",
+]
