@@ -1,13 +1,6 @@
-
-
-use rand::random;use serde_derive::{Deserialize, Serialize};
 use crate::types::U256;
-
-#[derive(Debug)]
-pub struct NodeConfig {
-    pub our_node: NodeInfo,
-    pub ledger: Ledger,
-}
+use rand::random;
+use serde_derive::{Deserialize, Serialize};
 
 // TODO: add public key and an optional private key
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -22,7 +15,7 @@ impl NodeInfo {
     /// Creates a new NodeInfo with a random public key.
     /// TODO: actually implement something useful.
     pub fn new() -> NodeInfo {
-        NodeInfo{
+        NodeInfo {
             public: random(),
             info: "new node".to_string(),
             ip: "127".to_string(),
@@ -38,25 +31,39 @@ pub struct Ledger {
     root: NodeInfo,
 }
 
-// TODO: find good name, add private key
-#[derive(Debug, Deserialize)]
-pub struct Toml {
-    our_node: Option<NodeInfo>,
-    ledger: Ledger,
+#[derive(Debug)]
+pub struct NodeConfig {
+    pub our_node: NodeInfo,
+    // pub ledger: Ledger,
 }
 
-// Parses the string as a config for the node. If the ledger is not available, it returns an error.
-// If the our_node is missing, it is created.
-pub fn parse_config(file: String) -> Result<NodeConfig, String> {
-    let t: Toml = toml::from_str(file.as_str()).map_err(|e| e.to_string())?;
+impl NodeConfig {
+    /// Parses the string as a config for the node. If the ledger is not available, it returns an error.
+    /// If the our_node is missing, it is created.
+    pub fn new(str: String) -> Result<NodeConfig, String> {
+        let t: Toml = if str.len() > 0 {
+            toml::from_str(str.as_str()).map_err(|e| e.to_string())?
+        } else {
+            Toml { our_node: None }
+        };
 
-    let our_node = match t.our_node {
-        Some(n) => n,
-        None => NodeInfo::new()
-    };
+        Ok(NodeConfig {
+            our_node: t.our_node.unwrap_or(NodeInfo::new()),
+            // ledger: t.ledger,
+        })
+    }
 
-    Ok(NodeConfig{
-        our_node,
-        ledger: t.ledger,
-    })
+    pub fn to_string(&self) -> Result<String, String> {
+        toml::to_string(&Toml {
+            our_node: Some(self.our_node.clone()),
+        })
+        .map_err(|e| e.to_string())
+    }
+}
+
+// TODO: find good name, add private key
+#[derive(Debug, Deserialize, Serialize)]
+struct Toml {
+    our_node: Option<NodeInfo>,
+    // ledger: Ledger,
 }

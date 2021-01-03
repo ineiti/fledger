@@ -1,25 +1,33 @@
+use common::node::Node;
+use std::sync::Arc;
+use std::sync::Mutex;
+
+use logger::LoggerOutput;
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 
 #[macro_use]
 mod logs;
+mod logger;
+mod node;
 mod rest;
 mod web_rtc;
 
 // use rest::demo;
-use web_rtc::demo;
+// use web_rtc::demo;
+use node::start;
 
 struct Model {
     link: ComponentLink<Self>,
-    log: String,
+    node: Option<Arc<Mutex<Node>>>,
+    log_str: Arc<Mutex<String>>,
 }
 
 enum Msg {
+    UpdateLog,
     ClearNodes,
-    SendID,
-    Reset,
     Connect,
-    WebRTCDone,
+    Node(Result<Node, JsValue>),
 }
 
 async fn wrap<F: std::future::Future>(f: F, done_cb: yew::Callback<F::Output>) {
@@ -30,10 +38,9 @@ async fn wrap_short<F: std::future::Future>(f: F) {
     f.await;
 }
 
-async fn rtc_demo() {
-    match demo().await {
-        Err(e) => console_warn!("Couldn't finish task: {:?}", e),
-        Ok(_) => (),
+async fn wrap_short_log<F: std::future::Future<Output = Result<(), String>>>(f: F) {
+    if let Err(e) = f.await {
+        console_warn!("Something went wrong: {:?}", e);
     };
 }
 
@@ -41,25 +48,41 @@ impl Component for Model {
     type Message = Msg;
     type Properties = ();
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        wasm_bindgen_futures::spawn_local(wrap_short(rtc_demo()));
+        let (logger, node_logger) = LoggerOutput::new();
+        wasm_bindgen_futures::spawn_local(wrap(
+            start(Box::new(node_logger)),
+            link.callback(|n: Result<Node, JsValue>| Msg::Node(n)),
+        ));
+        wasm_bindgen_futures::spawn_local(wrap_short(LoggerOutput::listen(
+            logger.ch,
+            Arc::clone(&logger.str),
+        )));
         Self {
             link,
-            log: "".to_string(),
+            node: None,
+            log_str: Arc::clone(&logger.str),
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::SendID => {
-                wasm_bindgen_futures::spawn_local(wrap(
-                    rtc_demo(),
-                    self.link.callback(|_| Msg::WebRTCDone),
-                ));
-            }
-            Msg::WebRTCDone => {}
+            Msg::UpdateLog => {}
+            Msg::Connect => match &self.node {
+                None => {}
+                Some(n) => {
+                    let node_copy = Arc::clone(&n);
+                    wasm_bindgen_futures::spawn_local(async move {
+                        let mut node = node_copy.lock().unwrap();
+                        node.connect().await;
+                    });
+                }
+            },
             Msg::ClearNodes => {}
-            Msg::Reset => {}
-            Msg::Connect => {}
+            Msg::Node(res_node) => {
+                if let Ok(node) = res_node {
+                    self.node = Some(Arc::new(Mutex::new(node)));
+                }
+            }
         }
         true
     }
@@ -72,13 +95,15 @@ impl Component for Model {
     }
 
     fn view(&self) -> Html {
-        let log_str = &self.log;
+        let str = self.log_str.lock().unwrap();
         html! {
             <div class="main">
                 <div class="ui">
                     <div>
-                        <button onclick=self.link.callback(|_| Msg::SendID)>{ "+1" }</button>
-                        <p>{"log:"}{ log_str }</p>
+                        <button onclick=self.link.callback(|_| Msg::UpdateLog)>{ "Update Log" }</button>
+                        <button onclick=self.link.callback(|_| Msg::Connect)>{ "Connect" }</button>
+                        <pre>{"log:"}
+                        { str }</pre>
                     </div>
                 </div>
             </div>

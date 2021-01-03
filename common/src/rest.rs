@@ -39,10 +39,10 @@ impl RestClient {
         Ok(id.new_id)
     }
 
-    pub async fn add_id(&mut self, id: U256, ni: NodeInfo) -> Result<(), String> {
+    pub async fn add_id(&mut self, id: U256, ni: &NodeInfo) -> Result<(), String> {
         let pw = serde_json::to_string(&PostWebRTC {
             list_id: id,
-            node: ni,
+            node: ni.clone(),
         })
         .map_err(|e| e.to_string())?;
         self.rest.call(RestMethod::Post, "addNode".to_string(), Some(pw))

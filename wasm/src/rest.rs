@@ -11,7 +11,7 @@ pub async fn demo() -> Result<(), JsValue> {
     rest.clear_nodes().await?;
     let id1 = rest.new_id().await?;
     let ni1 = NodeInfo::new();
-    rest.add_id(id1, ni1).await?;
+    rest.add_id(id1, &ni1).await?;
     console_log!("Added new node");
     console_log!("IDs: {:?}", rest.list_ids().await?);
 
