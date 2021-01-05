@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::ext_interface::RestCaller;
+use crate::ext_interface::RestMethod;
 use crate::{config::NodeInfo, types::U256};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -19,22 +21,26 @@ pub struct GetWebRTC {
 }
 
 pub struct RestClient {
-    rest: RestCaller,
+    rest: Box<dyn RestCaller>,
 }
 
 impl RestClient {
-    pub fn new(rest: RestCaller) -> RestClient {
+    pub fn new(rest: Box<dyn RestCaller>) -> RestClient {
         RestClient { rest }
     }
 
     pub async fn clear_nodes(&self) -> Result<(), String> {
-        self.rest.call(RestMethod::Delete, "clearNodes".to_string(), None)
+        self.rest
+            .call(RestMethod::Delete, "clearNodes".to_string(), None)
             .await
             .map(|_| ())
     }
 
     pub async fn new_id(&mut self) -> Result<U256, String> {
-        let reply = self.rest.call(RestMethod::Get, "newID".to_string(), None).await?;
+        let reply = self
+            .rest
+            .call(RestMethod::Get, "newID".to_string(), None)
+            .await?;
         let id: GetListID = serde_json::from_str(reply.as_str()).map_err(|e| e.to_string())?;
         Ok(id.new_id)
     }
@@ -45,31 +51,18 @@ impl RestClient {
             node: ni.clone(),
         })
         .map_err(|e| e.to_string())?;
-        self.rest.call(RestMethod::Post, "addNode".to_string(), Some(pw))
+        self.rest
+            .call(RestMethod::Post, "addNode".to_string(), Some(pw))
             .await
             .map(|_| ())
     }
 
     pub async fn list_ids(&mut self) -> Result<Vec<NodeInfo>, String> {
-        let reply = self.rest.call(RestMethod::Get, "listIDs".to_string(), None).await?;
+        let reply = self
+            .rest
+            .call(RestMethod::Get, "listIDs".to_string(), None)
+            .await?;
         let ids: GetWebRTC = serde_json::from_str(reply.as_str()).map_err(|e| e.to_string())?;
         Ok(ids.list)
     }
 }
-
-pub enum RestMethod {
-    Get,
-    Post,
-    Put,
-    Delete,
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-mod dummy;
-#[cfg(not(target_arch = "wasm32"))]
-pub use dummy::RestCaller;
-
-#[cfg(target_arch = "wasm32")]
-mod wasm;
-#[cfg(target_arch = "wasm32")]
-pub use wasm::RestCaller;

@@ -1,4 +1,5 @@
 use common::node::Node;
+
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -11,6 +12,7 @@ mod logs;
 mod logger;
 mod node;
 mod rest;
+mod tests;
 mod web_rtc;
 
 // use rest::demo;
@@ -25,7 +27,6 @@ struct Model {
 
 enum Msg {
     UpdateLog,
-    ClearNodes,
     Connect,
     Node(Result<Node, JsValue>),
 }
@@ -77,7 +78,6 @@ impl Component for Model {
                     });
                 }
             },
-            Msg::ClearNodes => {}
             Msg::Node(res_node) => {
                 if let Ok(node) = res_node {
                     self.node = Some(Arc::new(Mutex::new(node)));

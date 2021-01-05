@@ -1,9 +1,9 @@
 use crate::config::{NodeConfig, NodeInfo};
-use crate::ext_interface::{DataStorage, Logger};
+
+
+use crate::ext_interface::RestCaller;use crate::ext_interface::WebRTCCaller;use crate::ext_interface::{DataStorage, Logger};
 use crate::rest::RestClient;
 use crate::web_rtc::WebRTCClient;
-use std::future::Future;
-use std::sync::Arc;
 
 /// The node structure holds it all together. It is the main structure of the project.
 pub struct Node {
@@ -21,8 +21,8 @@ impl Node {
     /// Create new node by loading the config from the storage.
     /// If the storage is
     pub fn new<'a>(
-        rest: RestClient,
-        web_rtc: WebRTCClient,
+        rest: Box<dyn RestCaller>,
+        web_rtc: Box<dyn WebRTCCaller>,
         storage: Box<dyn DataStorage>,
         logger: Box<dyn Logger>,
     ) -> Result<Node, String> {
@@ -35,8 +35,8 @@ impl Node {
         Ok(Node {
             info: config.our_node,
             storage,
-            rest,
-            web_rtc,
+            rest: RestClient::new(rest),
+            web_rtc: WebRTCClient::new(web_rtc),
             logger,
             nodes: vec![],
         })
