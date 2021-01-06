@@ -16,7 +16,7 @@ impl NodeInfo {
     /// TODO: actually implement something useful.
     pub fn new() -> NodeInfo {
         NodeInfo {
-            public: random(),
+            public: U256::rnd(),
             info: "new node".to_string(),
             ip: "127".to_string(),
             webrtc_address: "something".to_string(),

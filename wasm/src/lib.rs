@@ -1,7 +1,9 @@
 use common::node::Node;
+use yew::services::IntervalService;
 
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use logger::LoggerOutput;
 use wasm_bindgen::prelude::*;
@@ -39,15 +41,10 @@ async fn wrap_short<F: std::future::Future>(f: F) {
     f.await;
 }
 
-async fn wrap_short_log<F: std::future::Future<Output = Result<(), String>>>(f: F) {
-    if let Err(e) = f.await {
-        console_warn!("Something went wrong: {:?}", e);
-    };
-}
-
 impl Component for Model {
     type Message = Msg;
     type Properties = ();
+
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         let (logger, node_logger) = LoggerOutput::new();
         wasm_bindgen_futures::spawn_local(wrap(
@@ -57,6 +54,10 @@ impl Component for Model {
         wasm_bindgen_futures::spawn_local(wrap_short(LoggerOutput::listen(
             logger.ch,
             Arc::clone(&logger.str),
+        )));
+        let _ = Box::leak(Box::new(IntervalService::spawn(
+            Duration::from_secs(1),
+            link.callback(|_| Msg::UpdateLog),
         )));
         Self {
             link,

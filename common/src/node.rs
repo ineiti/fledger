@@ -30,7 +30,7 @@ impl Node {
         logger.info("Config loaded");
         storage.save(CONFIG_NAME, &config.to_string()?)?;
         logger.info("Config saved");
-        logger.info(&format!("Starting node: {:?}", config.our_node.public));
+        logger.info(&format!("Starting node: {}", config.our_node.public));
 
         Ok(Node {
             info: config.our_node,
