@@ -1,6 +1,4 @@
 use async_trait::async_trait;
-use common::ext_interface::RestCaller;
-use common::ext_interface::RestMethod;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;

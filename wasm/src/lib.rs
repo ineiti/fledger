@@ -3,6 +3,7 @@ use yew::services::IntervalService;
 
 use std::sync::Arc;
 use std::sync::Mutex;
+
 use std::time::Duration;
 
 use logger::LoggerOutput;
@@ -13,13 +14,18 @@ use yew::prelude::*;
 mod logs;
 mod logger;
 mod node;
-mod rest;
-mod tests;
-mod web_rtc;
+// mod tests;
+mod web_rtc_setup;
+mod web_rtc_connection;
+mod web_socket;
+
+mod test_webrtc;
 
 // use rest::demo;
 // use web_rtc::demo;
 use node::start;
+
+const URL: &str = "ws://localhost:8765";
 
 struct Model {
     link: ComponentLink<Self>,
@@ -29,7 +35,8 @@ struct Model {
 
 enum Msg {
     UpdateLog,
-    Connect,
+    List,
+    Ping,
     Node(Result<Node, JsValue>),
 }
 
@@ -46,9 +53,12 @@ impl Component for Model {
     type Properties = ();
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
+        console_log!("setting panic hook");
+        console_error_panic_hook::set_once();
+
         let (logger, node_logger) = LoggerOutput::new();
         wasm_bindgen_futures::spawn_local(wrap(
-            start(Box::new(node_logger)),
+            start(Box::new(node_logger), URL),
             link.callback(|n: Result<Node, JsValue>| Msg::Node(n)),
         ));
         wasm_bindgen_futures::spawn_local(wrap_short(LoggerOutput::listen(
@@ -69,21 +79,13 @@ impl Component for Model {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::UpdateLog => {}
-            Msg::Connect => match &self.node {
-                None => {}
-                Some(n) => {
-                    let node_copy = Arc::clone(&n);
-                    wasm_bindgen_futures::spawn_local(async move {
-                        let mut node = node_copy.lock().unwrap();
-                        node.connect().await;
-                    });
-                }
-            },
             Msg::Node(res_node) => {
                 if let Ok(node) = res_node {
                     self.node = Some(Arc::new(Mutex::new(node)));
                 }
             }
+            Msg::List => self.node_list(),
+            Msg::Ping => self.node_ping(),
         }
         true
     }
@@ -101,13 +103,50 @@ impl Component for Model {
             <div class="main">
                 <div class="ui">
                     <div>
-                        <button onclick=self.link.callback(|_| Msg::UpdateLog)>{ "Update Log" }</button>
-                        <button onclick=self.link.callback(|_| Msg::Connect)>{ "Connect" }</button>
-                        <pre>{"log:"}
+                        <button onclick=self.link.callback(|_| Msg::List)>{ "List Nodes" }</button>
+                        <button onclick=self.link.callback(|_| Msg::Ping)>{ "Ping Nodes" }</button>
+                        <pre class="wrap">{"log:"}
                         { str }</pre>
                     </div>
                 </div>
             </div>
+        }
+    }
+}
+
+impl Model {
+    fn node_copy<'a>(&self) -> Option<Arc<Mutex<Node>>>{
+        if let Some(n) = &self.node{
+            Some(Arc::clone(&n))
+        } else {
+            None
+        }
+    }
+
+    // fn node_connect(&self){
+    //     if let Some(n) = self.node_copy(){
+    //         wasm_bindgen_futures::spawn_local(async move {
+    //             let mut node = n.lock().unwrap();
+    //             node.connect().await;
+    //         });
+    //     }
+    // }
+
+    fn node_list(&self) {
+        if let Some(n) = self.node_copy() {
+            wasm_bindgen_futures::spawn_local(async move {
+                let mut node = n.lock().unwrap();
+                node.list().await;
+            });
+        }
+    }
+
+    fn node_ping(&self) {
+        if let Some(n) = self.node_copy() {
+            wasm_bindgen_futures::spawn_local(async move {
+                let mut node = n.lock().unwrap();
+                node.ping().await;
+            });
         }
     }
 }

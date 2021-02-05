@@ -41,19 +41,29 @@ pub struct NodeLogger {
     ch: SyncSender<String>,
 }
 
+impl NodeLogger {
+    fn print(&self, s: String){
+        if let Err(e) = self.ch.send(s.clone()){
+            console_log!("Coudln't send: {:?}", e);
+        }
+        console_log!("{:?}", s);
+    }
+}
+
 impl Logger for NodeLogger {
     fn info(&self, s: &str) {
-        self.ch.send(format!("info: {:?}", s));
-        console_log!("info: {:?}", s);
+        self.print(format!("info: {:?}", s));
     }
 
     fn warn(&self, s: &str) {
-        self.ch.send(format!("warn: {:?}", s));
-        console_warn!("warn: {:?}", s);
+        self.print(format!("warn: {:?}", s));
     }
 
     fn error(&self, s: &str) {
-        self.ch.send(format!("err : {:?}", s));
-        console_warn!("err : {:?}", s);
+        self.print(format!("err : {:?}", s));
+    }
+
+    fn clone(&self) -> Box<dyn Logger>{
+        Box::new(NodeLogger{ch: self.ch.clone()})
     }
 }

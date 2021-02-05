@@ -1,16 +1,14 @@
-use common::config::NodeInfo;
-use common::ext_interface::WebRTCCallerState;
+use common::ext_interface::WebRTCConnectionState;
 
-use common::rest::RestClient;
 use common::web_rtc::WebRTCClient;
 use wasm_bindgen::prelude::*;
 
-use crate::rest::RestCallerWasm;
-use crate::web_rtc::WebRTCCallerWasm;
+use crate::web_rtc::WebRTCConnectionWasm;
+
 pub async fn test_webrtc() -> Result<(), JsValue> {
     // Set up two PCs - one needs to have init == true, the other init == false
-    let pc1 = WebRTCCallerWasm::new(WebRTCCallerState::Initializer)?;
-    let pc2 = WebRTCCallerWasm::new(WebRTCCallerState::Follower)?;
+    let pc1 = WebRTCConnectionWasm::new(WebRTCConnectionState::Initializer)?;
+    let pc2 = WebRTCConnectionWasm::new(WebRTCConnectionState::Follower)?;
     let mut rc1 = WebRTCClient::new(Box::new(pc1));
     let mut rc2 = WebRTCClient::new(Box::new(pc2));
 
@@ -44,19 +42,5 @@ pub async fn test_webrtc() -> Result<(), JsValue> {
     }
 
     console_log!("Going away - all done");
-    Ok(())
-}
-
-pub async fn demo() -> Result<(), JsValue> {
-    console_log!("Starting REST-test in 2021");
-    let rc = RestCallerWasm::new("http://localhost:8000");
-    let mut rest = RestClient::new(Box::new(rc));
-    rest.clear_nodes().await?;
-    let id1 = rest.new_id().await?;
-    let ni1 = NodeInfo::new();
-    rest.add_id(id1, &ni1).await?;
-    console_log!("Added new node");
-    console_log!("IDs: {:?}", rest.list_ids().await?);
-
     Ok(())
 }

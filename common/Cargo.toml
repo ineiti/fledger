@@ -18,6 +18,8 @@ wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
 js-sys = "0.3.46"
 wasm-bindgen-futures = "0.4.19"
 
+futures = ""
+
 [dependencies.web-sys]
 version = "0.3.46"
 features = [

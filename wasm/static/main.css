@@ -5,14 +5,12 @@
   border: 3px solid green;
 }
 
-.main2 {
-  width: 50%;
-  padding: 70px 0;
-  border: 3px solid green;
-}
-
 .ui {
   display: block;
   padding: 10px;
   margin: 10% 10%;
+}
+
+.wrap {
+  white-space: pre-wrap;
 }

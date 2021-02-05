@@ -25,4 +25,13 @@ cargo build
 ./cli --server
 ```
 
-Then use the IP of the server in the 
+Then use the IP of the server in the
+
+# Roadmap
+
+Next steps of the project:
+- add ICE connection through the server
+  - add REST endpoints
+  - implement connection in Node
+- auto-run node to connect through Server
+- implement linux-network code to add WebRTC to server

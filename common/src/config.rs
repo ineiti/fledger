@@ -1,5 +1,4 @@
 use crate::types::U256;
-use rand::random;
 use serde_derive::{Deserialize, Serialize};
 
 // TODO: add public key and an optional private key
