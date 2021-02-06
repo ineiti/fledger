@@ -1,13 +1,15 @@
 # WebRTC example
 
-Creating a first example for Fledger, using three components;
+Creating a first example for Fledger, using four components;
 - common - holding all common definitions, like structures and logic
-- wasm - the web part using yew
+- wasm - the web part using yew in the browser
 - signal - what will be run on the server
+- os - for the client part using linux webrtc (least priority for the moment)
 
 The goal is to be able to:
 
 1. Run signal-CLI on the server (fledger.io)
+1. Run a client that is always on
 1. Open the wasm part, where every opening in the browser
   - contacts the CLI on the server
   - sends the info necessary to connect over WebRTC

@@ -65,6 +65,20 @@ pub enum PeerMessage {
     DoneFollow,
 }
 
+impl std::fmt::Display for PeerMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PeerMessage::Init => write!(f, "Init"),
+            PeerMessage::Offer(_) => write!(f, "Offer"),
+            PeerMessage::Answer(_) => write!(f, "Answer"),
+            PeerMessage::IceInit(_) => write!(f, "IceInit"),
+            PeerMessage::IceFollow(_) => write!(f, "IceFollow"),
+            PeerMessage::DoneInit => write!(f, "DoneInit"),
+            PeerMessage::DoneFollow => write!(f, "DoneFollow"),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PeerInfo {
     pub id_init: U256,
@@ -129,6 +143,20 @@ pub enum WSSignalMessage {
     ClearNodes,
     PeerSetup(PeerInfo),
     Done,
+}
+
+impl std::fmt::Display for WSSignalMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            WSSignalMessage::Challenge(_) => write!(f, "Challenge"),
+            WSSignalMessage::Announce(_) => write!(f, "Announce"),
+            WSSignalMessage::ListIDsRequest => write!(f, "ListIDsRequest"),
+            WSSignalMessage::ListIDsReply(_) => write!(f, "ListIDsReply"),
+            WSSignalMessage::ClearNodes => write!(f, "ClearNodes"),
+            WSSignalMessage::PeerSetup(_) => write!(f, "PeerSetup"),
+            WSSignalMessage::Done => write!(f, "Done"),
+        }
+    }
 }
 
 /// TODO: add a signature on the challenge

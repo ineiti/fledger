@@ -15,8 +15,8 @@ mod logs;
 mod logger;
 mod node;
 // mod tests;
-mod web_rtc_setup;
 mod web_rtc_connection;
+mod web_rtc_setup;
 mod web_socket;
 
 mod test_webrtc;
@@ -115,8 +115,8 @@ impl Component for Model {
 }
 
 impl Model {
-    fn node_copy<'a>(&self) -> Option<Arc<Mutex<Node>>>{
-        if let Some(n) = &self.node{
+    fn node_copy<'a>(&self) -> Option<Arc<Mutex<Node>>> {
+        if let Some(n) = &self.node {
             Some(Arc::clone(&n))
         } else {
             None
@@ -136,7 +136,9 @@ impl Model {
         if let Some(n) = self.node_copy() {
             wasm_bindgen_futures::spawn_local(async move {
                 let mut node = n.lock().unwrap();
-                node.list().await;
+                if let Err(e) = node.list().await {
+                    console_warn!("Couldn't get list: {}", e);
+                }
             });
         }
     }
@@ -145,7 +147,9 @@ impl Model {
         if let Some(n) = self.node_copy() {
             wasm_bindgen_futures::spawn_local(async move {
                 let mut node = n.lock().unwrap();
-                node.ping().await;
+                if let Err(e) = node.ping().await{
+                    console_warn!("Couldn't ping node: {}", e);
+                }
             });
         }
     }

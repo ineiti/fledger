@@ -30,11 +30,8 @@ impl WebSocketWasm {
         console_log!("creating onmessage callback");
         let cb_clone = wsw.cb.clone();
         let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
-            console_log!("Getting message");
             if let Ok(txt) = e.data().dyn_into::<js_sys::JsString>() {
                 let s: String = txt.into();
-                console_log!("message event, received Text: {:?}", s);
-                // cb_clone.borrow_mut().and_then(|mut cb| {cb(wsm); Some(cb)});
                 if let Some(cb) = cb_clone.borrow_mut().as_deref_mut() {
                     cb(WSMessage::MessageString(s));
                 }

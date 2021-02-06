@@ -1,10 +1,13 @@
-
-use crate::types::U256;use crate::{ext_interface::{DataStorage, Logger}, network::WebRTCReceive};
 use crate::network::Network;
+use crate::types::U256;
 use crate::{
     config::{NodeConfig, NodeInfo},
     web_rtc::WebRTCSpawner,
     websocket::WebSocketConnection,
+};
+use crate::{
+    ext_interface::{DataStorage, Logger},
+    network::WebRTCReceive,
 };
 use std::sync::{Arc, Mutex};
 
@@ -61,18 +64,18 @@ impl Node {
     }
 
     /// TODO: this is only for development
-    pub async fn clear(&self) {
-        self.network.clear_nodes();
+    pub async fn clear(&self) -> Result<(), String> {
+        self.network.clear_nodes()
     }
 
     /// Requests a list of all connected nodes
-    pub async fn list(&mut self) {
+    pub async fn list(&mut self) -> Result<(), String> {
         self.network.update_node_list()
     }
 
     /// Pings all known nodes
-    pub async fn ping(&mut self) {
-        for node in &self.network.get_list() {
+    pub async fn ping(&mut self) -> Result<(), String> {
+        for node in &self.network.get_list()? {
             self.logger.info(&format!("Contacting node {:?}", node));
             match self.network.send(&node.public, "ping".to_string()).await {
                 Ok(_) => self.logger.info("Successfully sent ping"),
@@ -81,9 +84,10 @@ impl Node {
                     .error(&format!("Error while sending ping: {:?}", e)),
             }
         }
+        Ok(())
     }
 
-    pub async fn send(&self, dst: &U256, msg: String) -> Result<(), String>{
+    pub async fn send(&self, dst: &U256, msg: String) -> Result<(), String> {
         self.network.send(dst, msg).await
     }
 }

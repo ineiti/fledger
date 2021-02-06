@@ -43,25 +43,39 @@ impl Network {
     /// message is actually sent
     pub async fn send(&self, dst: &U256, msg: String) -> Result<(), String> {
         self.logger.info(&format!("Sending to: {}", dst));
-        let mut int = self.intern.lock().unwrap();
-        int.send(dst, msg).await
+        if let Ok(mut int) = self.intern.try_lock() {
+            return int.send(dst, msg).await;
+        } else {
+            return Err("Couldn't take lock of intern".to_string());
+        }
     }
 
-    pub fn clear_nodes(&self) {
+    pub fn clear_nodes(&self) -> Result<(), String> {
         self.logger.info(&format!("Clearing nodes"));
-        self.intern
-            .lock()
-            .unwrap()
-            .send_ws(WSSignalMessage::ClearNodes);
+        if let Ok(mut int) = self.intern.try_lock() {
+            int.send_ws(WSSignalMessage::ClearNodes);
+            Ok(())
+        } else {
+            Err("Couldn't get lock on int in clear_nodes".to_string())
+        }
     }
 
-    pub fn update_node_list(&self) {
+    pub fn update_node_list(&self) -> Result<(), String> {
         self.logger.info(&format!("Updating node list"));
-        Arc::clone(&self.intern).lock().unwrap().update_node_list();
+        if let Ok(mut int) = self.intern.try_lock(){
+            int.update_node_list();
+            Ok(())
+        } else {
+            Err("Couldn't get lock on int in update_node_list".to_string())
+        }
     }
 
-    pub fn get_list(&self) -> Vec<NodeInfo> {
+    pub fn get_list(&self) -> Result<Vec<NodeInfo>, String> {
         self.logger.info(&format!("getting list"));
-        Arc::clone(&self.intern).lock().unwrap().list.clone()
+        if let Ok(int) = self.intern.try_lock(){
+            Ok(int.list.clone())
+        } else {
+            Err("Couldn't get lock on int in get_list".to_string())
+        }
     }
 }
