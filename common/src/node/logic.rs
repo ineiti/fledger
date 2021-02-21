@@ -1,4 +1,4 @@
-use crate::config::NodeInfo;
+use super::config::NodeInfo;
 use std::sync::{Arc, Mutex};
 
 pub struct Logic {

@@ -1,13 +1,18 @@
-use crate::network::Network;
-use crate::types::U256;
-use crate::{
+pub mod network;
+pub mod config;
+pub mod ext_interface;
+pub mod logic;
+pub mod types;
+
+use crate::node::{
+    types::U256,
+    network::{Network, WebRTCReceive},
     config::{NodeConfig, NodeInfo},
+    ext_interface::{DataStorage, Logger},
+};
+use crate::signal::{
     web_rtc::WebRTCSpawner,
     websocket::WebSocketConnection,
-};
-use crate::{
-    ext_interface::{DataStorage, Logger},
-    network::WebRTCReceive,
 };
 use std::sync::{Arc, Mutex};
 

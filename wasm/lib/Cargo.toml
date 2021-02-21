@@ -1,0 +1,55 @@
+[package]
+name = "lib"
+version = "0.1.0"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common = {path = "../../common"}
+wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
+js-sys = "0.3.46"
+wasm-bindgen-futures = "0.4.19"
+serde = { version = "1.0.80", features = ["derive"] }
+serde_derive = "^1.0.59"
+serde_json = "1.0.59"
+yew = "0.17.4"
+getrandom = { version = "0.2", features = ["js"] }
+console_error_panic_hook = "0.1.6"
+async-trait = ""
+wasm-bindgen-test = ""
+
+[dependencies.web-sys]
+version = "0.3.46"
+features = [
+  'Headers',
+  'Request',
+  'RequestInit',
+  'RequestMode',
+  'Response',
+  'Window',
+  'ReadableStream',
+  "MessageEvent",
+  "RtcPeerConnection",
+  "RtcSignalingState",
+  "RtcSdpType",
+  "RtcSessionDescriptionInit",
+  "RtcPeerConnectionIceEvent",
+  "RtcIceCandidate",
+  "RtcIceCandidateInit",
+  "RtcIceConnectionState",
+  "RtcIceGatheringState",
+  "RtcDataChannel",
+  "RtcDataChannelEvent",
+  "RtcDataChannelState",
+
+  "BinaryType",
+  "Blob",
+  "ErrorEvent",
+  "FileReader",
+  "MessageEvent",
+  "ProgressEvent",
+  "WebSocket",
+
+]
