@@ -1,4 +1,3 @@
-use common::node::Node;
 use yew::services::IntervalService;
 
 use std::sync::Arc;
@@ -9,9 +8,19 @@ use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 
-// use rest::demo;
-// use web_rtc::demo;
-use lib::node::start;
+use common::node::Node;
+
+use wasm_lib::node::start;
+use wasm_lib::logger::LoggerOutput;
+use web_sys::console;
+
+fn log_1(s: &str){
+    console::log_1(&JsValue::from(s));
+}
+
+fn log_2(s: &str, t: String){
+    console::log_2(&JsValue::from(s), &JsValue::from(t));
+}
 
 const URL: &str = "ws://localhost:8765";
 
@@ -41,7 +50,7 @@ impl Component for Model {
     type Properties = ();
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        console_log!("setting panic hook");
+        log_1("setting panic hook");
         console_error_panic_hook::set_once();
 
         let (logger, node_logger) = LoggerOutput::new();
@@ -125,7 +134,7 @@ impl Model {
             wasm_bindgen_futures::spawn_local(async move {
                 let mut node = n.lock().unwrap();
                 if let Err(e) = node.list().await {
-                    console_warn!("Couldn't get list: {}", e);
+                    log_2("Couldn't get list:", e);
                 }
             });
         }
@@ -136,7 +145,7 @@ impl Model {
             wasm_bindgen_futures::spawn_local(async move {
                 let mut node = n.lock().unwrap();
                 if let Err(e) = node.ping().await{
-                    console_warn!("Couldn't ping node: {}", e);
+                    log_2("Couldn't ping node:", e);
                 }
             });
         }
@@ -147,5 +156,5 @@ impl Model {
 pub async fn run_app() {
     console_error_panic_hook::set_once();
     App::<Model>::new().mount_to_body();
-    console_log!("starting app for now!");
+    log_1("starting app for now!");
 }

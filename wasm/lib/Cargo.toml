@@ -1,5 +1,5 @@
 [package]
-name = "lib"
+name = "wasm-lib"
 version = "0.1.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 edition = "2018"

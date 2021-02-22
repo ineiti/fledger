@@ -18,7 +18,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 common = {path = "../../common"}
-lib = {path = "../lib"}
+wasm-lib = {path = "../lib"}
 wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
 js-sys = "0.3.46"
 wasm-bindgen-futures = "0.4.19"

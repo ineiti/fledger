@@ -1,10 +1,14 @@
 use wasm_bindgen::prelude::*;
 
+pub fn logit(){}
+
+#[macro_export]
 macro_rules! console_log {
-    ($($t:tt)*) => (crate::logs::log(&format_args!($($t)*).to_string()))
+    ($($t:tt)*) => (super::logs::log(&format_args!($($t)*).to_string()))
 }
+#[macro_export]
 macro_rules! console_warn {
-    ($($t:tt)*) => (crate::logs::warn(&format_args!($($t)*).to_string()))
+    ($($t:tt)*) => (super::logs::warn(&format_args!($($t)*).to_string()))
 }
 
 #[wasm_bindgen]
