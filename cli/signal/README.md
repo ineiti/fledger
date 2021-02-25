@@ -7,5 +7,5 @@ With this websocket connection, the following can be done:
 - node -> server: request a connection to another node
 - server -> node: initiate a new connection
 
-The first implementation had only a REST interface, but this makes it difficult
-to signal a connection request to a node.
+Using the websocket, two nodes can exchange all data necessary to communicate
+using webRTC.

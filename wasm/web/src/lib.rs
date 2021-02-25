@@ -102,7 +102,7 @@ impl Component for Model {
                     <div>
                         <button onclick=self.link.callback(|_| Msg::List)>{ "List Nodes" }</button>
                         <button onclick=self.link.callback(|_| Msg::Ping)>{ "Ping Nodes" }</button>
-                        <pre class="wrap">{"log:"}
+                        <pre class="wrap" id="log">{"log:"}
                         { str }</pre>
                     </div>
                 </div>

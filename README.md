@@ -1,52 +1,87 @@
-# WebRTC example
+# Fledger - the fast, fun, easy ledger
 
-Creating a first example for Fledger, using four components;
-- common - holding all common definitions, like structures and logic
-- wasm - the web part using yew in the browser
-- signal - what will be run on the server
-- os - for the client part using linux webrtc (least priority for the moment)
+The main goal of Fledger is to have a blockchain with nodes that are so
+lightweight that you can run them in the browser.
+When running a node, each user must be able to receive _Mana_ in a reasonable
+timeframe (minutes), so she can use the ledger.
 
-The goal is to be able to:
+A first use-case of Fledger is to have a decentralized webserver:
+1. A user clicks on the link to the website
+1. The browser downloads the fledger code
+1. Connecting to fledger, the browser gets the data for the website and displays it
+1. While the user reads the website, the browser participates in fledger and
+pays for the view
 
-1. Run signal-CLI on the server (fledger.io)
-1. Run a client that is always on
-1. Open the wasm part, where every opening in the browser
-  - contacts the CLI on the server
-  - sends the info necessary to connect over WebRTC
-  - loops
-    - retrieves all other wasm clients
-    - contacts all other clients
+But of course there are many more things you can do:
+- Decentralized user management like [DARCs](https://www.c4dt.org/article/darc/)
+- Smart contract execution using WASM contracts
+- General storage / backup service
+
+On the technical side, Fledger will have:
+- BFT consensus using ByzCoinX
+- Proof-of-work using transactions instead of hashing
+- Sharding inspired by OmniLedger
+
+So the goal is to be able to serve both short-term online users like browsers,
+but also long-term users who have a server where they can run a fledger node.
+The system is set up to be 0-configuration and fast.
+
+What it will never do:
+- DeFi - the security guarantees for 1e6 US-$ and more will never be there
+- HODL - Fledger's Mana is not made to be held, but will disappear over time
+
+## State of Fledger
+
+Currently the following components are available:
+- [Signal server](./cli/signal) - for the webRTC rendez-vous
+- [Web node](./wasm/web) - for running the node in a browser
+- [CLI node](./cli/node) - for running a node in a CLI
+- [Node](./common) - the actual code for the Fledger nodes
+
+As a first step, the WebRTC communication has been set up.
+This works now for Chrome, Firefox, and Safari, as well as in the CLI using a
+headless browser.
+
+## Next steps
+
+The following next steps are in the pipeline:
+- Create a minimum consensus for people to try it out in the browser at
+https://fledg.re
+- move the notion.io text here
+- Link server nodes with browser nodes
+- Create two chains: identity chain for nodes, and a first worker chain
+- Add WASM smart contracts
+- Add sharding to have more than one worker chain
+- Create storage nodes that can serve data
 
 # Running it
 
-First run the cli:
+The simplest way to run it is to go to https://fledg.re and follow the
+instructions.
 
-```
-cd signal
-cargo run
-```
+## Running it on a server
 
-Then use the IP of the server in the wasm/src/node.rs::start method.
+Get the `docker-compose.yaml` and run it:
 
-Finally run
-```
-cd wasm
-make serve
+```bash
+wget https://github.com/ineiti/fledger/docker-compose.yaml
+docker-compose up -d
 ```
 
-And connect locally to your server on http://localhost:8080
-
-# Roadmap
-- make CI/CD to deploy to fledg.re
-  - running signalling server
-  - running a node-wasm client
-- make a somewhat nice UI
-- move the notion.io text here
-- auto-run node to connect through Server
-- implement linux-network code to add WebRTC to server
+This will create a new file called `fledger.toml` that contains the private key
+of your node.
+Do not lose this private key, as it is used to move around the Mana you get.
+The only time you need it will be once the server <-> browser connection will
+be set up.
 
 # Changelog
 
+- 0.2 - WIP
+  - Simple ping test with the nodes
+  - CLI node using headless Chrome
+  - Have website https://fledg.re running and pointing to an up-to-date
+  Fledger code
+  - Run some nodes constantly on https://fledg.re to have a minimum consensus
 - 0.1 - 2021-02-05
   - add ICE connection through the server
     - use websockets to connect to server
