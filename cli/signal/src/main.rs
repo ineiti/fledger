@@ -127,7 +127,7 @@ impl WebSocketConnectionSend for UnixWSConnection {
 
     async fn send(&mut self, msg: String) -> Result<(), String> {
         println!("sending: {:?}", msg);
-        self.websocket.write_message(Message::Text(msg)).unwrap();
+        self.websocket.write_message(Message::Text(msg)).map_err(|e| e.to_string())?;
         Ok(())
     }
 }
