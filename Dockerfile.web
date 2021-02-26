@@ -4,9 +4,8 @@ COPY . .
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 RUN cp -a wasm/web/static .
 RUN make -C wasm/web build
-RUN cargo install miniserve
 
-FROM debian:buster-slim
+FROM joseluisq/static-web-server
 COPY --from=builder /usr/src/fledger/wasm/web/static/ /var/www
-COPY --from=builder /usr/local/cargo/bin/miniserve /usr/local/bin
-CMD ["miniserve", "/var/www", "--index", "index.html"]
+ENV SERVER_NAME=fledger-web
+ENV SERVER_ROOT=/var/www

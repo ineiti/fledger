@@ -169,10 +169,8 @@ impl Intern {
         self.logger.info(&format!("Sending {} over websocket", msg));
         let wsm = WebSocketMessage { msg };
         if let Err(e) = self.ws.send(wsm.to_string()) {
-            self.logger.info("Got error");
             self.logger.error(&format!("Error while sending: {:?}", e));
         }
-        self.logger.info("Message sent")
     }
 
     /// Requests a new node list from the server.
