@@ -2,7 +2,7 @@ name: Docker Build
 on:
   push:
     branches:
-    - standalone_server
+    - main
 
 jobs:
   docker:

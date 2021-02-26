@@ -2,6 +2,7 @@ FROM rust:latest as builder
 WORKDIR /usr/src/fledger
 COPY . .
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+RUN cp -a wasm/web/static .
 RUN make -C wasm/web build
 RUN cargo install miniserve
 
