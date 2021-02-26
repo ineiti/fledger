@@ -1,0 +1,45 @@
+name: Docker Build
+on:
+  push:
+    branches:
+    - standalone_server
+
+jobs:
+  signal:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_NAME }}
+        password: ${{ secrets.DOCKERHUB }}
+    - name: Push to docker hub
+      uses: docker/build-push-action@v2
+      with:
+        tags: fledgre/signal:latest
+        file: Dockerfile.signal
+        push: true
+
+    - name: Update signal.fledg.re
+      uses: appleboy/ssh-action@master
+      with:
+        host: signal.fledg.re
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          docker-compose down
+          docker-compose pull
+          docker-compose up -d
+
+  # web:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v2
+  #   - name: Push to docker hub
+  #     uses: docker/build-push-action@v2
+  #     with:
+  #       username: ${{ secrets.DOCKERHUB_NAME }}
+  #       password: ${{ secrets.DOCKERHUB }}
+  #       repository: fledgre/web
+  #       file: Dockerfile.web
+  #       tag_with_ref: true
