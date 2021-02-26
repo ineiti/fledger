@@ -10,16 +10,16 @@ use yew::prelude::*;
 
 use common::node::Node;
 
-use wasm_lib::node::start;
-use wasm_lib::logger::LoggerOutput;
-use web_sys::console;
 use js_sys::Date;
+use wasm_lib::logger::LoggerOutput;
+use wasm_lib::node::start;
+use web_sys::console;
 
-fn log_1(s: &str){
+fn log_1(s: &str) {
     console::log_1(&JsValue::from(s));
 }
 
-fn log_2(s: &str, t: String){
+fn log_2(s: &str, t: String) {
     console::log_2(&JsValue::from(s), &JsValue::from(t));
 }
 
@@ -30,12 +30,13 @@ struct Model {
     link: ComponentLink<Self>,
     node: Option<Arc<Mutex<Node>>>,
     log_str: Arc<Mutex<String>>,
+    counter: u32,
 }
 
 enum Msg {
     UpdateLog,
-    List,
-    Ping,
+    // List,
+    // Ping,
     Node(Result<Node, JsValue>),
 }
 
@@ -72,19 +73,26 @@ impl Component for Model {
             link,
             node: None,
             log_str: Arc::clone(&logger.str),
+            counter: 0,
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::UpdateLog => {}
+            Msg::UpdateLog => {
+                self.counter += 1;
+                if self.counter % 5 == 0 {
+                    self.node_list();
+                    self.node_ping();
+                }
+            }
             Msg::Node(res_node) => {
                 if let Ok(node) = res_node {
                     self.node = Some(Arc::new(Mutex::new(node)));
                 }
             }
-            Msg::List => self.node_list(),
-            Msg::Ping => self.node_ping(),
+            // Msg::List => self.node_list(),
+            // Msg::Ping => self.node_ping(),
         }
         true
     }
@@ -97,15 +105,20 @@ impl Component for Model {
     }
 
     fn view(&self) -> Html {
-        let str = self.log_str.lock().unwrap();
+        let log = self.log_str.lock().unwrap();
         html! {
             <div class="main">
                 <div class="ui">
                     <div>
-                        <button onclick=self.link.callback(|_| Msg::List)>{ "List Nodes" }</button>
-                        <button onclick=self.link.callback(|_| Msg::Ping)>{ "Ping Nodes" }</button>
+                        <ul>
+                            <li>{self.connection_state((*log).clone())}</li>
+                            <li>{self.nodes_connected()}</li>
+                            <li>{self.nodes_reachable()}</li>
+                        </ul>
+                        // <button onclick=self.link.callback(|_| Msg::List)>{ "List Nodes" }</button>
+                        // <button onclick=self.link.callback(|_| Msg::Ping)>{ "Ping Nodes" }</button>
                         <pre class="wrap" id="log">{"log:"}
-                        { str }</pre>
+                        { log }</pre>
                     </div>
                 </div>
             </div>
@@ -114,6 +127,40 @@ impl Component for Model {
 }
 
 impl Model {
+    fn connection_state(&self, log: String) -> String {
+        format!(
+            "State of connection: {}",
+            match self.node {
+                Some(_) =>
+                    if log.contains("Announce") {
+                        "Connected"
+                    } else {
+                        "Connecting"
+                    },
+                None => "Unknown",
+            }
+        )
+    }
+
+    fn nodes_connected(&self) -> String {
+        return format!(
+            "Other nodes connected: {}",
+            if let Some(n) = self.node_copy() {
+                if let Ok(list) = n.lock().unwrap().network.get_list() {
+                    list.len().to_string()
+                } else {
+                    "0".to_string()
+                }
+            } else {
+                "N/A".to_string()
+            }
+        );
+    }
+
+    fn nodes_reachable(&self) -> &str {
+        return "Nodes reachable: N/A";
+    }
+
     fn node_copy<'a>(&self) -> Option<Arc<Mutex<Node>>> {
         if let Some(n) = &self.node {
             Some(Arc::clone(&n))
@@ -147,7 +194,7 @@ impl Model {
             wasm_bindgen_futures::spawn_local(async move {
                 let mut node = n.lock().unwrap();
                 let str = Date::new_0().to_iso_string().as_string().unwrap();
-                if let Err(e) = node.ping(&str).await{
+                if let Err(e) = node.ping(&str).await {
                     log_2("Couldn't ping node:", e);
                 }
             });

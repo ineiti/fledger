@@ -47,7 +47,6 @@ headless browser.
 The following next steps are in the pipeline:
 - Create a minimum consensus for people to try it out in the browser at
 https://fledg.re
-- move the notion.io text here
 - Link server nodes with browser nodes
 - Create two chains: identity chain for nodes, and a first worker chain
 - Add WASM smart contracts
@@ -76,12 +75,15 @@ be set up.
 
 # Changelog
 
-- 0.2 - WIP
+- 0.2.2
+  - Run some nodes constantly on https://fledg.re to have a minimum consensus
+- 0.2.1
+  - Make the https://web.fledg.re a bit nicer and more automatic
+- 0.2 - 2021-02-26
   - Simple ping test with the nodes
   - CLI node using headless Chrome
   - Have website https://fledg.re running and pointing to an up-to-date
   Fledger code
-  - Run some nodes constantly on https://fledg.re to have a minimum consensus
 - 0.1 - 2021-02-05
   - add ICE connection through the server
     - use websockets to connect to server

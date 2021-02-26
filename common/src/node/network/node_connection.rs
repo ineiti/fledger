@@ -1,7 +1,7 @@
 use crate::node::ext_interface::Logger;
 
-
-use crate::signal::web_rtc::setup::ProcessResult;use crate::signal::web_rtc::{
+use crate::signal::web_rtc::setup::ProcessResult;
+use crate::signal::web_rtc::{
     setup::WebRTCSetup, PeerMessage, WebRTCConnection, WebRTCConnectionState, WebRTCMessageCB,
     WebRTCSpawner,
 };
@@ -186,10 +186,11 @@ impl NodeConnection {
                     }
                 }
                 PeerMessage::DoneFollow => {
-                    for msg in self.outgoing_queue.iter() {
-                        if let Some(conn) = self.outgoing.as_mut() {
+                    if let Some(conn) = self.outgoing.as_mut() {
+                        for msg in self.outgoing_queue.iter() {
                             conn.send(msg.to_string())?;
                         }
+                        self.outgoing_queue = vec![];
                     }
                     return Ok(None);
                 }

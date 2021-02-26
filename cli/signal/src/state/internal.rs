@@ -161,7 +161,9 @@ impl Internal {
             match self.nodes.entry(chal.clone()) {
                 Entry::Occupied(mut e) => {
                     self.logger.info("Internal::send_message executor");
-                    executor::block_on((e.get_mut().conn).send(msg_str)).unwrap();
+                    if let Err(e) = executor::block_on((e.get_mut().conn).send(msg_str)){
+                        self.logger.error(&format!("Couldn't send message: {}", e));
+                    }
                     self.logger.info("Internal::send_message executor done");
                     Ok(())
                 }

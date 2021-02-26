@@ -72,7 +72,6 @@ impl Network {
     }
 
     pub fn get_list(&self) -> Result<Vec<NodeInfo>, String> {
-        self.logger.info(&format!("getting list"));
         if let Ok(int) = self.intern.try_lock() {
             Ok(int.list.clone())
         } else {
