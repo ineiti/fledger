@@ -1,0 +1,11 @@
+FROM rust:latest as builder
+WORKDIR /usr/src/fledger
+COPY . .
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+RUN make -C wasm/web build
+RUN cargo install miniserve
+
+FROM debian:buster-slim
+COPY --from=builder /usr/src/fledger/wasm/web/static/ /var/www
+COPY --from=builder /usr/local/cargo/bin/miniserve /usr/local/bin
+CMD ["miniserve", "/var/www", "--index", "index.html"]

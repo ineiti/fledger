@@ -5,7 +5,7 @@ on:
     - standalone_server
 
 jobs:
-  signal:
+  docker:
     runs-on: ubuntu-latest
     steps:
     - name: Login to DockerHub
@@ -13,11 +13,19 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
-    - name: Push to docker hub
+
+    - name: Build Signalling server
       uses: docker/build-push-action@v2
       with:
         tags: fledgre/signal:latest
         file: Dockerfile.signal
+        push: true
+
+    - name: Build web server
+      uses: docker/build-push-action@v2
+      with:
+        tags: fledgre/web:latest
+        file: Dockerfile.web
         push: true
 
     - name: Update signal.fledg.re
@@ -30,16 +38,3 @@ jobs:
           docker-compose down
           docker-compose pull
           docker-compose up -d
-
-  # web:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - uses: actions/checkout@v2
-  #   - name: Push to docker hub
-  #     uses: docker/build-push-action@v2
-  #     with:
-  #       username: ${{ secrets.DOCKERHUB_NAME }}
-  #       password: ${{ secrets.DOCKERHUB }}
-  #       repository: fledgre/web
-  #       file: Dockerfile.web
-  #       tag_with_ref: true
