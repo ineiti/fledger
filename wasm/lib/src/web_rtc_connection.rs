@@ -19,7 +19,7 @@ impl WebRTCConnection for WebRTCConnectionWasm {
     fn send(&self, s: String) -> Result<(), String> {
         self.dc
             .send_with_str(&s)
-            .map_err(|e| e.as_string().unwrap())
+            .map_err(|e| format!("{:?}", e))
     }
 
     /// Sets the callback for incoming messages.

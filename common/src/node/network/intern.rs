@@ -169,8 +169,10 @@ impl Intern {
         self.logger.info(&format!("Sending {} over websocket", msg));
         let wsm = WebSocketMessage { msg };
         if let Err(e) = self.ws.send(wsm.to_string()) {
+            self.logger.info("Got error");
             self.logger.error(&format!("Error while sending: {:?}", e));
         }
+        self.logger.info("Message sent")
     }
 
     /// Requests a new node list from the server.
@@ -194,7 +196,6 @@ impl Intern {
     /// and the method returns.
     /// All messages in the queue will be sent once the connection is set up.
     pub async fn send(&mut self, dst: &U256, msg: String) -> Result<(), String> {
-        self.logger.info(&format!("Sending to {}: {}", dst, msg));
         let dst_clone = dst.clone();
         let rcv = Arc::clone(&self.web_rtc_rcv);
         let log = self.logger.clone();
@@ -214,9 +215,9 @@ impl Intern {
             ));
 
         let mut message: Option<PeerMessage> = None;
-        if conn.send(msg.clone()).is_err() {
+        if let Err(e) = conn.send(msg.clone()) {
             self.logger
-                .info(&format!("No connection to {} yet, starting it", dst));
+                .info(&format!("No connection to {} yet ({}), starting it", dst, e));
             message = conn.process_peer_setup_outgoing(PeerMessage::Init).await?;
             conn.send(msg)?;
         }

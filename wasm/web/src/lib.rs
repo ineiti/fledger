@@ -13,6 +13,7 @@ use common::node::Node;
 use wasm_lib::node::start;
 use wasm_lib::logger::LoggerOutput;
 use web_sys::console;
+use js_sys::Date;
 
 fn log_1(s: &str){
     console::log_1(&JsValue::from(s));
@@ -23,6 +24,7 @@ fn log_2(s: &str, t: String){
 }
 
 const URL: &str = "wss://signal.fledg.re";
+// const URL: &str = "ws://localhost:8765";
 
 struct Model {
     link: ComponentLink<Self>,
@@ -144,7 +146,8 @@ impl Model {
         if let Some(n) = self.node_copy() {
             wasm_bindgen_futures::spawn_local(async move {
                 let mut node = n.lock().unwrap();
-                if let Err(e) = node.ping().await{
+                let str = Date::new_0().to_iso_string().as_string().unwrap();
+                if let Err(e) = node.ping(&str).await{
                     log_2("Couldn't ping node:", e);
                 }
             });

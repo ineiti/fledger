@@ -66,7 +66,10 @@ impl UnixWebSocket {
             for stream in server.incoming() {
                 let mut cb_mutex = uws_cl.lock().unwrap();
                 if let Some(cb) = cb_mutex.as_mut() {
-                    cb(UnixWSConnection::new(stream.unwrap()));
+                    match UnixWSConnection::new(stream.unwrap()){
+                        Ok(conn) => cb(conn),
+                        Err(e) => println!("Error while getting connection: {:?}", e),
+                    }
                 }
             }
         });
@@ -84,9 +87,10 @@ unsafe impl Send for UnixWSConnection {}
 unsafe impl Sync for UnixWSConnection {}
 
 impl UnixWSConnection {
-    fn new(stream: TcpStream) -> Box<UnixWSConnection> {
+    fn new(stream: TcpStream) -> Result<Box<UnixWSConnection>, String> {
+        let websocket = accept(stream).map_err(|e| e.to_string())?;
         let mut uwsc = Box::new(UnixWSConnection {
-            websocket: accept(stream).unwrap(),
+            websocket,
             cb: Arc::new(Mutex::new(None)),
         });
         let cb_clone = Arc::clone(&uwsc.cb);
@@ -110,7 +114,7 @@ impl UnixWSConnection {
                 }
             }
         });
-        uwsc
+        Ok(uwsc)
     }
 }
 

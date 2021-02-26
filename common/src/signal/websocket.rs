@@ -15,6 +15,7 @@ pub type MessageCallback = Box<dyn FnMut(WSMessage)>;
 pub trait WebSocketConnection {
     fn set_cb_wsmessage(&mut self, cb: MessageCallback);
     fn send(&mut self, msg: String) -> Result<(), String>;
+    fn reconnect(&mut self) -> Result<(), String>;
 }
 
 //
