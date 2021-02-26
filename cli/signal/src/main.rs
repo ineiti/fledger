@@ -24,13 +24,6 @@ use common::{
 
 use state::ServerState;
 
-fn main() {
-    let logger = Box::new(StdOutLogger {});
-    let ws = Box::new(UnixWebSocket::new());
-    let state = ServerState::new(logger, ws);
-    state.wait_done();
-}
-
 pub struct StdOutLogger {}
 
 impl Logger for StdOutLogger {
@@ -64,7 +57,7 @@ impl WebSocketServer for UnixWebSocket {
 
 impl UnixWebSocket {
     fn new() -> UnixWebSocket {
-        let server = TcpListener::bind("127.0.0.1:8765").unwrap();
+        let server = TcpListener::bind("0.0.0.0:8765").unwrap();
         let uws = UnixWebSocket {
             cb: Arc::new(Mutex::new(None)),
         };
@@ -133,4 +126,12 @@ impl WebSocketConnectionSend for UnixWSConnection {
         self.websocket.write_message(Message::Text(msg)).unwrap();
         Ok(())
     }
+}
+
+fn main() {
+    let logger = Box::new(StdOutLogger {});
+    let ws = Box::new(UnixWebSocket::new());
+    let state = ServerState::new(logger, ws);
+    println!("Server started and listening on port 8765");
+    state.wait_done();
 }
