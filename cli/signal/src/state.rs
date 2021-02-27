@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use std::sync::Mutex;
 use std::thread;
 
@@ -48,10 +48,11 @@ impl ServerState {
             .insert(challenge.clone(), NodeEntry::new(logger, challenge, conn));
     }
 
-    /// Bogous wait for all done.
-    pub fn wait_done(&self) {
+    /// Waits for everything done while calling cleanup from time to time.
+    pub fn wait_done(&self, delay: Duration) {
         loop {
-            thread::park();
+            thread::sleep(delay);
+            self.int.lock().unwrap().cleanup(delay);
         }
     }
 

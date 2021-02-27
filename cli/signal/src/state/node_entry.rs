@@ -1,5 +1,5 @@
 use futures::executor;
-use std::fmt;
+use std::{fmt, time::Instant};
 
 use common::{
     node::{config::NodeInfo, ext_interface::Logger, types::U256},
@@ -12,6 +12,7 @@ use common::{
 pub struct NodeEntry {
     pub conn: Box<dyn WebSocketConnectionSend>,
     pub info: Option<NodeInfo>,
+    pub last_seen: Instant,
     entry: U256,
     logger: Box<dyn Logger>,
 }
@@ -34,6 +35,7 @@ impl NodeEntry {
             logger,
             entry,
             conn,
+            last_seen: Instant::now(),
         };
         let msg = serde_json::to_string(&WebSocketMessage {
             msg: WSSignalMessage::Challenge(ne.entry.clone()),

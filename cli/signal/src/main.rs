@@ -11,6 +11,7 @@ use std::{
     net::{TcpListener, TcpStream},
     sync::{Arc, Mutex},
     thread,
+    time::Duration,
 };
 use tungstenite::{accept, protocol::Role, Message, WebSocket};
 
@@ -100,7 +101,6 @@ impl UnixWSConnection {
         thread::spawn(move || loop {
             match ws_clone.read_message() {
                 Ok(msg) => {
-                    println!("Got a raw message: {:?}", msg);
                     if msg.is_text() {
                         let mut cb_mutex = cb_clone.lock().unwrap();
                         if let Some(cb) = cb_mutex.as_mut() {
@@ -126,7 +126,6 @@ impl WebSocketConnectionSend for UnixWSConnection {
     }
 
     async fn send(&mut self, msg: String) -> Result<(), String> {
-        println!("sending: {:?}", msg);
         self.websocket.write_message(Message::Text(msg)).map_err(|e| e.to_string())?;
         Ok(())
     }
@@ -137,5 +136,5 @@ fn main() {
     let ws = Box::new(UnixWebSocket::new());
     let state = ServerState::new(logger, ws);
     println!("Server started and listening on port 8765");
-    state.wait_done();
+    state.wait_done(Duration::from_secs(30));
 }

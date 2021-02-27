@@ -1,19 +1,18 @@
 use bimap::BiMap;
-use std::sync::Mutex;
+use futures::executor;
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
 };
-use futures::executor;
+use std::{
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 
 use common::{
-    node::{
-        config::NodeInfo,
-        ext_interface::Logger,
-        types::U256,
-    },
+    node::{config::NodeInfo, ext_interface::Logger, types::U256},
     signal::{
-        web_rtc::{WSSignalMessage,WebSocketMessage},
+        web_rtc::{WSSignalMessage, WebSocketMessage},
         websocket::WSMessage,
     },
 };
@@ -23,6 +22,7 @@ use super::node_entry::NodeEntry;
 pub struct Internal {
     pub logger: Box<dyn Logger>,
     pub nodes: HashMap<U256, NodeEntry>,
+    // Left: public - Right: challenge
     pub_chal: BiMap<U256, U256>,
 }
 
@@ -38,16 +38,8 @@ impl Internal {
 
     /// Treats incoming messages from nodes.
     pub fn cb_msg(&mut self, chal: &U256, msg: WSMessage) {
-        let src = match self.chal_to_pub(chal) {
-            Some(public) => public,
-            None => chal.clone(),
-        };
-        self.logger.info(&format!(
-            "Got new message from {:?} -> {:?}: {:?}",
-            chal, src, msg
-        ));
         match msg {
-            WSMessage::MessageString(s) => self.receive_msg(&src, s),
+            WSMessage::MessageString(s) => self.receive_msg(chal, s),
             WSMessage::Closed(_) => self.close_ws(),
             WSMessage::Opened(_) => self.opened_ws(),
             WSMessage::Error(_) => self.error_ws(),
@@ -72,7 +64,9 @@ impl Internal {
         }
     }
 
-    fn receive_msg(&mut self, src: &U256, msg: String) {
+    /// Receives a message from the websocket. Src is the challenge-ID, which is
+    /// random and only tied to the public ID through self.pub_chal.
+    fn receive_msg(&mut self, chal: &U256, msg: String) {
         let msg_ws = match WebSocketMessage::from_str(&msg) {
             Ok(mw) => mw,
             Err(e) => {
@@ -83,6 +77,10 @@ impl Internal {
                 return;
             }
         };
+
+        if let Some(node) = self.nodes.get_mut(chal) {
+            node.last_seen = Instant::now();
+        }
 
         match msg_ws.msg {
             // Node sends his information to the server
@@ -97,13 +95,10 @@ impl Internal {
                     return true;
                 });
                 self.pub_chal
-                    .insert(msg_ann.node_info.public.clone(), src.clone());
-                self.logger
-                    .info(&format!("Converter list is {:?}", self.pub_chal));
+                    .insert(msg_ann.node_info.public.clone(), chal.clone());
                 self.nodes
-                    .entry(src.clone())
+                    .entry(chal.clone())
                     .and_modify(|ne| ne.info = Some(msg_ann.node_info));
-                self.logger.info(&format!("Final list is {:?}", self.nodes));
             }
 
             // Node requests deleting of the list of all nodes
@@ -116,22 +111,23 @@ impl Internal {
             // Node requests a list of all currently connected nodes,
             // including itself.
             WSSignalMessage::ListIDsRequest => {
-                self.logger.info("Sending list IDs");
                 let ids: Vec<NodeInfo> = self
                     .nodes
                     .iter()
                     .filter(|ne| ne.1.info.is_some())
                     .map(|ne| ne.1.info.clone().unwrap())
                     .collect();
-                self.send_message_errlog(src, WSSignalMessage::ListIDsReply(ids));
+                let src = self.chal_to_pub(chal).unwrap();
+                self.send_message_errlog(&src, WSSignalMessage::ListIDsReply(ids));
             }
 
             // Node sends a PeerRequest with some of the data set to 'Some'.
             WSSignalMessage::PeerSetup(pr) => {
                 self.logger.info(&format!("Got a PeerSetup {:?}", pr));
-                let dst = if *src == pr.id_init {
+                let src = self.chal_to_pub(chal).unwrap();
+                let dst = if src == pr.id_init {
                     &pr.id_follow
-                } else if *src == pr.id_follow {
+                } else if src == pr.id_follow {
                     &pr.id_init
                 } else {
                     self.logger
@@ -160,17 +156,31 @@ impl Internal {
         if let Some(chal) = self.pub_to_chal(public) {
             match self.nodes.entry(chal.clone()) {
                 Entry::Occupied(mut e) => {
-                    self.logger.info("Internal::send_message executor");
-                    if let Err(e) = executor::block_on((e.get_mut().conn).send(msg_str)){
+                    if let Err(e) = executor::block_on((e.get_mut().conn).send(msg_str)) {
                         self.logger.error(&format!("Couldn't send message: {}", e));
                     }
-                    self.logger.info("Internal::send_message executor done");
                     Ok(())
                 }
                 Entry::Vacant(_) => Err("Destination not reachable".to_string()),
             }
         } else {
             Err("Don't know this challenge".to_string())
+        }
+    }
+
+    /// Removes all nodes that haven't sent anything for a given delay.
+    pub fn cleanup(&mut self, delay: Duration) {
+        let now = Instant::now();
+        let filtered: Vec<U256> = self
+            .nodes
+            .iter()
+            .filter(|(_k, node)| now.duration_since(node.last_seen) > delay)
+            .map(|(k, _v)| k.clone())
+            .collect();
+        for key in filtered.iter() {
+            self.logger.info(&format!("Removing node {}", key));
+            self.nodes.remove(key);
+            self.pub_chal.remove_by_right(key);
         }
     }
 }
