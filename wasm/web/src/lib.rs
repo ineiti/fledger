@@ -8,12 +8,15 @@ use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 
-use common::node::Node;
-
 use js_sys::Date;
-use wasm_lib::logger::LoggerOutput;
-use wasm_lib::node::start;
-use web_sys::console;
+use regex::Regex;
+use wasm_lib::{
+    logger::LoggerOutput,
+    node::{start, MyDataStorage},
+};
+use web_sys::{console, window};
+
+use common::node::{ext_interface::DataStorage, Node, CONFIG_NAME};
 
 fn log_1(s: &str) {
     console::log_1(&JsValue::from(s));
@@ -23,10 +26,10 @@ fn log_2(s: &str, t: String) {
     console::log_2(&JsValue::from(s), &JsValue::from(t));
 }
 
-#[cfg(not(feature="local"))]
+#[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
 
-#[cfg(feature="local")]
+#[cfg(feature = "local")]
 const URL: &str = "ws://localhost:8765";
 
 struct Model {
@@ -58,6 +61,20 @@ impl Component for Model {
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         log_1("setting panic hook");
         console_error_panic_hook::set_once();
+        if let Ok(loc) = window().unwrap().location().href() {
+            log_2("Location is", loc.clone());
+            let reg = Regex::new(r".*?#").unwrap();
+            let data_enc = reg.replace(&loc, "");
+            if data_enc != "" {
+                log_1("Setting data");
+                if let Ok(data) = urlencoding::decode(&data_enc) {
+                    let storage = MyDataStorage {};
+                    if let Err(err) = storage.save(CONFIG_NAME, &data){
+                        log_2("Got error while saving config:", err);
+                    }
+                }
+            }
+        }
 
         let (logger, node_logger) = LoggerOutput::new();
         wasm_bindgen_futures::spawn_local(wrap(

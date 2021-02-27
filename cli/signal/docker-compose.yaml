@@ -37,6 +37,28 @@ services:
     networks:
       - traefik
 
+  node1:
+    image: fledgre/node
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "4"
+    restart: unless-stopped
+    volumes:
+      data/node1:/fledger
+
+  node2:
+    image: fledgre/node
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "4"
+    restart: unless-stopped
+    volumes:
+      data/node2:/fledger
+
   # watchtower:
   #   image: containrrr/watchtower:latest
   #   volumes:
