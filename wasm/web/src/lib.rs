@@ -23,7 +23,10 @@ fn log_2(s: &str, t: String) {
     console::log_2(&JsValue::from(s), &JsValue::from(t));
 }
 
-// const URL: &str = "wss://signal.fledg.re";
+#[cfg(not(feature="local"))]
+const URL: &str = "wss://signal.fledg.re";
+
+#[cfg(feature="local")]
 const URL: &str = "ws://localhost:8765";
 
 struct Model {

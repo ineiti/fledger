@@ -16,6 +16,9 @@ target = "wasm"
 crate-type = ["cdylib"]
 # crate-type = ["cdylib", "rlib"]
 
+[features]
+local = []
+
 [dependencies]
 common = {path = "../../common"}
 wasm-lib = {path = "../lib"}
