@@ -1,0 +1,10 @@
+FROM rust:latest as builder
+WORKDIR /usr/src/node
+COPY . .
+RUN cargo install --path cli/node
+
+FROM debian:buster-slim
+COPY --from=builder /usr/local/cargo/bin/flnode /usr/local/bin/flnode
+RUN apt-get update && apt-get install -y libssl1.1 && rm -rf /var/lib/apt/lists/*
+WORKDIR /fledger
+CMD ["flnode"]

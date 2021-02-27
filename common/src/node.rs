@@ -26,7 +26,7 @@ pub struct Node {
     // logic: Arc<Mutex<Logic>>,
 }
 
-const CONFIG_NAME: &str = "nodeConfig";
+pub const CONFIG_NAME: &str = "nodeConfig";
 
 impl Node {
     /// Create new node by loading the config from the storage.
