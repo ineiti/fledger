@@ -1,6 +1,7 @@
 miniserve := $(shell echo $$HOME )/.cargo/bin/miniserve
 src := $(shell find src -name "*.rs")
-build := wasm-pack build --debug --target web --out-name wasm --out-dir ./static
+build := wasm-pack build --debug --target web --out-name wasm \
+	--out-dir ./static -- --features local
 
 serve: static/wasm_bg.wasm ${miniserve}
 	${miniserve} ./static --index index.html
