@@ -1,0 +1,20 @@
+name: Testing web_rtc
+on:
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout branch
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Run wasm-test
+      run: |
+        curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        cd wasm/lib/src
+        wasm-pack test --chrome --headless

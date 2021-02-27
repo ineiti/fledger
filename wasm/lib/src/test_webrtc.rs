@@ -130,6 +130,10 @@ impl WebSocketConnection for WebSocketConnectionDummy {
         });
         Ok(())
     }
+
+    fn reconnect(&mut self) -> Result<(), String> {
+        todo!()
+    }
 }
 
 pub struct DataStorageDummy {}

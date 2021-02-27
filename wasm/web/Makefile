@@ -17,7 +17,3 @@ watch: build_bg serve
 build:
 	${build}
 
-test:
-	cd src
-	wasm-pack test --chrome
-	# open http://localhost:8000
