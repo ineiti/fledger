@@ -14,7 +14,7 @@ signal::{
 use wasm_bindgen_test::*;
 
 use crate::logs::wait_ms;
-use crate::node::WasmLogger;
+use crate::storage_logs::ConsoleLogger;
 use crate::web_rtc_setup::WebRTCConnectionSetupWasm;
 
 struct Message {
@@ -152,7 +152,7 @@ impl DataStorage for DataStorageDummy {
 async fn connect_test() {
     console_error_panic_hook::set_once();
 
-    let log = Box::new(WasmLogger {});
+    let log = Box::new(ConsoleLogger {});
     match connect_test_simple().await {
         Ok(_) => log.info("All OK"),
         Err(e) => log.error(&format!("Something went wrong: {}", e)),
@@ -160,7 +160,7 @@ async fn connect_test() {
 }
 
 async fn connect_test_simple() -> Result<(), String> {
-    let log = Box::new(WasmLogger {});
+    let log = Box::new(ConsoleLogger {});
     let mut ws_conn = WebSocketDummy::new(log.clone());
 
     // First node

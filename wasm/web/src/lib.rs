@@ -1,9 +1,9 @@
 #![recursion_limit = "1024"]
 
-use yew::services::IntervalService;
 use common::node::ext_interface::Logger;
 use std::sync::Arc;
 use std::sync::Mutex;
+use yew::services::IntervalService;
 
 use std::time::Duration;
 
@@ -14,7 +14,9 @@ use js_sys::Date;
 use regex::Regex;
 use wasm_lib::{
     logger::{LoggerOutput, NodeLogger},
-    node::{start, MyDataStorage},
+    node::LocalStorage,
+    web_rtc_setup::WebRTCConnectionSetupWasm,
+    web_socket::WebSocketWasm,
 };
 use web_sys::{console, window};
 
@@ -29,7 +31,7 @@ fn log_2(s: &str, t: String) {
 }
 
 #[cfg(not(feature = "local"))]
-const URL: &str = "wss://signal.fledg.re";
+const URL: &str = "wss://signal.fledg.re ";
 
 #[cfg(feature = "local")]
 const URL: &str = "ws://localhost:8765";
@@ -62,12 +64,11 @@ impl Component for Model {
     type Properties = ();
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        log_1("setting panic hook");
         console_error_panic_hook::set_once();
         Model::set_localstorage();
 
         let (logger, node_logger) = LoggerOutput::new();
-        Model::start_node(node_logger.clone(), &link);
+        Model::node_start(node_logger.clone(), &link);
         wasm_bindgen_futures::spawn_local(wrap_short(LoggerOutput::listen(
             logger.ch,
             Arc::clone(&logger.str),
@@ -95,19 +96,18 @@ impl Component for Model {
                     self.node_ping();
                 }
             }
-            Msg::Node(res_node) => {
-                match res_node {
-                    Ok(node) => self.node = Some(Arc::new(Mutex::new(node))),
-                    Err(e) => {
-                        self.logger.error(&format!("Couldn't create node: {}", e.as_string().unwrap()));
-                        self.show_reset = true;
-                    }
+            Msg::Node(res_node) => match res_node {
+                Ok(node) => self.node = Some(Arc::new(Mutex::new(node))),
+                Err(e) => {
+                    self.logger
+                        .error(&format!("Couldn't create node: {}", e.as_string().unwrap()));
+                    self.show_reset = true;
                 }
-            }
+            },
             Msg::Reset => {
                 Model::set_config("");
                 self.show_reset = false;
-                Model::start_node(self.logger.clone(), &self.link);
+                Model::node_start(self.logger.clone(), &self.link);
             }
         }
         true
@@ -146,15 +146,22 @@ impl Component for Model {
 }
 
 impl Model {
-    fn start_node(logger: Box<dyn Logger>, link: &ComponentLink<Model>){
+    fn node_start(logger: Box<dyn Logger>, link: &ComponentLink<Model>) {
         wasm_bindgen_futures::spawn_local(wrap(
-            start(logger, URL),
+            async {
+                let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
+                let my_storage = Box::new(LocalStorage {});
+                let ws = WebSocketWasm::new(URL)?;
+                let node = Node::new(my_storage, logger, Box::new(ws), rtc_spawner)?;
+
+                Ok(node)
+            },
             link.callback(|n: Result<Node, JsValue>| Msg::Node(n)),
         ));
     }
 
     fn set_config(data: &str) {
-        if let Err(err) = Node::set_config(Box::new(MyDataStorage {}), &data) {
+        if let Err(err) = Node::set_config(Box::new(LocalStorage {}), &data) {
             log_2("Got error while saving config:", err);
         }
     }
@@ -217,21 +224,13 @@ impl Model {
         }
     }
 
-    // fn node_connect(&self){
-    //     if let Some(n) = self.node_copy(){
-    //         wasm_bindgen_futures::spawn_local(async move {
-    //             let mut node = n.lock().unwrap();
-    //             node.connect().await;
-    //         });
-    //     }
-    // }
-
     fn node_list(&self) {
         if let Some(n) = self.node_copy() {
+            let log = self.logger.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 let mut node = n.lock().unwrap();
                 if let Err(e) = node.list().await {
-                    log_2("Couldn't get list:", e);
+                    log.error(&format!("Couldn't get list: {:?}", e));
                 }
             });
         }
@@ -239,11 +238,12 @@ impl Model {
 
     fn node_ping(&self) {
         if let Some(n) = self.node_copy() {
+            let log = self.logger.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 let mut node = n.lock().unwrap();
                 let str = Date::new_0().to_iso_string().as_string().unwrap();
                 if let Err(e) = node.ping(&str).await {
-                    log_2("Couldn't ping node:", e);
+                    log.error(&format!("Couldn't ping node: {:?}", e));
                 }
             });
         }

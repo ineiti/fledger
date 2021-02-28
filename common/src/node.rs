@@ -39,7 +39,14 @@ impl Node {
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
     ) -> Result<Node, String> {
-        let config = NodeConfig::new(storage.load(CONFIG_NAME)?)?;
+        let config_str = match storage.load(CONFIG_NAME){
+            Ok(s) => s,
+            Err(_) => {
+                logger.info(&format!("Couldn't load configuration - start with empty"));
+                "".to_string()
+            }
+        };
+        let config = NodeConfig::new(config_str)?;
         storage.save(CONFIG_NAME, &config.to_string()?)?;
         logger.info(&format!("Starting node: {}", config.our_node.public));
         // let logic = Logic::new(config.our_node.clone());

@@ -46,7 +46,7 @@ impl WebRTCConnectionSetupWasm {
     /// Followed by that they need to exchange the ice strings, in either order.
     /// Only after exchanging this information can the msg_send and msg_receive methods be used.
     pub fn new(nt: WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, String> {
-        let rp_conn = RtcPeerConnection::new().map_err(|e| e.as_string().unwrap())?;
+        let rp_conn = RtcPeerConnection::new().map_err(|e| format!("PeerConnection error: {:?}", e))?;
         let ch_dc = match nt {
             WebRTCConnectionState::Initializer => dc_create_init(&rp_conn)?,
             WebRTCConnectionState::Follower => dc_create_follow(&rp_conn),
