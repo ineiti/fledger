@@ -93,4 +93,8 @@ impl Node {
     pub async fn send(&self, dst: &U256, msg: String) -> Result<(), String> {
         self.network.send(dst, msg).await
     }
+
+    pub fn set_config(storage: Box<dyn DataStorage>, config: &str) -> Result<(), String>{
+        storage.save(CONFIG_NAME, config)
+    }
 }

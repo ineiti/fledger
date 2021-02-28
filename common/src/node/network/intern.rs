@@ -39,7 +39,7 @@ impl Intern {
             web_rtc: Arc::new(Mutex::new(web_rtc)),
             web_rtc_rcv,
             connections: HashMap::new(),
-            logger,
+            logger: logger.clone(),
             node_info,
             list: vec![],
         }));

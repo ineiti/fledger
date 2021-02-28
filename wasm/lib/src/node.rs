@@ -54,7 +54,6 @@ impl Logger for WasmLogger {
 pub async fn start(log: Box<dyn Logger>, url: &str) -> Result<Node, JsValue> {
     let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
     let my_storage = Box::new(MyDataStorage {});
-    // let ws = WebSocketWasm::new("wss://signal.fledg.re")?;
     let ws = WebSocketWasm::new(url)?;
     let node = Node::new(my_storage, log, Box::new(ws), rtc_spawner)?;
 

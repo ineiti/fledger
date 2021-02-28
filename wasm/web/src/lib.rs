@@ -1,5 +1,7 @@
-use yew::services::IntervalService;
+#![recursion_limit = "1024"]
 
+use yew::services::IntervalService;
+use common::node::ext_interface::Logger;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -11,12 +13,12 @@ use yew::prelude::*;
 use js_sys::Date;
 use regex::Regex;
 use wasm_lib::{
-    logger::LoggerOutput,
+    logger::{LoggerOutput, NodeLogger},
     node::{start, MyDataStorage},
 };
 use web_sys::{console, window};
 
-use common::node::{ext_interface::DataStorage, Node, CONFIG_NAME};
+use common::node::Node;
 
 fn log_1(s: &str) {
     console::log_1(&JsValue::from(s));
@@ -37,12 +39,13 @@ struct Model {
     node: Option<Arc<Mutex<Node>>>,
     log_str: Arc<Mutex<String>>,
     counter: u32,
+    show_reset: bool,
+    logger: NodeLogger,
 }
 
 enum Msg {
     UpdateLog,
-    // List,
-    // Ping,
+    Reset,
     Node(Result<Node, JsValue>),
 }
 
@@ -61,26 +64,10 @@ impl Component for Model {
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         log_1("setting panic hook");
         console_error_panic_hook::set_once();
-        if let Ok(loc) = window().unwrap().location().href() {
-            log_2("Location is", loc.clone());
-            let reg = Regex::new(r".*?#").unwrap();
-            let data_enc = reg.replace(&loc, "");
-            if data_enc != "" {
-                log_1("Setting data");
-                if let Ok(data) = urlencoding::decode(&data_enc) {
-                    let storage = MyDataStorage {};
-                    if let Err(err) = storage.save(CONFIG_NAME, &data){
-                        log_2("Got error while saving config:", err);
-                    }
-                }
-            }
-        }
+        Model::set_localstorage();
 
         let (logger, node_logger) = LoggerOutput::new();
-        wasm_bindgen_futures::spawn_local(wrap(
-            start(Box::new(node_logger), URL),
-            link.callback(|n: Result<Node, JsValue>| Msg::Node(n)),
-        ));
+        Model::start_node(node_logger.clone(), &link);
         wasm_bindgen_futures::spawn_local(wrap_short(LoggerOutput::listen(
             logger.ch,
             Arc::clone(&logger.str),
@@ -94,6 +81,8 @@ impl Component for Model {
             node: None,
             log_str: Arc::clone(&logger.str),
             counter: 0,
+            show_reset: false,
+            logger: node_logger,
         }
     }
 
@@ -107,12 +96,19 @@ impl Component for Model {
                 }
             }
             Msg::Node(res_node) => {
-                if let Ok(node) = res_node {
-                    self.node = Some(Arc::new(Mutex::new(node)));
+                match res_node {
+                    Ok(node) => self.node = Some(Arc::new(Mutex::new(node))),
+                    Err(e) => {
+                        self.logger.error(&format!("Couldn't create node: {}", e.as_string().unwrap()));
+                        self.show_reset = true;
+                    }
                 }
             }
-            // Msg::List => self.node_list(),
-            // Msg::Ping => self.node_ping(),
+            Msg::Reset => {
+                Model::set_config("");
+                self.show_reset = false;
+                Model::start_node(self.logger.clone(), &self.link);
+            }
         }
         true
     }
@@ -126,6 +122,10 @@ impl Component for Model {
 
     fn view(&self) -> Html {
         let log = self.log_str.lock().unwrap();
+        let reset_style = match self.show_reset {
+            false => "display: none;",
+            true => "",
+        };
         html! {
             <div class="main">
                 <div class="ui">
@@ -135,8 +135,7 @@ impl Component for Model {
                             <li>{self.nodes_connected()}</li>
                             <li>{self.nodes_reachable()}</li>
                         </ul>
-                        // <button onclick=self.link.callback(|_| Msg::List)>{ "List Nodes" }</button>
-                        // <button onclick=self.link.callback(|_| Msg::Ping)>{ "Ping Nodes" }</button>
+                        <button style={reset_style} onclick=self.link.callback(|_| Msg::Reset)>{ "Reset Config" }</button>
                         <pre class="wrap" id="log">{"log:"}
                         { log }</pre>
                     </div>
@@ -147,6 +146,35 @@ impl Component for Model {
 }
 
 impl Model {
+    fn start_node(logger: Box<dyn Logger>, link: &ComponentLink<Model>){
+        wasm_bindgen_futures::spawn_local(wrap(
+            start(logger, URL),
+            link.callback(|n: Result<Node, JsValue>| Msg::Node(n)),
+        ));
+    }
+
+    fn set_config(data: &str) {
+        if let Err(err) = Node::set_config(Box::new(MyDataStorage {}), &data) {
+            log_2("Got error while saving config:", err);
+        }
+    }
+
+    fn set_localstorage() {
+        if let Ok(loc) = window().unwrap().location().href() {
+            log_2("Location is", loc.clone());
+            if loc.contains("#") {
+                let reg = Regex::new(r".*?#").unwrap();
+                let data_enc = reg.replace(&loc, "");
+                if data_enc != "" {
+                    log_1("Setting data");
+                    if let Ok(data) = urlencoding::decode(&data_enc) {
+                        Model::set_config(&data);
+                    }
+                }
+            }
+        }
+    }
+
     fn connection_state(&self, log: String) -> String {
         format!(
             "State of connection: {}",
