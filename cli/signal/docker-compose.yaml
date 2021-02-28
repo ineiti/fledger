@@ -46,7 +46,7 @@ services:
         max-file: "4"
     restart: unless-stopped
     volumes:
-      data/node1:/fledger
+      - ./data/node1:/fledger
 
   node2:
     image: fledgre/node
@@ -57,7 +57,7 @@ services:
         max-file: "4"
     restart: unless-stopped
     volumes:
-      data/node2:/fledger
+      - ./data/node2:/fledger
 
   # watchtower:
   #   image: containrrr/watchtower:latest
