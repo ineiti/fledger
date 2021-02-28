@@ -41,11 +41,9 @@ impl NodeEntry {
             msg: WSSignalMessage::Challenge(ne.entry.clone()),
         })
         .unwrap();
-        ne.logger.info("NodeEntry::new executor start");
         if let Err(e) = executor::block_on(ne.conn.send(msg)) {
             ne.logger.error(&format!("while sending challenge: {}", e));
         }
-        ne.logger.info("NodeEntry::new executor done");
         ne
     }
 }
