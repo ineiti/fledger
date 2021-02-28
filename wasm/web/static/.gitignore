@@ -1,1 +1,8 @@
-*
+LICENSE.md
+README.md
+package.json
+wasm.d.ts
+wasm.js
+wasm_bg.wasm
+wasm_bg.wasm.d.ts
+snippets/

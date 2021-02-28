@@ -1,0 +1,12 @@
+#FROM rust:latest as builder
+#WORKDIR /usr/src/flnode
+#COPY . .
+#RUN make -C cli/flnode build
+
+FROM node:latest
+#COPY --from=builder /usr/src/flnode/{run,static} /fledger-src
+COPY run /fledger-src/run
+COPY static /fledger-src/static
+WORKDIR /fledger
+RUN cd /fledger-src/run; npm i -g node-pre-gyp; npm ci
+CMD ["node", "/fledger-src/run/main.js"]

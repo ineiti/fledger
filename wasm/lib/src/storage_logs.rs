@@ -1,14 +1,10 @@
 use common::node::ext_interface::{DataStorage,Logger};
 
-use common::node::Node;
-use wasm_bindgen::JsValue;
 use web_sys::window;
 
-use crate::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
+pub struct LocalStorage {}
 
-pub struct MyDataStorage {}
-
-impl DataStorage for MyDataStorage {
+impl DataStorage for LocalStorage {
     fn load(&self, key: &str) -> Result<String, String> {
         window()
             .unwrap()
@@ -31,9 +27,9 @@ impl DataStorage for MyDataStorage {
     }
 }
 
-pub struct WasmLogger {}
+pub struct ConsoleLogger {}
 
-impl Logger for WasmLogger {
+impl Logger for ConsoleLogger {
     fn info(&self, s: &str) {
         console_log!("info: {}", s);
     }
@@ -47,15 +43,6 @@ impl Logger for WasmLogger {
     }
 
     fn clone(&self) -> Box<dyn Logger> {
-        Box::new(WasmLogger {})
+        Box::new(ConsoleLogger {})
     }
-}
-
-pub async fn start(log: Box<dyn Logger>, url: &str) -> Result<Node, JsValue> {
-    let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
-    let my_storage = Box::new(MyDataStorage {});
-    let ws = WebSocketWasm::new(url)?;
-    let node = Node::new(my_storage, log, Box::new(ws), rtc_spawner)?;
-
-    Ok(node)
 }
