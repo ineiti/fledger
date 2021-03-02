@@ -13,8 +13,8 @@ use yew::prelude::*;
 use js_sys::Date;
 use regex::Regex;
 use wasm_lib::{
+    storage_logs::LocalStorage,
     logger::{LoggerOutput, NodeLogger},
-    node::LocalStorage,
     web_rtc_setup::WebRTCConnectionSetupWasm,
     web_socket::WebSocketWasm,
 };

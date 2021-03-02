@@ -3,8 +3,7 @@ use common::node::ext_interface::{DataStorage,Logger};
 use common::node::Node;
 use wasm_bindgen::JsValue;
 
-use wasm_lib::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
-    logs::wait_ms};
+use wasm_lib::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
 
 use wasm_bindgen::prelude::*;
 
@@ -54,6 +53,13 @@ async fn list_ping(n: &mut Node) -> Result<(), String>{
     n.list().await?;
     n.ping("something").await?;
     Ok(())
+}
+
+#[wasm_bindgen(
+    inline_js = "module.exports.wait_ms = function(ms){ return new Promise((r) => setTimeout(r, ms));}"
+)]
+extern "C" {
+    pub async fn wait_ms(ms: u32);
 }
 
 #[wasm_bindgen(start)]

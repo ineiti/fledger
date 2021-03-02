@@ -1,4 +1,4 @@
-src := $(shell find src -name "*.rs")
+src := $(shell find src ../../common ../../wasm/lib -name "*.rs")
 wasm := static/wasm_bg.wasm
 build = wasm-pack build --debug --target nodejs --out-name wasm \
 	--out-dir ./static -- $(FEATURES)

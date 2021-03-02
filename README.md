@@ -75,9 +75,9 @@ be set up.
 
 # Changelog
 
-- 0.2.2
+- 0.2.2 - 2021-03-02
   - Run some nodes constantly on https://fledg.re to have a minimum consensus
-- 0.2.1
+- 0.2.1 - 2021-02-28
   - Make the https://web.fledg.re a bit nicer and more automatic
 - 0.2 - 2021-02-26
   - Simple ping test with the nodes
