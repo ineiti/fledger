@@ -7,8 +7,6 @@ description = "gtk for WebRTC Fledger communication"
 repository = "https://github.com/ineiti/fledger-1-webrtc"
 license = "AGPLv3"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [build]
 target = "wasm"
 
@@ -21,7 +19,7 @@ local = []
 
 [dependencies]
 common = {path = "../../common"}
-wasm-lib = {path = "../../wasm/lib"}
+wasm-lib = {path = "../../wasm/lib", features=["node"]}
 wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
 js-sys = "0.3.46"
 wasm-bindgen-futures = "0.4.19"

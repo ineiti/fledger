@@ -1,4 +1,4 @@
-use crate::node::ext_interface::Logger;
+use crate::{node::ext_interface::Logger, signal::web_rtc::ConnectionStateMap};
 
 use crate::signal::web_rtc::setup::ProcessResult;
 use crate::signal::web_rtc::{
@@ -52,6 +52,17 @@ impl NodeConnection {
             cb_msg: Arc::new(Mutex::new(cb_msg)),
             logger,
         }
+    }
+
+    pub async fn get_stats(&self) -> Result<Vec<Option<ConnectionStateMap>>, String> {
+        let mut ret = vec![];
+        for dir in vec![self.incoming.as_ref(), self.outgoing.as_ref()] {
+            match dir {
+                Some(conn) => ret.push(Some(conn.get_state().await?)),
+                None => ret.push(None),
+            }
+        }
+        Ok(ret)
     }
 
     pub fn get_connection(&mut self) -> Option<ConnectionType> {

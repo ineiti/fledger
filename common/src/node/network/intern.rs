@@ -1,8 +1,8 @@
 use crate::node::{
     config::NodeInfo,
     ext_interface::Logger,
+    network::{node_connection::NodeConnection, WebRTCReceive},
     types::U256,
-    network::{WebRTCReceive, node_connection::NodeConnection},
 };
 use crate::signal::{
     web_rtc::{
@@ -214,8 +214,10 @@ impl Intern {
 
         let mut message: Option<PeerMessage> = None;
         if let Err(e) = conn.send(msg.clone()) {
-            self.logger
-                .info(&format!("No connection to {} yet ({}), starting it", dst, e));
+            self.logger.info(&format!(
+                "No connection to {} yet ({}), starting it",
+                dst, e
+            ));
             message = conn.process_peer_setup_outgoing(PeerMessage::Init).await?;
             conn.send(msg)?;
         }
@@ -226,6 +228,17 @@ impl Intern {
                 id_follow: dst.clone(),
             };
             self.send_ws(WSSignalMessage::PeerSetup(pi));
+        }
+        Ok(())
+    }
+
+    pub async fn print_states(&self) -> Result<(), String> {
+        for (_id, conn) in self.connections.iter() {
+            for dir in conn.get_stats().await? {
+                if let Some(stats) = dir {
+                    self.logger.info(&format!("Connection is: {:?}", stats));
+                }
+            }
         }
         Ok(())
     }

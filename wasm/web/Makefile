@@ -1,7 +1,6 @@
 miniserve := $(shell echo $$HOME )/.cargo/bin/miniserve
 src := $(shell find src -name "*.rs")
-TARGET = nodejs
-build = wasm-pack build --debug --target $(TARGET) --out-name wasm \
+build = wasm-pack build --debug --target web --out-name wasm \
 	--out-dir ./static -- $(FEATURES)
 
 serve: static/wasm_bg.wasm ${miniserve}

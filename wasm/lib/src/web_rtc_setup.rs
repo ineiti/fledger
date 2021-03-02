@@ -235,12 +235,6 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     }
 
     async fn print_states(&mut self) {
-        let conn_stats: js_sys::Map =
-            wasm_bindgen_futures::JsFuture::from(self.rp_conn.get_stats())
-                .await
-                .unwrap()
-                .into();
-        conn_stats.for_each(&mut |v, k| log(&format!("{:?}: {:?}", k, v)));
         log(&format!(
             "{:?}: rpc_conn state is: {:?} / {:?} / {:?}",
             self.nt,
@@ -252,8 +246,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
 
     async fn get_connection(&mut self) -> Result<Box<dyn WebRTCConnection>, String> {
         self.is_open().await?;
-        self.print_states().await;
-        Ok(WebRTCConnectionWasm::new(self.dc.take().unwrap()))
+        Ok(WebRTCConnectionWasm::new(self.dc.take().unwrap(), self.rp_conn.clone()))
     }
 }
 

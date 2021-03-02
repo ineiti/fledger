@@ -45,6 +45,7 @@ impl Network {
     pub async fn send(&self, dst: &U256, msg: String) -> Result<(), String> {
         self.logger.info(&format!("Sending to: {}", dst));
         if let Ok(mut int) = self.intern.try_lock() {
+            // int.print_states().await?;
             return int.send(dst, msg).await;
         } else {
             return Err("Couldn't take lock of intern".to_string());

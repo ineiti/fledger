@@ -36,6 +36,7 @@ pub trait WebRTCConnectionSetup {
     async fn get_connection(&mut self) -> Result<Box<dyn WebRTCConnection>, String>;
 }
 
+#[async_trait(?Send)]
 pub trait WebRTCConnection {
     /// Send a message to the other node. This call blocks until the message
     /// is queued.
@@ -43,6 +44,19 @@ pub trait WebRTCConnection {
 
     /// Sets the callback for incoming messages.
     fn set_cb_message(&self, cb: WebRTCMessageCB);
+
+    /// Return some statistics on the connection
+    async fn get_state(&self) -> Result<ConnectionStateMap, String>;
+}
+
+/// Some statistics about the connection
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct ConnectionStateMap {
+    pub stun_local: bool,
+    pub stun_remote: bool,
+    pub rx_bytes: u64,
+    pub tx_bytes: u64,
+    pub delay_ms: u32,
 }
 
 pub type WebRTCMessageCB = Box<dyn FnMut(String)>;
