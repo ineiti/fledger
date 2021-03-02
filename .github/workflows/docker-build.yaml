@@ -3,6 +3,7 @@ on:
   push:
     branches:
     - main
+    - docker_node
 
 jobs:
   docker:
@@ -17,8 +18,8 @@ jobs:
     - name: Build flnode
       uses: docker/build-push-action@v2
       with:
-        tags: fledgre/node:latest
-        file: Dockerfile.node
+        tags: fledgre/flnode:latest
+        file: Dockerfile.flnode
         push: true
 
     - name: Build Signalling server

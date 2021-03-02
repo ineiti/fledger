@@ -20,7 +20,7 @@ extern "C" {
 }
 
 #[wasm_bindgen(
-    inline_js = "module.exports.wait_ms = function(ms) { return new Promise((r) => setTimeout(r, ms)); }"
+    inline_js = "export function wait_ms(ms){ return new Promise((r) => setTimeout(r, ms));}"
 )]
 extern "C" {
     pub async fn wait_ms(ms: u32);
