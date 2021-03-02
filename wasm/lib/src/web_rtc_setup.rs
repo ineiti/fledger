@@ -46,7 +46,8 @@ impl WebRTCConnectionSetupWasm {
     /// Followed by that they need to exchange the ice strings, in either order.
     /// Only after exchanging this information can the msg_send and msg_receive methods be used.
     pub fn new(nt: WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, String> {
-        let rp_conn = RtcPeerConnection::new().map_err(|e| format!("PeerConnection error: {:?}", e))?;
+        let rp_conn =
+            RtcPeerConnection::new().map_err(|e| format!("PeerConnection error: {:?}", e))?;
         let ch_dc = match nt {
             WebRTCConnectionState::Initializer => dc_create_init(&rp_conn)?,
             WebRTCConnectionState::Follower => dc_create_follow(&rp_conn),
@@ -234,6 +235,12 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     }
 
     async fn print_states(&mut self) {
+        let conn_stats: js_sys::Map =
+            wasm_bindgen_futures::JsFuture::from(self.rp_conn.get_stats())
+                .await
+                .unwrap()
+                .into();
+        conn_stats.for_each(&mut |v, k| log(&format!("{:?}: {:?}", k, v)));
         log(&format!(
             "{:?}: rpc_conn state is: {:?} / {:?} / {:?}",
             self.nt,
@@ -245,6 +252,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
 
     async fn get_connection(&mut self) -> Result<Box<dyn WebRTCConnection>, String> {
         self.is_open().await?;
+        self.print_states().await;
         Ok(WebRTCConnectionWasm::new(self.dc.take().unwrap()))
     }
 }
@@ -252,24 +260,24 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
 fn ice_start(rp_conn: &RtcPeerConnection) -> Receiver<String> {
     let (s1, r1) = mpsc::sync_channel::<String>(1);
 
-    let onicecandidate_callback1 = Closure::wrap(Box::new(move |ev: RtcPeerConnectionIceEvent| {
-        match ev.candidate() {
-            Some(candidate) => {
-                let cand = format!(
-                    "{}::{}::{}",
-                    candidate.candidate(),
-                    candidate.sdp_mid().unwrap(),
-                    candidate.sdp_m_line_index().unwrap()
-                );
-                match s1.try_send(cand) {
-                    Ok(_) => (),
-                    Err(e) => log(&format!("Couldn't transmit ICE string: {:?}", e)),
+    let onicecandidate_callback1 =
+        Closure::wrap(
+            Box::new(move |ev: RtcPeerConnectionIceEvent| match ev.candidate() {
+                Some(candidate) => {
+                    let cand = format!(
+                        "{}::{}::{}",
+                        candidate.candidate(),
+                        candidate.sdp_mid().unwrap(),
+                        candidate.sdp_m_line_index().unwrap()
+                    );
+                    match s1.try_send(cand) {
+                        Ok(_) => (),
+                        Err(e) => log(&format!("Couldn't transmit ICE string: {:?}", e)),
+                    }
                 }
-            }
-            None => {}
-        }
-    })
-        as Box<dyn FnMut(RtcPeerConnectionIceEvent)>);
+                None => {}
+            }) as Box<dyn FnMut(RtcPeerConnectionIceEvent)>,
+        );
     rp_conn.set_onicecandidate(Some(onicecandidate_callback1.as_ref().unchecked_ref()));
     onicecandidate_callback1.forget();
     r1
