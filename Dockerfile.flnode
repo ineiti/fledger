@@ -1,7 +1,9 @@
 FROM rust:latest as builder
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+RUN apt update && apt install -y npm nodejs
+RUN npm i -g node-pre-gyp
 WORKDIR /usr/src/flnode
 COPY . .
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 RUN make -C cli/flnode build
 
 FROM node:latest

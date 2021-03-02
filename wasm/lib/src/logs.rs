@@ -19,9 +19,12 @@ extern "C" {
     pub fn warn(s: &str);
 }
 
-#[wasm_bindgen(
+#[cfg_attr(feature = "node", wasm_bindgen(
+    inline_js = "module.exports.wait_ms = function(ms){ return new Promise((r) => setTimeout(r, ms));}"
+))]
+#[cfg_attr(not(feature = "node"), wasm_bindgen(
     inline_js = "export function wait_ms(ms){ return new Promise((r) => setTimeout(r, ms));}"
-)]
+))]
 extern "C" {
     pub async fn wait_ms(ms: u32);
 }
