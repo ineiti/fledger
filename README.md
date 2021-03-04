@@ -63,18 +63,21 @@ instructions.
 Get the `docker-compose.yaml` and run it:
 
 ```bash
-wget https://github.com/ineiti/fledger/docker-compose.yaml
+wget https://github.com/ineiti/fledger/blob/main/docker-compose.yaml
 docker-compose up -d
 ```
 
-This will create a new file called `fledger.toml` that contains the private key
-of your node.
+This will create a new file called `fledger.toml` in the `fledger` directory
+that contains the private key of your node.
 Do not lose this private key, as it is used to move around the Mana you get.
 The only time you need it will be once the server <-> browser connection will
 be set up.
 
 # Changelog
 
+- 0.2.3 - 2021-03-04
+  - Fix node Running
+  - Add docker-compose.yaml
 - 0.2.2 - 2021-03-02
   - Run some nodes constantly on https://fledg.re to have a minimum consensus
 - 0.2.1 - 2021-02-28
