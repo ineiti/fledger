@@ -1,0 +1,13 @@
+version: "3.0"
+
+services:
+  node:
+    image: fledgre/flnode:latest
+    logging: # As the node will create a lot of logs, limit it to 10MB
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "4"
+    restart: unless-stopped
+    volumes: # This will hold the private key as well as the cached data
+      - ./fledger:/fledger
