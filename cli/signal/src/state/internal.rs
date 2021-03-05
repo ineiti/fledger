@@ -117,8 +117,9 @@ impl Internal {
                     .filter(|ne| ne.1.info.is_some())
                     .map(|ne| ne.1.info.clone().unwrap())
                     .collect();
-                let src = self.chal_to_pub(chal).unwrap();
-                self.send_message_errlog(&src, WSSignalMessage::ListIDsReply(ids));
+                if let Some(src) = self.chal_to_pub(chal) {
+                    self.send_message_errlog(&src, WSSignalMessage::ListIDsReply(ids));
+                }
             }
 
             // Node sends a PeerRequest with some of the data set to 'Some'.

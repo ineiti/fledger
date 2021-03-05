@@ -42,6 +42,7 @@ struct Model {
     log_str: Arc<Mutex<String>>,
     counter: u32,
     show_reset: bool,
+    no_contact_yet: bool,
     logger: NodeLogger,
 }
 
@@ -83,6 +84,7 @@ impl Component for Model {
             log_str: Arc::clone(&logger.str),
             counter: 0,
             show_reset: false,
+            no_contact_yet: true,
             logger: node_logger,
         }
     }
@@ -90,6 +92,18 @@ impl Component for Model {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::UpdateLog => {
+                if self.no_contact_yet{
+                    if let Some(n) = self.node_copy() {
+                        let mut node = n.lock().unwrap();
+                        if let Ok(l) = node.get_list(){
+                            self.logger.info(&format!("List length is: {:?}", l));
+                            if l.len() > 0{
+                                self.no_contact_yet = false;
+                                self.node_ping();
+                            }
+                        }
+                    }
+                }
                 self.counter += 1;
                 if self.counter % 15 == 0 {
                     self.node_list();
@@ -97,7 +111,10 @@ impl Component for Model {
                 }
             }
             Msg::Node(res_node) => match res_node {
-                Ok(node) => self.node = Some(Arc::new(Mutex::new(node))),
+                Ok(node) => {
+                    self.logger.info("Got node");
+                    self.node = Some(Arc::new(Mutex::new(node)));
+                },
                 Err(e) => {
                     self.logger
                         .error(&format!("Couldn't create node: {}", e.as_string().unwrap()));
@@ -226,13 +243,10 @@ impl Model {
 
     fn node_list(&self) {
         if let Some(n) = self.node_copy() {
-            let log = self.logger.clone();
-            wasm_bindgen_futures::spawn_local(async move {
-                let mut node = n.lock().unwrap();
-                if let Err(e) = node.list().await {
-                    log.error(&format!("Couldn't get list: {:?}", e));
-                }
-            });
+            let mut node = n.lock().unwrap();
+            if let Err(e) = node.list() {
+                self.logger.error(&format!("Couldn't get list: {:?}", e));
+            }
         }
     }
 
