@@ -1,6 +1,6 @@
 #![recursion_limit = "1024"]
 
-use common::node::ext_interface::Logger;
+use common::node::{config::NodeInfo, ext_interface::Logger};
 use std::sync::Arc;
 use std::sync::Mutex;
 use yew::services::IntervalService;
@@ -13,8 +13,8 @@ use yew::prelude::*;
 use js_sys::Date;
 use regex::Regex;
 use wasm_lib::{
-    storage_logs::LocalStorage,
     logger::{LoggerOutput, NodeLogger},
+    storage_logs::LocalStorage,
     web_rtc_setup::WebRTCConnectionSetupWasm,
     web_socket::WebSocketWasm,
 };
@@ -92,12 +92,12 @@ impl Component for Model {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::UpdateLog => {
-                if self.no_contact_yet{
+                if self.no_contact_yet {
                     if let Some(n) = self.node_copy() {
                         let mut node = n.lock().unwrap();
-                        if let Ok(l) = node.get_list(){
+                        if let Ok(l) = node.get_list() {
                             self.logger.info(&format!("List length is: {:?}", l));
-                            if l.len() > 0{
+                            if l.len() > 0 {
                                 self.no_contact_yet = false;
                                 self.node_ping();
                             }
@@ -114,7 +114,7 @@ impl Component for Model {
                 Ok(node) => {
                     self.logger.info("Got node");
                     self.node = Some(Arc::new(Mutex::new(node)));
-                },
+                }
                 Err(e) => {
                     self.logger
                         .error(&format!("Couldn't create node: {}", e.as_string().unwrap()));
@@ -145,17 +145,23 @@ impl Component for Model {
         };
         html! {
             <div class="main">
+                <h1>{"Fledger Web Node"}</h1>
+                <p>{"This is a full node running in the web browser. Instead of having to invest
+                in big hardware, fleger is light enough that you can participate using a browser.
+                The mined Mana can be used to run smart contracts, store data, or use the
+                re-encryption service."}</p>
+                <p>{"For more information, see the documentation: "}
+                <a href={"https://fledg.re/doc/index.html"} target={"other"}>{"Fledger - the blockchain that could"}</a>
+                </p>
                 <div class="ui">
-                    <div>
-                        <ul>
-                            <li>{self.connection_state((*log).clone())}</li>
-                            <li>{self.nodes_connected()}</li>
-                            <li>{self.nodes_reachable()}</li>
-                        </ul>
-                        <button style={reset_style} onclick=self.link.callback(|_| Msg::Reset)>{ "Reset Config" }</button>
-                        <pre class="wrap" id="log">{"log:"}
-                        { log }</pre>
-                    </div>
+                    <ul>
+                        <li>{self.connection_state((*log).clone())}</li>
+                        <li>{self.nodes_connected()}</li>
+                        <li>{self.nodes_reachable()}</li>
+                    </ul>
+                    <button style={reset_style} onclick=self.link.callback(|_| Msg::Reset)>{ "Reset Config" }</button>
+                    // <pre class="wrap" id="log">{"log:"}
+                    // { log }</pre>
                 </div>
             </div>
         }
@@ -229,8 +235,16 @@ impl Model {
         );
     }
 
-    fn nodes_reachable(&self) -> &str {
-        return "Nodes reachable: N/A";
+    fn nodes_reachable(&self) -> String {
+        if let Some(n) = self.node_copy() {
+            let node = n.lock().unwrap();
+            if let Ok(pings) = node.get_pings_str(){
+                if pings.len() > 0 {
+                    return format!("Nodes reachable: {}", pings);
+                }
+            }
+        }
+        return "Nodes reachable: N/A".into();
     }
 
     fn node_copy<'a>(&self) -> Option<Arc<Mutex<Node>>> {
@@ -241,7 +255,7 @@ impl Model {
         }
     }
 
-    fn node_list(&self) {
+    fn node_list(&mut self) {
         if let Some(n) = self.node_copy() {
             let mut node = n.lock().unwrap();
             if let Err(e) = node.list() {

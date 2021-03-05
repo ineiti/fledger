@@ -7,6 +7,7 @@ pub mod types;
 use crate::node::{
     config::{NodeConfig, NodeInfo},
     ext_interface::{DataStorage, Logger},
+    logic::Logic,
     network::{Network, WebRTCReceive},
     types::U256,
 };
@@ -23,7 +24,7 @@ pub struct Node {
     pub network: Network,
     pub storage: Box<dyn DataStorage>,
     pub logger: Box<dyn Logger>,
-    // logic: Arc<Mutex<Logic>>,
+    logic: Arc<Mutex<Logic>>,
 }
 
 pub const CONFIG_NAME: &str = "nodeConfig";
@@ -39,7 +40,7 @@ impl Node {
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
     ) -> Result<Node, String> {
-        let config_str = match storage.load(CONFIG_NAME){
+        let config_str = match storage.load(CONFIG_NAME) {
             Ok(s) => s,
             Err(_) => {
                 logger.info(&format!("Couldn't load configuration - start with empty"));
@@ -49,10 +50,10 @@ impl Node {
         let config = NodeConfig::new(config_str)?;
         storage.save(CONFIG_NAME, &config.to_string()?)?;
         logger.info(&format!("Starting node: {}", config.our_node.public));
-        // let logic = Logic::new(config.our_node.clone());
-        let log_clone = logger.clone();
+        let logic = Logic::new(config.our_node.clone(), logger.clone());
+        let logic_clone = Arc::clone(&logic);
         let web_rtc_rcv: WebRTCReceive = Arc::new(Mutex::new(Box::new(move |id, msg| {
-            log_clone.info(&format!("Got msg id: {}, msg: {}", id, msg))
+            logic_clone.lock().unwrap().rcv(id, msg);
         })));
         let network = Network::new(
             ws,
@@ -68,7 +69,7 @@ impl Node {
             network,
             logger,
             nodes: vec![],
-            // logic,
+            logic,
         })
     }
 
@@ -83,8 +84,32 @@ impl Node {
     }
 
     /// Gets the current list
-    pub fn get_list(&mut self) -> Result<Vec<NodeInfo>, String>{
+    pub fn get_list(&mut self) -> Result<Vec<NodeInfo>, String> {
         self.network.get_list()
+    }
+
+    /// Get number of pings from each remote node
+    pub fn get_pings(&self) -> Result<Vec<(NodeInfo, u64)>, String> {
+        let pings = self.logic.lock().unwrap().pings.clone();
+        return Ok(self
+            .network
+            .get_list()?
+            .iter()
+            .map(|n| (n.clone(), *pings.get(&n.public).or(Some(&0u64)).unwrap()))
+            .collect());
+    }
+
+    /// Returns a nicely formatted string of the nodes with number of pings received
+    pub fn get_pings_str(&self) -> Result<String, String> {
+        let lg = self.get_pings()?;
+        if lg.len() > 0 {
+            return Ok(lg
+                .iter()
+                .map(|ni| format!("({} / {})", ni.0.info.clone(), ni.1))
+                .collect::<Vec<String>>()
+                .join(" :: "));
+        }
+        Ok("".into())
     }
 
     /// Pings all known nodes
@@ -106,7 +131,7 @@ impl Node {
         self.network.send(dst, msg).await
     }
 
-    pub fn set_config(storage: Box<dyn DataStorage>, config: &str) -> Result<(), String>{
+    pub fn set_config(storage: Box<dyn DataStorage>, config: &str) -> Result<(), String> {
         storage.save(CONFIG_NAME, config)
     }
 }
