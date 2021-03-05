@@ -17,6 +17,7 @@ async-trait = "0.1.42"
 wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
 js-sys = "0.3.46"
 wasm-bindgen-futures = "0.4.19"
+names = { path = "../vendor/names" }
 
 futures = ""
 
