@@ -49,7 +49,10 @@ impl Node {
         };
         let config = NodeConfig::new(config_str)?;
         storage.save(CONFIG_NAME, &config.to_string()?)?;
-        logger.info(&format!("Starting node: {}", config.our_node.public));
+        logger.info(&format!(
+            "Starting node: {} = {}",
+            config.our_node.info, config.our_node.public
+        ));
         let logic = Logic::new(config.our_node.clone(), logger.clone());
         let logic_clone = Arc::clone(&logic);
         let web_rtc_rcv: WebRTCReceive = Arc::new(Mutex::new(Box::new(move |id, msg| {

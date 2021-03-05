@@ -155,6 +155,7 @@ impl Component for Model {
                 </p>
                 <div class="ui">
                     <ul>
+                        <li>{"Our node: "}{self.describe()}</li>
                         <li>{self.connection_state((*log).clone())}</li>
                         <li>{self.nodes_connected()}</li>
                         <li>{self.nodes_reachable()}</li>
@@ -181,6 +182,14 @@ impl Model {
             },
             link.callback(|n: Result<Node, JsValue>| Msg::Node(n)),
         ));
+    }
+
+    fn describe(&self) -> String{
+        if let Some(n) = self.node_copy() {
+            let node = n.lock().unwrap();
+            return format!("{} => {}", node.info.info, node.info.public);
+        }
+        return "Unknown".into();
     }
 
     fn set_config(data: &str) {

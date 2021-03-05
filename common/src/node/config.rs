@@ -16,7 +16,7 @@ impl NodeInfo {
     pub fn new() -> NodeInfo {
         NodeInfo {
             public: U256::rnd(),
-            info: "new node".to_string(),
+            info: names::Generator::default().next().unwrap().to_string(),
             ip: "127".to_string(),
             webrtc_address: "something".to_string(),
         }
