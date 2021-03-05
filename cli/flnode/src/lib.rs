@@ -49,9 +49,10 @@ async fn start(log: Box<dyn Logger>, url: &str) -> Result<Node, JsValue> {
     Ok(node)
 }
 
-async fn list_ping(n: &mut Node) -> Result<(), String>{
+async fn list_ping(log: Box<dyn Logger>, n: &mut Node) -> Result<(), String>{
     n.list()?;
     n.ping("something").await?;
+    log.info(&format!("Nodes: {}", n.get_pings_str()?));
     Ok(())
 }
 
@@ -66,7 +67,7 @@ extern "C" {
 pub async fn run_app() {
     console_error_panic_hook::set_once();
 
-    let logger = ConsoleLogger{};
+    let logger = Box::new(ConsoleLogger{});
     logger.info("starting app for now!");
 
     let mut node = match start(logger.clone(), URL).await{
@@ -80,7 +81,7 @@ pub async fn run_app() {
     loop{
         logger.info("Waiting");
         wait_ms(10000).await;
-        if let Err(e) = list_ping(&mut node).await{
+        if let Err(e) = list_ping(logger.clone(), &mut node).await{
             logger.error(&format!("Couldn't list or ping nodes: {}", e));
         }
     }
