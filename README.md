@@ -63,7 +63,7 @@ instructions.
 Get the `docker-compose.yaml` and run it:
 
 ```bash
-wget https://github.com/ineiti/fledger/blob/main/docker-compose.yaml
+wget https://github.com/ineiti/fledger/raw/main/docker-compose.yaml
 docker-compose up -d
 ```
 
