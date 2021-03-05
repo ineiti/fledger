@@ -78,8 +78,13 @@ impl Node {
     }
 
     /// Requests a list of all connected nodes
-    pub async fn list(&mut self) -> Result<(), String> {
+    pub fn list(&mut self) -> Result<(), String> {
         self.network.update_node_list()
+    }
+
+    /// Gets the current list
+    pub fn get_list(&mut self) -> Result<Vec<NodeInfo>, String>{
+        self.network.get_list()
     }
 
     /// Pings all known nodes

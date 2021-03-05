@@ -111,6 +111,7 @@ impl Intern {
                     node_info: self.node_info.clone(),
                 };
                 self.send_ws(WSSignalMessage::Announce(ma));
+                self.update_node_list();
             }
             WSSignalMessage::ListIDsReply(list) => {
                 self.logger.info("Processing ListIDsReply message");

@@ -50,7 +50,7 @@ async fn start(log: Box<dyn Logger>, url: &str) -> Result<Node, JsValue> {
 }
 
 async fn list_ping(n: &mut Node) -> Result<(), String>{
-    n.list().await?;
+    n.list()?;
     n.ping("something").await?;
     Ok(())
 }
