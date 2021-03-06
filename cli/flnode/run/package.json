@@ -20,6 +20,7 @@
   "main": "wasm.js",
   "types": "wasm.d.ts",
   "dependencies": {
+    "node-pre-gyp": "^0.17.0",
     "wrtc": "^0.4.7",
     "ws": "^7.4.3"
   }

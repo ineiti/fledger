@@ -3,6 +3,9 @@ wasm := static/wasm_bg.wasm
 build = wasm-pack build --debug --target nodejs --out-name wasm \
 	--out-dir ./static -- $(FEATURES)
 
+clean:
+	rm $(wasm)
+
 run: build_local
 	node run/main.js
 
@@ -12,14 +15,15 @@ run2: build_local
 	cd node2 && node ../run/main.js
 
 run_remote: build
-	cd run; npm ci
 	node run/main.js
 
-build: ${wasm}
+build: ${wasm} run/node_modules
+
+run/node_modules:
+	cd run; npm ci
 
 ${wasm}: ${src}
 	${build}
 
 build_local: FEATURES=--features local
 build_local: build
-	cd run; npm ci

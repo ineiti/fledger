@@ -263,8 +263,8 @@ fn ice_start(rp_conn: &RtcPeerConnection) -> Receiver<String> {
                         candidate.sdp_mid().unwrap(),
                         candidate.sdp_m_line_index().unwrap()
                     );
-                    match s1.try_send(cand) {
-                        Ok(_) => (),
+                    match s1.try_send(cand.clone()) {
+                        Ok(_) => log(&format!("Transmitted ICE string {}", cand)),
                         Err(e) => log(&format!("Couldn't transmit ICE string: {:?}", e)),
                     }
                 }
