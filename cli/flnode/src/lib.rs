@@ -81,7 +81,7 @@ pub async fn run_app() {
     let mut i = 0;
     loop {
         i = i + 1;
-        if let Err(e) = node.process().await{
+        if let Err(e) = node.process().await {
             logger.error(&format!("Error while processing messages: {}", e));
         }
         if i % 10 == 0 {

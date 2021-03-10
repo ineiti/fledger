@@ -76,52 +76,11 @@ impl WebRTCConnectionSetupWasm {
         }
         Ok(())
     }
-
-    // fn is_not_setup(&self) -> Result<(), String> {
-    //     if self.dc.is_some() {
-    //         return Err("This method is only available before setup is complete".to_string());
-    //     }
-    //     Ok(())
-    // }
-    //
-    // async fn is_setup(&mut self) -> Result<(), String> {
-    //     if self.dc.is_none() {
-    //         self.is_not_setup()?;
-    //         for _ in 0u8..10 {
-    //             match self.ch_dc.try_iter().next() {
-    //                 Some(dc) => {
-    //                     log(&format!("Found RDC: {:?}", dc.ready_state()));
-    //                     self.dc = Some(dc);
-    //                     return Ok(());
-    //                 }
-    //                 None => wait_ms(1000).await,
-    //             }
-    //         }
-    //         return Err("This method is only available once setup is complete".to_string());
-    //     }
-    //     Ok(())
-    // }
-    //
-    // async fn is_open(&mut self) -> Result<(), String> {
-    //     self.is_setup().await?;
-    //     for _ in 0u8..10 {
-    //         match &self.dc {
-    //             Some(dc) => {
-    //                 if dc.ready_state() == RtcDataChannelState::Open {
-    //                     return Ok(());
-    //                 }
-    //             }
-    //             None => return Err("DataChannel should be set by now!".to_string()),
-    //         }
-    //         wait_ms(1000).await;
-    //     }
-    //     Err("DataChannelState is not going into 'Open'".to_string())
-    // }
 }
 
 #[async_trait(?Send)]
 impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
-    /// Returns the offer string that needs to be sent to the `Follower` node.
+    // Returns the offer string that needs to be sent to the `Follower` node.
     async fn make_offer(&mut self) -> Result<String, String> {
         self.is_initializer()?;
         let offer = JsFuture::from(self.rp_conn.create_offer())
@@ -141,7 +100,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         Ok(offer_sdp)
     }
 
-    /// Takes the offer string
+    // Takes the offer string
     async fn make_answer(&mut self, offer: String) -> Result<String, String> {
         self.is_follower()?;
         let mut offer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
@@ -172,7 +131,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         Ok(answer_sdp)
     }
 
-    /// Takes the answer string and finalizes the first part of the connection.
+    // Takes the answer string and finalizes the first part of the connection.
     async fn use_answer(&mut self, answer: String) -> Result<(), String> {
         self.is_initializer()?;
         let mut answer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
@@ -184,7 +143,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         Ok(())
     }
 
-    /// Waits for the ICE to move on from the 'New' state
+    // Waits for the ICE to move on from the 'New' state
     async fn wait_gathering(&mut self) -> Result<(), String> {
         // self.is_not_setup()?;
         for _ in 0u8..10 {
@@ -196,18 +155,18 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         Err("Didn't reach IceGatheringState".to_string())
     }
 
-    /// Waits for the ICE string to be avaialble.
+    // Waits for the ICE string to be avaialble.
     async fn set_callback(&mut self, cb: WebRTCSetupCB) {
         self.callback.lock().unwrap().replace(cb);
     }
 
-    /// Sends the ICE string to the WebRTC.
+    // Sends the ICE string to the WebRTC.
     async fn ice_put(&mut self, ice: String) -> Result<(), String> {
         // self.is_not_setup()?;
         let rp_clone = self.rp_conn.clone();
         let els: Vec<&str> = ice.split(":-:").collect();
         if els.len() != 3 {
-            return Err("wrong ice candidate string".to_string());
+            return Err(format!("wrong ice candidate string: {}", ice));
         }
         let mut ric_init = RtcIceCandidateInit::new(els[0]);
         ric_init.sdp_mid(Some(els[1]));
@@ -231,12 +190,6 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
             self.rp_conn.ice_connection_state()
         ));
     }
-
-    // TODO: move that to the callback
-    // async fn get_connection(&mut self) -> Result<Box<dyn WebRTCConnection>, String> {
-    //     self.is_open().await?;
-    //     Ok(WebRTCConnectionWasm::new(self.dc.take().unwrap(), self.rp_conn.clone()))
-    // }
 }
 
 fn ice_start(rp_conn: &RtcPeerConnection, callback: Arc<Mutex<Option<WebRTCSetupCB>>>) {
@@ -269,7 +222,6 @@ fn dc_create_init(rp_conn: RtcPeerConnection, cb: Arc<Mutex<Option<WebRTCSetupCB
 fn dc_create_follow(rp_conn: RtcPeerConnection, cb: Arc<Mutex<Option<WebRTCSetupCB>>>) {
     let mut rpc = Some(rp_conn.clone());
     let ondatachannel_callback = Closure::wrap(Box::new(move |ev: RtcDataChannelEvent| {
-        log("Setting new DataChannel");
         let dc = ev.channel();
         dc_set_onopen(&mut Some(dc), &mut rpc, Arc::clone(&cb));
     }) as Box<dyn FnMut(RtcDataChannelEvent)>);
@@ -286,7 +238,6 @@ fn dc_set_onopen(
     let mut dccc = Some(dcc.clone());
     let mut rpc = Some(rp_conn.take().unwrap());
     let ondatachannel_open = Closure::wrap(Box::new(move |_ev: Event| {
-        log("DataChannel opened");
         let conn = WebRTCConnectionWasm::new(dccc.take().unwrap(), rpc.take().unwrap());
         cb.lock().unwrap().as_ref().unwrap()(WebRTCSetupCBMessage::Connection(conn));
     }) as Box<dyn FnMut(Event)>);

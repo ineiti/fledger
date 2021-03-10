@@ -107,6 +107,8 @@ impl ConnectionState {
                 .send(CSOutput::WebSocket(PeerMessage::IceCandidate(ice)))
                 .map_err(|e| e.to_string()),
             WebRTCSetupCBMessage::Connection(conn) => {
+                self.logger
+                    .info(&format!("Connected with remote = {}", self.remote));
                 let chan = self.output_tx.clone();
                 let log = self.logger.clone();
                 conn.set_cb_message(Box::new(move |msg| {
@@ -161,7 +163,16 @@ impl ConnectionState {
             CSEnum::Idle => {
                 self.process_peer_message(PeerMessage::Init).await?;
             }
-            CSEnum::Connected => return self.connected.as_ref().unwrap().send(msg),
+            CSEnum::Connected => {
+                if let Err(e) = self.connected.as_ref().unwrap().send(msg) {
+                    self.logger.error(&format!(
+                        "Couldn't send over webrtc, resetting connection: {}",
+                        e
+                    ));
+                    self.state = CSEnum::Idle;
+                }
+                return Ok(());
+            }
             _ => {}
         }
         self.send_queue.push(msg);
