@@ -1,19 +1,20 @@
 use async_trait::async_trait;
 
-use std::sync::mpsc;
-use std::sync::mpsc::Receiver;
+use std::sync::{
+    Arc, Mutex,
+};
 
 use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
-use common::signal::web_rtc::{WebRTCConnection, WebRTCConnectionSetup, WebRTCConnectionState};
+use common::signal::web_rtc::{WebRTCSetupCB, WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCBMessage};
 
 use web_sys::{
-    console::log_1, RtcDataChannel, RtcDataChannelEvent, RtcDataChannelState, RtcIceCandidate,
+    console::log_1, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
     RtcIceCandidateInit, RtcIceGatheringState, RtcPeerConnection, RtcPeerConnectionIceEvent,
-    RtcSdpType, RtcSessionDescriptionInit,
+    RtcSdpType, RtcSessionDescriptionInit, Event,
 };
 
 use crate::{logs::wait_ms, web_rtc_connection::WebRTCConnectionWasm};
@@ -26,9 +27,7 @@ fn log(s: &str) {
 pub struct WebRTCConnectionSetupWasm {
     nt: WebRTCConnectionState,
     rp_conn: RtcPeerConnection,
-    ch_dc: Receiver<RtcDataChannel>,
-    ch_ice: Receiver<String>,
-    dc: Option<RtcDataChannel>,
+    callback: Arc<Mutex<Option<WebRTCSetupCB>>>,
 }
 
 impl WebRTCConnectionSetupWasm {
@@ -48,17 +47,16 @@ impl WebRTCConnectionSetupWasm {
     pub fn new(nt: WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, String> {
         let rp_conn =
             RtcPeerConnection::new().map_err(|e| format!("PeerConnection error: {:?}", e))?;
-        let ch_dc = match nt {
-            WebRTCConnectionState::Initializer => dc_create_init(&rp_conn)?,
-            WebRTCConnectionState::Follower => dc_create_follow(&rp_conn),
-        };
-        let ch_ice = ice_start(&rp_conn);
         let rn = WebRTCConnectionSetupWasm {
             nt,
-            rp_conn,
-            ch_dc,
-            ch_ice,
-            dc: None,
+            rp_conn: rp_conn.clone(),
+            callback: Arc::new(Mutex::new(None)),
+        };
+        ice_start(&rp_conn, Arc::clone(&rn.callback));
+        let cb_clone = Arc::clone(&rn.callback);
+        match nt {
+            WebRTCConnectionState::Initializer => dc_create_init(rp_conn.clone(), cb_clone),
+            WebRTCConnectionState::Follower => dc_create_follow(rp_conn.clone(), cb_clone),
         };
         Ok(Box::new(rn))
     }
@@ -79,46 +77,46 @@ impl WebRTCConnectionSetupWasm {
         Ok(())
     }
 
-    fn is_not_setup(&self) -> Result<(), String> {
-        if self.dc.is_some() {
-            return Err("This method is only available before setup is complete".to_string());
-        }
-        Ok(())
-    }
-
-    async fn is_setup(&mut self) -> Result<(), String> {
-        if self.dc.is_none() {
-            self.is_not_setup()?;
-            for _ in 0u8..10 {
-                match self.ch_dc.try_iter().next() {
-                    Some(dc) => {
-                        log(&format!("Found RDC: {:?}", dc.ready_state()));
-                        self.dc = Some(dc);
-                        return Ok(());
-                    }
-                    None => wait_ms(1000).await,
-                }
-            }
-            return Err("This method is only available once setup is complete".to_string());
-        }
-        Ok(())
-    }
-
-    async fn is_open(&mut self) -> Result<(), String> {
-        self.is_setup().await?;
-        for _ in 0u8..10 {
-            match &self.dc {
-                Some(dc) => {
-                    if dc.ready_state() == RtcDataChannelState::Open {
-                        return Ok(());
-                    }
-                }
-                None => return Err("DataChannel should be set by now!".to_string()),
-            }
-            wait_ms(1000).await;
-        }
-        Err("DataChannelState is not going into 'Open'".to_string())
-    }
+    // fn is_not_setup(&self) -> Result<(), String> {
+    //     if self.dc.is_some() {
+    //         return Err("This method is only available before setup is complete".to_string());
+    //     }
+    //     Ok(())
+    // }
+    //
+    // async fn is_setup(&mut self) -> Result<(), String> {
+    //     if self.dc.is_none() {
+    //         self.is_not_setup()?;
+    //         for _ in 0u8..10 {
+    //             match self.ch_dc.try_iter().next() {
+    //                 Some(dc) => {
+    //                     log(&format!("Found RDC: {:?}", dc.ready_state()));
+    //                     self.dc = Some(dc);
+    //                     return Ok(());
+    //                 }
+    //                 None => wait_ms(1000).await,
+    //             }
+    //         }
+    //         return Err("This method is only available once setup is complete".to_string());
+    //     }
+    //     Ok(())
+    // }
+    //
+    // async fn is_open(&mut self) -> Result<(), String> {
+    //     self.is_setup().await?;
+    //     for _ in 0u8..10 {
+    //         match &self.dc {
+    //             Some(dc) => {
+    //                 if dc.ready_state() == RtcDataChannelState::Open {
+    //                     return Ok(());
+    //                 }
+    //             }
+    //             None => return Err("DataChannel should be set by now!".to_string()),
+    //         }
+    //         wait_ms(1000).await;
+    //     }
+    //     Err("DataChannelState is not going into 'Open'".to_string())
+    // }
 }
 
 #[async_trait(?Send)]
@@ -188,7 +186,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
 
     /// Waits for the ICE to move on from the 'New' state
     async fn wait_gathering(&mut self) -> Result<(), String> {
-        self.is_not_setup()?;
+        // self.is_not_setup()?;
         for _ in 0u8..10 {
             match self.rp_conn.ice_gathering_state() {
                 RtcIceGatheringState::New => wait_ms(1000).await,
@@ -199,23 +197,13 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     }
 
     /// Waits for the ICE string to be avaialble.
-    async fn ice_string(&mut self) -> Result<String, String> {
-        self.is_not_setup()?;
-        for _ in 0..10 {
-            match self.ch_ice.try_iter().next() {
-                Some(s) => {
-                    return Ok(s);
-                }
-                None => (),
-            };
-            wait_ms(1000).await;
-        }
-        Err("Didn't get ICE in time".to_string())
+    async fn set_callback(&mut self, cb: WebRTCSetupCB){
+        self.callback.lock().unwrap().replace(cb);
     }
 
     /// Sends the ICE string to the WebRTC.
     async fn ice_put(&mut self, ice: String) -> Result<(), String> {
-        self.is_not_setup()?;
+        // self.is_not_setup()?;
         let rp_clone = self.rp_conn.clone();
         let els: Vec<&str> = ice.split("::").collect();
         if els.len() != 3 {
@@ -244,18 +232,20 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         ));
     }
 
-    async fn get_connection(&mut self) -> Result<Box<dyn WebRTCConnection>, String> {
-        self.is_open().await?;
-        Ok(WebRTCConnectionWasm::new(self.dc.take().unwrap(), self.rp_conn.clone()))
-    }
+    // TODO: move that to the callback
+    // async fn get_connection(&mut self) -> Result<Box<dyn WebRTCConnection>, String> {
+    //     self.is_open().await?;
+    //     Ok(WebRTCConnectionWasm::new(self.dc.take().unwrap(), self.rp_conn.clone()))
+    // }
 }
 
-fn ice_start(rp_conn: &RtcPeerConnection) -> Receiver<String> {
-    let (s1, r1) = mpsc::sync_channel::<String>(1);
-
+fn ice_start(rp_conn: &RtcPeerConnection,
+    callback: Arc<Mutex<Option<WebRTCSetupCB>>>){
     let onicecandidate_callback1 =
         Closure::wrap(
-            Box::new(move |ev: RtcPeerConnectionIceEvent| match ev.candidate() {
+            Box::new(move |ev: RtcPeerConnectionIceEvent|
+                {log(&format!(":: Got ICE candidate: {:?}", ev.candidate()));
+                match ev.candidate() {
                 Some(candidate) => {
                     let cand = format!(
                         "{}::{}::{}",
@@ -263,36 +253,48 @@ fn ice_start(rp_conn: &RtcPeerConnection) -> Receiver<String> {
                         candidate.sdp_mid().unwrap(),
                         candidate.sdp_m_line_index().unwrap()
                     );
-                    match s1.try_send(cand.clone()) {
-                        Ok(_) => log(&format!("Transmitted ICE string {}", cand)),
-                        Err(e) => log(&format!("Couldn't transmit ICE string: {:?}", e)),
+                    log(":: Sending candidate");
+                    if let Some(cb) = callback.lock().unwrap().as_ref(){
+                        log(":: Calling callback");
+                        cb(WebRTCSetupCBMessage::Ice(cand.clone()));
+                        log(":: Callback done");
                     }
+                    log(":: Over and out");
                 }
-                None => {}
+                None => {log(":: Nothing to see");}
+            }
             }) as Box<dyn FnMut(RtcPeerConnectionIceEvent)>,
         );
     rp_conn.set_onicecandidate(Some(onicecandidate_callback1.as_ref().unchecked_ref()));
     onicecandidate_callback1.forget();
-    r1
 }
 
-fn dc_create_init(rp_conn: &RtcPeerConnection) -> Result<Receiver<RtcDataChannel>, String> {
+fn dc_create_init(rp_conn: RtcPeerConnection, cb: Arc<Mutex<Option<WebRTCSetupCB>>>){
     let dc = rp_conn.create_data_channel("data-channel");
-    let (dc_send, dc_rcv) = mpsc::sync_channel::<RtcDataChannel>(1);
-    dc_send.send(dc).map_err(|err| err.to_string())?;
-    Ok(dc_rcv)
+    dc_set_onopen(&mut Some(dc), &mut Some(rp_conn), cb);
 }
 
-fn dc_create_follow(rp_conn: &RtcPeerConnection) -> Receiver<RtcDataChannel> {
-    let (dc_send, dc_rcv) = mpsc::sync_channel::<RtcDataChannel>(1);
+fn dc_create_follow(rp_conn: RtcPeerConnection, cb: Arc<Mutex<Option<WebRTCSetupCB>>>) {
+    let mut rpc = Some(rp_conn.clone());
     let ondatachannel_callback = Closure::wrap(Box::new(move |ev: RtcDataChannelEvent| {
+        log("Setting new DataChannel");
         let dc = ev.channel();
-        match dc_send.send(dc) {
-            Err(e) => log(&format!("Error while sending dc: {:?}", e)),
-            _ => (),
-        };
+        dc_set_onopen(&mut Some(dc), &mut rpc, Arc::clone(&cb));
     }) as Box<dyn FnMut(RtcDataChannelEvent)>);
     rp_conn.set_ondatachannel(Some(ondatachannel_callback.as_ref().unchecked_ref()));
     ondatachannel_callback.forget();
-    dc_rcv
+}
+
+fn dc_set_onopen(dc: &mut Option<RtcDataChannel>, rp_conn: &mut Option<RtcPeerConnection>,
+cb: Arc<Mutex<Option<WebRTCSetupCB>>>){
+    let dcc = dc.take().unwrap();
+    let mut dccc = Some(dcc.clone());
+    let mut rpc = Some(rp_conn.take().unwrap());
+    let ondatachannel_open = Closure::wrap(Box::new(move |_ev: Event| {
+        log("DataChannel opened");
+        let conn = WebRTCConnectionWasm::new(dccc.take().unwrap(), rpc.take().unwrap());
+        cb.lock().unwrap().as_ref().unwrap()(WebRTCSetupCBMessage::Connection(conn));
+    }) as Box<dyn FnMut(Event)>);
+    dcc.set_onopen(Some(ondatachannel_open.as_ref().unchecked_ref()));
+    ondatachannel_open.forget();
 }

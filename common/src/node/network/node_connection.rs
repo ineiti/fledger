@@ -1,11 +1,27 @@
-use crate::{node::ext_interface::Logger, signal::web_rtc::ConnectionStateMap};
-
-use crate::signal::web_rtc::setup::ProcessResult;
-use crate::signal::web_rtc::{
-    setup::WebRTCSetup, PeerMessage, WebRTCConnection, WebRTCConnectionState, WebRTCMessageCB,
-    WebRTCSpawner,
+use crate::{
+    node::{
+        ext_interface::Logger,
+        network::connection_state::{CSEnum, CSInput, CSOutput, ConnectionState},
+    },
+    signal::web_rtc::{ConnectionStateMap, PeerMessage},
 };
-use std::sync::{Arc, Mutex};
+
+use crate::signal::web_rtc::WebRTCSpawner;
+use std::sync::{
+    mpsc::{channel, Receiver, Sender},
+    Arc, Mutex,
+};
+
+#[derive(Debug)]
+pub enum NCInput {
+    WebSocket(PeerMessage, bool),
+}
+
+#[derive(Debug)]
+pub enum NCOutput {
+    WebSocket(PeerMessage, bool),
+    WebRTCMessage(String),
+}
 
 /// There might be up to two connections per remote node.
 /// This is in the case both nodes try to set up a connection at the same time.
@@ -15,202 +31,138 @@ use std::sync::{Arc, Mutex};
 /// connection is considered stale and discarded.
 pub struct NodeConnection {
     // outgoing connections are the preferred ones.
-    pub outgoing: Option<Box<dyn WebRTCConnection>>,
-    // the setup connection, which will be None once the connection exists.
-    pub outgoing_setup: Option<WebRTCSetup>,
-    // during the setup of the connection, all new messages to be sent go into
-    // the queue.
-    outgoing_queue: Vec<String>,
-
+    pub outgoing: ConnectionState,
     // incoming connections are connections initiated from another node.
-    pub incoming: Option<Box<dyn WebRTCConnection>>,
-    pub incoming_setup: Option<WebRTCSetup>,
+    pub incoming: ConnectionState,
 
-    web_rtc: Arc<Mutex<WebRTCSpawner>>,
-    cb_msg: Arc<Mutex<WebRTCMessageCB>>,
+    // channels for communicating with this module
+    pub output_rx: Receiver<NCOutput>,
+    pub input_tx: Sender<NCInput>,
+    output_tx: Sender<NCOutput>,
+    input_rx: Receiver<NCInput>,
+
     logger: Box<dyn Logger>,
-}
-
-pub enum ConnectionType<'a> {
-    Setup,
-    Connection(&'a mut Box<dyn WebRTCConnection>),
+    states: Vec<Option<ConnectionStateMap>>,
 }
 
 impl NodeConnection {
-    pub fn new(
-        web_rtc: Arc<Mutex<WebRTCSpawner>>,
-        cb_msg: WebRTCMessageCB,
-        logger: Box<dyn Logger>,
-    ) -> NodeConnection {
-        NodeConnection {
-            incoming: None,
-            incoming_setup: None,
-            outgoing: None,
-            outgoing_setup: None,
-            outgoing_queue: vec![],
-            web_rtc,
-            cb_msg: Arc::new(Mutex::new(cb_msg)),
+    pub fn new(logger: Box<dyn Logger>, web_rtc: Arc<Mutex<WebRTCSpawner>>) ->
+    Result<NodeConnection, String> {
+        let (output_tx, output_rx) = channel::<NCOutput>();
+        let (input_tx, input_rx) = channel::<NCInput>();
+        let nc = NodeConnection {
+            outgoing: ConnectionState::new(false, logger.clone(), Arc::clone(&web_rtc))?,
+            incoming: ConnectionState::new(true, logger.clone(), Arc::clone(&web_rtc))?,
+            output_tx,
+            output_rx,
+            input_tx,
+            input_rx,
             logger,
-        }
+            states: vec![None, None],
+        };
+        Ok(nc)
     }
 
-    pub async fn get_stats(&self) -> Result<Vec<Option<ConnectionStateMap>>, String> {
-        let mut ret = vec![];
-        for dir in vec![self.incoming.as_ref(), self.outgoing.as_ref()] {
-            match dir {
-                Some(conn) => ret.push(Some(conn.get_state().await?)),
-                None => ret.push(None),
-            }
-        }
-        Ok(ret)
+    /// Processes all messages waiting from the submodules, and calls the submodules to
+    /// process waiting messages.
+    pub async fn process(&mut self) -> Result<(), String> {
+        self.process_connection(true, self.incoming.output_rx.try_iter().collect())
+            .await?;
+        self.process_connection(false, self.outgoing.output_rx.try_iter().collect())
+            .await?;
+        self.process_incoming().await?;
+        self.incoming.process().await?;
+        self.outgoing.process().await?;
+        Ok(())
     }
 
-    pub fn get_connection(&mut self) -> Option<ConnectionType> {
-        if let Some(conn) = self.outgoing.as_mut() {
-            return Some(ConnectionType::Connection(conn));
-        }
-        if let Some(conn) = self.incoming.as_mut() {
-            return Some(ConnectionType::Connection(conn));
-        }
-        if self.outgoing_setup.is_some() || self.incoming_setup.is_some() {
-            return Some(ConnectionType::Setup);
-        }
-
-        return None;
-    }
-
+    /// Tries to send a message over the webrtc connection.
+    /// If the connection is in setup phase, the message is queued.
+    /// If the connection is idle, an error is returned.
     pub fn send(&mut self, msg: String) -> Result<(), String> {
-        if let Some(ct) = self.get_connection() {
-            match ct {
-                ConnectionType::Setup => Ok(self.outgoing_queue.push(msg)),
-                ConnectionType::Connection(conn) => conn.send(msg),
-            }
-        } else {
-            Err("Neither connection nor setup".to_string())
+        // self.logger.info("dbg: Sending to node");
+        match self.get_connection_channel() {
+            Some(chan) => chan.send(CSInput::Send(msg)).map_err(|e| e.to_string()),
+            None => self
+                .outgoing
+                .input_tx
+                .send(CSInput::Send(msg))
+                .map_err(|e| e.to_string()),
         }
     }
 
-    pub fn get_setup(&self, state: WebRTCConnectionState) -> Result<WebRTCSetup, String> {
-        match self.web_rtc.try_lock() {
-            Ok(web_rtc) => {
-                let conn = web_rtc(state)?;
-                Ok(WebRTCSetup::new(
-                    Arc::new(Mutex::new(conn)),
-                    state,
-                    self.logger.clone(),
-                ))
+    /// Return the stats of outgoing / incoming connection. Every time this method
+    /// is called, a new state is requested. But the returned state is the last one
+    /// received.
+    pub async fn get_stats(&self) -> Result<Vec<Option<ConnectionStateMap>>, String> {
+        for chan in &[&self.incoming.input_tx, &self.outgoing.input_tx] {
+            chan.send(CSInput::GetState).map_err(|e| e.to_string())?;
+        }
+        Ok(self.states.clone())
+    }
+
+    async fn process_incoming(&mut self) -> Result<(), String> {
+        let msgs: Vec<NCInput> = self.input_rx.try_iter().collect();
+        for msg in msgs {
+            match msg {
+                NCInput::WebSocket(pi, remote) => self.process_ws(pi, remote).await?,
             }
-            Err(_) => Err("Couldn't get lock on web_rtc in get_setup".to_string()),
+        }
+        Ok(())
+    }
+
+    async fn process_ws(&mut self, ws_msg: PeerMessage, remote: bool) -> Result<(), String> {
+        let msg = CSInput::ProcessPeerMessage(ws_msg);
+        match remote {
+            false => self.outgoing.input_tx.send(msg).map_err(|e| e.to_string()),
+            true => self.incoming.input_tx.send(msg).map_err(|e| e.to_string()),
         }
     }
 
-    pub async fn process_peer_setup(
+    /// Processes incoming messages from a connection.
+    async fn process_connection(
         &mut self,
-        pi_message: PeerMessage,
         remote: bool,
-    ) -> Result<Option<PeerMessage>, String> {
-        if remote {
-            self.process_peer_setup_incoming(pi_message).await
-        } else {
-            self.process_peer_setup_outgoing(pi_message).await
-        }
-    }
-
-    /// Process message for incoming webrtc setup.
-    pub async fn process_peer_setup_incoming(
-        &mut self,
-        pi_message: PeerMessage,
-    ) -> Result<Option<PeerMessage>, String> {
-        match self.incoming_setup.as_mut() {
-            Some(web) => match web.process(pi_message).await? {
-                ProcessResult::Message(message) => {
-                    return Ok(Some(message));
-                }
-                ProcessResult::Connection(new_conn) => {
-                    self.incoming_setup = None;
-                    let cb = Arc::clone(&self.cb_msg);
-                    let log = self.logger.clone();
-                    new_conn.set_cb_message(Box::new(move |msg| {
-                        if let Ok(mut cb_mut) = cb.try_lock() {
-                            cb_mut(msg);
-                        } else {
-                            log.error("Couldn't lock cb-msg in process_peer_setup_incoming");
-                        }
-                    }));
-                    self.incoming = Some(new_conn);
-                    return Ok(Some(PeerMessage::DoneFollow));
-                }
-            },
-            None => {
-                if let PeerMessage::Offer(_) = pi_message {
-                    let mut web = self.get_setup(WebRTCConnectionState::Follower)?;
-                    match web.process(pi_message).await? {
-                        ProcessResult::Message(message) => {
-                            self.incoming_setup = Some(web);
-                            return Ok(Some(message));
-                        }
-                        _ => return Err("couldn't start webrtc handshake".to_string()),
+        cmds: Vec<CSOutput>,
+    ) -> Result<(), String> {
+        for cmd in cmds {
+            // self.logger.info(&format!("dbg: NodeConnect::process {:?}", cmd));
+            match cmd {
+                CSOutput::State(s) => {
+                    if remote {
+                        self.states[1] = s;
+                    } else {
+                        self.states[0] = s;
                     }
                 }
-                return Err(
-                    "Can only start follower webrtc handshake with Offer message".to_string(),
-                );
+                CSOutput::WebSocket(msg) => self
+                    .output_tx
+                    .send(NCOutput::WebSocket(msg, remote))
+                    .map_err(|e| e.to_string())?,
+                CSOutput::WebRTCMessage(msg) => self
+                    .output_tx
+                    .send(NCOutput::WebRTCMessage(msg))
+                    .map_err(|e| e.to_string())?,
             }
         }
+        Ok(())
     }
 
-    /// Process message for outgoing webrtc setup.
-    pub async fn process_peer_setup_outgoing(
-        &mut self,
-        pi_message: PeerMessage,
-    ) -> Result<Option<PeerMessage>, String> {
-        match self.outgoing_setup.as_mut() {
-            Some(web) => match web.process(pi_message).await? {
-                ProcessResult::Message(message) => {
-                    return Ok(Some(message));
-                }
-                ProcessResult::Connection(new_conn) => {
-                    self.outgoing_setup = None;
-                    let cb = Arc::clone(&self.cb_msg);
-                    let log = self.logger.clone();
-                    new_conn.set_cb_message(Box::new(move |msg| {
-                        if let Ok(mut cb_mut) = cb.try_lock() {
-                            cb_mut(msg);
-                        } else {
-                            log.error("Couldn't lock cb-msg in process_peer_setup_outgoing");
-                        }
-                    }));
-                    self.outgoing = Some(new_conn);
-                    return Ok(Some(PeerMessage::DoneInit));
-                }
-            },
-            None => match pi_message {
-                PeerMessage::Init => {
-                    let mut web = self.get_setup(WebRTCConnectionState::Initializer)?;
-                    match web.process(PeerMessage::Init).await? {
-                        ProcessResult::Message(message) => {
-                            self.outgoing = None;
-                            self.outgoing_setup = Some(web);
-                            return Ok(Some(message));
-                        }
-                        _ => return Err("couldn't start webrtc handshake".to_string()),
-                    }
-                }
-                PeerMessage::DoneFollow => {
-                    if let Some(conn) = self.outgoing.as_mut() {
-                        for msg in self.outgoing_queue.iter() {
-                            conn.send(msg.to_string())?;
-                        }
-                        self.outgoing_queue = vec![];
-                    }
-                    return Ok(None);
-                }
-                _ => {
-                    return Err(
-                        "Can only start outgoing webrtc setup with Init message".to_string()
-                    );
-                }
-            },
+    /// Return a connected direction, preferably outgoing.
+    /// Else if one of the connections is setup, return setup (incoming first).
+    /// If all else fails, return None.
+    fn get_connection_channel(&mut self) -> Option<Sender<CSInput>> {
+        match self.outgoing.state {
+            CSEnum::Connected => return Some(self.outgoing.input_tx.clone()),
+            _ => {}
+        }
+        match self.incoming.state {
+            CSEnum::Idle => {}
+            _ => return Some(self.incoming.input_tx.clone()),
+        }
+        match self.outgoing.state {
+            CSEnum::Setup => Some(self.outgoing.input_tx.clone()),
+            _ => None,
         }
     }
 }

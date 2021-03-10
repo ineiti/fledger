@@ -1,4 +1,4 @@
-use common::node::ext_interface::{DataStorage,Logger};
+use common::node::ext_interface::{DataStorage, Logger};
 
 use common::node::Node;
 use wasm_bindgen::JsValue;
@@ -27,7 +27,7 @@ extern "C" {
 
 const STORAGE_NAME: &str = "fledger.toml";
 
-struct DummyDS{}
+struct DummyDS {}
 
 impl DataStorage for DummyDS {
     fn load(&self, _key: &str) -> Result<String, String> {
@@ -49,7 +49,7 @@ async fn start(log: Box<dyn Logger>, url: &str) -> Result<Node, JsValue> {
     Ok(node)
 }
 
-async fn list_ping(log: Box<dyn Logger>, n: &mut Node) -> Result<(), String>{
+async fn list_ping(log: Box<dyn Logger>, n: &mut Node) -> Result<(), String> {
     n.list()?;
     n.ping("something").await?;
     log.info(&format!("Nodes: {}", n.get_pings_str()?));
@@ -67,10 +67,10 @@ extern "C" {
 pub async fn run_app() {
     console_error_panic_hook::set_once();
 
-    let logger = Box::new(ConsoleLogger{});
+    let logger = Box::new(ConsoleLogger {});
     logger.info("starting app for now!");
 
-    let mut node = match start(logger.clone(), URL).await{
+    let mut node = match start(logger.clone(), URL).await {
         Ok(node) => node,
         Err(e) => {
             logger.error(&format!("Error while creating node: {:?}", e));
@@ -78,11 +78,18 @@ pub async fn run_app() {
         }
     };
     logger.info("Started successfully");
-    loop{
-        logger.info("Waiting");
-        wait_ms(10000).await;
-        if let Err(e) = list_ping(logger.clone(), &mut node).await{
-            logger.error(&format!("Couldn't list or ping nodes: {}", e));
+    let mut i = 0;
+    loop {
+        i = i + 1;
+        if let Err(e) = node.process().await{
+            logger.error(&format!("Error while processing messages: {}", e));
         }
+        if i % 10 == 0 {
+            logger.info("Waiting");
+            if let Err(e) = list_ping(logger.clone(), &mut node).await {
+                logger.error(&format!("Couldn't list or ping nodes: {}", e));
+            }
+        }
+        wait_ms(1000).await;
     }
 }
