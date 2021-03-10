@@ -38,6 +38,7 @@ impl Internal {
 
     /// Treats incoming messages from nodes.
     pub fn cb_msg(&mut self, chal: &U256, msg: WSMessage) {
+        self.logger.info(&format!("Got message: {:?}", msg));
         match msg {
             WSMessage::MessageString(s) => self.receive_msg(chal, s),
             WSMessage::Closed(_) => self.close_ws(),

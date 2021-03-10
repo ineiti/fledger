@@ -1,12 +1,13 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 use crate::node::{config::NodeInfo, types::U256};
 
-pub mod setup;
-
 pub type WebRTCSpawner =
     Box<dyn Fn(WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, String>>;
+
+pub type WebRTCSetupCB = Box<dyn Fn(WebRTCSetupCBMessage)>;
 
 #[async_trait(?Send)]
 pub trait WebRTCConnectionSetup {
@@ -19,22 +20,34 @@ pub trait WebRTCConnectionSetup {
     /// Takes the answer string and finalizes the first part of the connection.
     async fn use_answer(&mut self, answer: String) -> Result<(), String>;
 
-    /// Waits for the ICE to move on from the 'New' state
-    async fn wait_gathering(&mut self) -> Result<(), String>;
-
-    /// Waits for the ICE string to be avaialble.
-    async fn ice_string(&mut self) -> Result<String, String>;
+    /// Returns either an ice string or a connection
+    async fn set_callback(&mut self, cb: WebRTCSetupCB);
 
     /// Sends the ICE string to the WebRTC.
     async fn ice_put(&mut self, ice: String) -> Result<(), String>;
 
+    /// TODO: this can probably go away
+    async fn wait_gathering(&mut self) -> Result<(), String>;
+
     /// Debugging output of the RTC state
     async fn print_states(&mut self);
-
-    /// Returns the connection. This only works once all correct calls
-    /// have been made and the webrtc is correctly set up.
-    async fn get_connection(&mut self) -> Result<Box<dyn WebRTCConnection>, String>;
 }
+
+pub enum WebRTCSetupCBMessage {
+    Ice(String),
+    Connection(Box<dyn WebRTCConnection>),
+}
+
+impl fmt::Debug for WebRTCSetupCBMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WebRTCSetupCBMessage::Ice(_) => f.write_str("Ice")?,
+            WebRTCSetupCBMessage::Connection(_) => f.write_str("Connection")?,
+        }
+        Ok(())
+    }
+}
+
 
 #[async_trait(?Send)]
 pub trait WebRTCConnection {
@@ -73,10 +86,7 @@ pub enum PeerMessage {
     Init,
     Offer(String),
     Answer(String),
-    IceInit(String),
-    IceFollow(String),
-    DoneInit,
-    DoneFollow,
+    IceCandidate(String),
 }
 
 impl std::fmt::Display for PeerMessage {
@@ -85,10 +95,7 @@ impl std::fmt::Display for PeerMessage {
             PeerMessage::Init => write!(f, "Init"),
             PeerMessage::Offer(_) => write!(f, "Offer"),
             PeerMessage::Answer(_) => write!(f, "Answer"),
-            PeerMessage::IceInit(_) => write!(f, "IceInit"),
-            PeerMessage::IceFollow(_) => write!(f, "IceFollow"),
-            PeerMessage::DoneInit => write!(f, "DoneInit"),
-            PeerMessage::DoneFollow => write!(f, "DoneFollow"),
+            PeerMessage::IceCandidate(_) => write!(f, "IceCandidate"),
         }
     }
 }

@@ -6,18 +6,18 @@ build = wasm-pack build --debug --target nodejs --out-name wasm \
 clean:
 	rm $(wasm)
 
-run: build_local
+run: build_local run/node_modules
 	node run/main.js
 
-run2: build_local
+run2: build_local run/node_modules
 	mkdir -p node[12]
 	cd node1 && node ../run/main.js &
 	cd node2 && node ../run/main.js
 
-run_remote: build
+run_remote: build run/node_modules
 	node run/main.js
 
-build: ${wasm} run/node_modules
+build: ${wasm}
 
 run/node_modules:
 	cd run; npm ci

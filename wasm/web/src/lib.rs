@@ -31,7 +31,7 @@ fn log_2(s: &str, t: String) {
 }
 
 #[cfg(not(feature = "local"))]
-const URL: &str = "wss://signal.fledg.re ";
+const URL: &str = "wss://signal.fledg.re";
 
 #[cfg(feature = "local")]
 const URL: &str = "ws://localhost:8765";
@@ -92,18 +92,18 @@ impl Component for Model {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::UpdateLog => {
-                if self.no_contact_yet {
-                    if let Some(n) = self.node_copy() {
+                if let Some(n) = self.node_copy() {
+                    if self.no_contact_yet {
                         let mut node = n.lock().unwrap();
-                        if let Ok(l) = node.get_list() {
-                            self.logger.info(&format!("List length is: {:?}", l));
-                            if l.len() > 0 {
-                                self.no_contact_yet = false;
-                                self.node_ping();
-                            }
+                        let l = node.get_list();
+                        self.logger.info(&format!("List length is: {:?}", l));
+                        if l.len() > 0 {
+                            self.no_contact_yet = false;
+                            self.node_ping();
                         }
                     }
                 }
+                self.process();
                 self.counter += 1;
                 if self.counter % 15 == 0 {
                     self.node_list();
@@ -170,6 +170,17 @@ impl Component for Model {
 }
 
 impl Model {
+    fn process(&self){
+        if let Some(n) = self.node_copy() {
+            let log = self.logger.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let mut node = n.lock().unwrap();
+                if let Err(e) = node.process().await{
+                    log.info(&format!("Error: {}", e));
+                }
+            });
+        }
+    }
     fn node_start(logger: Box<dyn Logger>, link: &ComponentLink<Model>) {
         wasm_bindgen_futures::spawn_local(wrap(
             async {
@@ -184,7 +195,7 @@ impl Model {
         ));
     }
 
-    fn describe(&self) -> String{
+    fn describe(&self) -> String {
         if let Some(n) = self.node_copy() {
             let node = n.lock().unwrap();
             return format!("{} => {}", node.info.info, node.info.public);
@@ -233,11 +244,7 @@ impl Model {
         return format!(
             "Other nodes connected: {}",
             if let Some(n) = self.node_copy() {
-                if let Ok(list) = n.lock().unwrap().network.get_list() {
-                    list.len().to_string()
-                } else {
-                    "0".to_string()
-                }
+                n.lock().unwrap().network.get_list().len().to_string()
             } else {
                 "N/A".to_string()
             }
@@ -247,7 +254,7 @@ impl Model {
     fn nodes_reachable(&self) -> String {
         if let Some(n) = self.node_copy() {
             let node = n.lock().unwrap();
-            if let Ok(pings) = node.get_pings_str(){
+            if let Ok(pings) = node.get_pings_str() {
                 if pings.len() > 0 {
                     return format!("Nodes reachable: {}", pings);
                 }
