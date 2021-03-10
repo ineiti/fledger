@@ -1,20 +1,20 @@
 use async_trait::async_trait;
 
-use std::sync::{
-    Arc, Mutex,
-};
+use std::sync::{Arc, Mutex};
 
 use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
-use common::signal::web_rtc::{WebRTCSetupCB, WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCBMessage};
+use common::signal::web_rtc::{
+    WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCB, WebRTCSetupCBMessage,
+};
 
 use web_sys::{
-    console::log_1, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
+    console::log_1, Event, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
     RtcIceCandidateInit, RtcIceGatheringState, RtcPeerConnection, RtcPeerConnectionIceEvent,
-    RtcSdpType, RtcSessionDescriptionInit, Event,
+    RtcSdpType, RtcSessionDescriptionInit,
 };
 
 use crate::{logs::wait_ms, web_rtc_connection::WebRTCConnectionWasm};
@@ -197,7 +197,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     }
 
     /// Waits for the ICE string to be avaialble.
-    async fn set_callback(&mut self, cb: WebRTCSetupCB){
+    async fn set_callback(&mut self, cb: WebRTCSetupCB) {
         self.callback.lock().unwrap().replace(cb);
     }
 
@@ -205,7 +205,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     async fn ice_put(&mut self, ice: String) -> Result<(), String> {
         // self.is_not_setup()?;
         let rp_clone = self.rp_conn.clone();
-        let els: Vec<&str> = ice.split("::").collect();
+        let els: Vec<&str> = ice.split(":-:").collect();
         if els.len() != 3 {
             return Err("wrong ice candidate string".to_string());
         }
@@ -239,37 +239,29 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     // }
 }
 
-fn ice_start(rp_conn: &RtcPeerConnection,
-    callback: Arc<Mutex<Option<WebRTCSetupCB>>>){
-    let onicecandidate_callback1 =
-        Closure::wrap(
-            Box::new(move |ev: RtcPeerConnectionIceEvent|
-                {log(&format!(":: Got ICE candidate: {:?}", ev.candidate()));
-                match ev.candidate() {
-                Some(candidate) => {
-                    let cand = format!(
-                        "{}::{}::{}",
-                        candidate.candidate(),
-                        candidate.sdp_mid().unwrap(),
-                        candidate.sdp_m_line_index().unwrap()
-                    );
-                    log(":: Sending candidate");
-                    if let Some(cb) = callback.lock().unwrap().as_ref(){
-                        log(":: Calling callback");
-                        cb(WebRTCSetupCBMessage::Ice(cand.clone()));
-                        log(":: Callback done");
-                    }
-                    log(":: Over and out");
+fn ice_start(rp_conn: &RtcPeerConnection, callback: Arc<Mutex<Option<WebRTCSetupCB>>>) {
+    let onicecandidate_callback1 = Closure::wrap(Box::new(move |ev: RtcPeerConnectionIceEvent| {
+        match ev.candidate() {
+            Some(candidate) => {
+                let cand = format!(
+                    "{}:-:{}:-:{}",
+                    candidate.candidate(),
+                    candidate.sdp_mid().unwrap(),
+                    candidate.sdp_m_line_index().unwrap()
+                );
+                if let Some(cb) = callback.lock().unwrap().as_ref() {
+                    cb(WebRTCSetupCBMessage::Ice(cand.clone()));
                 }
-                None => {log(":: Nothing to see");}
             }
-            }) as Box<dyn FnMut(RtcPeerConnectionIceEvent)>,
-        );
+            None => {}
+        }
+    })
+        as Box<dyn FnMut(RtcPeerConnectionIceEvent)>);
     rp_conn.set_onicecandidate(Some(onicecandidate_callback1.as_ref().unchecked_ref()));
     onicecandidate_callback1.forget();
 }
 
-fn dc_create_init(rp_conn: RtcPeerConnection, cb: Arc<Mutex<Option<WebRTCSetupCB>>>){
+fn dc_create_init(rp_conn: RtcPeerConnection, cb: Arc<Mutex<Option<WebRTCSetupCB>>>) {
     let dc = rp_conn.create_data_channel("data-channel");
     dc_set_onopen(&mut Some(dc), &mut Some(rp_conn), cb);
 }
@@ -285,8 +277,11 @@ fn dc_create_follow(rp_conn: RtcPeerConnection, cb: Arc<Mutex<Option<WebRTCSetup
     ondatachannel_callback.forget();
 }
 
-fn dc_set_onopen(dc: &mut Option<RtcDataChannel>, rp_conn: &mut Option<RtcPeerConnection>,
-cb: Arc<Mutex<Option<WebRTCSetupCB>>>){
+fn dc_set_onopen(
+    dc: &mut Option<RtcDataChannel>,
+    rp_conn: &mut Option<RtcPeerConnection>,
+    cb: Arc<Mutex<Option<WebRTCSetupCB>>>,
+) {
     let dcc = dc.take().unwrap();
     let mut dccc = Some(dcc.clone());
     let mut rpc = Some(rp_conn.take().unwrap());
