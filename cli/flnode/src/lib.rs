@@ -52,7 +52,7 @@ async fn start(log: Box<dyn Logger>, url: &str) -> Result<Node, JsValue> {
 async fn list_ping(log: Box<dyn Logger>, n: &mut Node) -> Result<(), String> {
     n.list()?;
     n.ping("something").await?;
-    log.info(&format!("Nodes: {}", n.get_pings_str()?));
+    log.info(&format!("Nodes: {}", n.logic.stats()));
     Ok(())
 }
 

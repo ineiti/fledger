@@ -14,7 +14,7 @@ use std::sync::{
 };
 
 /// Represents the state of an incoming or outgoing connection.
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum CSEnum {
     /// No connection yet
     Idle,
@@ -36,7 +36,7 @@ pub enum CSInput {
 /// Messages from ConnectionState to the parent or other modules.
 #[derive(Debug)]
 pub enum CSOutput {
-    State(Option<ConnectionStateMap>),
+    State(CSEnum, Option<ConnectionStateMap>),
     WebSocket(PeerMessage),
     WebRTCMessage(String),
 }
@@ -107,8 +107,10 @@ impl ConnectionState {
                 .send(CSOutput::WebSocket(PeerMessage::IceCandidate(ice)))
                 .map_err(|e| e.to_string()),
             WebRTCSetupCBMessage::Connection(conn) => {
-                self.logger
-                    .info(&format!("Connected with remote = {}", self.remote));
+                self.logger.info(&format!(
+                    "Connected {}",
+                    if self.remote { "incoming" } else { "outgoing" }
+                ));
                 let chan = self.output_tx.clone();
                 let log = self.logger.clone();
                 conn.set_cb_message(Box::new(move |msg| {
@@ -118,6 +120,9 @@ impl ConnectionState {
                 }));
                 self.connected = Some(conn);
                 self.state = CSEnum::Connected;
+                self.output_tx
+                    .send(CSOutput::State(self.state.clone(), None))
+                    .map_err(|e| e.to_string())?;
                 Ok(())
             }
         }
@@ -125,12 +130,12 @@ impl ConnectionState {
 
     /// Returns the state of the connection, if available.
     async fn get_state(&self) -> Result<(), String> {
-        let state = match &self.state {
+        let stat = match &self.state {
             CSEnum::Connected => Some(self.connected.as_ref().unwrap().get_state().await?),
             _ => None,
         };
         self.output_tx
-            .send(CSOutput::State(state))
+            .send(CSOutput::State(self.state.clone(), stat))
             .map_err(|e| e.to_string())
     }
 
@@ -170,6 +175,9 @@ impl ConnectionState {
                         e
                     ));
                     self.state = CSEnum::Idle;
+                    self.output_tx
+                        .send(CSOutput::State(self.state.clone(), None))
+                        .map_err(|e| e.to_string())?;
                 }
                 return Ok(());
             }
@@ -196,6 +204,9 @@ impl ConnectionState {
         }))
         .await;
         self.state = CSEnum::Setup;
+        self.output_tx
+            .send(CSOutput::State(self.state.clone(), None))
+            .map_err(|e| e.to_string())?;
         self.setup = Some(conn);
         Ok(())
     }

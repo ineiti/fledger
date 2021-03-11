@@ -1,7 +1,13 @@
-use crate::node::{config::NodeInfo, ext_interface::Logger, types::U256};
 use crate::signal::{
-    web_rtc::{MessageAnnounce, PeerInfo, WSSignalMessage, WebRTCSpawner, WebSocketMessage},
+    web_rtc::{
+        ConnectionStateMap, MessageAnnounce, PeerInfo, WSSignalMessage, WebRTCSpawner,
+        WebSocketMessage,
+    },
     websocket::{WSMessage, WebSocketConnection},
+};
+use crate::{
+    node::{config::NodeInfo, ext_interface::Logger, types::U256},
+    signal::web_rtc::WebRTCConnectionState,
 };
 
 use std::sync::{
@@ -12,12 +18,19 @@ use std::{collections::HashMap, sync::Arc};
 
 use node_connection::{NCInput, NodeConnection};
 
-use self::node_connection::NCOutput;
-mod connection_state;
-mod node_connection;
+use self::{connection_state::CSEnum, node_connection::NCOutput};
+pub mod connection_state;
+pub mod node_connection;
 
 pub enum NOutput {
     WebRTC(U256, String),
+    UpdateList(Vec<NodeInfo>),
+    State(
+        U256,
+        WebRTCConnectionState,
+        CSEnum,
+        Option<ConnectionStateMap>,
+    ),
 }
 
 pub enum NInput {
@@ -131,6 +144,10 @@ impl Network {
                         .output_tx
                         .send(NOutput::WebRTC(conn.0.clone(), msg))
                         .map_err(|e| e.to_string())?,
+                    NCOutput::State(dir, c, sta) =>
+                        self.output_tx
+                            .send(NOutput::State(conn.0.clone(), dir, c, sta))
+                            .map_err(|e| e.to_string())?,
                 }
             }
             conn.1.process().await?;
@@ -162,7 +179,7 @@ impl Network {
             }
             WSSignalMessage::ListIDsReply(list) => {
                 self.logger.info("Processing ListIDsReply message");
-                self.update_list(list);
+                self.update_list(list)?;
             }
             WSSignalMessage::PeerSetup(pi) => {
                 // self.logger
@@ -201,16 +218,17 @@ impl Network {
     }
 
     /// Stores a node list sent from the signalling server.
-    fn update_list(&mut self, list: Vec<NodeInfo>) {
+    fn update_list(&mut self, list: Vec<NodeInfo>) -> Result<(), String> {
         self.list = list
             .iter()
             .filter(|entry| entry.public != self.node_info.public)
             .cloned()
             .collect();
+        self.output_tx.send(NOutput::UpdateList(list)).map_err(|e| e.to_string())
     }
 
-    fn ws_send(&mut self, msg: WSSignalMessage) -> Result<(), String>{
-        self.ws.send(WebSocketMessage{msg}.to_string())
+    fn ws_send(&mut self, msg: WSSignalMessage) -> Result<(), String> {
+        self.ws.send(WebSocketMessage { msg }.to_string())
     }
 
     /// Sends a message to the node dst.

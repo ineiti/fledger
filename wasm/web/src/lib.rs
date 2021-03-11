@@ -1,6 +1,6 @@
 #![recursion_limit = "1024"]
 
-use common::node::{config::NodeInfo, ext_interface::Logger};
+use common::node::{ext_interface::Logger, logic::Stat};
 use std::sync::Arc;
 use std::sync::Mutex;
 use yew::services::IntervalService;
@@ -13,8 +13,7 @@ use yew::prelude::*;
 use js_sys::Date;
 use regex::Regex;
 use wasm_lib::{
-    logger::{LoggerOutput, NodeLogger},
-    storage_logs::LocalStorage,
+    storage_logs::{ConsoleLogger, LocalStorage},
     web_rtc_setup::WebRTCConnectionSetupWasm,
     web_socket::WebSocketWasm,
 };
@@ -39,11 +38,10 @@ const URL: &str = "ws://localhost:8765";
 struct Model {
     link: ComponentLink<Self>,
     node: Option<Arc<Mutex<Node>>>,
-    log_str: Arc<Mutex<String>>,
+    logger: ConsoleLogger,
     counter: u32,
     show_reset: bool,
     no_contact_yet: bool,
-    logger: NodeLogger,
 }
 
 enum Msg {
@@ -56,10 +54,6 @@ async fn wrap<F: std::future::Future>(f: F, done_cb: yew::Callback<F::Output>) {
     done_cb.emit(f.await);
 }
 
-async fn wrap_short<F: std::future::Future>(f: F) {
-    f.await;
-}
-
 impl Component for Model {
     type Message = Msg;
     type Properties = ();
@@ -68,12 +62,8 @@ impl Component for Model {
         console_error_panic_hook::set_once();
         Model::set_localstorage();
 
-        let (logger, node_logger) = LoggerOutput::new();
-        Model::node_start(node_logger.clone(), &link);
-        wasm_bindgen_futures::spawn_local(wrap_short(LoggerOutput::listen(
-            logger.ch,
-            Arc::clone(&logger.str),
-        )));
+        let logger = ConsoleLogger {};
+        Model::node_start(logger.clone(), &link);
         let _ = Box::leak(Box::new(IntervalService::spawn(
             Duration::from_secs(1),
             link.callback(|_| Msg::UpdateLog),
@@ -81,11 +71,10 @@ impl Component for Model {
         Self {
             link,
             node: None,
-            log_str: Arc::clone(&logger.str),
             counter: 0,
             show_reset: false,
             no_contact_yet: true,
-            logger: node_logger,
+            logger,
         }
     }
 
@@ -94,12 +83,13 @@ impl Component for Model {
             Msg::UpdateLog => {
                 if let Some(n) = self.node_copy() {
                     if self.no_contact_yet {
-                        let mut node = n.lock().unwrap();
-                        let l = node.get_list();
-                        self.logger.info(&format!("List length is: {:?}", l));
-                        if l.len() > 0 {
-                            self.no_contact_yet = false;
-                            self.node_ping();
+                        if let Ok(mut node) = n.try_lock(){
+                            let l = node.get_list();
+                            self.logger.info(&format!("List length is: {:?}", l));
+                            if l.len() > 0 {
+                                self.no_contact_yet = false;
+                                self.node_ping();
+                            }
                         }
                     }
                 }
@@ -138,7 +128,6 @@ impl Component for Model {
     }
 
     fn view(&self) -> Html {
-        let log = self.log_str.lock().unwrap();
         let reset_style = match self.show_reset {
             false => "display: none;",
             true => "",
@@ -146,23 +135,27 @@ impl Component for Model {
         html! {
             <div class="main">
                 <h1>{"Fledger Web Node"}</h1>
-                <p>{"This is a full node running in the web browser. Instead of having to invest
-                in big hardware, fleger is light enough that you can participate using a browser.
-                The mined Mana can be used to run smart contracts, store data, or use the
+                <p>{"The goal of Fledger is to have a full node running in the web browser.
+                Instead of having to invest in big hardware, fledger will be light enough
+                that you can participate using a browser.
+                You will mine Mana can be used to run smart contracts, store data, or use the
                 re-encryption service."}</p>
+                <p>{"The state of the project is"}</p>
+                <ul>
+                    <li>{"In process: learning Rust and making WebRTC work reliably"}</li>
+                    <li>{"Coming up: Set up Identity Chain"}</li>
+                    <li>{"Coming up: Add shard chains"}</li>
+                    <li>{"Coming up: Other chains: memory and secret"}</li>
+                </ul>
                 <p>{"For more information, see the documentation: "}
                 <a href={"https://fledg.re/doc/index.html"} target={"other"}>{"Fledger - the blockchain that could"}</a>
                 </p>
                 <div class="ui">
                     <ul>
                         <li>{"Our node: "}{self.describe()}</li>
-                        <li>{self.connection_state((*log).clone())}</li>
-                        <li>{self.nodes_connected()}</li>
-                        <li>{self.nodes_reachable()}</li>
+                        <li>{"Known Nodes:"}{self.nodes_reachable()}</li>
                     </ul>
                     <button style={reset_style} onclick=self.link.callback(|_| Msg::Reset)>{ "Reset Config" }</button>
-                    // <pre class="wrap" id="log">{"log:"}
-                    // { log }</pre>
                 </div>
             </div>
         }
@@ -170,13 +163,14 @@ impl Component for Model {
 }
 
 impl Model {
-    fn process(&self){
+    fn process(&self) {
         if let Some(n) = self.node_copy() {
             let log = self.logger.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let mut node = n.lock().unwrap();
-                if let Err(e) = node.process().await{
-                    log.info(&format!("Error: {}", e));
+                if let Ok(mut node) = n.try_lock(){
+                    if let Err(e) = node.process().await {
+                        log.info(&format!("Error: {}", e));
+                    }
                 }
             });
         }
@@ -197,8 +191,9 @@ impl Model {
 
     fn describe(&self) -> String {
         if let Some(n) = self.node_copy() {
-            let node = n.lock().unwrap();
-            return format!("{} => {}", node.info.info, node.info.public);
+            if let Ok(node) = n.try_lock(){
+                return format!("{} => {}", node.info.info, node.info.public);
+            }
         }
         return "Unknown".into();
     }
@@ -225,42 +220,45 @@ impl Model {
         }
     }
 
-    fn connection_state(&self, log: String) -> String {
-        format!(
-            "State of connection: {}",
-            match self.node {
-                Some(_) =>
-                    if log.contains("Announce") {
-                        "Connected"
-                    } else {
-                        "Connecting"
-                    },
-                None => "Unknown",
-            }
-        )
-    }
-
-    fn nodes_connected(&self) -> String {
-        return format!(
-            "Other nodes connected: {}",
-            if let Some(n) = self.node_copy() {
-                n.lock().unwrap().network.get_list().len().to_string()
-            } else {
-                "N/A".to_string()
-            }
-        );
-    }
-
-    fn nodes_reachable(&self) -> String {
+    fn nodes_reachable(&self) -> Html {
+        let mut out = vec![];
         if let Some(n) = self.node_copy() {
-            let node = n.lock().unwrap();
-            if let Ok(pings) = node.get_pings_str() {
-                if pings.len() > 0 {
-                    return format!("Nodes reachable: {}", pings);
+            if let Ok(node) = n.try_lock(){
+                let mut stats: Vec<Stat> = node.logic.stats.iter().map(|(_k, v)| v.clone()).collect();
+                stats.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
+                let now = Date::now();
+                for stat in stats {
+                    if let Some(ni) = stat.node_info.as_ref() {
+                        if node.info.public != ni.public {
+                            out.push(vec![
+                                format!("{}", ni.info),
+                                format!("{} / {}", stat.ping_rx, stat.ping_tx),
+                                format!("{}s", ((now-stat.last_contact) / 1000.).floor()),
+                                format!("{:?} / {:?}", stat.incoming, stat.outgoing),
+                            ]);
+                        }
+                    }
                 }
             }
         }
-        return "Nodes reachable: N/A".into();
+        return html! {
+        <ul class={"no-bullets"}>
+            <li class={"info"}>
+                <span class={"info_node"}>{"Name"}</span>
+                <span class={"info_node"}>{"Count (rx/tx)"}</span>
+                <span class={"info_node"}>{"Last seen"}</span>
+                <span class={"info_node"}>{"Conn Stat (in/out)"}</span>
+            </li>
+        {out.iter().map(|li|
+            html!{
+                <li class={"info"}>
+                    <span class={"info_node"}>{li[0].clone()}</span>
+                    <span class={"info_node"}>{li[1].clone()}</span>
+                    <span class={"info_node"}>{li[2].clone()}</span>
+                    <span class={"info_node"}>{li[3].clone()}</span>
+                </li>
+            }).collect::<Html>()}
+        </ul>};
     }
 
     fn node_copy<'a>(&self) -> Option<Arc<Mutex<Node>>> {
@@ -273,9 +271,10 @@ impl Model {
 
     fn node_list(&mut self) {
         if let Some(n) = self.node_copy() {
-            let mut node = n.lock().unwrap();
-            if let Err(e) = node.list() {
-                self.logger.error(&format!("Couldn't get list: {:?}", e));
+            if let Ok(mut node) = n.try_lock(){
+                if let Err(e) = node.list() {
+                    self.logger.error(&format!("Couldn't get list: {:?}", e));
+                }
             }
         }
     }
@@ -284,10 +283,11 @@ impl Model {
         if let Some(n) = self.node_copy() {
             let log = self.logger.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let mut node = n.lock().unwrap();
-                let str = Date::new_0().to_iso_string().as_string().unwrap();
-                if let Err(e) = node.ping(&str).await {
-                    log.error(&format!("Couldn't ping node: {:?}", e));
+                if let Ok(mut node) = n.try_lock(){
+                    let str = Date::new_0().to_iso_string().as_string().unwrap();
+                    if let Err(e) = node.ping(&str).await {
+                        log.error(&format!("Couldn't ping node: {:?}", e));
+                    }
                 }
             });
         }
