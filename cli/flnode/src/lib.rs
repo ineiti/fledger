@@ -1,6 +1,11 @@
-use common::node::ext_interface::{DataStorage, Logger};
+use common::node::{
+    ext_interface::{DataStorage, Logger},
+    logic::Stat,
+};
 
 use common::node::Node;
+
+use js_sys::Date;
 use wasm_bindgen::JsValue;
 
 use wasm_lib::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
@@ -52,7 +57,23 @@ async fn start(log: Box<dyn Logger>, url: &str) -> Result<Node, JsValue> {
 async fn list_ping(log: Box<dyn Logger>, n: &mut Node) -> Result<(), String> {
     n.list()?;
     n.ping("something").await?;
-    log.info(&format!("Nodes: {}", n.get_pings_str()?));
+    let mut nodes: Vec<Stat> = n.logic.stats.iter().map(|(_k, v)| v.clone()).collect();
+    nodes.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
+    for node in nodes {
+        if let Some(info) = node.node_info.as_ref() {
+            if n.info.public != info.public {
+                log.info(&format!(
+                    "Node: name:{} age:{} ping:({}/{}) conn:({:?}/{:?})",
+                    info.info,
+                    ((Date::now() - node.last_contact) / 1000.).floor(),
+                    node.ping_rx,
+                    node.ping_tx,
+                    node.incoming,
+                    node.outgoing,
+                ));
+            }
+        }
+    }
     Ok(())
 }
 

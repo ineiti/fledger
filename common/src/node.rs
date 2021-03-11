@@ -24,7 +24,7 @@ pub struct Node {
     pub info: NodeInfo,
     pub logic: Logic,
     _storage: Box<dyn DataStorage>,
-    logger: Box<dyn Logger>,
+    _logger: Box<dyn Logger>,
 }
 
 pub const CONFIG_NAME: &str = "nodeConfig";
@@ -60,7 +60,7 @@ impl Node {
             info: config.our_node,
             _storage,
             network,
-            logger,
+            _logger: logger,
             logic,
         })
     }
@@ -87,6 +87,16 @@ impl Node {
                         .send(LInput::WebRTC(id, msg))
                         .map_err(|e| e.to_string())?;
                 }
+                NOutput::UpdateList(list) => self
+                    .logic
+                    .input_tx
+                    .send(LInput::SetNodes(list))
+                    .map_err(|e| e.to_string())?,
+                NOutput::State(id, dir, c, s) => self
+                    .logic
+                    .input_tx
+                    .send(LInput::ConnStat(id, dir, c, s))
+                    .map_err(|e| e.to_string())?,
             }
         }
         Ok(())
@@ -121,38 +131,12 @@ impl Node {
         self.network.get_list()
     }
 
-    /// Get number of pings from each remote node
-    pub fn get_pings(&self) -> Result<Vec<(NodeInfo, u64)>, String> {
-        let pings = self.logic.pings.clone();
-        return Ok(self
-            .network
-            .get_list()
-            .iter()
-            .map(|n| (n.clone(), *pings.get(&n.public).or(Some(&0u64)).unwrap()))
-            .collect());
-    }
-
-    /// Returns a nicely formatted string of the nodes with number of pings received
-    pub fn get_pings_str(&self) -> Result<String, String> {
-        let lg = self.get_pings()?;
-        if lg.len() > 0 {
-            return Ok(lg
-                .iter()
-                .map(|ni| format!("({} / {})", ni.0.info.clone(), ni.1))
-                .collect::<Vec<String>>()
-                .join(" :: "));
-        }
-        Ok("".into())
-    }
-
     /// Pings all known nodes
     pub async fn ping(&mut self, msg: &str) -> Result<(), String> {
-        for node in &self.network.get_list() {
-            self.logger.info(&format!("Contacting node {:?}", node));
-            let ping = format!("Ping {}", msg);
-            self.send(&node.public, ping)?;
-        }
-        Ok(())
+        self.logic
+            .input_tx
+            .send(LInput::PingAll(msg.to_string()))
+            .map_err(|e| e.to_string())
     }
 
     /// Sends a message over webrtc to a node. The node must already be connected

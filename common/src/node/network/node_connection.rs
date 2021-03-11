@@ -3,7 +3,7 @@ use crate::{
         ext_interface::Logger,
         network::connection_state::{CSEnum, CSInput, CSOutput, ConnectionState},
     },
-    signal::web_rtc::{ConnectionStateMap, PeerMessage},
+    signal::web_rtc::{ConnectionStateMap, PeerMessage, WebRTCConnectionState},
 };
 
 use crate::signal::web_rtc::WebRTCSpawner;
@@ -21,6 +21,7 @@ pub enum NCInput {
 pub enum NCOutput {
     WebSocket(PeerMessage, bool),
     WebRTCMessage(String),
+    State(WebRTCConnectionState, CSEnum, Option<ConnectionStateMap>),
 }
 
 /// There might be up to two connections per remote node.
@@ -41,13 +42,15 @@ pub struct NodeConnection {
     output_tx: Sender<NCOutput>,
     input_rx: Receiver<NCInput>,
 
-    logger: Box<dyn Logger>,
+    _logger: Box<dyn Logger>,
     states: Vec<Option<ConnectionStateMap>>,
 }
 
 impl NodeConnection {
-    pub fn new(logger: Box<dyn Logger>, web_rtc: Arc<Mutex<WebRTCSpawner>>) ->
-    Result<NodeConnection, String> {
+    pub fn new(
+        logger: Box<dyn Logger>,
+        web_rtc: Arc<Mutex<WebRTCSpawner>>,
+    ) -> Result<NodeConnection, String> {
         let (output_tx, output_rx) = channel::<NCOutput>();
         let (input_tx, input_rx) = channel::<NCInput>();
         let nc = NodeConnection {
@@ -57,7 +60,7 @@ impl NodeConnection {
             output_rx,
             input_tx,
             input_rx,
-            logger,
+            _logger: logger,
             states: vec![None, None],
         };
         Ok(nc)
@@ -128,12 +131,16 @@ impl NodeConnection {
         for cmd in cmds {
             // self.logger.info(&format!("dbg: NodeConnect::process {:?}", cmd));
             match cmd {
-                CSOutput::State(s) => {
-                    if remote {
-                        self.states[1] = s;
+                CSOutput::State(cs, stat) => {
+                    let dir = if remote {
+                        self.states[1] = stat;
+                        WebRTCConnectionState::Follower
                     } else {
-                        self.states[0] = s;
-                    }
+                        self.states[0] = stat;
+                        WebRTCConnectionState::Initializer
+                    };
+                    self.output_tx.send(NCOutput::State(dir, cs, stat))
+                    .map_err(|e| e.to_string())?;
                 }
                 CSOutput::WebSocket(msg) => self
                     .output_tx

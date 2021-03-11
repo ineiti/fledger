@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use std::sync::{mpsc::channel, Arc, Mutex};
-use std::{cell::RefCell, pin::Pin};
+use std::cell::RefCell;
 
 use common::{
     node::{
@@ -122,14 +122,6 @@ impl WebSocketConnectionDummy {
             cb: Rc::new(RefCell::new(None)),
         }
     }
-
-    // fn clone(&self) -> WebSocketConnectionDummy {
-    //     WebSocketConnectionDummy {
-    //         msg_queue: Rc::clone(&self.msg_queue),
-    //         id: self.id,
-    //         cb: Rc::clone(&self.cb),
-    //     }
-    // }
 }
 
 impl WebSocketConnection for WebSocketConnectionDummy {
@@ -188,7 +180,7 @@ async fn set_callback(
     let connc = Arc::clone(&conn);
     webrtc
         .set_callback(Box::new(move |msg| {
-            // logc.info(&format!("dbg: Got message: {:?}", &msg));
+            logc.info(&format!("dbg: Got message: {:?}", &msg));
             put_msg(&icec, &connc, msg);
         }))
         .await;
@@ -338,12 +330,11 @@ async fn connect_test() {
     console_error_panic_hook::set_once();
 
     let log = Box::new(ConsoleLogger {});
-    // test_channel().await;
-    // match connect_test_base().await {
-    //     Ok(_) => log.info("All OK"),
-    //     Err(e) => log.info(&format!("Something went wrong: {}", e)),
-    // };
-    match connect_test_simple().await {
+    match async {
+        connect_test_base().await?;
+        test_channel().await?;
+        connect_test_simple().await
+    }.await {
         Ok(_) => log.info("All OK"),
         Err(e) => log.info(&format!("Something went wrong: {}", e)),
     };
