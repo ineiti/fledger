@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 
 use wasm_bindgen::{prelude::Closure, JsCast};
-use web_sys::{console::log_1, MessageEvent, RtcDataChannel, RtcPeerConnection};
+use web_sys::{MessageEvent, RtcDataChannel, RtcPeerConnection};
+// use web_sys::console::log_1;
 
-use common::signal::web_rtc::{ConnectionStateMap, WebRTCConnection, WebRTCMessageCB};
+use common::signal::web_rtc::{ConnectionStateMap, WebRTCConnection, WebRTCMessageCB, ConnType};
 
 pub struct WebRTCConnectionWasm {
     dc: RtcDataChannel,
@@ -45,13 +46,27 @@ impl WebRTCConnection for WebRTCConnectionWasm {
             .await
             .unwrap()
             .into();
-        conn_stats.for_each(&mut |v, k| log_1(&format!("- {:?}: {:?}", k, v).into()));
+        // conn_stats.for_each(&mut |v, k| log_1(&format!("- {:?}: {:?}", k, v).into()));
+        let mut type_remote = ConnType::Unknown;
+        conn_stats.for_each(&mut |k, _v| {
+            let s = format!("{:?}", k);
+            // log_1(&s.clone().into());
+            if s.contains("srflx"){
+                type_remote = ConnType::STUNServer;
+            } else if s.contains("prflx"){
+                type_remote = ConnType::STUNPeer;
+            } else if s.contains("relay"){
+                type_remote = ConnType::TURN;
+            // } else if s.contains("host") {
+            //     type_remote = ConnType::Host;
+            }
+        });
         Ok(ConnectionStateMap {
             delay_ms: 0,
             tx_bytes: 0,
             rx_bytes: 0,
-            stun_remote: false,
-            stun_local: false,
+            type_remote,
+            type_local: type_remote,
         })
     }
 }

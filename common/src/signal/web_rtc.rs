@@ -62,11 +62,20 @@ pub trait WebRTCConnection {
     async fn get_state(&self) -> Result<ConnectionStateMap, String>;
 }
 
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum ConnType {
+    Unknown,
+    Host,
+    STUNPeer,
+    STUNServer,
+    TURN,
+}
+
 /// Some statistics about the connection
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub struct ConnectionStateMap {
-    pub stun_local: bool,
-    pub stun_remote: bool,
+    pub type_local: ConnType,
+    pub type_remote: ConnType,
     pub rx_bytes: u64,
     pub tx_bytes: u64,
     pub delay_ms: u32,

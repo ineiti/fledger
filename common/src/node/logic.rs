@@ -33,6 +33,7 @@ pub enum ConnState {
     Connected,
     TURN,
     STUN,
+    Host,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -110,11 +111,27 @@ impl Logic {
         self.stats
             .entry(id.clone())
             .or_insert_with(|| Stat::new(None));
+        let log = self.logger.clone();
         self.stats.entry(id.clone()).and_modify(|s| {
             let cs = match st {
                 CSEnum::Idle => ConnState::Idle,
                 CSEnum::Setup => ConnState::Setup,
-                CSEnum::Connected => ConnState::Connected,
+                CSEnum::Connected => {
+                    if let Some(state_value) = state {
+                        if let Some(n) = s.node_info.as_ref() {
+                            log.info(&format!("Got CSM from {}: {:?}", n.info, state_value));
+                        }
+                        match state_value.type_local {
+                            crate::signal::web_rtc::ConnType::Unknown => ConnState::Connected,
+                            crate::signal::web_rtc::ConnType::Host => ConnState::Host,
+                            crate::signal::web_rtc::ConnType::STUNPeer => ConnState::STUN,
+                            crate::signal::web_rtc::ConnType::STUNServer => ConnState::STUN,
+                            crate::signal::web_rtc::ConnType::TURN => ConnState::TURN,
+                        }
+                    } else {
+                        ConnState::Connected
+                    }
+                },
             };
             if dir == WebRTCConnectionState::Initializer {
                 s.outgoing = cs;
@@ -122,9 +139,6 @@ impl Logic {
                 s.incoming = cs;
             }
         });
-        if let Some(s) = state {
-            self.logger.info(&format!("Got CSM: {:?}", s));
-        }
     }
 
     fn store_nodes(&mut self, nodes: Vec<NodeInfo>) {

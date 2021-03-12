@@ -95,7 +95,7 @@ impl Component for Model {
                 }
                 self.process();
                 self.counter += 1;
-                if self.counter % 15 == 0 {
+                if self.counter % 15 == 0 || self.counter < 3 {
                     self.node_list();
                     self.node_ping();
                 }
@@ -241,24 +241,31 @@ impl Model {
                 }
             }
         }
+        if out.len() == 0{
+            return html!{<div>{"Fetching node list"}</div>}
+        }
         return html! {
-        <ul class={"no-bullets"}>
-            <li class={"info"}>
-                <span class={"info_node"}>{"Name"}</span>
-                <span class={"info_node"}>{"Count (rx/tx)"}</span>
-                <span class={"info_node"}>{"Last seen"}</span>
-                <span class={"info_node"}>{"Conn Stat (in/out)"}</span>
-            </li>
-        {out.iter().map(|li|
-            html!{
-                <li class={"info"}>
-                    <span class={"info_node"}>{li[0].clone()}</span>
-                    <span class={"info_node"}>{li[1].clone()}</span>
-                    <span class={"info_node"}>{li[2].clone()}</span>
-                    <span class={"info_node"}>{li[3].clone()}</span>
-                </li>
-            }).collect::<Html>()}
-        </ul>};
+        <table class={"styled-table"}>
+            <thead>
+                <tr>
+                    <th>{"Name"}</th>
+                    <th>{"Count (rx/tx)"}</th>
+                    <th>{"Last seen"}</th>
+                    <th>{"Conn Stat (in/out)"}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {out.iter().map(|li|
+                    html!{
+                        <tr>
+                            <td>{li[0].clone()}</td>
+                            <td>{li[1].clone()}</td>
+                            <td>{li[2].clone()}</td>
+                            <td>{li[3].clone()}</td>
+                        </tr>
+                    }).collect::<Html>()}
+            </tbody>
+        </table>};
     }
 
     fn node_copy<'a>(&self) -> Option<Arc<Mutex<Node>>> {

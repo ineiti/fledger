@@ -178,6 +178,8 @@ impl ConnectionState {
                     self.output_tx
                         .send(CSOutput::State(self.state.clone(), None))
                         .map_err(|e| e.to_string())?;
+                } else {
+                    self.get_state().await?;
                 }
                 return Ok(());
             }
