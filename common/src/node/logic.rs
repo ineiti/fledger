@@ -137,9 +137,10 @@ impl Logic {
 
     fn store_nodes(&mut self, nodes: Vec<NodeInfo>) {
         for ni in nodes {
-            self.stats
+            let s = self.stats
                 .entry(ni.id.clone())
-                .or_insert_with(|| Stat::new(Some(ni)));
+                .or_insert_with(|| Stat::new(None));
+            s.node_info = Some(ni);
         }
     }
 
