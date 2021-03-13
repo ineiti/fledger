@@ -130,8 +130,8 @@ impl Network {
                 match output {
                     NCOutput::WebSocket(message, remote) => {
                         let (id_init, id_follow) = match remote {
-                            true => (conn.0.clone(), self.node_info.public.clone()),
-                            false => (self.node_info.public.clone(), conn.0.clone()),
+                            true => (conn.0.clone(), self.node_info.id.clone()),
+                            false => (self.node_info.id.clone(), conn.0.clone()),
                         };
                         let peer_info = PeerInfo {
                             id_init,
@@ -163,9 +163,10 @@ impl Network {
     /// setup requests from another node.
     async fn process_msg(&mut self, msg: WSSignalMessage) -> Result<(), String> {
         match msg {
-            WSSignalMessage::Challenge(challenge) => {
-                self.logger.info("Processing Challenge message");
+            WSSignalMessage::Challenge(version, challenge) => {
+                self.logger.info(&format!("Processing Challenge message version: {}", version));
                 let ma = MessageAnnounce {
+                    version,
                     challenge,
                     node_info: self.node_info.clone(),
                 };
@@ -184,7 +185,7 @@ impl Network {
             WSSignalMessage::PeerSetup(pi) => {
                 // self.logger
                 //     .info(&format!("dbg: Network::Processing PeerSetup message: {}", pi.message));
-                let remote_node = match pi.get_remote(&self.node_info.public) {
+                let remote_node = match pi.get_remote(&self.node_info.id) {
                     Some(id) => id,
                     None => {
                         return Err("Got alien PeerSetup".to_string());
@@ -202,9 +203,6 @@ impl Network {
                     .send(NCInput::WebSocket(pi.message, remote))
                     .map_err(|e| e.to_string())?;
             }
-            WSSignalMessage::Done => {
-                self.logger.info("Processing done message");
-            }
             ws => {
                 self.logger.info(&format!("Got unusable message: {:?}", ws));
             }
@@ -221,7 +219,7 @@ impl Network {
     fn update_list(&mut self, list: Vec<NodeInfo>) -> Result<(), String> {
         self.list = list
             .iter()
-            .filter(|entry| entry.public != self.node_info.public)
+            .filter(|entry| entry.id != self.node_info.id)
             .cloned()
             .collect();
         self.output_tx.send(NOutput::UpdateList(list)).map_err(|e| e.to_string())

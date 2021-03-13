@@ -21,10 +21,10 @@ use self::{
 /// The node structure holds it all together. It is the main structure of the project.
 pub struct Node {
     pub network: Network,
-    pub info: NodeInfo,
+    pub config: NodeConfig,
     pub logic: Logic,
-    _storage: Box<dyn DataStorage>,
-    _logger: Box<dyn Logger>,
+    storage: Box<dyn DataStorage>,
+    logger: Box<dyn Logger>,
 }
 
 pub const CONFIG_NAME: &str = "nodeConfig";
@@ -35,12 +35,12 @@ impl Node {
     /// new messages from the signalling server and from other nodes.
     /// The actual logic is handled in Logic.
     pub fn new(
-        _storage: Box<dyn DataStorage>,
+        storage: Box<dyn DataStorage>,
         logger: Box<dyn Logger>,
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
     ) -> Result<Node, String> {
-        let config_str = match _storage.load(CONFIG_NAME) {
+        let config_str = match storage.load(CONFIG_NAME) {
             Ok(s) => s,
             Err(_) => {
                 logger.info(&format!("Couldn't load configuration - start with empty"));
@@ -48,19 +48,19 @@ impl Node {
             }
         };
         let config = NodeConfig::new(config_str)?;
-        _storage.save(CONFIG_NAME, &config.to_string()?)?;
+        storage.save(CONFIG_NAME, &config.to_string()?)?;
         logger.info(&format!(
             "Starting node: {} = {}",
-            config.our_node.info, config.our_node.public
+            config.our_node.info, config.our_node.id
         ));
         let network = Network::new(logger.clone(), config.our_node.clone(), ws, web_rtc);
         let logic = Logic::new(config.our_node.clone(), logger.clone());
 
         Ok(Node {
-            info: config.our_node,
-            _storage,
+            config,
+            storage,
             network,
-            _logger: logger,
+            logger,
             logic,
         })
     }
@@ -71,6 +71,15 @@ impl Node {
         self.logic.process().await?;
         self.network.process().await?;
         Ok(())
+    }
+
+    pub fn save(&self) -> Result<(), String>{
+        self.logger.info(&format!("Storing configuration: {}", self.config.to_string()?));
+        self.storage.save(CONFIG_NAME, &self.config.to_string()?)
+    }
+
+    pub fn info(&self) -> NodeInfo {
+        return self.config.our_node.clone();
     }
 
     fn process_network(&mut self) -> Result<(), String> {

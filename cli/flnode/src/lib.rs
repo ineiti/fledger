@@ -50,6 +50,14 @@ async fn start(log: Box<dyn Logger>, url: &str) -> Result<Node, JsValue> {
     let my_storage = Box::new(DummyDS {});
     let ws = WebSocketWasm::new(url)?;
     let node = Node::new(my_storage, log, Box::new(ws), rtc_spawner)?;
+    if let Some(window) = web_sys::window() {
+        let navigator = window.navigator();
+        node.info().client = match navigator.user_agent() {
+            Ok(p) => p,
+            Err(_) => "n/a".to_string(),
+        };
+    }
+    node.save()?;
 
     Ok(node)
 }
@@ -61,7 +69,7 @@ async fn list_ping(log: Box<dyn Logger>, n: &mut Node) -> Result<(), String> {
     nodes.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
     for node in nodes {
         if let Some(info) = node.node_info.as_ref() {
-            if n.info.public != info.public {
+            if n.info().id != info.id {
                 log.info(&format!(
                     "Node: name:{} age:{} ping:({}/{}) conn:({:?}/{:?})",
                     info.info,

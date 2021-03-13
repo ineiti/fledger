@@ -161,30 +161,34 @@ impl WebSocketMessage {
 /// server will send a 'PeerReply' to the corresponding node, which will continue
 /// the protocol by sending its own PeerRequest.
 /// - Done is a standard message that can be sent back to indicate all is well.
-///
-/// TODO: use the "Challenge" to sign with the private key of the node, so that the server
-/// can verify that the node knows the corresponding private key of its public key.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum WSSignalMessage {
-    Challenge(U256),
+    Challenge(u64, U256),
     Announce(MessageAnnounce),
     ListIDsRequest,
     ListIDsReply(Vec<NodeInfo>),
     ClearNodes,
     PeerSetup(PeerInfo),
-    Done,
+    NodeStats(Vec<NodeStat>)
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct NodeStat{
+    pub id: U256,
+    pub ping_ms: u32,
+    pub ping_rx: u32,
 }
 
 impl std::fmt::Display for WSSignalMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            WSSignalMessage::Challenge(_) => write!(f, "Challenge"),
+            WSSignalMessage::Challenge(_, _) => write!(f, "Challenge"),
             WSSignalMessage::Announce(_) => write!(f, "Announce"),
             WSSignalMessage::ListIDsRequest => write!(f, "ListIDsRequest"),
             WSSignalMessage::ListIDsReply(_) => write!(f, "ListIDsReply"),
             WSSignalMessage::ClearNodes => write!(f, "ClearNodes"),
             WSSignalMessage::PeerSetup(_) => write!(f, "PeerSetup"),
-            WSSignalMessage::Done => write!(f, "Done"),
+            WSSignalMessage::NodeStats(_) => write!(f, "NodeStats"),
         }
     }
 }
@@ -192,6 +196,7 @@ impl std::fmt::Display for WSSignalMessage {
 /// TODO: add a signature on the challenge
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MessageAnnounce {
+    pub version: u64,
     pub challenge: U256,
     pub node_info: NodeInfo,
 }

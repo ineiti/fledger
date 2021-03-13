@@ -38,7 +38,7 @@ impl NodeEntry {
             last_seen: Instant::now(),
         };
         let msg = serde_json::to_string(&WebSocketMessage {
-            msg: WSSignalMessage::Challenge(ne.entry.clone()),
+            msg: WSSignalMessage::Challenge(1u64, ne.entry.clone()),
         })
         .unwrap();
         if let Err(e) = executor::block_on(ne.conn.send(msg)) {

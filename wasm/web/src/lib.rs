@@ -95,7 +95,7 @@ impl Component for Model {
                 }
                 self.process();
                 self.counter += 1;
-                if self.counter % 15 == 0 || self.counter < 3 {
+                if self.counter % 15 == 0 || self.counter < 5 {
                     self.node_list();
                     self.node_ping();
                 }
@@ -181,8 +181,10 @@ impl Model {
                 let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
                 let my_storage = Box::new(LocalStorage {});
                 let ws = WebSocketWasm::new(URL)?;
+                let log = logger.clone();
                 let node = Node::new(my_storage, logger, Box::new(ws), rtc_spawner)?;
 
+                log.info(&format!("Client info: {}", node.info().client));
                 Ok(node)
             },
             link.callback(|n: Result<Node, JsValue>| Msg::Node(n)),
@@ -192,7 +194,7 @@ impl Model {
     fn describe(&self) -> String {
         if let Some(n) = self.node_copy() {
             if let Ok(node) = n.try_lock(){
-                return format!("{} => {}", node.info.info, node.info.public);
+                return format!("{} => {}", node.info().info, node.info().id);
             }
         }
         return "Unknown".into();
@@ -229,7 +231,7 @@ impl Model {
                 let now = Date::now();
                 for stat in stats {
                     if let Some(ni) = stat.node_info.as_ref() {
-                        if node.info.public != ni.public {
+                        if node.info().id != ni.id {
                             out.push(vec![
                                 format!("{}", ni.info),
                                 format!("{} / {}", stat.ping_rx, stat.ping_tx),
@@ -250,7 +252,7 @@ impl Model {
                 <tr>
                     <th>{"Name"}</th>
                     <th>{"Count (rx/tx)"}</th>
-                    <th>{"Last seen"}</th>
+                    <th>{"Last ping"}</th>
                     <th>{"Conn Stat (in/out)"}</th>
                 </tr>
             </thead>

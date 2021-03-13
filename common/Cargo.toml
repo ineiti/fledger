@@ -45,4 +45,6 @@ features = [
   "RtcDataChannel",
   "RtcDataChannelEvent",
   "RtcDataChannelState",
+
+  "Navigator",
 ]

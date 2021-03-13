@@ -1,39 +1,27 @@
 use super::types::U256;
 use serde_derive::{Deserialize, Serialize};
 
-// TODO: add public key and an optional private key
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct NodeInfo {
-    pub public: U256,
+    pub id: U256,
     pub info: String,
-    pub ip: String,
-    pub webrtc_address: String,
+    pub client: String,
 }
 
 impl NodeInfo {
-    /// Creates a new NodeInfo with a random public key.
-    /// TODO: actually implement something useful.
+    /// Creates a new NodeInfo with a random id.
     pub fn new() -> NodeInfo {
         NodeInfo {
-            public: U256::rnd(),
+            id: U256::rnd(),
             info: names::Generator::default().next().unwrap().to_string(),
-            ip: "127".to_string(),
-            webrtc_address: "something".to_string(),
+            client: "Node".to_string(),
         }
     }
 }
 
-// TODO: handle discovering the ledger and remove the root NodeInfo
-#[derive(Debug, Deserialize)]
-pub struct Ledger {
-    name: String,
-    root: NodeInfo,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NodeConfig {
     pub our_node: NodeInfo,
-    // pub ledger: Ledger,
 }
 
 impl NodeConfig {
@@ -43,18 +31,17 @@ impl NodeConfig {
         let t: Toml = if str.len() > 0 {
             toml::from_str(str.as_str()).map_err(|e| e.to_string())?
         } else {
-            Toml { our_node: None }
+            Toml { v1: None }
         };
 
-        Ok(NodeConfig {
-            our_node: t.our_node.unwrap_or(NodeInfo::new()),
-            // ledger: t.ledger,
-        })
+        Ok(t.v1.unwrap_or(NodeConfig{
+            our_node: NodeInfo::new(),
+        }))
     }
 
     pub fn to_string(&self) -> Result<String, String> {
         toml::to_string(&Toml {
-            our_node: Some(self.our_node.clone()),
+            v1: Some(self.clone()),
         })
         .map_err(|e| e.to_string())
     }
@@ -63,6 +50,6 @@ impl NodeConfig {
 // TODO: find good name, add private key
 #[derive(Debug, Deserialize, Serialize)]
 struct Toml {
-    our_node: Option<NodeInfo>,
+    v1: Option<NodeConfig>,
     // ledger: Ledger,
 }

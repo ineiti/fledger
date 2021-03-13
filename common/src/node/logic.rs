@@ -119,7 +119,7 @@ impl Logic {
                 CSEnum::Connected => {
                     if let Some(state_value) = state {
                         if let Some(n) = s.node_info.as_ref() {
-                            log.info(&format!("Got CSM from {}: {:?}", n.info, state_value));
+                            log.info(&format!("Got stats for {}: {:?}", n.info, state_value));
                         }
                         match state_value.type_local {
                             crate::signal::web_rtc::ConnType::Unknown => ConnState::Connected,
@@ -144,7 +144,7 @@ impl Logic {
     fn store_nodes(&mut self, nodes: Vec<NodeInfo>) {
         for ni in nodes {
             self.stats
-                .entry(ni.public.clone())
+                .entry(ni.id.clone())
                 .or_insert_with(|| Stat::new(Some(ni)));
         }
     }
@@ -152,9 +152,9 @@ impl Logic {
     fn ping_all(&mut self, msg: String) -> Result<(), String> {
         for stat in self.stats.iter_mut() {
             if let Some(ni) = stat.1.node_info.as_ref() {
-                if self.node_info.public != ni.public {
+                if self.node_info.id != ni.id {
                     self.output_tx
-                        .send(LOutput::WebRTC(ni.public.clone(), msg.clone()))
+                        .send(LOutput::WebRTC(ni.id.clone(), msg.clone()))
                         .map_err(|e| e.to_string())?;
                     stat.1.ping_tx += 1;
                 }

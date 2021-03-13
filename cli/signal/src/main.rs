@@ -1,7 +1,7 @@
 /// Very simple rendez-vous server that allows new nodes to send their node_info.
 /// It also allows the nodes to fetch all existing node_infos of all the other nodes.
 ///
-/// TODO: use the `newID` endpoint to authentify the nodes' public key
+/// TODO: use the `newID` endpoint to authentify the nodes' id
 // mod node_list;
 mod state;
 

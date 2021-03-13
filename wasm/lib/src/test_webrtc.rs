@@ -54,7 +54,7 @@ impl WebSocketDummy {
         let wscd = WebSocketConnectionDummy::new(Rc::clone(&self.msg_queue), id);
         self.callbacks.push(Rc::clone(&wscd.cb));
         let wsm_str = WebSocketMessage {
-            msg: WSSignalMessage::Challenge(U256::rnd()),
+            msg: WSSignalMessage::Challenge(1u64, U256::rnd()),
         }
         .to_string();
         self.msg_queue
@@ -278,7 +278,7 @@ async fn connect_test_simple() -> Result<(), String> {
 
     // Pass messages
     ws_conn.run_queue()?;
-    node1.send(&node2.info.public, "ping".to_string())?;
+    node1.send(&node2.info().id, "ping".to_string())?;
 
     let mut i = 0;
     loop {
@@ -293,8 +293,8 @@ async fn connect_test_simple() -> Result<(), String> {
         // }
         if i == 12 {
             log.info("Connection should be set up now");
-            node1.send(&node2.info.public, "ping".to_string())?;
-            node2.send(&node1.info.public, "pong".to_string())?;
+            node1.send(&node2.info().id, "ping".to_string())?;
+            node2.send(&node1.info().id, "pong".to_string())?;
         }
         if i > 20 {
             break;

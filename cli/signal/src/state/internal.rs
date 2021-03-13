@@ -12,7 +12,7 @@ use std::{
 use common::{
     node::{config::NodeInfo, ext_interface::Logger, types::U256},
     signal::{
-        web_rtc::{WSSignalMessage, WebSocketMessage},
+        web_rtc::{WSSignalMessage, WebSocketMessage, NodeStat},
         websocket::WSMessage,
     },
 };
@@ -22,7 +22,8 @@ use super::node_entry::NodeEntry;
 pub struct Internal {
     pub logger: Box<dyn Logger>,
     pub nodes: HashMap<U256, NodeEntry>,
-    // Left: public - Right: challenge
+    pub stats: HashMap<U256, Vec<Vec<NodeStat>>>,
+    // Left: id - Right: challenge
     pub_chal: BiMap<U256, U256>,
 }
 
@@ -30,6 +31,7 @@ impl Internal {
     pub fn new(logger: Box<dyn Logger>) -> Arc<Mutex<Internal>> {
         let int = Arc::new(Mutex::new(Internal {
             logger,
+            stats: HashMap::new(),
             nodes: HashMap::new(),
             pub_chal: BiMap::new(),
         }));
@@ -51,8 +53,8 @@ impl Internal {
     fn close_ws(&self) {}
     fn opened_ws(&self) {}
 
-    fn pub_to_chal(&self, public: &U256) -> Option<U256> {
-        match self.pub_chal.get_by_left(public) {
+    fn pub_to_chal(&self, id: &U256) -> Option<U256> {
+        match self.pub_chal.get_by_left(id) {
             Some(p) => Some(p.clone()),
             None => None,
         }
@@ -66,7 +68,7 @@ impl Internal {
     }
 
     /// Receives a message from the websocket. Src is the challenge-ID, which is
-    /// random and only tied to the public ID through self.pub_chal.
+    /// random and only tied to the id ID through self.pub_chal.
     fn receive_msg(&mut self, chal: &U256, msg: String) {
         let msg_ws = match WebSocketMessage::from_str(&msg) {
             Ok(mw) => mw,
@@ -88,15 +90,15 @@ impl Internal {
             WSSignalMessage::Announce(msg_ann) => {
                 self.logger
                     .info(&format!("Storing node {:?}", msg_ann.node_info));
-                let public = msg_ann.node_info.public.clone();
+                let id = msg_ann.node_info.id.clone();
                 self.nodes.retain(|_, ni| {
                     if let Some(info) = ni.info.clone() {
-                        return info.public != public;
+                        return info.id != id;
                     }
                     return true;
                 });
                 self.pub_chal
-                    .insert(msg_ann.node_info.public.clone(), chal.clone());
+                    .insert(msg_ann.node_info.id.clone(), chal.clone());
                 self.nodes
                     .entry(chal.clone())
                     .and_modify(|ne| ne.info = Some(msg_ann.node_info));
@@ -138,14 +140,26 @@ impl Internal {
                 };
                 self.send_message_errlog(&dst, WSSignalMessage::PeerSetup(pr.clone()));
             }
+
+            WSSignalMessage::NodeStats(ns) => {
+                if let Some(node) = self.nodes.get(&chal) {
+                    self.logger.info(&format!(
+                        "Got node statistics from '{}' about {} nodes",
+                        node.info.as_ref().unwrap().info,
+                        ns.len()
+                    ));
+                    let src = self.chal_to_pub(chal).unwrap();
+                    self.stats.entry(src.clone()).or_insert(vec![]);
+                    self.stats.entry(src).and_modify(|e| e.push(ns));
+                }
+            }
             _ => {}
         }
     }
 
-    fn send_message_errlog(&mut self, public: &U256, msg: WSSignalMessage) {
-        self.logger
-            .info(&format!("Sending to {}: {:?}", public, msg));
-        if let Err(e) = self.send_message(public, msg.clone()) {
+    fn send_message_errlog(&mut self, id: &U256, msg: WSSignalMessage) {
+        self.logger.info(&format!("Sending to {}: {:?}", id, msg));
+        if let Err(e) = self.send_message(id, msg.clone()) {
             self.logger
                 .error(&format!("Error {} while sending {:?}", e, msg));
         }
@@ -153,9 +167,9 @@ impl Internal {
 
     /// Tries to send a message to the indicated node.
     /// If the node is not reachable, an error will be returned.
-    pub fn send_message(&mut self, public: &U256, msg: WSSignalMessage) -> Result<(), String> {
+    pub fn send_message(&mut self, id: &U256, msg: WSSignalMessage) -> Result<(), String> {
         let msg_str = serde_json::to_string(&WebSocketMessage { msg }).unwrap();
-        if let Some(chal) = self.pub_to_chal(public) {
+        if let Some(chal) = self.pub_to_chal(id) {
             match self.nodes.entry(chal.clone()) {
                 Entry::Occupied(mut e) => {
                     if let Err(e) = executor::block_on((e.get_mut().conn).send(msg_str)) {

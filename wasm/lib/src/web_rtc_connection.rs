@@ -50,15 +50,14 @@ impl WebRTCConnection for WebRTCConnectionWasm {
         let mut type_remote = ConnType::Unknown;
         conn_stats.for_each(&mut |k, _v| {
             let s = format!("{:?}", k);
-            // log_1(&s.clone().into());
-            if s.contains("srflx"){
+            if s.contains("candidateType\":\"srflx"){
                 type_remote = ConnType::STUNServer;
-            } else if s.contains("prflx"){
+            } else if s.contains("candidateType\":\"prflx"){
                 type_remote = ConnType::STUNPeer;
-            } else if s.contains("relay"){
+            } else if s.contains("candidateType\":\"relay"){
                 type_remote = ConnType::TURN;
-            // } else if s.contains("host") {
-            //     type_remote = ConnType::Host;
+            } else if s.contains("candidateType\":\"host") {
+                type_remote = ConnType::Host;
             }
         });
         Ok(ConnectionStateMap {

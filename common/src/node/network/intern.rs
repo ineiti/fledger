@@ -120,7 +120,7 @@ impl Intern {
             WSSignalMessage::PeerSetup(pi) => {
                 self.logger
                     .info(&format!("Processing PeerSetup message: {}", pi.message));
-                let remote = match pi.get_remote(&self.node_info.public) {
+                let remote = match pi.get_remote(&self.node_info.id) {
                     Some(id) => id,
                     None => {
                         return Err("Got alien PeerSetup".to_string());
@@ -183,7 +183,7 @@ impl Intern {
     fn update_list(&mut self, list: Vec<NodeInfo>) {
         self.list = list
             .iter()
-            .filter(|entry| entry.public != self.node_info.public)
+            .filter(|entry| entry.id != self.node_info.id)
             .cloned()
             .collect();
     }
@@ -225,7 +225,7 @@ impl Intern {
         if let Some(message) = message {
             let pi = PeerInfo {
                 message,
-                id_init: self.node_info.public.clone(),
+                id_init: self.node_info.id.clone(),
                 id_follow: dst.clone(),
             };
             self.send_ws(WSSignalMessage::PeerSetup(pi));
