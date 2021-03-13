@@ -157,7 +157,20 @@ impl ConnectionState {
                     ));
                 }
             }
-            _ => self.setup_peer_message(pi_message).await?,
+            _ => {
+                if let Err(e) = self.setup_peer_message(pi_message).await {
+                    self.logger.error(&format!(
+                        "Couldn't set peer message, resetting connection: {}",
+                        e.to_string()
+                    ));
+                    self.state = CSEnum::Idle;
+                    if !self.remote {
+                        self.logger.info("Starting new connection");
+                        self.setup_new_connection().await?;
+                        self.setup_peer_message(PeerMessage::Init).await?;
+                    }
+                }
+            }
         }
         Ok(())
     }
