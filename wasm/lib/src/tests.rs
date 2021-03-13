@@ -19,10 +19,6 @@ pub async fn test_webrtc() -> Result<(), JsValue> {
     let answer = rc2.make_answer(offer).await?;
     rc1.use_answer(answer).await?;
 
-    // Now both nodes need to wait for the messages to be exchanged.
-    rc1.wait_gathering().await?;
-    rc2.wait_gathering().await?;
-
     // Same thing for the ICE information that is converted to strings here and must be passed
     // through a signnalling server.
     console_log!("Pass ICE back and forth");

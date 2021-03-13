@@ -34,7 +34,6 @@ impl WebSocketWasm {
         let ws = self.ws.clone();
 
         // create callback
-        console_log!("creating onmessage callback");
         let cb_clone = self.cb.clone();
         let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
             if let Ok(txt) = e.data().dyn_into::<js_sys::JsString>() {
@@ -51,7 +50,6 @@ impl WebSocketWasm {
         // forget the callback to keep it alive
         onmessage_callback.forget();
 
-        console_log!("creating onerror callback");
         let cb_clone = self.cb.clone();
         let onerror_callback = Closure::wrap(Box::new(move |e: ErrorEvent| {
             console_log!("error event: {:?}", e);
@@ -63,7 +61,6 @@ impl WebSocketWasm {
         ws.set_onerror(Some(onerror_callback.as_ref().unchecked_ref()));
         onerror_callback.forget();
 
-        console_log!("creating onopen callback");
         let cb_clone = self.cb.clone();
         let onopen_callback = Closure::wrap(Box::new(move |_| {
             console_log!("socket opened");
@@ -73,8 +70,6 @@ impl WebSocketWasm {
         }) as Box<dyn FnMut(JsValue)>);
         ws.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
         onopen_callback.forget();
-
-        console_log!("websocket done");
     }
 }
 

@@ -7,17 +7,15 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
-use common::signal::web_rtc::{
-    WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCB, WebRTCSetupCBMessage,
-};
+use common::signal::web_rtc::{ConnectionStateMap ,WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCB, WebRTCSetupCBMessage};
 
 use web_sys::{
     console::log_1, Event, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
-    RtcIceCandidateInit, RtcIceGatheringState, RtcPeerConnection, RtcPeerConnectionIceEvent,
-    RtcSdpType, RtcSessionDescriptionInit,
+    RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
+    RtcSessionDescriptionInit, RtcSignalingState,
 };
 
-use crate::{logs::wait_ms, web_rtc_connection::WebRTCConnectionWasm};
+use crate::web_rtc_connection::{WebRTCConnectionWasm, get_state};
 
 fn log(s: &str) {
     log_1(&JsValue::from_str(s));
@@ -134,6 +132,9 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     // Takes the answer string and finalizes the first part of the connection.
     async fn use_answer(&mut self, answer: String) -> Result<(), String> {
         self.is_initializer()?;
+        if self.rp_conn.signaling_state() == RtcSignalingState::Stable{
+            return Ok(());
+        }
         let mut answer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
         answer_obj.sdp(&answer);
         let srd_promise = self.rp_conn.set_remote_description(&answer_obj);
@@ -141,18 +142,6 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
             .await
             .map_err(|e| format!("{:?}", e))?;
         Ok(())
-    }
-
-    // Waits for the ICE to move on from the 'New' state
-    async fn wait_gathering(&mut self) -> Result<(), String> {
-        // self.is_not_setup()?;
-        for _ in 0u8..10 {
-            match self.rp_conn.ice_gathering_state() {
-                RtcIceGatheringState::New => wait_ms(1000).await,
-                _ => return Ok(()),
-            }
-        }
-        Err("Didn't reach IceGatheringState".to_string())
     }
 
     // Waits for the ICE string to be avaialble.
@@ -174,15 +163,16 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         ric_init.sdp_m_line_index(Some(els[2].parse::<u16>().unwrap()));
         match RtcIceCandidate::new(&ric_init) {
             Ok(e) => {
-                log(&format!("Adding ice: {:?} / {:?}", els, e));
+                // DEBUG: clean up logging once ICE stuff is more clear...
+                // log(&format!("dbg: Adding ice: {:?} / {:?}", els, e));
                 if let Err(e) = wasm_bindgen_futures::JsFuture::from(
                     rp_clone.add_ice_candidate_with_opt_rtc_ice_candidate(Some(&e)),
                 )
                 .await
                 {
                     log(&format!("Couldn't add ice candidate: {:?}", e));
-                } else {
-                    log("Added ice successfully");
+                // } else {
+                //     log("dbg: Added ice successfully");
                 }
                 Ok(())
             }
@@ -191,14 +181,8 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         .map_err(|js| js.to_string())
     }
 
-    async fn print_states(&mut self) {
-        log(&format!(
-            "{:?}: rpc_conn state is: {:?} / {:?} / {:?}",
-            self.nt,
-            self.rp_conn.signaling_state(),
-            self.rp_conn.ice_gathering_state(),
-            self.rp_conn.ice_connection_state()
-        ));
+    async fn get_state(&self) -> Result<ConnectionStateMap, String> {
+        get_state(self.rp_conn.clone()).await
     }
 }
 

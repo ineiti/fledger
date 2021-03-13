@@ -13,6 +13,8 @@ use std::sync::{
     Arc, Mutex,
 };
 
+use web_sys::RtcIceConnectionState;
+
 /// Represents the state of an incoming or outgoing connection.
 #[derive(PartialEq, Debug, Clone)]
 pub enum CSEnum {
@@ -99,6 +101,9 @@ impl ConnectionState {
                 }
             };
         }
+        if self.state != CSEnum::Idle {
+                self.get_state().await?;
+        }
         Ok(())
     }
 
@@ -120,7 +125,6 @@ impl ConnectionState {
                         log.error(&format!("Couldn't send WebRTCMessage to node: {}", e));
                     }
                 }));
-                self.setup = None;
                 self.connected = Some(conn);
                 self.state = CSEnum::Connected;
                 self.output_tx
@@ -132,11 +136,23 @@ impl ConnectionState {
     }
 
     /// Returns the state of the connection, if available.
-    async fn get_state(&self) -> Result<(), String> {
+    async fn get_state(&mut self) -> Result<(), String> {
         let stat = match &self.state {
             CSEnum::Connected => Some(self.connected.as_ref().unwrap().get_state().await?),
+            CSEnum::Setup => Some(self.setup.as_ref().unwrap().get_state().await?),
             _ => None,
         };
+        if let Some(s) = stat {
+            let reset = match s.connection{
+                RtcIceConnectionState::Failed => true,
+                RtcIceConnectionState::Disconnected => true,
+                RtcIceConnectionState::Closed => true,
+                _ => false
+            };
+            if reset {
+                self.start_connection(Some("Found bad ConnetionState".into())).await?;
+            }
+        }
         self.output_tx
             .send(CSOutput::State(self.state.clone(), stat))
             .map_err(|e| e.to_string())
@@ -205,8 +221,8 @@ impl ConnectionState {
                         "Couldn't send over webrtc, resetting connection".to_string(),
                     ))
                     .await?;
-                } else {
-                    self.get_state().await?;
+                // } else {
+                //     self.get_state().await?;
                 }
             }
             _ => {}
@@ -267,35 +283,12 @@ impl ConnectionState {
                     setup.use_answer(answer).await?;
                 }
                 PeerMessage::IceCandidate(ice) => {
-                    setup.wait_gathering().await?;
+                    // self.logger.warn(&format!("dbg: state is {:?}", self.state));
                     setup.ice_put(ice).await?;
                 }
             }
         } else {
-            match pi_message {
-                PeerMessage::Init => {
-                    if self.remote {
-                        return Err("Cannot use Init on incoming connection".into());
-                    }
-                    return Err("Re-initializing outgoing connection".into());
-                }
-                PeerMessage::Offer(o) => {
-                    if self.remote {
-                        self.setup_new_connection().await?;
-                        self.input_tx
-                            .send(CSInput::ProcessPeerMessage(PeerMessage::Offer(o)))
-                            .map_err(|e| e.to_string())?;
-                    } else {
-                        self.logger.warn("Got Offer for outgoing connection");
-                    }
-                }
-                PeerMessage::Answer(_) => {
-                    self.logger.warn("Cannot use Answer with this connection state");
-                }
-                PeerMessage::IceCandidate(_) => {
-                    self.logger.warn("Ignoring IceCandidate for connection");
-                }
-            }
+            return Err("setup_peer_message cannot be called without self.setup".into());
         }
         Ok(())
     }

@@ -114,7 +114,8 @@ impl Intern {
                 self.update_node_list();
             }
             WSSignalMessage::ListIDsReply(list) => {
-                self.logger.info("Processing ListIDsReply message");
+                // DEBUG: sometimes new nodes are not recognized anymore
+                self.logger.info(&format!("Processing ListIDsReply message: {:?}", list));
                 self.update_list(list);
             }
             WSSignalMessage::PeerSetup(pi) => {
@@ -229,17 +230,6 @@ impl Intern {
                 id_follow: dst.clone(),
             };
             self.send_ws(WSSignalMessage::PeerSetup(pi));
-        }
-        Ok(())
-    }
-
-    pub async fn print_states(&self) -> Result<(), String> {
-        for (_id, conn) in self.connections.iter() {
-            for dir in conn.get_stats().await? {
-                if let Some(stats) = dir {
-                    self.logger.info(&format!("Connection is: {:?}", stats));
-                }
-            }
         }
         Ok(())
     }

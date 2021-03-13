@@ -89,8 +89,6 @@ impl Logic {
     pub async fn process(&mut self) -> Result<(), String> {
         let msgs: Vec<LInput> = self.input_rx.try_iter().collect();
         for msg in msgs {
-            // self.logger
-            //     .info(&format!("dbg: Logic::process got {:?}", msg));
             match msg {
                 LInput::WebRTC(id, msg) => self.rcv(id, msg),
                 LInput::SetNodes(nodes) => self.store_nodes(nodes),
@@ -111,16 +109,12 @@ impl Logic {
         self.stats
             .entry(id.clone())
             .or_insert_with(|| Stat::new(None));
-        let log = self.logger.clone();
         self.stats.entry(id.clone()).and_modify(|s| {
             let cs = match st {
                 CSEnum::Idle => ConnState::Idle,
                 CSEnum::Setup => ConnState::Setup,
                 CSEnum::Connected => {
                     if let Some(state_value) = state {
-                        if let Some(n) = s.node_info.as_ref() {
-                            log.info(&format!("Got stats for {}: {:?}", n.info, state_value));
-                        }
                         match state_value.type_local {
                             crate::signal::web_rtc::ConnType::Unknown => ConnState::Connected,
                             crate::signal::web_rtc::ConnType::Host => ConnState::Host,

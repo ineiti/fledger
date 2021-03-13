@@ -41,11 +41,10 @@ struct Model {
     logger: ConsoleLogger,
     counter: u32,
     show_reset: bool,
-    no_contact_yet: bool,
 }
 
 enum Msg {
-    UpdateLog,
+    Tick,
     Reset,
     Node(Result<Node, JsValue>),
 }
@@ -66,39 +65,26 @@ impl Component for Model {
         Model::node_start(logger.clone(), &link);
         let _ = Box::leak(Box::new(IntervalService::spawn(
             Duration::from_secs(1),
-            link.callback(|_| Msg::UpdateLog),
+            link.callback(|_| Msg::Tick),
         )));
         Self {
             link,
             node: None,
             counter: 0,
             show_reset: false,
-            no_contact_yet: true,
             logger,
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::UpdateLog => {
-                if let Some(n) = self.node_copy() {
-                    if self.no_contact_yet {
-                        if let Ok(mut node) = n.try_lock(){
-                            let l = node.get_list();
-                            self.logger.info(&format!("List length is: {:?}", l));
-                            if l.len() > 0 {
-                                self.no_contact_yet = false;
-                                self.node_ping();
-                            }
-                        }
-                    }
-                }
-                self.process();
+            Msg::Tick => {
                 self.counter += 1;
-                if self.counter % 15 == 0 || self.counter < 5 {
+                if self.counter % 5 == 0 || self.counter < 5 {
                     self.node_list();
                     self.node_ping();
                 }
+                self.process();
             }
             Msg::Node(res_node) => match res_node {
                 Ok(node) => {
@@ -134,7 +120,8 @@ impl Component for Model {
         };
         html! {
             <div class="main">
-                <h1>{"Fledger Web Node - "}<i>{self.get_info()}</i></h1>
+                <h1>{"Fledger Web Node"}</h1>
+                <h2><i>{self.get_info()}</i></h2>
                 <p>{"The goal of Fledger is to have a full node running in the web browser.
                 Instead of having to invest in big hardware, fledger will be light enough
                 that you can participate using a browser.
@@ -167,6 +154,8 @@ impl Model {
                     if let Err(e) = node.process().await {
                         log.info(&format!("Error: {}", e));
                     }
+                } else {
+                    log.error("process couldn't get lock");
                 }
             });
         }
@@ -191,6 +180,8 @@ impl Model {
         if let Some(n) = self.node_copy() {
             if let Ok(node) = n.try_lock(){
                 return node.info().info;
+            } else {
+                self.logger.error("get_info couldn't get lock");
             }
         }
         return "Unknown".into();
@@ -237,6 +228,8 @@ impl Model {
                         }
                     }
                 }
+            } else {
+                self.logger.error("nodes_reachable couldn't get lock");
             }
         }
         if out.len() == 0{
@@ -280,6 +273,8 @@ impl Model {
                 if let Err(e) = node.list() {
                     self.logger.error(&format!("Couldn't get list: {:?}", e));
                 }
+            } else {
+                self.logger.error("node_list couldn't get lock");
             }
         }
     }
@@ -293,6 +288,8 @@ impl Model {
                     if let Err(e) = node.ping(&str).await {
                         log.error(&format!("Couldn't ping node: {:?}", e));
                     }
+                } else {
+                    log.error("node_ping couldn't get lock");
                 }
             });
         }

@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use web_sys::{RtcIceGatheringState, RtcIceConnectionState};
 
 use crate::node::{config::NodeInfo, types::U256};
 
@@ -26,11 +27,8 @@ pub trait WebRTCConnectionSetup {
     /// Sends the ICE string to the WebRTC.
     async fn ice_put(&mut self, ice: String) -> Result<(), String>;
 
-    /// TODO: this can probably go away
-    async fn wait_gathering(&mut self) -> Result<(), String>;
-
-    /// Debugging output of the RTC state
-    async fn print_states(&mut self);
+    /// Return some statistics on the connection
+    async fn get_state(&self) -> Result<ConnectionStateMap, String>;
 }
 
 pub enum WebRTCSetupCBMessage {
@@ -71,11 +69,21 @@ pub enum ConnType {
     TURN,
 }
 
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum SignalingState {
+    Closed,
+    Setup,
+    Stable,
+}
+
 /// Some statistics about the connection
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub struct ConnectionStateMap {
     pub type_local: ConnType,
     pub type_remote: ConnType,
+    pub signaling: SignalingState,
+    pub gathering: RtcIceGatheringState,
+    pub connection: RtcIceConnectionState,
     pub rx_bytes: u64,
     pub tx_bytes: u64,
     pub delay_ms: u32,
@@ -193,7 +201,6 @@ impl std::fmt::Display for WSSignalMessage {
     }
 }
 
-/// TODO: add a signature on the challenge
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MessageAnnounce {
     pub version: u64,

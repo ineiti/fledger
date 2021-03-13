@@ -179,7 +179,6 @@ impl Network {
                 self.update_node_list()?;
             }
             WSSignalMessage::ListIDsReply(list) => {
-                self.logger.info("Processing ListIDsReply message");
                 self.update_list(list)?;
             }
             WSSignalMessage::PeerSetup(pi) => {
@@ -242,18 +241,6 @@ impl Network {
                 Arc::clone(&self.web_rtc),
             )?);
         conn.send(msg.clone())
-    }
-
-    /// Prints the states of all connections.
-    pub async fn print_states(&self) -> Result<(), String> {
-        for (_id, conn) in self.connections.iter() {
-            for dir in conn.get_stats().await? {
-                if let Some(stats) = dir {
-                    self.logger.info(&format!("Connection is: {:?}", stats));
-                }
-            }
-        }
-        Ok(())
     }
 
     pub fn clear_nodes(&mut self) -> Result<(), String> {

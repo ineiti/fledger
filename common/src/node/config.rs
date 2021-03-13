@@ -47,9 +47,7 @@ impl NodeConfig {
     }
 }
 
-// TODO: find good name, add private key
 #[derive(Debug, Deserialize, Serialize)]
 struct Toml {
     v1: Option<NodeConfig>,
-    // ledger: Ledger,
 }

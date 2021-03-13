@@ -12,7 +12,7 @@ use std::{
 use common::{
     node::{config::NodeInfo, ext_interface::Logger, types::U256},
     signal::{
-        web_rtc::{WSSignalMessage, WebSocketMessage, NodeStat},
+        web_rtc::{NodeStat, WSSignalMessage, WebSocketMessage},
         websocket::WSMessage,
     },
 };
@@ -128,17 +128,21 @@ impl Internal {
             // Node sends a PeerRequest with some of the data set to 'Some'.
             WSSignalMessage::PeerSetup(pr) => {
                 self.logger.info(&format!("Got a PeerSetup {:?}", pr));
-                let src = self.chal_to_pub(chal).unwrap();
-                let dst = if src == pr.id_init {
-                    &pr.id_follow
-                } else if src == pr.id_follow {
-                    &pr.id_init
+                if let Some(src) = self.chal_to_pub(chal) {
+                    let dst = if src == pr.id_init {
+                        &pr.id_follow
+                    } else if src == pr.id_follow {
+                        &pr.id_init
+                    } else {
+                        self.logger
+                            .error("Node sent a PeerSetup without including itself");
+                        return;
+                    };
+                    self.send_message_errlog(&dst, WSSignalMessage::PeerSetup(pr.clone()));
                 } else {
                     self.logger
-                        .error("Node sent a PeerSetup without including itself");
-                    return;
-                };
-                self.send_message_errlog(&dst, WSSignalMessage::PeerSetup(pr.clone()));
+                        .error(&format!("Got a PeerSetup for an unknown node"));
+                }
             }
 
             WSSignalMessage::NodeStats(ns) => {
