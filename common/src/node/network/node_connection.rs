@@ -95,14 +95,16 @@ impl NodeConnection {
                     chan.send(CSInput::Send(m)).map_err(|e| e.to_string())?;
                 }
                 Ok(())
-            },
+            }
             None => {
-                self.msg_queue.push(msg);
-                self
-                .outgoing
-                .input_tx
-                .send(CSInput::StartConnection)
-                .map_err(|e| e.to_string())
+                if self.outgoing.state == CSEnum::Idle {
+                    self.msg_queue.push(msg);
+                    self.outgoing
+                        .input_tx
+                        .send(CSInput::StartConnection)
+                        .map_err(|e| e.to_string())?;
+                }
+                Ok(())
             }
         }
     }
@@ -152,8 +154,9 @@ impl NodeConnection {
                         self.states[0] = stat;
                         WebRTCConnectionState::Initializer
                     };
-                    self.output_tx.send(NCOutput::State(dir, cs, stat))
-                    .map_err(|e| e.to_string())?;
+                    self.output_tx
+                        .send(NCOutput::State(dir, cs, stat))
+                        .map_err(|e| e.to_string())?;
                 }
                 CSOutput::WebSocket(msg) => self
                     .output_tx

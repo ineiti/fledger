@@ -95,15 +95,7 @@ impl ConnectionState {
                 CSInput::Send(s) => self.send(s).await?,
                 CSInput::WebRTCSetup(s) => self.web_rtc_setup(s)?,
                 CSInput::StartConnection => {
-                    if self.remote {
-                        self.logger.error("Cannot start connection for incoming!");
-                    } else {
-                        if self.state == CSEnum::Idle {
-                            self.logger.info("Starting outgoing connection");
-                            self.setup_new_connection().await?;
-                            self.setup_peer_message(PeerMessage::Init).await?;
-                        }
-                    }
+                    self.start_connection(None).await?;
                 }
             };
         }
@@ -128,6 +120,7 @@ impl ConnectionState {
                         log.error(&format!("Couldn't send WebRTCMessage to node: {}", e));
                     }
                 }));
+                self.setup = None;
                 self.connected = Some(conn);
                 self.state = CSEnum::Connected;
                 self.output_tx
@@ -169,23 +162,30 @@ impl ConnectionState {
             }
             _ => {
                 if let Err(e) = self.setup_peer_message(pi_message).await {
-                    self.reset_connection(format!(
+                    self.start_connection(Some(format!(
                         "Couldn't set peer message, resetting connection: {}",
                         e.to_string()
-                    )).await?;
+                    )))
+                    .await?;
                 }
             }
         }
         Ok(())
     }
 
-    async fn reset_connection(&mut self, reason: String) -> Result<(), String> {
-        self.logger.error(&reason);
-        self.state = CSEnum::Idle;
-        self.output_tx
-            .send(CSOutput::State(self.state.clone(), None))
-            .map_err(|e| e.to_string())?;
-        if !self.remote {
+    async fn start_connection(&mut self, reason: Option<String>) -> Result<(), String> {
+        if let Some(s) = reason {
+            self.logger.error(&s);
+        }
+        if self.state != CSEnum::Idle {
+            self.state = CSEnum::Idle;
+            self.output_tx
+                .send(CSOutput::State(self.state.clone(), None))
+                .map_err(|e| e.to_string())?;
+        }
+        if self.remote {
+            self.logger.error("Cannot start incoming connection")
+        } else {
             self.logger.info("Starting new connection");
             self.setup_new_connection().await?;
             self.setup_peer_message(PeerMessage::Init).await?;
@@ -200,10 +200,9 @@ impl ConnectionState {
                 self.process_peer_message(PeerMessage::Init).await?;
             }
             CSEnum::Connected => {
-                if let Err(e) = self.connected.as_ref().unwrap().send(msg) {
-                    self.reset_connection(format!(
-                        "Couldn't send over webrtc, resetting connection: {}",
-                        e
+                if let Err(_) = self.connected.as_ref().unwrap().send(msg) {
+                    self.start_connection(Some(
+                        "Couldn't send over webrtc, resetting connection".to_string(),
                     ))
                     .await?;
                 } else {
@@ -236,39 +235,66 @@ impl ConnectionState {
             .send(CSOutput::State(self.state.clone(), None))
             .map_err(|e| e.to_string())?;
         self.setup = Some(conn);
+        self.connected = None;
         Ok(())
     }
 
     async fn setup_peer_message(&mut self, pi_message: PeerMessage) -> Result<(), String> {
-        let setup = self.setup.as_mut().unwrap();
-        match pi_message {
-            PeerMessage::Init => {
-                if self.remote {
-                    return Err("Only Initializer can initialize".into());
+        if let Some(setup) = self.setup.as_mut() {
+            match pi_message {
+                PeerMessage::Init => {
+                    if self.remote {
+                        return Err("Only Initializer can initialize".into());
+                    }
+                    let offer = setup.make_offer().await?;
+                    self.output_tx
+                        .send(CSOutput::WebSocket(PeerMessage::Offer(offer)))
+                        .map_err(|e| e.to_string())?;
                 }
-                let offer = setup.make_offer().await?;
-                self.output_tx
-                    .send(CSOutput::WebSocket(PeerMessage::Offer(offer)))
-                    .map_err(|e| e.to_string())?;
-            }
-            PeerMessage::Offer(offer) => {
-                if !self.remote {
-                    return Err("Only follower can treat offer".into());
+                PeerMessage::Offer(offer) => {
+                    if !self.remote {
+                        return Err("Only follower can treat offer".into());
+                    }
+                    let answer = setup.make_answer(offer).await?;
+                    self.output_tx
+                        .send(CSOutput::WebSocket(PeerMessage::Answer(answer)))
+                        .map_err(|e| e.to_string())?;
                 }
-                let answer = setup.make_answer(offer).await?;
-                self.output_tx
-                    .send(CSOutput::WebSocket(PeerMessage::Answer(answer)))
-                    .map_err(|e| e.to_string())?;
-            }
-            PeerMessage::Answer(answer) => {
-                if self.remote {
-                    return Err("Only initializer can treat answer".into());
+                PeerMessage::Answer(answer) => {
+                    if self.remote {
+                        return Err("Only initializer can treat answer".into());
+                    }
+                    setup.use_answer(answer).await?;
                 }
-                setup.use_answer(answer).await?;
+                PeerMessage::IceCandidate(ice) => {
+                    setup.wait_gathering().await?;
+                    setup.ice_put(ice).await?;
+                }
             }
-            PeerMessage::IceCandidate(ice) => {
-                setup.wait_gathering().await?;
-                setup.ice_put(ice).await?;
+        } else {
+            match pi_message {
+                PeerMessage::Init => {
+                    if self.remote {
+                        return Err("Cannot use Init on incoming connection".into());
+                    }
+                    return Err("Re-initializing outgoing connection".into());
+                }
+                PeerMessage::Offer(o) => {
+                    if self.remote {
+                        self.setup_new_connection().await?;
+                        self.input_tx
+                            .send(CSInput::ProcessPeerMessage(PeerMessage::Offer(o)))
+                            .map_err(|e| e.to_string())?;
+                    } else {
+                        self.logger.warn("Got Offer for outgoing connection");
+                    }
+                }
+                PeerMessage::Answer(_) => {
+                    self.logger.warn("Cannot use Answer with this connection state");
+                }
+                PeerMessage::IceCandidate(_) => {
+                    self.logger.warn("Ignoring IceCandidate for connection");
+                }
             }
         }
         Ok(())

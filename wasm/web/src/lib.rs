@@ -134,7 +134,7 @@ impl Component for Model {
         };
         html! {
             <div class="main">
-                <h1>{"Fledger Web Node"}</h1>
+                <h1>{"Fledger Web Node - "}<i>{self.get_info()}</i></h1>
                 <p>{"The goal of Fledger is to have a full node running in the web browser.
                 Instead of having to invest in big hardware, fledger will be light enough
                 that you can participate using a browser.
@@ -150,13 +150,9 @@ impl Component for Model {
                 <p>{"For more information, see the documentation: "}
                 <a href={"https://fledg.re/doc/index.html"} target={"other"}>{"Fledger - the blockchain that could"}</a>
                 </p>
-                <div class="ui">
-                    <ul>
-                        <li>{"Our node: "}{self.describe()}</li>
-                        <li>{"Known Nodes:"}{self.nodes_reachable()}</li>
-                    </ul>
-                    <button style={reset_style} onclick=self.link.callback(|_| Msg::Reset)>{ "Reset Config" }</button>
-                </div>
+                {self.nodes_reachable()}
+                <br/>
+                <button style={reset_style} onclick=self.link.callback(|_| Msg::Reset)>{ "Reset Config" }</button>
             </div>
         }
     }
@@ -191,10 +187,10 @@ impl Model {
         ));
     }
 
-    fn describe(&self) -> String {
+    fn get_info(&self) -> String {
         if let Some(n) = self.node_copy() {
             if let Ok(node) = n.try_lock(){
-                return format!("{} => {}", node.info().info, node.info().id);
+                return node.info().info;
             }
         }
         return "Unknown".into();

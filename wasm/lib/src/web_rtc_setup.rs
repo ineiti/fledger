@@ -139,7 +139,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         let srd_promise = self.rp_conn.set_remote_description(&answer_obj);
         JsFuture::from(srd_promise)
             .await
-            .map_err(|e| e.as_string().unwrap())?;
+            .map_err(|e| format!("{:?}", e))?;
         Ok(())
     }
 
@@ -165,15 +165,25 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         // self.is_not_setup()?;
         let rp_clone = self.rp_conn.clone();
         let els: Vec<&str> = ice.split(":-:").collect();
-        if els.len() != 3 {
-            return Err(format!("wrong ice candidate string: {}", ice));
+        if els.len() != 3 || els[0] == "" {
+            log(&format!("wrong ice candidate string: {}", ice));
+            return Ok(());
         }
         let mut ric_init = RtcIceCandidateInit::new(els[0]);
         ric_init.sdp_mid(Some(els[1]));
         ric_init.sdp_m_line_index(Some(els[2].parse::<u16>().unwrap()));
         match RtcIceCandidate::new(&ric_init) {
             Ok(e) => {
-                let _ = rp_clone.add_ice_candidate_with_opt_rtc_ice_candidate(Some(&e));
+                log(&format!("Adding ice: {:?} / {:?}", els, e));
+                if let Err(e) = wasm_bindgen_futures::JsFuture::from(
+                    rp_clone.add_ice_candidate_with_opt_rtc_ice_candidate(Some(&e)),
+                )
+                .await
+                {
+                    log(&format!("Couldn't add ice candidate: {:?}", e));
+                } else {
+                    log("Added ice successfully");
+                }
                 Ok(())
             }
             Err(e) => Err(format!("Couldn't consume ice: {:?}", e)),
@@ -193,23 +203,23 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
 }
 
 fn ice_start(rp_conn: &RtcPeerConnection, callback: Arc<Mutex<Option<WebRTCSetupCB>>>) {
-    let onicecandidate_callback1 = Closure::wrap(Box::new(move |ev: RtcPeerConnectionIceEvent| {
-        match ev.candidate() {
-            Some(candidate) => {
-                let cand = format!(
-                    "{}:-:{}:-:{}",
-                    candidate.candidate(),
-                    candidate.sdp_mid().unwrap(),
-                    candidate.sdp_m_line_index().unwrap()
-                );
-                if let Some(cb) = callback.lock().unwrap().as_ref() {
-                    cb(WebRTCSetupCBMessage::Ice(cand.clone()));
+    let onicecandidate_callback1 =
+        Closure::wrap(
+            Box::new(move |ev: RtcPeerConnectionIceEvent| match ev.candidate() {
+                Some(candidate) => {
+                    let cand = format!(
+                        "{}:-:{}:-:{}",
+                        candidate.candidate(),
+                        candidate.sdp_mid().unwrap(),
+                        candidate.sdp_m_line_index().unwrap()
+                    );
+                    if let Some(cb) = callback.lock().unwrap().as_ref() {
+                        cb(WebRTCSetupCBMessage::Ice(cand.clone()));
+                    }
                 }
-            }
-            None => {}
-        }
-    })
-        as Box<dyn FnMut(RtcPeerConnectionIceEvent)>);
+                None => {}
+            }) as Box<dyn FnMut(RtcPeerConnectionIceEvent)>,
+        );
     rp_conn.set_onicecandidate(Some(onicecandidate_callback1.as_ref().unchecked_ref()));
     onicecandidate_callback1.forget();
 }

@@ -1,6 +1,6 @@
-use std::{sync::Arc, time::Duration};
 use std::sync::Mutex;
 use std::thread;
+use std::{sync::Arc, time::Duration};
 
 use common::{
     node::{ext_interface::Logger, types::U256},
@@ -38,14 +38,17 @@ impl ServerState {
         let ch_cl = challenge.clone();
         let int_clone = Arc::clone(&int);
         conn.set_cb_wsmessage(Box::new(move |cb| {
-            int_clone.lock().unwrap().cb_msg(&ch_cl, cb)
+            if let Ok(mut ic) = int_clone.try_lock() {
+                ic.cb_msg(&ch_cl, cb)
+            }
         }));
 
-        let mut int_lock = int.lock().unwrap();
-        let logger = int_lock.logger.clone();
-        int_lock
-            .nodes
-            .insert(challenge.clone(), NodeEntry::new(logger, challenge, conn));
+        if let Ok(mut int_lock) = int.try_lock() {
+            let logger = int_lock.logger.clone();
+            int_lock
+                .nodes
+                .insert(challenge.clone(), NodeEntry::new(logger, challenge, conn));
+        }
     }
 
     /// Waits for everything done while calling cleanup from time to time.
