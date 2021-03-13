@@ -31,6 +31,7 @@ pub enum CSInput {
     ProcessPeerMessage(PeerMessage),
     Send(String),
     WebRTCSetup(WebRTCSetupCBMessage),
+    StartConnection,
 }
 
 /// Messages from ConnectionState to the parent or other modules.
@@ -50,7 +51,6 @@ pub struct ConnectionState {
     input_rx: Receiver<CSInput>,
     logger: Box<dyn Logger>,
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
-    send_queue: Vec<String>,
     setup: Option<Box<dyn WebRTCConnectionSetup>>,
     connected: Option<Box<dyn WebRTCConnection>>,
     remote: bool,
@@ -73,7 +73,6 @@ impl ConnectionState {
             input_tx,
             logger,
             web_rtc,
-            send_queue: vec![],
             setup: None,
             connected: None,
             remote,
@@ -95,6 +94,17 @@ impl ConnectionState {
                 CSInput::ProcessPeerMessage(msg) => self.process_peer_message(msg).await?,
                 CSInput::Send(s) => self.send(s).await?,
                 CSInput::WebRTCSetup(s) => self.web_rtc_setup(s)?,
+                CSInput::StartConnection => {
+                    if self.remote {
+                        self.logger.error("Cannot start connection for incoming!");
+                    } else {
+                        if self.state == CSEnum::Idle {
+                            self.logger.info("Starting outgoing connection");
+                            self.setup_new_connection().await?;
+                            self.setup_peer_message(PeerMessage::Init).await?;
+                        }
+                    }
+                }
             };
         }
         Ok(())
@@ -159,18 +169,26 @@ impl ConnectionState {
             }
             _ => {
                 if let Err(e) = self.setup_peer_message(pi_message).await {
-                    self.logger.error(&format!(
+                    self.reset_connection(format!(
                         "Couldn't set peer message, resetting connection: {}",
                         e.to_string()
-                    ));
-                    self.state = CSEnum::Idle;
-                    if !self.remote {
-                        self.logger.info("Starting new connection");
-                        self.setup_new_connection().await?;
-                        self.setup_peer_message(PeerMessage::Init).await?;
-                    }
+                    )).await?;
                 }
             }
+        }
+        Ok(())
+    }
+
+    async fn reset_connection(&mut self, reason: String) -> Result<(), String> {
+        self.logger.error(&reason);
+        self.state = CSEnum::Idle;
+        self.output_tx
+            .send(CSOutput::State(self.state.clone(), None))
+            .map_err(|e| e.to_string())?;
+        if !self.remote {
+            self.logger.info("Starting new connection");
+            self.setup_new_connection().await?;
+            self.setup_peer_message(PeerMessage::Init).await?;
         }
         Ok(())
     }
@@ -183,22 +201,17 @@ impl ConnectionState {
             }
             CSEnum::Connected => {
                 if let Err(e) = self.connected.as_ref().unwrap().send(msg) {
-                    self.logger.error(&format!(
+                    self.reset_connection(format!(
                         "Couldn't send over webrtc, resetting connection: {}",
                         e
-                    ));
-                    self.state = CSEnum::Idle;
-                    self.output_tx
-                        .send(CSOutput::State(self.state.clone(), None))
-                        .map_err(|e| e.to_string())?;
+                    ))
+                    .await?;
                 } else {
                     self.get_state().await?;
                 }
-                return Ok(());
             }
             _ => {}
         }
-        self.send_queue.push(msg);
         Ok(())
     }
 

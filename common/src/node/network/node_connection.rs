@@ -41,6 +41,7 @@ pub struct NodeConnection {
     pub input_tx: Sender<NCInput>,
     output_tx: Sender<NCOutput>,
     input_rx: Receiver<NCInput>,
+    msg_queue: Vec<String>,
 
     _logger: Box<dyn Logger>,
     states: Vec<Option<ConnectionStateMap>>,
@@ -60,6 +61,7 @@ impl NodeConnection {
             output_rx,
             input_tx,
             input_rx,
+            msg_queue: vec![],
             _logger: logger,
             states: vec![None, None],
         };
@@ -85,12 +87,23 @@ impl NodeConnection {
     pub fn send(&mut self, msg: String) -> Result<(), String> {
         // self.logger.info("dbg: Sending to node");
         match self.get_connection_channel() {
-            Some(chan) => chan.send(CSInput::Send(msg)).map_err(|e| e.to_string()),
-            None => self
+            Some(chan) => {
+                // Correctly orders the message after already waiting messages and
+                // avoids an if to check if the queue is full...
+                self.msg_queue.push(msg);
+                for m in self.msg_queue.splice(.., vec![]).collect::<Vec<String>>() {
+                    chan.send(CSInput::Send(m)).map_err(|e| e.to_string())?;
+                }
+                Ok(())
+            },
+            None => {
+                self.msg_queue.push(msg);
+                self
                 .outgoing
                 .input_tx
-                .send(CSInput::Send(msg))
-                .map_err(|e| e.to_string()),
+                .send(CSInput::StartConnection)
+                .map_err(|e| e.to_string())
+            }
         }
     }
 
@@ -156,20 +169,16 @@ impl NodeConnection {
     }
 
     /// Return a connected direction, preferably outgoing.
-    /// Else if one of the connections is setup, return setup (incoming first).
-    /// If all else fails, return None.
+    /// Else return None.
     fn get_connection_channel(&mut self) -> Option<Sender<CSInput>> {
         match self.outgoing.state {
             CSEnum::Connected => return Some(self.outgoing.input_tx.clone()),
             _ => {}
         }
         match self.incoming.state {
-            CSEnum::Idle => {}
-            _ => return Some(self.incoming.input_tx.clone()),
+            CSEnum::Connected => return Some(self.incoming.input_tx.clone()),
+            _ => {}
         }
-        match self.outgoing.state {
-            CSEnum::Setup => Some(self.outgoing.input_tx.clone()),
-            _ => None,
-        }
+        None
     }
 }
