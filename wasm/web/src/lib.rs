@@ -167,9 +167,16 @@ impl Model {
                 let my_storage = Box::new(LocalStorage {});
                 let ws = WebSocketWasm::new(URL)?;
                 let log = logger.clone();
-                let node = Node::new(my_storage, logger, Box::new(ws), rtc_spawner)?;
-
-                log.info(&format!("Client info: {}", node.info().client));
+                let mut node = Node::new(my_storage, logger, Box::new(ws), rtc_spawner)?;
+                if let Some(window) = web_sys::window() {
+                    let navigator = window.navigator();
+                    node.set_client(match navigator.user_agent() {
+                        Ok(p) => p,
+                        Err(_) => "n/a".to_string(),
+                    });
+                }
+                node.save()?;
+            
                 Ok(node)
             },
             link.callback(|n: Result<Node, JsValue>| Msg::Node(n)),

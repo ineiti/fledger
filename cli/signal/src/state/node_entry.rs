@@ -1,8 +1,9 @@
+use log::error;
 use futures::executor;
 use std::{fmt, time::Instant};
 
 use common::{
-    node::{config::NodeInfo, ext_interface::Logger, types::U256},
+    node::{config::NodeInfo, types::U256},
     signal::{
         web_rtc::{WSSignalMessage, WebSocketMessage},
         websocket::WebSocketConnectionSend,
@@ -14,7 +15,6 @@ pub struct NodeEntry {
     pub info: Option<NodeInfo>,
     pub last_seen: Instant,
     entry: U256,
-    logger: Box<dyn Logger>,
 }
 
 impl fmt::Debug for NodeEntry {
@@ -26,13 +26,11 @@ impl fmt::Debug for NodeEntry {
 
 impl NodeEntry {
     pub fn new(
-        logger: Box<dyn Logger>,
         entry: U256,
         conn: Box<dyn WebSocketConnectionSend>,
     ) -> NodeEntry {
         let mut ne = NodeEntry {
             info: None,
-            logger,
             entry,
             conn,
             last_seen: Instant::now(),
@@ -42,7 +40,7 @@ impl NodeEntry {
         })
         .unwrap();
         if let Err(e) = executor::block_on(ne.conn.send(msg)) {
-            ne.logger.error(&format!("while sending challenge: {}", e));
+            error!("while sending challenge: {}", e);
         }
         ne
     }

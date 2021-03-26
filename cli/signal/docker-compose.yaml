@@ -1,72 +1,17 @@
-version: "3.0"
-
+version: '2'
 services:
-  signal:
-    image: fledgre/signal
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "4"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.signal.rule=Host(`signal.fledg.re`)"
-      - "traefik.http.routers.signal.entrypoints=websecure"
-      - "traefik.http.routers.signal.tls.certresolver=myresolver"
-      - "traefik.http.services.signal.loadbalancer.server.port=8765"
-      - "com.centurylinklabs.watchtower.enable=true"
-    networks:
-      - traefik
-
-  web:
-    image: fledgre/web
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "4"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.web.rule=Host(`web.fledg.re`)"
-      - "traefik.http.routers.web.entrypoints=websecure"
-      - "traefik.http.routers.web.tls.certresolver=myresolver"
-      - "traefik.http.services.web.loadbalancer.server.port=80"
-      - "com.centurylinklabs.watchtower.enable=true"
-    networks:
-      - traefik
-
-  node1:
-    image: fledgre/node
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "4"
-    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
     volumes:
-      - ./data/node1:/fledger
+      - ./grafana/grafana:/var/lib/grafana
 
-  node2:
-    image: fledgre/node
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "4"
-    restart: unless-stopped
+  graphite:
+    image: graphiteapp/graphite-statsd
+    ports:
+      - "80:80"
+      - "2003-2004:2003-2004"
     volumes:
-      - ./data/node2:/fledger
-
-  # watchtower:
-  #   image: containrrr/watchtower:latest
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #   command: --interval 3600 --label-enable
-  #   restart: unless-stopped
-
-networks:
-  traefik:
-    external:
-      name: traefik_traefik
+      - ./grafana/graphite/conf:/opt/graphite/confg
+      - ./grafana/graphite/storage:/opt/graphite/storage
