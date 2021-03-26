@@ -1,10 +1,4 @@
-use crate::signal::{
-    web_rtc::{
-        ConnectionStateMap, MessageAnnounce, PeerInfo, WSSignalMessage, WebRTCSpawner,
-        WebSocketMessage,
-    },
-    websocket::{WSMessage, WebSocketConnection},
-};
+use crate::signal::{web_rtc::{ConnectionStateMap, MessageAnnounce, NodeStat, PeerInfo, WSSignalMessage, WebRTCSpawner, WebSocketMessage}, websocket::{WSMessage, WebSocketConnection}};
 use crate::{
     node::{config::NodeInfo, ext_interface::Logger, types::U256},
     signal::web_rtc::WebRTCConnectionState,
@@ -16,6 +10,7 @@ use std::sync::{
 };
 use std::{collections::HashMap, sync::Arc};
 
+use WSSignalMessage::NodeStats;
 use node_connection::{NCInput, NodeConnection};
 
 use self::{connection_state::CSEnum, node_connection::NCOutput};
@@ -35,6 +30,7 @@ pub enum NOutput {
 
 pub enum NInput {
     WebRTC(U256, String),
+    SendStats(Vec<NodeStat>),
 }
 
 pub struct Network {
@@ -53,7 +49,7 @@ pub struct Network {
 
 /// Network combines a websocket to connect to the signal server with
 /// a WebRTC trait to connect to other nodes.
-/// It supports setting up automatic connetions to other nodes.
+/// It supports setting up automatic connections to other nodes.
 impl Network {
     pub fn new(
         logger: Box<dyn Logger>,
@@ -99,6 +95,7 @@ impl Network {
         let msgs: Vec<NInput> = self.input_rx.try_iter().collect();
         for msg in msgs {
             match msg {
+                NInput::SendStats(s) => self.ws_send(NodeStats(s))?,
                 NInput::WebRTC(id, msg) => self.send(&id, msg).await?,
             }
         }

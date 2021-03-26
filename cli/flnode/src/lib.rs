@@ -50,14 +50,6 @@ async fn start(log: Box<dyn Logger>, url: &str) -> Result<Node, JsValue> {
     let my_storage = Box::new(DummyDS {});
     let ws = WebSocketWasm::new(url)?;
     let node = Node::new(my_storage, log, Box::new(ws), rtc_spawner)?;
-    if let Some(window) = web_sys::window() {
-        let navigator = window.navigator();
-        node.info().client = match navigator.user_agent() {
-            Ok(p) => p,
-            Err(_) => "n/a".to_string(),
-        };
-    }
-    node.save()?;
 
     Ok(node)
 }

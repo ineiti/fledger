@@ -10,7 +10,7 @@ run: build_local run/node_modules
 	node run/main.js
 
 run2: build_local run/node_modules
-	mkdir -p node[12]
+	mkdir -p node{1,2}
 	cd node1 && node ../run/main.js &
 	cd node2 && node ../run/main.js
 

@@ -1,49 +1,29 @@
 /// Very simple rendez-vous server that allows new nodes to send their node_info.
 /// It also allows the nodes to fetch all existing node_infos of all the other nodes.
-///
-/// TODO: use the `newID` endpoint to authentify the nodes' id
-// mod node_list;
 mod state;
+mod config;
 
+use structopt::StructOpt;
+use log::{warn, info, error};
+use flexi_logger::Logger;
 use async_trait::async_trait;
 
 use std::{
     net::{TcpListener, TcpStream},
     sync::{Arc, Mutex},
     thread,
-    time::Duration,
 };
 use tungstenite::{accept, protocol::Role, Message, WebSocket};
 
 use common::{
-    node::ext_interface::Logger,
     signal::websocket::{
         MessageCallbackSend, NewConnectionCallback, WSMessage, WebSocketConnectionSend,
         WebSocketServer,
     },
 };
+use config::Config;
 
 use state::ServerState;
-
-pub struct StdOutLogger {}
-
-impl Logger for StdOutLogger {
-    fn info(&self, s: &str) {
-        println!("{}", s);
-    }
-
-    fn warn(&self, s: &str) {
-        println!("{}", s);
-    }
-
-    fn error(&self, s: &str) {
-        println!("{}", s);
-    }
-
-    fn clone(&self) -> Box<dyn Logger> {
-        Box::new(StdOutLogger {})
-    }
-}
 
 pub struct UnixWebSocket {
     cb: Arc<Mutex<Option<NewConnectionCallback>>>,
@@ -109,7 +89,7 @@ impl UnixWSConnection {
                     }
                 }
                 Err(e) => {
-                    println!("Closing connection: {:?}", e);
+                    warn!("Closing connection: {:?}", e);
                     return;
                 }
             }
@@ -132,9 +112,15 @@ impl WebSocketConnectionSend for UnixWSConnection {
 }
 
 fn main() {
-    let logger = Box::new(StdOutLogger {});
+    let cfg = Config::from_args();
+    Logger::with_str("error, signal=".to_string() + cfg.logger_str()).start().unwrap();
     let ws = Box::new(UnixWebSocket::new());
-    let state = ServerState::new(logger, ws);
-    println!("Server started and listening on port 8765");
-    state.wait_done(Duration::from_secs(30));
+    let port = cfg.port;
+    match ServerState::new(cfg, ws){
+        Ok(state) => {
+    info!("Server started and listening on port {}", port);
+    state.wait_done();
+        },
+        Err(e) => error!("Couldn't start server: {}", e),
+    }
 }

@@ -1,7 +1,5 @@
-use super::{
-    config::NodeInfo, ext_interface::Logger, network::connection_state::CSEnum, types::U256,
-};
-use crate::signal::web_rtc::{ConnectionStateMap, WebRTCConnectionState};
+use super::{config::{NodeConfig, NodeInfo, NODE_VERSION}, ext_interface::Logger, network::connection_state::CSEnum, types::U256};
+use crate::signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState};
 use js_sys::Date;
 use std::{
     collections::HashMap,
@@ -24,6 +22,7 @@ pub enum LInput {
 #[derive(Debug)]
 pub enum LOutput {
     WebRTC(U256, String),
+    SendStats(Vec<NodeStat>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -39,8 +38,8 @@ pub enum ConnState {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Stat {
     pub node_info: Option<NodeInfo>,
-    pub ping_rx: u64,
-    pub ping_tx: u64,
+    pub ping_rx: u32,
+    pub ping_tx: u32,
     pub last_contact: f64,
     pub incoming: ConnState,
     pub outgoing: ConnState,
@@ -67,22 +66,24 @@ pub struct Logic {
     pub output_rx: Receiver<LOutput>,
     input_rx: Receiver<LInput>,
     output_tx: Sender<LOutput>,
-    node_info: NodeInfo,
+    node_config: NodeConfig,
     logger: Box<dyn Logger>,
+    last_stats: f64,
 }
 
 impl Logic {
-    pub fn new(node_info: NodeInfo, logger: Box<dyn Logger>) -> Logic {
+    pub fn new(node_config: NodeConfig, logger: Box<dyn Logger>) -> Logic {
         let (input_tx, input_rx) = channel::<LInput>();
         let (output_tx, output_rx) = channel::<LOutput>();
         Logic {
-            node_info,
+            node_config,
             logger,
             stats: HashMap::new(),
             input_tx,
             input_rx,
             output_tx,
             output_rx,
+            last_stats: 0.,
         }
     }
 
@@ -95,6 +96,25 @@ impl Logic {
                 LInput::PingAll(msg) => self.ping_all(msg)?,
                 LInput::ConnStat(id, dir, c, stm) => self.update_connection_state(id, dir, c, stm),
             }
+        }
+        // Send statistics to the signalling server
+        if Date::now() > self.last_stats + self.node_config.send_stats.unwrap() {
+            self.last_stats = Date::now();
+            let stats: Vec<NodeStat> = self
+                .stats
+                .iter()
+                // Ignore our node and nodes that are inactive
+                .filter(|(k, v)| k != &&self.node_config.our_node.id && Date::now() - v.last_contact < self.node_config.stats_ignore.unwrap())
+                .map(|(k, v)| NodeStat {
+                    id: k.clone(),
+                    version: NODE_VERSION,
+                    ping_ms: 0u32,
+                    ping_rx: v.ping_rx,
+                })
+                .collect();
+            self.output_tx
+                .send(LOutput::SendStats(stats))
+                .map_err(|e| e.to_string())?;
         }
         Ok(())
     }
@@ -125,7 +145,7 @@ impl Logic {
                     } else {
                         ConnState::Connected
                     }
-                },
+                }
             };
             if dir == WebRTCConnectionState::Initializer {
                 s.outgoing = cs;
@@ -137,7 +157,8 @@ impl Logic {
 
     fn store_nodes(&mut self, nodes: Vec<NodeInfo>) {
         for ni in nodes {
-            let s = self.stats
+            let s = self
+                .stats
                 .entry(ni.id.clone())
                 .or_insert_with(|| Stat::new(None));
             s.node_info = Some(ni);
@@ -147,7 +168,7 @@ impl Logic {
     fn ping_all(&mut self, msg: String) -> Result<(), String> {
         for stat in self.stats.iter_mut() {
             if let Some(ni) = stat.1.node_info.as_ref() {
-                if self.node_info.id != ni.id {
+                if self.node_config.our_node.id != ni.id {
                     self.output_tx
                         .send(LOutput::WebRTC(ni.id.clone(), msg.clone()))
                         .map_err(|e| e.to_string())?;
@@ -159,7 +180,6 @@ impl Logic {
     }
 
     fn rcv(&mut self, id: U256, msg: String) {
-        self.logger.info(&format!("Got msg {} from id {}", msg, id));
         self.stats
             .entry(id.clone())
             .or_insert_with(|| Stat::new(None));

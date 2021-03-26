@@ -66,13 +66,9 @@ impl WebSocketDummy {
     fn run_queue(&mut self) -> Result<usize, String> {
         let msgs: Vec<Message> = self.msg_queue.borrow_mut().drain(..).collect();
         let msgs_count = msgs.len();
-        // self.logger
-        //     .info(&format!("dbg: WebSocketDummy has {} messages", msgs_count));
         msgs.iter().for_each(|msg| {
             match WebSocketMessage::from_str(&msg.str) {
                 Ok(wsm) => {
-                    // self.logger
-                    // .info(&format!("dbg: WebSocketDummy got msg {:?} from {}", wsm.msg, msg.id));
                     match wsm.msg {
                         WSSignalMessage::PeerSetup(_) => {
                             if self.callbacks.len() == 2 {

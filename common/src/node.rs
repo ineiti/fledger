@@ -54,7 +54,7 @@ impl Node {
             config.our_node.info, config.our_node.id
         ));
         let network = Network::new(logger.clone(), config.our_node.clone(), ws, web_rtc);
-        let logic = Logic::new(config.our_node.clone(), logger.clone());
+        let logic = Logic::new(config.clone(), logger.clone());
 
         Ok(Node {
             config,
@@ -73,8 +73,11 @@ impl Node {
         Ok(())
     }
 
-    pub fn save(&self) -> Result<(), String>{
-        self.logger.info(&format!("Storing configuration: {}", self.config.to_string()?));
+    pub fn save(&self) -> Result<(), String> {
+        self.logger.info(&format!(
+            "Storing configuration: {}",
+            self.config.to_string()?
+        ));
         self.storage.save(CONFIG_NAME, &self.config.to_string()?)
     }
 
@@ -82,15 +85,15 @@ impl Node {
         return self.config.our_node.clone();
     }
 
+    pub fn set_client(&mut self, client: String) {
+        self.config.our_node.client = client;
+    }
+
     fn process_network(&mut self) -> Result<(), String> {
         let msgs: Vec<NOutput> = self.network.output_rx.try_iter().collect();
         for msg in msgs {
             match msg {
                 NOutput::WebRTC(id, msg) => {
-                    // self.logger.info(&format!(
-                    //     "dbg: Node::process webrtc message {} from {}",
-                    //     msg, id
-                    // ));
                     self.logic
                         .input_tx
                         .send(LInput::WebRTC(id, msg))
@@ -115,10 +118,15 @@ impl Node {
         let msgs: Vec<LOutput> = self.logic.output_rx.try_iter().collect();
         for msg in msgs {
             match msg {
-                logic::LOutput::WebRTC(id, msg) => self
+                LOutput::WebRTC(id, msg) => self
                     .network
                     .input_tx
                     .send(NInput::WebRTC(id, msg))
+                    .map_err(|e| e.to_string())?,
+                LOutput::SendStats(s) => self
+                    .network
+                    .input_tx
+                    .send(NInput::SendStats(s))
                     .map_err(|e| e.to_string())?,
             }
         }
@@ -140,6 +148,7 @@ impl Node {
         self.network.get_list()
     }
 
+    /// TODO: remove ping and send - they should be called only by the Logic class.
     /// Pings all known nodes
     pub async fn ping(&mut self, msg: &str) -> Result<(), String> {
         self.logic
