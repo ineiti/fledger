@@ -91,6 +91,6 @@ impl WebSocketConnection for WebSocketWasm {
     fn reconnect(&mut self) -> Result<(), String>{
         self.ws = WebSocket::new(&self.addr).map_err(|e| e.as_string().unwrap())?;
         self.attach_callbacks();
-        Err("Not implemented".to_string())
+        Ok(())
     }
 }
