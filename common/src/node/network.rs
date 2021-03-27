@@ -62,7 +62,6 @@ impl Network {
         let (ws_tx, ws_rx) = channel::<WSMessage>();
         let log_clone = logger.clone();
         ws.set_cb_wsmessage(Box::new(move |msg| {
-            // log_clone.info(&format!("dbg: Got message from websocket: {:?}", msg));
             if let Err(e) = ws_tx.send(msg) {
                 log_clone.info(&format!("Couldn't send msg over ws-channel: {}", e));
             }

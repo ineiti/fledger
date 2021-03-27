@@ -180,6 +180,7 @@ impl Logic {
     }
 
     fn rcv(&mut self, id: U256, msg: String) {
+        self.logger.info(&format!("Received message from WebRTC: {}", msg));
         self.stats
             .entry(id.clone())
             .or_insert_with(|| Stat::new(None));
