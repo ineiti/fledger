@@ -1,6 +1,6 @@
 #![recursion_limit = "1024"]
 
-use common::node::{ext_interface::Logger, logic::Stat};
+use common::node::{ext_interface::Logger, logic::Stat, config::NODE_VERSION};
 use std::sync::Arc;
 use std::sync::Mutex;
 use yew::services::IntervalService;
@@ -139,6 +139,7 @@ impl Component for Model {
                 </p>
                 {self.nodes_reachable()}
                 <br/>
+                <div style="float: right;">{self.get_version()}</div>
                 <button style={reset_style} onclick=self.link.callback(|_| Msg::Reset)>{ "Reset Config" }</button>
             </div>
         }
@@ -166,7 +167,6 @@ impl Model {
                 let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
                 let my_storage = Box::new(LocalStorage {});
                 let ws = WebSocketWasm::new(URL)?;
-                let log = logger.clone();
                 let mut node = Node::new(my_storage, logger, Box::new(ws), rtc_spawner)?;
                 if let Some(window) = web_sys::window() {
                     let navigator = window.navigator();
@@ -214,6 +214,10 @@ impl Model {
                 }
             }
         }
+    }
+
+    fn get_version(&self) -> String {
+        format!("{:x}", NODE_VERSION)
     }
 
     fn nodes_reachable(&self) -> Html {
