@@ -45,6 +45,7 @@ impl Intern {
         }));
         let int_cl = Arc::clone(&int);
         let msg_queue = Arc::new(Mutex::new(vec![]));
+        let log = logger.clone();
         int.lock()
             .unwrap()
             .ws
@@ -73,6 +74,8 @@ impl Intern {
                                 cl.msg_cb(msg).await;
                             }
                         }
+                    } else {
+                        log.warn("Couldn't get lock on int_cl_square in intern::cb_wsmessage");
                     }
                 });
             }));
