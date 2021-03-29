@@ -1,5 +1,8 @@
 use async_trait::async_trait;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+};
 
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
@@ -30,7 +33,7 @@ impl WebSocketWasm {
         Ok(wsw)
     }
 
-    fn attach_callbacks(&mut self){
+    fn attach_callbacks(&mut self) {
         let ws = self.ws.clone();
 
         // create callback
@@ -79,16 +82,25 @@ impl WebSocketConnection for WebSocketWasm {
         if self.ws.ready_state() != WebSocket::OPEN {
             console_log!("Websocket is not open - trying to reconnect");
             self.reconnect()?;
+            Err("Send while not connected".to_string())
+        } else {
+                self.ws
+                    .send_with_str(&msg)
+                    .map_err(|e| format!("Error while sending: {:?}", e))?;
+            Ok(())
         }
-        self.ws.send_with_str(&msg).map_err(|e| format!("Error while sending: {:?}", e))?;
-        Ok(())
     }
 
     fn set_cb_wsmessage(&mut self, cb: MessageCallback) {
         self.cb.borrow_mut().replace(cb);
     }
 
-    fn reconnect(&mut self) -> Result<(), String>{
+    fn reconnect(&mut self) -> Result<(), String> {
+        console_log!("Closing websocket first");
+        if let Err(e) = self.ws.close() {
+            console_log!("Error while closing: {:?}", e);
+        }
+        console_log!("Re-opening websocket");
         self.ws = WebSocket::new(&self.addr).map_err(|e| e.as_string().unwrap())?;
         self.attach_callbacks();
         Ok(())

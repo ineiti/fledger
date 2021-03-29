@@ -124,6 +124,12 @@ pub struct PeerInfo {
     pub message: PeerMessage,
 }
 
+impl std::fmt::Display for PeerInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "init: {} - follow: {}", self.id_init, self.id_follow)
+    }
+}
+
 impl PeerInfo {
     pub fn new(init: &U256, follow: &U256) -> PeerInfo {
         PeerInfo {

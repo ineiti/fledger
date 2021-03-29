@@ -177,7 +177,7 @@ impl Internal {
 
             // Node sends a PeerRequest with some of the data set to 'Some'.
             WSSignalMessage::PeerSetup(pr) => {
-                info!("Got a PeerSetup {:?}", pr);
+                info!("Got a PeerSetup {}", pr);
                 if let Some(src) = self.chal_to_pub(chal) {
                     let dst = if src == pr.id_init {
                         &pr.id_follow

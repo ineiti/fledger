@@ -74,10 +74,6 @@ impl Node {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        self.logger.info(&format!(
-            "Storing configuration: {}",
-            self.config.to_string()?
-        ));
         self.storage.save(CONFIG_NAME, &self.config.to_string()?)
     }
 
