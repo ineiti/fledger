@@ -14,10 +14,13 @@ RUN cd wasm/lib; cargo build
 COPY wasm/web/Cargo.toml wasm/web/
 COPY dummy.rs wasm/web/src/lib.rs
 COPY wasm/web/Makefile wasm/web
-RUN cd wasm/web; make build
+RUN cd wasm/web; wasm-pack build --debug --target web --out-name wasm --out-dir ./static
 
+RUN cat common/src/lib.rs
 COPY . .
-RUN cd wasm/web; make build
+RUN cat common/src/lib.rs
+RUN cd wasm/web; wasm-pack build --debug --target web --out-name wasm --out-dir ./static
+RUN ls wasm/web
 
 FROM node:latest as runtime
 WORKDIR /fledger

@@ -5,7 +5,7 @@ on:
     - main
 
 jobs:
-  docker:
+  test:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout branch
