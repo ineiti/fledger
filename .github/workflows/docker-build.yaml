@@ -11,43 +11,29 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    # - name: Login to DockerHub
-    #   uses: docker/login-action@v1
-    #   with:
-    #     username: ${{ secrets.DOCKERHUB_NAME }}
-    #     password: ${{ secrets.DOCKERHUB }}
-
-    # - uses: satackey/action-docker-layer-caching@v0.0.11
-    #   # Ignore the failure of a step and avoid terminating the job.
-    #   continue-on-error: true
-
-    # - name: Build flnode
-    #   uses: docker/build-push-action@v2
-    #   with:
-    #     tags: fledgre/flnode:latest
-    #     file: Dockerfile.flnode
-    #     push: true
-
     - name: Build Signalling server
       uses: whoan/docker-build-with-cache-action@v5
       with:
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
         image_name: fledgre/signal
+        dockerfile: Dockerfile.signal
+
+    - name: Build CLI Fledger Node
+      uses: whoan/docker-build-with-cache-action@v5
+      with:
+        username: ${{ secrets.DOCKERHUB_NAME }}
+        password: ${{ secrets.DOCKERHUB }}
+        image_name: fledgre/flnode
         dockerfile: Dockerfile.flnode
 
-      # uses: docker/build-push-action@v2
-      # with:
-      #   tags: fledgre/signal:latest
-      #   file: Dockerfile.signal
-      #   push: true
-
-    # - name: Build web server
-    #   uses: docker/build-push-action@v2
-    #   with:
-    #     tags: fledgre/web:latest
-    #     file: Dockerfile.web
-    #     push: true
+    - name: Build Web Fledger Node
+      uses: whoan/docker-build-with-cache-action@v5
+      with:
+        username: ${{ secrets.DOCKERHUB_NAME }}
+        password: ${{ secrets.DOCKERHUB }}
+        image_name: fledgre/web
+        dockerfile: Dockerfile.web
 
     # - name: Update signal.fledg.re
     #   uses: appleboy/ssh-action@master

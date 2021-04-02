@@ -4,12 +4,12 @@ RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 COPY vendor vendor
 
 COPY common/Cargo.toml common/
+COPY dummy.rs common/src/lib.rs
+RUN cd common; cargo build
+
 COPY wasm/lib/Cargo.toml wasm/lib/
 COPY dummy.rs wasm/lib/src/lib.rs
 RUN cd wasm/lib; cargo build
-
-COPY dummy.rs common/src/lib.rs
-RUN cd common; cargo build
 
 COPY wasm/web/Cargo.toml wasm/web/
 COPY dummy.rs wasm/web/src/lib.rs
