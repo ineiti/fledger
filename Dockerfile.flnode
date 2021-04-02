@@ -1,14 +1,28 @@
-FROM rust:latest as builder
+FROM rust as builder
+# TODO: change to /fledger
+WORKDIR fledger
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-WORKDIR /usr/src/flnode
-COPY . .
-RUN make -C cli/flnode build
+COPY vendor vendor
 
-FROM node:latest
-COPY --from=builder /usr/src/flnode/cli/flnode/run /fledger-src/run
-COPY --from=builder /usr/src/flnode/cli/flnode/static /fledger-src/static
-#COPY run /fledger-src/run
-#COPY static /fledger-src/static
+COPY common/Cargo.toml common/Cargo.toml
+COPY dummy.rs common/src/lib.rs
+RUN cd common; cargo build
+
+COPY dummy.rs wasm/lib/src/lib.rs
+COPY wasm/lib/Cargo.toml wasm/lib/Cargo.toml
+RUN cd wasm/lib; cargo build
+
+COPY dummy.rs cli/flnode/src/lib.rs
+COPY cli/flnode/Cargo.toml cli/flnode
+COPY cli/flnode/Makefile cli/flnode/Makefile
+RUN cd cli/flnode; make build
+
+COPY . .
+RUN cd cli/flnode; make build
+
+FROM node:latest as runtime
 WORKDIR /fledger
-RUN cd /fledger-src/run; npm i -g node-pre-gyp; npm ci
-CMD ["node", "/fledger-src/run/main.js"]
+COPY --from=builder /fledger/cli/flnode/run run
+COPY --from=builder /fledger/cli/flnode/static static
+RUN cd run; npm i -g node-pre-gyp; npm ci
+ENTRYPOINT ["node", "/fledger/run/main.js"]

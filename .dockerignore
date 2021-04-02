@@ -3,3 +3,4 @@ cli/signal/grafana
 cli/signal/target
 target/
 node_modules/
+**/Cargo.lock

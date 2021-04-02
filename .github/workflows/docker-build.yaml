@@ -3,6 +3,7 @@ on:
   push:
     branches:
     - main
+    - docker_caching
 
 jobs:
   docker:
@@ -14,12 +15,16 @@ jobs:
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
 
-    - name: Build flnode
-      uses: docker/build-push-action@v2
-      with:
-        tags: fledgre/flnode:latest
-        file: Dockerfile.flnode
-        push: true
+    - uses: satackey/action-docker-layer-caching@v0.0.11
+      # Ignore the failure of a step and avoid terminating the job.
+      continue-on-error: true
+
+    # - name: Build flnode
+    #   uses: docker/build-push-action@v2
+    #   with:
+    #     tags: fledgre/flnode:latest
+    #     file: Dockerfile.flnode
+    #     push: true
 
     - name: Build Signalling server
       uses: docker/build-push-action@v2
@@ -28,20 +33,20 @@ jobs:
         file: Dockerfile.signal
         push: true
 
-    - name: Build web server
-      uses: docker/build-push-action@v2
-      with:
-        tags: fledgre/web:latest
-        file: Dockerfile.web
-        push: true
+    # - name: Build web server
+    #   uses: docker/build-push-action@v2
+    #   with:
+    #     tags: fledgre/web:latest
+    #     file: Dockerfile.web
+    #     push: true
 
-    - name: Update signal.fledg.re
-      uses: appleboy/ssh-action@master
-      with:
-        host: signal.fledg.re
-        username: ${{ secrets.SSH_USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        script: |
-          docker-compose down
-          docker-compose pull
-          docker-compose up -d
+    # - name: Update signal.fledg.re
+    #   uses: appleboy/ssh-action@master
+    #   with:
+    #     host: signal.fledg.re
+    #     username: ${{ secrets.SSH_USERNAME }}
+    #     key: ${{ secrets.SSH_KEY }}
+    #     script: |
+    #       docker-compose down
+    #       docker-compose pull
+    #       docker-compose up -d

@@ -1,11 +1,27 @@
-FROM rust:latest as builder
-WORKDIR /usr/src/fledger
-COPY . .
+FROM rust as builder
+WORKDIR fledger
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-RUN cp -a wasm/web/static .
-RUN make -C wasm/web build
+COPY vendor vendor
 
-FROM joseluisq/static-web-server
-COPY --from=builder /usr/src/fledger/wasm/web/static/ /var/www
-ENV SERVER_NAME=fledger-web
-ENV SERVER_ROOT=/var/www
+COPY common/Cargo.toml common/
+COPY wasm/lib/Cargo.toml wasm/lib/
+COPY dummy.rs wasm/lib/src/lib.rs
+RUN cd wasm/lib; cargo build
+
+COPY dummy.rs common/src/lib.rs
+RUN cd common; cargo build
+
+COPY wasm/web/Cargo.toml wasm/web/
+COPY dummy.rs wasm/web/src/lib.rs
+COPY wasm/web/Makefile wasm/web
+RUN cd wasm/web; make build
+
+COPY . .
+RUN cd wasm/web; make build
+
+FROM node:latest as runtime
+WORKDIR /fledger
+COPY --from=builder /fledger/wasm/web/run run
+COPY --from=builder /fledger/wasm/web/static static
+RUN cd run; npm i -g node-pre-gyp; npm ci
+ENTRYPOINT ["node", "/fledger/run/main.js"]
