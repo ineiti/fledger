@@ -1,30 +1,36 @@
-FROM rust as builder
-WORKDIR fledger
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-COPY vendor vendor
-
-COPY common/Cargo.toml common/
-COPY dummy.rs common/src/lib.rs
-RUN cd common; cargo build
-
-COPY wasm/lib/Cargo.toml wasm/lib/
-COPY dummy.rs wasm/lib/src/lib.rs
-RUN cd wasm/lib; cargo build
-
-COPY wasm/web/Cargo.toml wasm/web/
-COPY dummy.rs wasm/web/src/lib.rs
-COPY wasm/web/Makefile wasm/web
-RUN cd wasm/web; wasm-pack build --debug --target web --out-name wasm --out-dir ./static
-
-RUN cat common/src/lib.rs
-COPY . .
-RUN cat common/src/lib.rs
-RUN cd wasm/web; wasm-pack build --debug --target web --out-name wasm --out-dir ./static
-RUN ls wasm/web
-
-FROM node:latest as runtime
+FROM rust as planner
 WORKDIR /fledger
-COPY --from=builder /fledger/wasm/web/run run
-COPY --from=builder /fledger/wasm/web/static static
-RUN cd run; npm i -g node-pre-gyp; npm ci
-ENTRYPOINT ["node", "/fledger/run/main.js"]
+# We only pay the installation cost once, 
+# it will be cached from the second build onwards
+# To ensure a reproducible build consider pinning 
+# the cargo-chef version with `--version X.X.X`
+RUN cargo install cargo-chef 
+COPY . .
+RUN cd wasm/web; cargo chef prepare --recipe-path recipe.json
+
+FROM rust as cacher
+WORKDIR /fledger
+RUN cargo install cargo-chef
+COPY vendor vendor
+RUN rustup target add wasm32-unknown-unknown
+COPY --from=planner /fledger/wasm/web/recipe.json wasm/web/recipe.json
+COPY common/Cargo.toml common/
+RUN echo 'fn main(){}' > common/src/lib.rs
+COPY wasm/lib/Cargo.toml wasm/lib/
+RUN echo 'fn main(){}' > wasm/lib/src/lib.rs
+RUN cd wasm/web; cargo chef cook --target wasm32-unknown-unknown --release --recipe-path recipe.json
+
+FROM rust as builder
+WORKDIR /fledger
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+RUN rustup target add wasm32-unknown-unknown
+COPY . .
+# Copy over the cached dependencies
+COPY --from=cacher /fledger/wasm/web/target wasm/web/target
+COPY --from=cacher /usr/local/cargo /usr/local/cargo
+RUN cd wasm/web; make build
+
+FROM joseluisq/static-web-server
+COPY --from=builder /fledger/wasm/web/static/ /var/www/
+ENV SERVER_NAME=fledger-web
+ENV SERVER_ROOT=/var/www

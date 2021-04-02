@@ -1,21 +1,39 @@
-FROM rust as builder
-WORKDIR fledger
-COPY vendor vendor
-
-COPY dummy.rs common/src/main.rs
-COPY common/Cargo.toml common/
-RUN cd common; cargo build
-
-COPY dummy.rs cli/signal/src/main.rs
-COPY cli/signal/Cargo.toml cli/signal/
-RUN cd cli/signal; cargo build --release
-
+FROM rust as planner
+WORKDIR /fledger
+# We only pay the installation cost once, 
+# it will be cached from the second build onwards
+# To ensure a reproducible build consider pinning 
+# the cargo-chef version with `--version X.X.X`
+RUN cargo install cargo-chef 
 COPY . .
-#COPY cli/signal/src cli/signal/src
-# COPY common/src common/src
-# RUN cd common; cargo build
-RUN cd cli/signal; cargo build --release
+RUN cargo chef prepare --recipe-path recipe.json
+# RUN cd cli/signal; cargo chef prepare --recipe-path recipe.json
+# RUN cd common; cargo chef prepare --recipe-path recipe.json
+
+FROM rust as cacher
+WORKDIR /fledger
+RUN cargo install cargo-chef
+COPY vendor vendor
+COPY --from=planner /fledger/recipe.json .
+# COPY --from=planner /fledger/common/recipe.json common/recipe.json
+# COPY --from=planner /fledger/cli/signal/recipe.json cli/signal/recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+# RUN cd common; cargo chef cook --release --recipe-path recipe.json
+# RUN cd cli/signal; cargo chef cook --release --recipe-path recipe.json
+
+FROM rust as builder
+WORKDIR /fledger
+COPY . .
+# Copy over the cached dependencies
+COPY --from=cacher /fledger/target target/
+RUN ls
+RUN ls target
+# COPY --from=cacher /fledger/cli/signal/target cli/signal/target
+COPY --from=cacher /usr/local/cargo /usr/local/cargo
+RUN cd cli/signal; cargo build --release --bin signal
+# RUN cargo build -p signal --release --bin signal
 
 FROM rust as runtime
-COPY --from=builder fledger/cli/signal/target/release/signal /usr/local/bin
-ENTRYPOINT ["/usr/local/bin/signal"]
+WORKDIR /fledger
+COPY --from=builder /fledger/target/release/signal signal
+ENTRYPOINT ["/fledger/signal"]
