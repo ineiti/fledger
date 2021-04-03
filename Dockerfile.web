@@ -7,7 +7,7 @@ FROM lukemathwalker/cargo-chef as cacher
 WORKDIR /fledger
 RUN rustup target add wasm32-unknown-unknown
 COPY --from=planner /fledger/recipe.json recipe.json
-RUN cargo chef cook --release --target wasm32-unknown-unknown -p flnode
+RUN cargo chef cook --release --target wasm32-unknown-unknown -p wasm-web
 
 FROM rust as builder
 WORKDIR /fledger
