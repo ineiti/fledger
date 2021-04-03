@@ -954,28 +954,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
 
 [[package]]
-name = "wasm"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "common",
- "console_error_panic_hook",
- "getrandom 0.2.0",
- "js-sys",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "urlencoding",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-test",
- "wasm-lib",
- "web-sys",
- "yew",
-]
-
-[[package]]
 name = "wasm-bindgen"
 version = "0.2.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1082,6 +1060,28 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "web-sys",
+ "yew",
+]
+
+[[package]]
+name = "wasm-web"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "common",
+ "console_error_panic_hook",
+ "getrandom 0.2.0",
+ "js-sys",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "urlencoding",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+ "wasm-lib",
  "web-sys",
  "yew",
 ]

@@ -1,34 +1,22 @@
-FROM rust as planner
+FROM lukemathwalker/cargo-chef as planner
 WORKDIR /fledger
-# We only pay the installation cost once, 
-# it will be cached from the second build onwards
-# To ensure a reproducible build consider pinning 
-# the cargo-chef version with `--version X.X.X`
-RUN cargo install cargo-chef 
 COPY . .
-RUN cd wasm/web; cargo chef prepare --recipe-path recipe.json
+RUN cargo chef prepare
 
-FROM rust as cacher
+FROM lukemathwalker/cargo-chef as cacher
 WORKDIR /fledger
-RUN cargo install cargo-chef
-COPY vendor vendor
 RUN rustup target add wasm32-unknown-unknown
-COPY --from=planner /fledger/wasm/web/recipe.json wasm/web/recipe.json
-COPY common/Cargo.toml common/
-RUN echo 'fn main(){}' > common/src/lib.rs
-COPY wasm/lib/Cargo.toml wasm/lib/
-RUN echo 'fn main(){}' > wasm/lib/src/lib.rs
-RUN cd wasm/web; cargo chef cook --target wasm32-unknown-unknown --release --recipe-path recipe.json
+COPY --from=planner /fledger/recipe.json recipe.json
+RUN cargo chef cook --release --target wasm32-unknown-unknown -p flnode
 
 FROM rust as builder
 WORKDIR /fledger
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-RUN rustup target add wasm32-unknown-unknown
 COPY . .
-# Copy over the cached dependencies
-COPY --from=cacher /fledger/wasm/web/target wasm/web/target
+COPY --from=cacher /fledger/target target
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
-RUN cd wasm/web; make build
+RUN find target -name names* | xargs rm -rf
+RUN cd wasm/web; wasm-pack build --release --target web --out-name wasm --out-dir ./static
 
 FROM joseluisq/static-web-server
 COPY --from=builder /fledger/wasm/web/static/ /var/www/

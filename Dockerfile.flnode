@@ -1,24 +1,22 @@
-FROM rust as builder
-# TODO: change to /fledger
-WORKDIR fledger
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-COPY vendor vendor
-
-COPY common/Cargo.toml common/Cargo.toml
-COPY dummy.rs common/src/lib.rs
-RUN cd common; cargo build
-
-COPY dummy.rs wasm/lib/src/lib.rs
-COPY wasm/lib/Cargo.toml wasm/lib/Cargo.toml
-RUN cd wasm/lib; cargo build
-
-COPY dummy.rs cli/flnode/src/lib.rs
-COPY cli/flnode/Cargo.toml cli/flnode
-COPY cli/flnode/Makefile cli/flnode/Makefile
-RUN cd cli/flnode; make build
-
+FROM lukemathwalker/cargo-chef as planner
+WORKDIR /fledger
 COPY . .
-RUN cd cli/flnode; make build
+RUN cargo chef prepare
+
+FROM lukemathwalker/cargo-chef as cacher
+WORKDIR /fledger
+RUN rustup target add wasm32-unknown-unknown
+COPY --from=planner /fledger/recipe.json recipe.json
+RUN cargo chef cook --release --target wasm32-unknown-unknown -p flnode
+
+FROM rust as builder
+WORKDIR /fledger
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+COPY . .
+COPY --from=cacher /fledger/target target
+COPY --from=cacher /usr/local/cargo /usr/local/cargo
+RUN find target -name names* | xargs rm -rf
+RUN cd cli/flnode; wasm-pack build --release --target web --out-name wasm --out-dir ./static
 
 FROM node:latest as runtime
 WORKDIR /fledger

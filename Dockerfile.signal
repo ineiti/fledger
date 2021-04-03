@@ -1,39 +1,21 @@
-FROM rust as planner
+FROM lukemathwalker/cargo-chef as planner
 WORKDIR /fledger
-# We only pay the installation cost once, 
-# it will be cached from the second build onwards
-# To ensure a reproducible build consider pinning 
-# the cargo-chef version with `--version X.X.X`
-RUN cargo install cargo-chef 
 COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
-# RUN cd cli/signal; cargo chef prepare --recipe-path recipe.json
-# RUN cd common; cargo chef prepare --recipe-path recipe.json
+RUN cargo chef prepare
 
-FROM rust as cacher
+FROM lukemathwalker/cargo-chef as cacher
 WORKDIR /fledger
-RUN cargo install cargo-chef
-COPY vendor vendor
-COPY --from=planner /fledger/recipe.json .
-# COPY --from=planner /fledger/common/recipe.json common/recipe.json
-# COPY --from=planner /fledger/cli/signal/recipe.json cli/signal/recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
-# RUN cd common; cargo chef cook --release --recipe-path recipe.json
-# RUN cd cli/signal; cargo chef cook --release --recipe-path recipe.json
+COPY --from=planner /fledger/recipe.json recipe.json
+RUN cargo chef cook --release
 
 FROM rust as builder
 WORKDIR /fledger
 COPY . .
-# Copy over the cached dependencies
-COPY --from=cacher /fledger/target target/
-RUN ls
-RUN ls target
-# COPY --from=cacher /fledger/cli/signal/target cli/signal/target
+COPY --from=cacher /fledger/target target
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
 RUN cd cli/signal; cargo build --release --bin signal
-# RUN cargo build -p signal --release --bin signal
 
 FROM rust as runtime
 WORKDIR /fledger
-COPY --from=builder /fledger/target/release/signal signal
+COPY --from=builder /fledger/cli/signal/target/release/signal signal
 ENTRYPOINT ["/fledger/signal"]
