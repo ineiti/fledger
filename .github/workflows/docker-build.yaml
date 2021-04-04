@@ -34,7 +34,8 @@ jobs:
     - name: Build web server
       run: cd wasm/web; make build
 
-    - uses: mr-smithers-excellent/docker-build-push@v5
+    - name: Docker build signal
+      uses: mr-smithers-excellent/docker-build-push@v5
       with:
         image: fledgre/signal
         registry: docker.io
@@ -43,7 +44,8 @@ jobs:
         password: ${{ secrets.DOCKERHUB }}
         tags: latest
 
-    - uses: mr-smithers-excellent/docker-build-push@v5
+    - name: Docker build flnode
+      uses: mr-smithers-excellent/docker-build-push@v5
       with:
         image: fledgre/flnode
         registry: docker.io
@@ -52,7 +54,8 @@ jobs:
         password: ${{ secrets.DOCKERHUB }}
         tags: latest
 
-    - uses: mr-smithers-excellent/docker-build-push@v5
+    - name: Docker build web
+      uses: mr-smithers-excellent/docker-build-push@v5
       with:
         image: fledgre/web
         registry: docker.io
