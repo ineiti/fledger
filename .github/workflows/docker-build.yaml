@@ -32,29 +32,29 @@ jobs:
       run: |
         cd wasm/web; make build
 
-    - uses: mr-smithers-excellent/docker-build-push@v5
-      with:
-        image: fledgre/signal
-        registry: docker.io
-        dockerfile: Dockerfile.signal
-        username: ${{ secrets.DOCKERHUB_NAME }}
-        password: ${{ secrets.DOCKERHUB }}
+    # - uses: mr-smithers-excellent/docker-build-push@v5
+    #   with:
+    #     image: fledgre/signal
+    #     registry: docker.io
+    #     dockerfile: Dockerfile.signal
+    #     username: ${{ secrets.DOCKERHUB_NAME }}
+    #     password: ${{ secrets.DOCKERHUB }}
 
-    - uses: mr-smithers-excellent/docker-build-push@v5
-      with:
-        image: fledgre/web
-        registry: docker.io
-        dockerfile: Dockerfile.web
-        username: ${{ secrets.DOCKERHUB_NAME }}
-        password: ${{ secrets.DOCKERHUB }}
+    # - uses: mr-smithers-excellent/docker-build-push@v5
+    #   with:
+    #     image: fledgre/web
+    #     registry: docker.io
+    #     dockerfile: Dockerfile.web
+    #     username: ${{ secrets.DOCKERHUB_NAME }}
+    #     password: ${{ secrets.DOCKERHUB }}
 
-    - uses: mr-smithers-excellent/docker-build-push@v5
-      with:
-        image: fledgre/flnode
-        registry: docker.io
-        dockerfile: Dockerfile.flnode
-        username: ${{ secrets.DOCKERHUB_NAME }}
-        password: ${{ secrets.DOCKERHUB }}
+    # - uses: mr-smithers-excellent/docker-build-push@v5
+    #   with:
+    #     image: fledgre/flnode
+    #     registry: docker.io
+    #     dockerfile: Dockerfile.flnode
+    #     username: ${{ secrets.DOCKERHUB_NAME }}
+    #     password: ${{ secrets.DOCKERHUB }}
 
   # deploy:
   #   runs-on: ubuntu-latest
