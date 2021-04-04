@@ -119,7 +119,7 @@ fn main() {
     let port = cfg.port;
     match ServerState::new(cfg, ws) {
         Ok(state) => {
-            info!("Something something 123456789a");
+            info!("Something something 123456789ab");
             info!("Server started and listening on port {}", port);
             state.wait_done();
         }
