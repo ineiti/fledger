@@ -3,10 +3,6 @@ on:
   pull_request:
     branches:
     - main
-  # This is needed for actions/cache to copy the cache over to the default branch
-  push:
-    branches:
-    - main
 
 jobs:
   wasm-test:
