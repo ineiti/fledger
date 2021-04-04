@@ -1,23 +1,4 @@
-FROM lukemathwalker/cargo-chef as planner
+FROM rust
 WORKDIR /fledger
-COPY . .
-RUN cargo chef prepare
-RUN sha256sum recipe.json
-RUN cat recipe.json
-
-FROM lukemathwalker/cargo-chef as cacher
-WORKDIR /fledger
-COPY --from=planner /fledger/recipe.json recipe.json
-RUN cargo chef cook --release -p signal
-
-FROM rust as builder
-WORKDIR /fledger
-COPY . .
-COPY --from=cacher /fledger/target target
-COPY --from=cacher /usr/local/cargo /usr/local/cargo
-RUN cd cli/signal; cargo build --release --bin signal
-
-FROM rust as runtime
-WORKDIR /fledger
-COPY --from=builder /fledger/target/release/signal signal
+COPY ./target/release/signal signal
 ENTRYPOINT ["/fledger/signal"]
