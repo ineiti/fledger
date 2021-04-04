@@ -26,9 +26,9 @@ jobs:
     # - name: Install wasm
     #   run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-    # - name: Build signal server
-    #   run: |
-    #     cargo build --release -p signal
+    - name: Build signal server
+      run: |
+        cargo build --release -p signal
 
     - name: Build flnode for docker server
       run: |
@@ -47,13 +47,13 @@ jobs:
   #       username: ${{ secrets.DOCKERHUB_NAME }}
   #       password: ${{ secrets.DOCKERHUB }}
 
-  #   - uses: mr-smithers-excellent/docker-build-push@v5
-  #     with:
-  #       image: fledgre/web
-  #       registry: docker.io
-  #       dockerfile: Dockerfile.web
-  #       username: ${{ secrets.DOCKERHUB_NAME }}
-  #       password: ${{ secrets.DOCKERHUB }}
+    - uses: mr-smithers-excellent/docker-build-push@v5
+      with:
+        image: fledgre/web
+        registry: docker.io
+        dockerfile: Dockerfile.web
+        username: ${{ secrets.DOCKERHUB_NAME }}
+        password: ${{ secrets.DOCKERHUB }}
 
   #   - uses: mr-smithers-excellent/docker-build-push@v5
   #     with:
