@@ -32,44 +32,43 @@ jobs:
       run: |
         cd wasm/web; make build
 
-    # - uses: mr-smithers-excellent/docker-build-push@v5
-    #   with:
-    #     image: fledgre/signal
-    #     registry: docker.io
-    #     dockerfile: Dockerfile.signal
-    #     username: ${{ secrets.DOCKERHUB_NAME }}
-    #     password: ${{ secrets.DOCKERHUB }}
+    - uses: mr-smithers-excellent/docker-build-push@v5
+      with:
+        image: fledgre/signal
+        registry: docker.io
+        dockerfile: Dockerfile.signal
+        username: ${{ secrets.DOCKERHUB_NAME }}
+        password: ${{ secrets.DOCKERHUB }}
 
-    # - uses: mr-smithers-excellent/docker-build-push@v5
-    #   with:
-    #     image: fledgre/web
-    #     registry: docker.io
-    #     dockerfile: Dockerfile.web
-    #     username: ${{ secrets.DOCKERHUB_NAME }}
-    #     password: ${{ secrets.DOCKERHUB }}
+    - uses: mr-smithers-excellent/docker-build-push@v5
+      with:
+        image: fledgre/web
+        registry: docker.io
+        dockerfile: Dockerfile.web
+        username: ${{ secrets.DOCKERHUB_NAME }}
+        password: ${{ secrets.DOCKERHUB }}
 
-    # - uses: mr-smithers-excellent/docker-build-push@v5
-    #   with:
-    #     image: fledgre/flnode
-    #     registry: docker.io
-    #     dockerfile: Dockerfile.flnode
-    #     username: ${{ secrets.DOCKERHUB_NAME }}
-    #     password: ${{ secrets.DOCKERHUB }}
+    - uses: mr-smithers-excellent/docker-build-push@v5
+      with:
+        image: fledgre/flnode
+        registry: docker.io
+        dockerfile: Dockerfile.flnode
+        username: ${{ secrets.DOCKERHUB_NAME }}
+        password: ${{ secrets.DOCKERHUB }}
 
-  # deploy:
-  #   runs-on: ubuntu-latest
-  #   needs: 
-  #     - build-signal
-  #     - build-flnode
-  #     - build-web
+  deploy:
+    runs-on: ubuntu-latest
+    needs: 
+      - build
 
-    # - name: Update signal.fledg.re
-    #   uses: appleboy/ssh-action@master
-    #   with:
-    #     host: signal.fledg.re
-    #     username: ${{ secrets.SSH_USERNAME }}
-    #     key: ${{ secrets.SSH_KEY }}
-    #     script: |
-    #       docker-compose down
-    #       docker-compose pull
-    #       docker-compose up -d
+    steps:
+    - name: Update signal.fledg.re
+      uses: appleboy/ssh-action@master
+      with:
+        host: signal.fledg.re
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          docker-compose down
+          docker-compose pull
+          docker-compose up -d
