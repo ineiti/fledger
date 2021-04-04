@@ -1,7 +1,7 @@
 use super::types::U256;
 use serde_derive::{Deserialize, Serialize};
 
-pub const NODE_VERSION: u64 = 0x2021040413;
+pub const NODE_VERSION: u64 = 0x202104041345;
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct NodeInfo {
