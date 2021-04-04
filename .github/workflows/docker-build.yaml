@@ -16,15 +16,15 @@ jobs:
           target
         key: ${{ runner.os }}-cargo
 
-    # - uses: jetli/wasm-pack-action@v0.3.0
-    #   with:
-    #     version: 'latest'
+    - uses: jetli/wasm-pack-action@v0.3.0
+      with:
+        version: 'latest'
     # - uses: actions-rs/toolchain@v1
     #   with:
     #     toolchain: stable
 
-    - name: Install wasm
-      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    # - name: Install wasm
+    #   run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
     # - name: Build signal server
     #   run: |
