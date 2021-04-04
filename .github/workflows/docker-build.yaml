@@ -17,7 +17,7 @@ jobs:
         username: ineiti
         password: "${{ secrets.GITHUB_TOKEN }}"
         registry: docker.pkg.github.com
-        image_name: fledgre/signal
+        image_name: ineiti/fledger/signal
         dockerfile: Dockerfile.signal.new
 
   # build-flnode:
