@@ -1,24 +1,4 @@
-FROM lukemathwalker/cargo-chef as planner
-WORKDIR /fledger
-COPY . .
-RUN cargo chef prepare
-
-FROM lukemathwalker/cargo-chef as cacher
-WORKDIR /fledger
-RUN rustup target add wasm32-unknown-unknown
-COPY --from=planner /fledger/recipe.json recipe.json
-RUN cargo chef cook --release --target wasm32-unknown-unknown -p wasm-web
-
-FROM rust as builder
-WORKDIR /fledger
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-COPY . .
-COPY --from=cacher /fledger/target target
-COPY --from=cacher /usr/local/cargo /usr/local/cargo
-RUN find target -name names* | xargs rm -rf
-RUN cd wasm/web; wasm-pack build --release --target web --out-name wasm --out-dir ./static
-
 FROM joseluisq/static-web-server
-COPY --from=builder /fledger/wasm/web/static/ /var/www/
+COPY wasm/web/static/ /var/www/
 ENV SERVER_NAME=fledger-web
 ENV SERVER_ROOT=/var/www

@@ -1,26 +1,6 @@
-FROM lukemathwalker/cargo-chef as planner
+FROM node:latest
 WORKDIR /fledger
-COPY . .
-RUN cargo chef prepare
-
-FROM lukemathwalker/cargo-chef as cacher
-WORKDIR /fledger
-RUN rustup target add wasm32-unknown-unknown
-COPY --from=planner /fledger/recipe.json recipe.json
-RUN cargo chef cook --release --target wasm32-unknown-unknown -p flnode
-
-FROM rust as builder
-WORKDIR /fledger
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-COPY . .
-COPY --from=cacher /fledger/target target
-COPY --from=cacher /usr/local/cargo /usr/local/cargo
-RUN find target -name names* | xargs rm -rf
-RUN cd cli/flnode; wasm-pack build --release --target web --out-name wasm --out-dir ./static
-
-FROM node:latest as runtime
-WORKDIR /fledger
-COPY --from=builder /fledger/cli/flnode/run run
-COPY --from=builder /fledger/cli/flnode/static static
+COPY cli/flnode/run run
+COPY cli/flnode/static static
 RUN cd run; npm i -g node-pre-gyp; npm ci
 ENTRYPOINT ["node", "/fledger/run/main.js"]
