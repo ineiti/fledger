@@ -1,11 +1,4 @@
-FROM rust:latest as builder
-WORKDIR /usr/src/fledger
-COPY . .
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-RUN cp -a wasm/web/static .
-RUN make -C wasm/web build
-
 FROM joseluisq/static-web-server
-COPY --from=builder /usr/src/fledger/wasm/web/static/ /var/www
+COPY wasm/web/static/ /var/www/
 ENV SERVER_NAME=fledger-web
 ENV SERVER_ROOT=/var/www

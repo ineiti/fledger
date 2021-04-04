@@ -1,5 +1,3 @@
-**/target/
 cli/signal/grafana
 cli/signal/target
-target/
-node_modules/
+**/node_modules/

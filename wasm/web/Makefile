@@ -1,22 +1,25 @@
 miniserve := $(shell echo $$HOME )/.cargo/bin/miniserve
+wasm := static/wasm_bg.wasm
 src := $(shell find src -name "*.rs")
-build = wasm-pack build --debug --target web --out-name wasm \
+TARGET := --release
+build = wasm-pack build ${TARGET} --target web --out-name wasm \
 	--out-dir ./static -- $(FEATURES)
 
-serve: static/wasm_bg.wasm ${miniserve}
+serve: ${wasm} ${miniserve}
 	${miniserve} ./static --index index.html
 
 ${miniserve}:
 	cargo install miniserve
 
-static/wasm_bg.wasm: ${src}
+${wasm}: ${src}
 	${build}
 
 .PHONY: watch build_bg
 watch: build_bg serve
 
-build:
+build: ${wasm}
 	${build}
 
 build_local: FEATURES=--features local
+build_local: TARGET=--debug
 build_local: build

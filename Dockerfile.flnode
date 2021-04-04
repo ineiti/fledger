@@ -1,14 +1,6 @@
-FROM rust:latest as builder
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-WORKDIR /usr/src/flnode
-COPY . .
-RUN make -C cli/flnode build
-
 FROM node:latest
-COPY --from=builder /usr/src/flnode/cli/flnode/run /fledger-src/run
-COPY --from=builder /usr/src/flnode/cli/flnode/static /fledger-src/static
-#COPY run /fledger-src/run
-#COPY static /fledger-src/static
 WORKDIR /fledger
-RUN cd /fledger-src/run; npm i -g node-pre-gyp; npm ci
-CMD ["node", "/fledger-src/run/main.js"]
+COPY cli/flnode/run /fledger-bin/run
+COPY cli/flnode/static /fledger-bin/static
+RUN cd /fledger-bin/run; npm i -g node-pre-gyp; npm ci
+ENTRYPOINT ["node", "/fledger-bin/run/main.js"]

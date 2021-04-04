@@ -1,6 +1,7 @@
 src := $(shell find src ../../common ../../wasm/lib ../../vendor -name "*.rs")
 wasm := static/wasm_bg.wasm
-build = wasm-pack build --debug --target nodejs --out-name wasm \
+TARGET := --release
+build = wasm-pack build ${TARGET} --target nodejs --out-name wasm \
 	--out-dir ./static -- $(FEATURES)
 
 clean:
@@ -26,4 +27,5 @@ ${wasm}: ${src}
 	${build}
 
 build_local: FEATURES=--features local
+build_local: TARGET=--debug
 build_local: build

@@ -1,7 +1,4 @@
-use common::node::{
-    ext_interface::{DataStorage, Logger},
-    logic::Stat,
-};
+use common::node::{config::NODE_VERSION, ext_interface::{DataStorage, Logger}, logic::Stat};
 
 use common::node::Node;
 
@@ -89,7 +86,7 @@ pub async fn run_app() {
     console_error_panic_hook::set_once();
 
     let logger = Box::new(ConsoleLogger {});
-    logger.info("starting app for now!");
+    logger.info(&format!("Starting app with version {}", NODE_VERSION));
 
     let mut node = match start(logger.clone(), URL).await {
         Ok(node) => node,
