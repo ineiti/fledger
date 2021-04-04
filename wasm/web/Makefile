@@ -18,7 +18,6 @@ ${wasm}: ${src}
 watch: build_bg serve
 
 build: ${wasm}
-	${build}
 
 build_local: FEATURES=--features local
 build_local: TARGET=--debug
