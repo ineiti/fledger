@@ -19,31 +19,31 @@ jobs:
         image_name: fledgre/signal
         dockerfile: Dockerfile.signal
 
-  build-flnode:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
+  # build-flnode:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v2
 
-    - name: Build CLI Fledger Node
-      uses: whoan/docker-build-with-cache-action@v5
-      with:
-        username: ${{ secrets.DOCKERHUB_NAME }}
-        password: ${{ secrets.DOCKERHUB }}
-        image_name: fledgre/flnode
-        dockerfile: Dockerfile.flnode
+  #   - name: Build CLI Fledger Node
+  #     uses: whoan/docker-build-with-cache-action@v5
+  #     with:
+  #       username: ${{ secrets.DOCKERHUB_NAME }}
+  #       password: ${{ secrets.DOCKERHUB }}
+  #       image_name: fledgre/flnode
+  #       dockerfile: Dockerfile.flnode
 
-  build-web:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
+  # build-web:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v2
 
-    - name: Build Web Fledger Node
-      uses: whoan/docker-build-with-cache-action@v5
-      with:
-        username: ${{ secrets.DOCKERHUB_NAME }}
-        password: ${{ secrets.DOCKERHUB }}
-        image_name: fledgre/web
-        dockerfile: Dockerfile.web
+  #   - name: Build Web Fledger Node
+  #     uses: whoan/docker-build-with-cache-action@v5
+  #     with:
+  #       username: ${{ secrets.DOCKERHUB_NAME }}
+  #       password: ${{ secrets.DOCKERHUB }}
+  #       image_name: fledgre/web
+  #       dockerfile: Dockerfile.web
 
   # deploy:
   #   runs-on: ubuntu-latest

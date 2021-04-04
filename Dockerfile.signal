@@ -2,6 +2,8 @@ FROM lukemathwalker/cargo-chef as planner
 WORKDIR /fledger
 COPY . .
 RUN cargo chef prepare
+RUN sha256sum recipe.json
+RUN cat recipe.json
 
 FROM lukemathwalker/cargo-chef as cacher
 WORKDIR /fledger
