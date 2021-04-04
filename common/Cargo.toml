@@ -14,6 +14,8 @@ toml = "0.5"
 rand = "0.8.0"
 async-trait = "0.1.42"
 
+# The "js" is to make sure it also works for the flnode and wasm/web
+getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
 js-sys = "0.3.46"
 wasm-bindgen-futures = "0.4.19"

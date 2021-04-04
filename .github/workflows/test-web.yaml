@@ -3,9 +3,13 @@ on:
   pull_request:
     branches:
     - main
+  # This is needed for actions/cache to copy the cache over to the default branch
+  push:
+    branches:
+    - main
 
 jobs:
-  docker:
+  wasm-test:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout branch
@@ -13,8 +17,20 @@ jobs:
       with:
         fetch-depth: 0
 
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo-
+
+    - uses: jetli/wasm-pack-action@v0.3.0
+      with:
+        version: 'latest'
+
     - name: Run wasm-test
       run: |
-        curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
         cd wasm/lib/src
         wasm-pack test --chrome --headless

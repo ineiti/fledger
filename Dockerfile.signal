@@ -1,9 +1,4 @@
-FROM rust:latest as builder
-WORKDIR /usr/src/signal
-COPY . .
-RUN cargo install --path cli/signal
-
-FROM debian:buster-slim
-COPY --from=builder /usr/local/cargo/bin/signal /usr/local/bin/signal
-RUN apt-get update && apt-get install -y libssl1.1 && rm -rf /var/lib/apt/lists/*
-CMD ["signal"]
+FROM rust
+WORKDIR /fledger
+COPY ./target/release/signal signal
+ENTRYPOINT ["/fledger/signal"]

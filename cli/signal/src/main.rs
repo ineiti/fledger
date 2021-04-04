@@ -1,12 +1,12 @@
+mod config;
 /// Very simple rendez-vous server that allows new nodes to send their node_info.
 /// It also allows the nodes to fetch all existing node_infos of all the other nodes.
 mod state;
-mod config;
 
-use structopt::StructOpt;
-use log::{warn, info, error};
-use flexi_logger::Logger;
 use async_trait::async_trait;
+use flexi_logger::Logger;
+use log::{error, info, warn};
+use structopt::StructOpt;
 
 use std::{
     net::{TcpListener, TcpStream},
@@ -15,11 +15,8 @@ use std::{
 };
 use tungstenite::{accept, protocol::Role, Message, WebSocket};
 
-use common::{
-    signal::websocket::{
-        MessageCallbackSend, NewConnectionCallback, WSMessage, WebSocketConnectionSend,
-        WebSocketServer,
-    },
+use common::signal::websocket::{
+    MessageCallbackSend, NewConnectionCallback, WSMessage, WebSocketConnectionSend, WebSocketServer,
 };
 use config::Config;
 
@@ -47,7 +44,7 @@ impl UnixWebSocket {
             for stream in server.incoming() {
                 let mut cb_mutex = uws_cl.lock().unwrap();
                 if let Some(cb) = cb_mutex.as_mut() {
-                    match UnixWSConnection::new(stream.unwrap()){
+                    match UnixWSConnection::new(stream.unwrap()) {
                         Ok(conn) => cb(conn),
                         Err(e) => println!("Error while getting connection: {:?}", e),
                     }
@@ -106,21 +103,26 @@ impl WebSocketConnectionSend for UnixWSConnection {
     }
 
     async fn send(&mut self, msg: String) -> Result<(), String> {
-        self.websocket.write_message(Message::Text(msg)).map_err(|e| e.to_string())?;
+        self.websocket
+            .write_message(Message::Text(msg))
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 }
 
 fn main() {
     let cfg = Config::from_args();
-    Logger::with_str("error, signal=".to_string() + cfg.logger_str()).start().unwrap();
+    Logger::with_str("error, signal=".to_string() + cfg.logger_str())
+        .start()
+        .unwrap();
     let ws = Box::new(UnixWebSocket::new());
     let port = cfg.port;
-    match ServerState::new(cfg, ws){
+    match ServerState::new(cfg, ws) {
         Ok(state) => {
-    info!("Server started and listening on port {}", port);
-    state.wait_done();
-        },
+            info!("Something something 123456789abc");
+            info!("Server started and listening on port {}", port);
+            state.wait_done();
+        }
         Err(e) => error!("Couldn't start server: {}", e),
     }
 }

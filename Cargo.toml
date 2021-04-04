@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+    "cli/signal",
+    "cli/flnode",
+    "wasm/web",
+    "wasm/lib",
+    "common",
+    "vendor/names"
+]
