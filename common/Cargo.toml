@@ -16,9 +16,6 @@ async-trait = "0.1.42"
 
 # The "js" is to make sure it also works for the flnode and wasm/web
 getrandom = { version = "0.2", features = ["js"] }
-wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
-js-sys = "0.3.46"
-wasm-bindgen-futures = "0.4.19"
 names = { path = "../vendor/names" }
 
 futures = ""
@@ -51,3 +48,12 @@ features = [
 
   "Navigator",
 ]
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono = ""
+flexi_logger = ""
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
+js-sys = "0.3.46"
+wasm-bindgen-futures = "0.4.19"

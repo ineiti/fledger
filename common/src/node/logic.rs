@@ -1,4 +1,15 @@
-use js_sys::Date;
+#[cfg(target_arch = "wasm32")]
+fn now() -> f64 {
+    use js_sys::Date;
+    Date::now()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn now() -> f64 {
+    use chrono::Utc;
+    Utc::now().timestamp_millis() as f64
+}
+
 use log::info;
 use std::{
     collections::HashMap,
@@ -59,7 +70,7 @@ impl Stat {
             node_info,
             ping_rx: 0,
             ping_tx: 0,
-            last_contact: Date::now(),
+            last_contact: now(),
             incoming: ConnState::Idle,
             outgoing: ConnState::Idle,
             client_info: "N/A".to_string(),
@@ -102,17 +113,25 @@ impl Logic {
                 LInput::ConnStat(id, dir, c, stm) => self.update_connection_state(id, dir, c, stm),
             }
         }
+
         // Send statistics to the signalling server
-        if Date::now() > self.last_stats + self.node_config.send_stats.unwrap() {
-            self.last_stats = Date::now();
+        if now() > self.last_stats + self.node_config.send_stats.unwrap() {
+            self.last_stats = now();
+            let expired: Vec<U256> = self
+                .stats
+                .iter()
+                .filter(|(_k, v)| now() - v.last_contact > self.node_config.stats_ignore.unwrap())
+                .map(|(k, _v)| k.clone())
+                .collect();
+            for k in expired {
+                self.stats.remove(&k);
+            }
+
             let stats: Vec<NodeStat> = self
                 .stats
                 .iter()
                 // Ignore our node and nodes that are inactive
-                .filter(|(k, v)| {
-                    k != &&self.node_config.our_node.id
-                        && Date::now() - v.last_contact < self.node_config.stats_ignore.unwrap()
-                })
+                .filter(|(k, _v)| k != &&self.node_config.our_node.id)
                 .map(|(k, v)| NodeStat {
                     id: k.clone(),
                     version: VERSION_STRING.to_string(),
@@ -193,8 +212,47 @@ impl Logic {
             .entry(id.clone())
             .or_insert_with(|| Stat::new(None));
         self.stats.entry(id.clone()).and_modify(|s| {
-            s.last_contact = Date::now();
+            s.last_contact = now();
             s.ping_rx += 1;
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{LInput, Logic};
+    use crate::node::config::{NodeConfig, NodeInfo};
+    use flexi_logger::Logger;
+    use futures::executor;
+    use std::{thread::sleep, time::Duration};
+
+    #[test]
+    /// Starts a Logic with two nodes, then receives ping only from one node.
+    /// The other node should be removed from the stats-list.
+    fn cleanup_stale_nodes() -> Result<(), String> {
+        Logger::with_str("debug").start().unwrap();
+
+        let n1 = NodeInfo::new();
+        let n2 = NodeInfo::new();
+        let mut nc = NodeConfig::new("".to_string())?;
+        nc.send_stats = Some(1f64);
+        nc.stats_ignore = Some(2f64);
+
+        let mut logic = Logic::new(nc);
+        logic
+            .input_tx
+            .send(LInput::SetNodes(vec![n1.clone(), n2.clone()]))
+            .map_err(|e| e.to_string())?;
+        executor::block_on(logic.process())?;
+        assert_eq!(2, logic.stats.len(), "Should have two nodes now");
+
+        sleep(Duration::from_millis(10));
+        logic
+            .input_tx
+            .send(LInput::WebRTC(n1.id.clone(), "ping".to_string()))
+            .map_err(|e| e.to_string())?;
+        executor::block_on(logic.process())?;
+        assert_eq!(1, logic.stats.len(), "One node should disappear");
+        Ok(())
     }
 }
