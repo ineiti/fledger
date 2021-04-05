@@ -265,6 +265,8 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "backtrace",
+ "chrono",
+ "flexi_logger",
  "futures",
  "getrandom 0.2.2",
  "js-sys",
