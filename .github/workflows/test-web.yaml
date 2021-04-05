@@ -32,3 +32,32 @@ jobs:
       run: |
         cd wasm/lib/src
         wasm-pack test --chrome --headless
+
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+          node_modules
+          ~/.npm
+        key: ${{ runner.os }}-cargo-test-build-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-test-build
+          ${{ runner.os }}-cargo-test-
+          ${{ runner.os }}-cargo-build-
+
+    - uses: jetli/wasm-pack-action@v0.3.0
+      with:
+        version: 'latest'
+
+    - name: Update build tag
+      run: make update_version
+
+    - name: Build all
+      run: cargo build --release

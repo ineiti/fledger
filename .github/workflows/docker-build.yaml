@@ -22,6 +22,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-build-
           ${{ runner.os }}-cargo-test-
+          ${{ runner.os }}-cargo-test-build-
 
     - uses: jetli/wasm-pack-action@v0.3.0
       with:
