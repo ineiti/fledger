@@ -1,15 +1,10 @@
-use common::node::{version::VERSION_STRING, ext_interface::{DataStorage, Logger}, logic::Stat};
-
-use common::node::Node;
-
 use js_sys::Date;
+use log::{error, info};
+use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
-
 use wasm_lib::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
 
-use wasm_bindgen::prelude::*;
-
-use wasm_lib::storage_logs::ConsoleLogger;
+use common::node::{ext_interface::DataStorage, logic::Stat, version::VERSION_STRING, Node};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -42,16 +37,16 @@ impl DataStorage for DummyDS {
     }
 }
 
-async fn start(log: Box<dyn Logger>, url: &str) -> Result<Node, JsValue> {
+async fn start(url: &str) -> Result<Node, JsValue> {
     let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
     let my_storage = Box::new(DummyDS {});
     let ws = WebSocketWasm::new(url)?;
-    let node = Node::new(my_storage, log, Box::new(ws), rtc_spawner)?;
+    let node = Node::new(my_storage, Box::new(ws), rtc_spawner)?;
 
     Ok(node)
 }
 
-async fn list_ping(log: Box<dyn Logger>, n: &mut Node) -> Result<(), String> {
+async fn list_ping(n: &mut Node) -> Result<(), String> {
     n.list()?;
     n.ping("something").await?;
     let mut nodes: Vec<Stat> = n.logic.stats.iter().map(|(_k, v)| v.clone()).collect();
@@ -59,7 +54,7 @@ async fn list_ping(log: Box<dyn Logger>, n: &mut Node) -> Result<(), String> {
     for node in nodes {
         if let Some(info) = node.node_info.as_ref() {
             if n.info().id != info.id {
-                log.info(&format!(
+                info!(
                     "Node: name:{} age:{} ping:({}/{}) conn:({:?}/{:?})",
                     info.info,
                     ((Date::now() - node.last_contact) / 1000.).floor(),
@@ -67,7 +62,7 @@ async fn list_ping(log: Box<dyn Logger>, n: &mut Node) -> Result<(), String> {
                     node.ping_tx,
                     node.incoming,
                     node.outgoing,
-                ));
+                );
             }
         }
     }
@@ -85,27 +80,28 @@ extern "C" {
 pub async fn run_app() {
     console_error_panic_hook::set_once();
 
-    let logger = Box::new(ConsoleLogger {});
-    logger.info(&format!("Starting app with version {}", VERSION_STRING));
+    wasm_logger::init(wasm_logger::Config::default());
 
-    let mut node = match start(logger.clone(), URL).await {
+    info!("Starting app with version {}", VERSION_STRING);
+
+    let mut node = match start(URL).await {
         Ok(node) => node,
         Err(e) => {
-            logger.error(&format!("Error while creating node: {:?}", e));
+            error!("Error while creating node: {:?}", e);
             return;
         }
     };
-    logger.info("Started successfully");
+    info!("Started successfully");
     let mut i = 0;
     loop {
         i = i + 1;
         if let Err(e) = node.process().await {
-            logger.error(&format!("Error while processing messages: {}", e));
+            error!("Error while processing messages: {}", e);
         }
         if i % 10 == 0 {
-            logger.info("Waiting");
-            if let Err(e) = list_ping(logger.clone(), &mut node).await {
-                logger.error(&format!("Couldn't list or ping nodes: {}", e));
+            info!("Waiting");
+            if let Err(e) = list_ping(&mut node).await {
+                error!("Couldn't list or ping nodes: {}", e);
             }
         }
         wait_ms(1000).await;

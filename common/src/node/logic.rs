@@ -1,10 +1,17 @@
-use super::{config::{NodeConfig, NodeInfo}, version::VERSION_STRING, ext_interface::Logger, network::connection_state::CSEnum, types::U256};
-use crate::signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState};
 use js_sys::Date;
+use log::info;
 use std::{
     collections::HashMap,
     sync::mpsc::{channel, Receiver, Sender},
 };
+
+use super::{
+    config::{NodeConfig, NodeInfo},
+    network::connection_state::CSEnum,
+    types::U256,
+    version::VERSION_STRING,
+};
+use crate::signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState};
 
 #[derive(Debug)]
 pub enum LInput {
@@ -67,17 +74,15 @@ pub struct Logic {
     input_rx: Receiver<LInput>,
     output_tx: Sender<LOutput>,
     node_config: NodeConfig,
-    logger: Box<dyn Logger>,
     last_stats: f64,
 }
 
 impl Logic {
-    pub fn new(node_config: NodeConfig, logger: Box<dyn Logger>) -> Logic {
+    pub fn new(node_config: NodeConfig) -> Logic {
         let (input_tx, input_rx) = channel::<LInput>();
         let (output_tx, output_rx) = channel::<LOutput>();
         Logic {
             node_config,
-            logger,
             stats: HashMap::new(),
             input_tx,
             input_rx,
@@ -104,7 +109,10 @@ impl Logic {
                 .stats
                 .iter()
                 // Ignore our node and nodes that are inactive
-                .filter(|(k, v)| k != &&self.node_config.our_node.id && Date::now() - v.last_contact < self.node_config.stats_ignore.unwrap())
+                .filter(|(k, v)| {
+                    k != &&self.node_config.our_node.id
+                        && Date::now() - v.last_contact < self.node_config.stats_ignore.unwrap()
+                })
                 .map(|(k, v)| NodeStat {
                     id: k.clone(),
                     version: VERSION_STRING.to_string(),
@@ -180,7 +188,7 @@ impl Logic {
     }
 
     fn rcv(&mut self, id: U256, msg: String) {
-        self.logger.info(&format!("Received message from WebRTC: {}", msg));
+        info!("Received message from WebRTC: {}", msg);
         self.stats
             .entry(id.clone())
             .or_insert_with(|| Stat::new(None));

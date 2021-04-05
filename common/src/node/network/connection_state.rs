@@ -1,19 +1,16 @@
 /// This handles one connection, either an incoming or an outgoing connection.
+use log::{info, error};
 use backtrace::Backtrace;
-
-use crate::{
-    node::ext_interface::Logger,
-    signal::web_rtc::{
-        ConnectionStateMap, PeerMessage, WebRTCConnection, WebRTCConnectionSetup,
-        WebRTCConnectionState, WebRTCSetupCBMessage, WebRTCSpawner,
-    },
-};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
 };
-
 use web_sys::RtcIceConnectionState;
+
+use crate::signal::web_rtc::{
+    ConnectionStateMap, PeerMessage, WebRTCConnection, WebRTCConnectionSetup,
+    WebRTCConnectionState, WebRTCSetupCBMessage, WebRTCSpawner,
+};
 
 /// Represents the state of an incoming or outgoing connection.
 #[derive(PartialEq, Debug, Clone)]
@@ -51,7 +48,6 @@ pub struct ConnectionState {
     pub input_tx: Sender<CSInput>,
     output_tx: Sender<CSOutput>,
     input_rx: Receiver<CSInput>,
-    logger: Box<dyn Logger>,
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
     setup: Option<Box<dyn WebRTCConnectionSetup>>,
     connected: Option<Box<dyn WebRTCConnection>>,
@@ -62,7 +58,6 @@ impl ConnectionState {
     /// Creates a new ConnectionState by
     pub fn new(
         remote: bool,
-        logger: Box<dyn Logger>,
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
     ) -> Result<ConnectionState, String> {
         let (output_tx, output_rx) = channel::<CSOutput>();
@@ -73,7 +68,6 @@ impl ConnectionState {
             output_tx,
             input_rx,
             input_tx,
-            logger,
             web_rtc,
             setup: None,
             connected: None,
@@ -90,7 +84,6 @@ impl ConnectionState {
     pub async fn process(&mut self) -> Result<(), String> {
         let inputs: Vec<CSInput> = self.input_rx.try_iter().collect();
         for input in inputs {
-            // self.logger.info(&format!("dbg: ConnectionState::processes {:?}", input));
             match input {
                 CSInput::GetState => self.get_state().await?,
                 CSInput::ProcessPeerMessage(msg) => self.process_peer_message(msg).await?,
@@ -102,7 +95,7 @@ impl ConnectionState {
             };
         }
         if self.state != CSEnum::Idle {
-                self.get_state().await?;
+            self.get_state().await?;
         }
         Ok(())
     }
@@ -114,15 +107,14 @@ impl ConnectionState {
                 .send(CSOutput::WebSocket(PeerMessage::IceCandidate(ice)))
                 .map_err(|e| e.to_string()),
             WebRTCSetupCBMessage::Connection(conn) => {
-                self.logger.info(&format!(
+                info!(
                     "Connected {}",
                     if self.remote { "incoming" } else { "outgoing" }
-                ));
+                );
                 let chan = self.output_tx.clone();
-                let log = self.logger.clone();
                 conn.set_cb_message(Box::new(move |msg| {
                     if let Err(e) = chan.send(CSOutput::WebRTCMessage(msg)) {
-                        log.error(&format!("Couldn't send WebRTCMessage to node: {}", e));
+                        error!("Couldn't send WebRTCMessage to node: {}", e);
                     }
                 }));
                 self.connected = Some(conn);
@@ -143,14 +135,15 @@ impl ConnectionState {
             _ => None,
         };
         if let Some(s) = stat {
-            let reset = match s.connection{
+            let reset = match s.connection {
                 RtcIceConnectionState::Failed => true,
                 RtcIceConnectionState::Disconnected => true,
                 RtcIceConnectionState::Closed => true,
-                _ => false
+                _ => false,
             };
             if reset {
-                self.start_connection(Some("Found bad ConnetionState".into())).await?;
+                self.start_connection(Some("Found bad ConnetionState".into()))
+                    .await?;
             }
         }
         self.output_tx
@@ -191,7 +184,7 @@ impl ConnectionState {
 
     async fn start_connection(&mut self, reason: Option<String>) -> Result<(), String> {
         if let Some(s) = reason {
-            self.logger.error(&s);
+            error!("{}", s);
         }
         if self.state != CSEnum::Idle {
             self.state = CSEnum::Idle;
@@ -200,9 +193,9 @@ impl ConnectionState {
                 .map_err(|e| e.to_string())?;
         }
         if self.remote {
-            self.logger.error("Cannot start incoming connection")
+            error!("Cannot start incoming connection")
         } else {
-            self.logger.info("Starting new connection");
+            info!("Starting new connection");
             self.setup_new_connection().await?;
             self.setup_peer_message(PeerMessage::Init).await?;
         }
@@ -221,8 +214,8 @@ impl ConnectionState {
                         "Couldn't send over webrtc, resetting connection".to_string(),
                     ))
                     .await?;
-                // } else {
-                //     self.get_state().await?;
+                    // } else {
+                    //     self.get_state().await?;
                 }
             }
             _ => {}
@@ -239,10 +232,9 @@ impl ConnectionState {
         };
         let mut conn = self.web_rtc.lock().unwrap()(state)?;
         let sender = self.input_tx.clone();
-        let log = self.logger.clone();
         conn.set_callback(Box::new(move |msg| {
             if let Err(e) = sender.send(CSInput::WebRTCSetup(msg)) {
-                log.error(&format!("Couldn't send WebRTCSetup: {}", e));
+                error!("Couldn't send WebRTCSetup: {}", e);
             }
         }))
         .await;
@@ -283,7 +275,6 @@ impl ConnectionState {
                     setup.use_answer(answer).await?;
                 }
                 PeerMessage::IceCandidate(ice) => {
-                    // self.logger.warn(&format!("dbg: state is {:?}", self.state));
                     setup.ice_put(ice).await?;
                 }
             }

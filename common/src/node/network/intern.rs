@@ -1,6 +1,9 @@
+use std::sync::Mutex;
+use std::{collections::HashMap, sync::Arc};
+use log::{info, error};
+
 use crate::node::{
     config::NodeInfo,
-    ext_interface::Logger,
     network::{node_connection::NodeConnection, WebRTCReceive},
     types::U256,
 };
@@ -11,15 +14,11 @@ use crate::signal::{
     websocket::{WSMessage, WebSocketConnection},
 };
 
-use std::sync::Mutex;
-use std::{collections::HashMap, sync::Arc};
-
 pub struct Intern {
     ws: Box<dyn WebSocketConnection>,
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
     web_rtc_rcv: WebRTCReceive,
     connections: HashMap<U256, NodeConnection>,
-    logger: Box<dyn Logger>,
     node_info: NodeInfo,
     pub list: Vec<NodeInfo>,
 }
@@ -31,7 +30,6 @@ impl Intern {
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
         web_rtc_rcv: WebRTCReceive,
-        logger: Box<dyn Logger>,
         node_info: NodeInfo,
     ) -> Arc<Mutex<Intern>> {
         let int = Arc::new(Mutex::new(Intern {
@@ -39,13 +37,11 @@ impl Intern {
             web_rtc: Arc::new(Mutex::new(web_rtc)),
             web_rtc_rcv,
             connections: HashMap::new(),
-            logger: logger.clone(),
             node_info,
             list: vec![],
         }));
         let int_cl = Arc::clone(&int);
         let msg_queue = Arc::new(Mutex::new(vec![]));
-        let log = logger.clone();
         int.lock()
             .unwrap()
             .ws
@@ -83,18 +79,14 @@ impl Intern {
     }
 
     async fn msg_cb(&mut self, msg: WSMessage) {
-        // self.logger.info("parsing message");
         match msg {
             WSMessage::MessageString(s) => match WebSocketMessage::from_str(&s) {
                 Ok(wsm) => {
                     if let Err(err) = self.process_msg(wsm.msg).await {
-                        self.logger
-                            .error(&format!("Couldn't process message: {}", err))
+                        error!("Couldn't process message: {}", err)
                     }
                 }
-                Err(err) => self
-                    .logger
-                    .error(&format!("While parsing message: {:?}", err)),
+                Err(err) =>                     error!("While parsing message: {:?}", err),
             },
             WSMessage::Closed(_) => {}
             WSMessage::Opened(_) => {}
@@ -108,7 +100,7 @@ impl Intern {
     async fn process_msg(&mut self, msg: WSSignalMessage) -> Result<(), String> {
         match msg {
             WSSignalMessage::Challenge(challenge) => {
-                self.logger.info("Processing Challenge message");
+                info!("Processing Challenge message");
                 let ma = MessageAnnounce {
                     challenge,
                     node_info: self.node_info.clone(),
@@ -118,12 +110,11 @@ impl Intern {
             }
             WSSignalMessage::ListIDsReply(list) => {
                 // DEBUG: sometimes new nodes are not recognized anymore
-                self.logger.info(&format!("Processing ListIDsReply message: {:?}", list));
+                info!("Processing ListIDsReply message: {:?}", list);
                 self.update_list(list);
             }
             WSSignalMessage::PeerSetup(pi) => {
-                self.logger
-                    .info(&format!("Processing PeerSetup message: {}", pi.message));
+                    info!("Processing PeerSetup message: {}", pi.message);
                 let remote = match pi.get_remote(&self.node_info.id) {
                     Some(id) => id,
                     None => {
@@ -132,7 +123,6 @@ impl Intern {
                 };
                 let remote_clone = remote.clone();
                 let rcv = Arc::clone(&self.web_rtc_rcv);
-                let log = self.logger.clone();
                 let conn = self
                     .connections
                     .entry(remote.clone())
@@ -142,12 +132,11 @@ impl Intern {
                             if let Ok(rcv_mut) = rcv.try_lock() {
                                 rcv_mut(remote_clone.clone(), msg);
                             } else {
-                                log.error(
+                                error!(
                                     "Couldn't get lock on web_rtc_rcv in process_msg::PeerSetup",
                                 );
                             }
                         }),
-                        self.logger.clone(),
                     ));
 
                 if let Some(message) = conn
@@ -158,10 +147,10 @@ impl Intern {
                 }
             }
             WSSignalMessage::Done => {
-                self.logger.info("Processing done message");
+                info!("Processing done message");
             }
             ws => {
-                self.logger.info(&format!("Got unusable message: {:?}", ws));
+                info!("Got unusable message: {:?}", ws);
             }
         }
         Ok(())
@@ -171,10 +160,10 @@ impl Intern {
     /// This is not a public method, as all communication should happen using
     /// webrtc connections.
     pub fn send_ws(&mut self, msg: WSSignalMessage) {
-        self.logger.info(&format!("Sending {} over websocket", msg));
+        info!("Sending {} over websocket", msg);
         let wsm = WebSocketMessage { msg };
         if let Err(e) = self.ws.send(wsm.to_string()) {
-            self.logger.error(&format!("Error while sending: {:?}", e));
+            error!("Error while sending: {:?}", e);
         }
     }
 
@@ -201,7 +190,6 @@ impl Intern {
     pub async fn send(&mut self, dst: &U256, msg: String) -> Result<(), String> {
         let dst_clone = dst.clone();
         let rcv = Arc::clone(&self.web_rtc_rcv);
-        let log = self.logger.clone();
         let conn = self
             .connections
             .entry(dst.clone())
@@ -211,18 +199,17 @@ impl Intern {
                     if let Ok(rcv_mut) = rcv.try_lock() {
                         rcv_mut(dst_clone.clone(), msg);
                     } else {
-                        log.error("Couldn't get lock on web_rtc_rcv in Intern::send");
+                        error!("Couldn't get lock on web_rtc_rcv in Intern::send");
                     }
                 }),
-                self.logger.clone(),
             ));
 
         let mut message: Option<PeerMessage> = None;
         if let Err(e) = conn.send(msg.clone()) {
-            self.logger.info(&format!(
+            info!(
                 "No connection to {} yet ({}), starting it",
                 dst, e
-            ));
+            );
             message = conn.process_peer_setup_outgoing(PeerMessage::Init).await?;
             conn.send(msg)?;
         }

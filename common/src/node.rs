@@ -1,13 +1,8 @@
-pub mod config;
-pub mod ext_interface;
-pub mod logic;
-pub mod network;
-pub mod types;
-pub mod version;
+use log::info;
 
 use crate::node::{
     config::{NodeConfig, NodeInfo},
-    ext_interface::{DataStorage, Logger},
+    ext_interface::DataStorage,
     logic::Logic,
     network::{NOutput, Network},
     types::U256,
@@ -19,13 +14,19 @@ use self::{
     network::NInput,
 };
 
+pub mod config;
+pub mod ext_interface;
+pub mod logic;
+pub mod network;
+pub mod types;
+pub mod version;
+
 /// The node structure holds it all together. It is the main structure of the project.
 pub struct Node {
     pub network: Network,
     pub config: NodeConfig,
     pub logic: Logic,
     storage: Box<dyn DataStorage>,
-    logger: Box<dyn Logger>,
 }
 
 pub const CONFIG_NAME: &str = "nodeConfig";
@@ -37,31 +38,29 @@ impl Node {
     /// The actual logic is handled in Logic.
     pub fn new(
         storage: Box<dyn DataStorage>,
-        logger: Box<dyn Logger>,
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
     ) -> Result<Node, String> {
         let config_str = match storage.load(CONFIG_NAME) {
             Ok(s) => s,
             Err(_) => {
-                logger.info(&format!("Couldn't load configuration - start with empty"));
+                info!("Couldn't load configuration - start with empty");
                 "".to_string()
             }
         };
         let config = NodeConfig::new(config_str)?;
         storage.save(CONFIG_NAME, &config.to_string()?)?;
-        logger.info(&format!(
+        info!(
             "Starting node: {} = {}",
             config.our_node.info, config.our_node.id
-        ));
-        let network = Network::new(logger.clone(), config.our_node.clone(), ws, web_rtc);
-        let logic = Logic::new(config.clone(), logger.clone());
+        );
+        let network = Network::new(config.our_node.clone(), ws, web_rtc);
+        let logic = Logic::new(config.clone());
 
         Ok(Node {
             config,
             storage,
             network,
-            logger,
             logic,
         })
     }
