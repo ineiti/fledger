@@ -27,6 +27,9 @@ jobs:
       with:
         version: 'latest'
 
+    - name: Update build tag
+      run: make update_version
+
     - name: Build signal server
       run: cargo build --release -p signal
 

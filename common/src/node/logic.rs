@@ -1,4 +1,4 @@
-use super::{config::{NodeConfig, NodeInfo, NODE_VERSION}, ext_interface::Logger, network::connection_state::CSEnum, types::U256};
+use super::{config::{NodeConfig, NodeInfo}, version::VERSION_STRING, ext_interface::Logger, network::connection_state::CSEnum, types::U256};
 use crate::signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState};
 use js_sys::Date;
 use std::{
@@ -107,7 +107,7 @@ impl Logic {
                 .filter(|(k, v)| k != &&self.node_config.our_node.id && Date::now() - v.last_contact < self.node_config.stats_ignore.unwrap())
                 .map(|(k, v)| NodeStat {
                     id: k.clone(),
-                    version: NODE_VERSION,
+                    version: VERSION_STRING.to_string(),
                     ping_ms: 0u32,
                     ping_rx: v.ping_rx,
                 })

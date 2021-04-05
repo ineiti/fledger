@@ -209,7 +209,7 @@ impl Internal {
                         if let Err(e) = f.write_record(&[
                             node_id.to_string(),
                             n.id.to_string(),
-                            format!("{:x}", n.version),
+                            n.version.clone(),
                             n.ping_rx.to_string(),
                             n.ping_ms.to_string(),
                         ]) {

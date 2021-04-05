@@ -3,6 +3,7 @@ pub mod ext_interface;
 pub mod logic;
 pub mod network;
 pub mod types;
+pub mod version;
 
 use crate::node::{
     config::{NodeConfig, NodeInfo},
