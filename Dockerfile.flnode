@@ -2,5 +2,4 @@ FROM node:latest
 WORKDIR /fledger
 COPY cli/flnode/run /fledger-bin/run
 COPY cli/flnode/static /fledger-bin/static
-RUN cd /fledger-bin/run; npm i -g node-pre-gyp; npm ci
 ENTRYPOINT ["node", "/fledger-bin/run/main.js"]
