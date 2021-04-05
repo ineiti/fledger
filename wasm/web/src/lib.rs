@@ -1,33 +1,20 @@
 #![recursion_limit = "1024"]
 
-use common::node::{ext_interface::Logger, logic::Stat, version::VERSION_STRING};
-use std::sync::Arc;
-use std::sync::Mutex;
-use yew::services::IntervalService;
-
-use std::time::Duration;
-
-use wasm_bindgen::prelude::*;
-use yew::prelude::*;
-
 use js_sys::Date;
+use log::{error, info};
 use regex::Regex;
-use wasm_lib::{
-    storage_logs::{ConsoleLogger, LocalStorage},
-    web_rtc_setup::WebRTCConnectionSetupWasm,
-    web_socket::WebSocketWasm,
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
 };
-use web_sys::{console, window};
+use wasm_bindgen::prelude::*;
+use yew::{prelude::*, services::IntervalService};
+
+use common::node::{logic::Stat, version::VERSION_STRING};
+use wasm_lib::{storage::LocalStorage, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
+use web_sys::window;
 
 use common::node::Node;
-
-fn log_1(s: &str) {
-    console::log_1(&JsValue::from(s));
-}
-
-fn log_2(s: &str, t: String) {
-    console::log_2(&JsValue::from(s), &JsValue::from(t));
-}
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -38,7 +25,6 @@ const URL: &str = "ws://localhost:8765";
 struct Model {
     link: ComponentLink<Self>,
     node: Option<Arc<Mutex<Node>>>,
-    logger: ConsoleLogger,
     counter: u32,
     show_reset: bool,
 }
@@ -61,8 +47,9 @@ impl Component for Model {
         console_error_panic_hook::set_once();
         Model::set_localstorage();
 
-        let logger = ConsoleLogger {};
-        Model::node_start(logger.clone(), &link);
+        wasm_logger::init(wasm_logger::Config::default());
+
+        Model::node_start(&link);
         let _ = Box::leak(Box::new(IntervalService::spawn(
             Duration::from_secs(1),
             link.callback(|_| Msg::Tick),
@@ -72,7 +59,6 @@ impl Component for Model {
             node: None,
             counter: 0,
             show_reset: false,
-            logger,
         }
     }
 
@@ -88,19 +74,18 @@ impl Component for Model {
             }
             Msg::Node(res_node) => match res_node {
                 Ok(node) => {
-                    self.logger.info("Got node");
+                    info!("Got node");
                     self.node = Some(Arc::new(Mutex::new(node)));
                 }
                 Err(e) => {
-                    self.logger
-                        .error(&format!("Couldn't create node: {}", e.as_string().unwrap()));
+                    error!("Couldn't create node: {}", e.as_string().unwrap());
                     self.show_reset = true;
                 }
             },
             Msg::Reset => {
                 Model::set_config("");
                 self.show_reset = false;
-                Model::node_start(self.logger.clone(), &self.link);
+                Model::node_start(&self.link);
             }
         }
         true
@@ -149,25 +134,24 @@ impl Component for Model {
 impl Model {
     fn process(&self) {
         if let Some(n) = self.node_copy() {
-            let log = self.logger.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                if let Ok(mut node) = n.try_lock(){
+                if let Ok(mut node) = n.try_lock() {
                     if let Err(e) = node.process().await {
-                        log.info(&format!("Error: {}", e));
+                        info!("Error: {}", e);
                     }
                 } else {
-                    log.error("process couldn't get lock");
+                    error!("process couldn't get lock");
                 }
             });
         }
     }
-    fn node_start(logger: Box<dyn Logger>, link: &ComponentLink<Model>) {
+    fn node_start(link: &ComponentLink<Model>) {
         wasm_bindgen_futures::spawn_local(wrap(
             async {
                 let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
                 let my_storage = Box::new(LocalStorage {});
                 let ws = WebSocketWasm::new(URL)?;
-                let mut node = Node::new(my_storage, logger, Box::new(ws), rtc_spawner)?;
+                let mut node = Node::new(my_storage, Box::new(ws), rtc_spawner)?;
                 if let Some(window) = web_sys::window() {
                     let navigator = window.navigator();
                     node.set_client(match navigator.user_agent() {
@@ -176,7 +160,7 @@ impl Model {
                     });
                 }
                 node.save()?;
-            
+
                 Ok(node)
             },
             link.callback(|n: Result<Node, JsValue>| Msg::Node(n)),
@@ -185,10 +169,10 @@ impl Model {
 
     fn get_info(&self) -> String {
         if let Some(n) = self.node_copy() {
-            if let Ok(node) = n.try_lock(){
+            if let Ok(node) = n.try_lock() {
                 return node.info().info;
             } else {
-                self.logger.error("get_info couldn't get lock");
+                error!("get_info couldn't get lock");
             }
         }
         return "Unknown".into();
@@ -196,18 +180,18 @@ impl Model {
 
     fn set_config(data: &str) {
         if let Err(err) = Node::set_config(Box::new(LocalStorage {}), &data) {
-            log_2("Got error while saving config:", err);
+            info!("Got error while saving config: {}", err);
         }
     }
 
     fn set_localstorage() {
         if let Ok(loc) = window().unwrap().location().href() {
-            log_2("Location is", loc.clone());
+            info!("Location is: {}", loc.clone());
             if loc.contains("#") {
                 let reg = Regex::new(r".*?#").unwrap();
                 let data_enc = reg.replace(&loc, "");
                 if data_enc != "" {
-                    log_1("Setting data");
+                    info!("Setting data");
                     if let Ok(data) = urlencoding::decode(&data_enc) {
                         Model::set_config(&data);
                     }
@@ -223,8 +207,9 @@ impl Model {
     fn nodes_reachable(&self) -> Html {
         let mut out = vec![];
         if let Some(n) = self.node_copy() {
-            if let Ok(node) = n.try_lock(){
-                let mut stats: Vec<Stat> = node.logic.stats.iter().map(|(_k, v)| v.clone()).collect();
+            if let Ok(node) = n.try_lock() {
+                let mut stats: Vec<Stat> =
+                    node.logic.stats.iter().map(|(_k, v)| v.clone()).collect();
                 stats.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
                 let now = Date::now();
                 for stat in stats {
@@ -233,18 +218,18 @@ impl Model {
                             out.push(vec![
                                 format!("{}", ni.info),
                                 format!("{} / {}", stat.ping_rx, stat.ping_tx),
-                                format!("{}s", ((now-stat.last_contact) / 1000.).floor()),
+                                format!("{}s", ((now - stat.last_contact) / 1000.).floor()),
                                 format!("{:?} / {:?}", stat.incoming, stat.outgoing),
                             ]);
                         }
                     }
                 }
             } else {
-                self.logger.error("nodes_reachable couldn't get lock");
+                error!("nodes_reachable couldn't get lock");
             }
         }
-        if out.len() == 0{
-            return html!{<div>{"Fetching node list"}</div>}
+        if out.len() == 0 {
+            return html! {<div>{"Fetching node list"}</div>};
         }
         return html! {
         <table class={"styled-table"}>
@@ -280,27 +265,26 @@ impl Model {
 
     fn node_list(&mut self) {
         if let Some(n) = self.node_copy() {
-            if let Ok(mut node) = n.try_lock(){
+            if let Ok(mut node) = n.try_lock() {
                 if let Err(e) = node.list() {
-                    self.logger.error(&format!("Couldn't get list: {:?}", e));
+                    error!("Couldn't get list: {:?}", e);
                 }
             } else {
-                self.logger.error("node_list couldn't get lock");
+                error!("node_list couldn't get lock");
             }
         }
     }
 
     fn node_ping(&self) {
         if let Some(n) = self.node_copy() {
-            let log = self.logger.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                if let Ok(mut node) = n.try_lock(){
+                if let Ok(mut node) = n.try_lock() {
                     let str = Date::new_0().to_iso_string().as_string().unwrap();
                     if let Err(e) = node.ping(&str).await {
-                        log.error(&format!("Couldn't ping node: {:?}", e));
+                        error!("Couldn't ping node: {:?}", e);
                     }
                 } else {
-                    log.error("node_ping couldn't get lock");
+                    error!("node_ping couldn't get lock");
                 }
             });
         }
@@ -311,5 +295,5 @@ impl Model {
 pub async fn run_app() {
     console_error_panic_hook::set_once();
     App::<Model>::new().mount_to_body();
-    log_1("starting app for now!");
+    info!("starting app for now!");
 }

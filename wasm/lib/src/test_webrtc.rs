@@ -1,13 +1,10 @@
-use std::rc::Rc;
-use std::sync::{mpsc::channel, Arc, Mutex};
-use std::cell::RefCell;
+use std::{cell::RefCell,
+    rc::Rc,
+    sync::{mpsc::channel, Arc, Mutex}};
+use log::{info, error};
 
 use common::{
-    node::{
-        ext_interface::{DataStorage, Logger},
-        types::U256,
-        Node,
-    },
+    node::{ext_interface::DataStorage, types::U256, Node},
     signal::{
         web_rtc::{
             WSSignalMessage, WebRTCConnection, WebRTCConnectionSetup, WebRTCConnectionState,
@@ -20,7 +17,6 @@ use common::{
 use wasm_bindgen_test::*;
 
 use crate::logs::wait_ms;
-use crate::storage_logs::ConsoleLogger;
 use crate::web_rtc_setup::WebRTCConnectionSetupWasm;
 
 #[derive(Debug)]
@@ -33,16 +29,14 @@ struct WebSocketDummy {
     msg_queue: Rc<RefCell<Vec<Message>>>,
     // connections: Vec<WebSocketConnectionDummy>,
     callbacks: Vec<Rc<RefCell<Option<MessageCallback>>>>,
-    logger: Box<dyn Logger>,
 }
 
 impl WebSocketDummy {
-    fn new(logger: Box<dyn Logger>) -> WebSocketDummy {
+    fn new() -> WebSocketDummy {
         WebSocketDummy {
             msg_queue: Rc::new(RefCell::new(vec![])),
             // connections: vec![],
             callbacks: vec![],
-            logger,
         }
     }
 
@@ -66,27 +60,22 @@ impl WebSocketDummy {
     fn run_queue(&mut self) -> Result<usize, String> {
         let msgs: Vec<Message> = self.msg_queue.borrow_mut().drain(..).collect();
         let msgs_count = msgs.len();
-        msgs.iter().for_each(|msg| {
-            match WebSocketMessage::from_str(&msg.str) {
-                Ok(wsm) => {
-                    match wsm.msg {
-                        WSSignalMessage::PeerSetup(_) => {
-                            if self.callbacks.len() == 2 {
-                                if let Err(e) =
-                                    self.send_message(1 - msg.id as usize, msg.str.clone())
-                                {
-                                    self.logger.error(&format!("couldn't push message: {}", e));
-                                }
+        msgs.iter()
+            .for_each(|msg| match WebSocketMessage::from_str(&msg.str) {
+                Ok(wsm) => match wsm.msg {
+                    WSSignalMessage::PeerSetup(_) => {
+                        if self.callbacks.len() == 2 {
+                            if let Err(e) = self.send_message(1 - msg.id as usize, msg.str.clone())
+                            {
+                                error!("couldn't push message: {}", e);
                             }
                         }
-                        _ => {}
                     }
-                }
-                Err(e) => self
-                    .logger
-                    .info(&format!("Error while getting message: {}", e)),
-            }
-        });
+                    _ => {}
+                },
+                Err(e) => 
+                    info!("Error while getting message: {}", e),
+            });
         Ok(msgs_count)
     }
 
@@ -126,7 +115,6 @@ impl WebSocketConnection for WebSocketConnectionDummy {
     }
 
     fn send(&mut self, msg: String) -> Result<(), String> {
-        // ConsoleLogger{}.info(&format!("dbg: WebSocketConnection::send({})", msg));
         let queue = Rc::clone(&self.msg_queue);
         queue.borrow_mut().push(Message {
             id: self.id,
@@ -166,64 +154,60 @@ fn put_msg(
 }
 
 async fn set_callback(
-    log: &ConsoleLogger,
     webrtc: &mut Box<dyn WebRTCConnectionSetup>,
     ice: &Arc<Mutex<Vec<String>>>,
     conn: &Arc<Mutex<Option<Box<dyn WebRTCConnection>>>>,
 ) {
-    let logc = log.clone();
     let icec = Arc::clone(&ice);
     let connc = Arc::clone(&conn);
     webrtc
         .set_callback(Box::new(move |msg| {
-            logc.info(&format!("dbg: Got message: {:?}", &msg));
+            info!("dbg: Got message: {:?}", &msg);
             put_msg(&icec, &connc, msg);
         }))
         .await;
 }
 
 async fn connect_test_base() -> Result<(), String> {
-    let log = Box::new(ConsoleLogger {});
-
-    log.info("Setting up nodes");
+    info!("Setting up nodes");
     // First node
     let ice1 = Arc::new(Mutex::new(vec![]));
     let conn1 = Arc::new(Mutex::new(None));
     let mut webrtc1 = WebRTCConnectionSetupWasm::new(WebRTCConnectionState::Initializer)?;
-    set_callback(&log, &mut webrtc1, &ice1, &conn1).await;
+    set_callback( &mut webrtc1, &ice1, &conn1).await;
 
     // Second node
     let ice2 = Arc::new(Mutex::new(vec![]));
     let conn2 = Arc::new(Mutex::new(None));
     let mut webrtc2 = WebRTCConnectionSetupWasm::new(WebRTCConnectionState::Follower)?;
-    set_callback(&log, &mut webrtc2, &ice2, &conn2).await;
+    set_callback(&mut webrtc2, &ice2, &conn2).await;
 
     // Exchange messages
     let offer = webrtc1.make_offer().await?;
     let answer = webrtc2.make_answer(offer).await?;
     webrtc1.use_answer(answer).await?;
 
-    log.info("Waiting 2 seconds");
+    info!("Waiting 2 seconds");
     wait_ms(2000).await;
 
     // Send ice strings to the other node
     let msgs1: Vec<String> = { ice1.lock().unwrap().splice(.., vec![]).collect() };
     for msg in msgs1 {
-        log.info(&format!("Got message from 1 {:?}", msg));
+        info!("Got message from 1 {:?}", msg);
         webrtc2.ice_put(msg).await?;
     }
 
     // Send ice strings to the other node
     let msgs2: Vec<String> = { ice2.lock().unwrap().splice(.., vec![]).collect() };
     for msg in msgs2 {
-        log.info(&format!("Got message from 2 {:?}", msg));
+        info!("Got message from 2 {:?}", msg);
         webrtc1.ice_put(msg).await?;
     }
 
-    log.info("Waiting 2 seconds");
+    info!("Waiting 2 seconds");
     wait_ms(2000).await;
 
-    log.info("Sending messages");
+    info!("Sending messages");
     // Make sure the connection arrived at the other end
     let conn1l = conn1.lock().unwrap().take().unwrap();
     let conn2l = conn2.lock().unwrap().take().unwrap();
@@ -238,39 +222,38 @@ async fn connect_test_base() -> Result<(), String> {
     conn1l.send("msg1".to_string())?;
     conn2l.send("msg2".to_string())?;
 
-    log.info("Waiting 2 seconds");
+    info!("Waiting 2 seconds");
     wait_ms(2000).await;
 
     {
-        log.info(&format!(
+        info!(
             "Messages are: {:?} - {:?}",
             msgs1.lock().unwrap().get(0),
             msgs2.lock().unwrap().get(0)
-        ));
+        );
     }
 
     assert_eq!(&"msg2".to_string(), msgs1.lock().unwrap().get(0).unwrap());
     assert_eq!(&"msg1".to_string(), msgs2.lock().unwrap().get(0).unwrap());
 
-    log.info("Done");
+    info!("Done");
     Ok(())
 }
 
 async fn connect_test_simple() -> Result<(), String> {
-    let log = Box::new(ConsoleLogger {});
-    let mut ws_conn = WebSocketDummy::new(log.clone());
+    let mut ws_conn = WebSocketDummy::new();
 
     // First node
     let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
     let my_storage = Box::new(DataStorageDummy {});
     let ws = Box::new(ws_conn.get_connection()?);
-    let mut node1 = Node::new(my_storage, log.clone(), ws, rtc_spawner)?;
+    let mut node1 = Node::new(my_storage, ws, rtc_spawner)?;
 
     // Second node
     let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
     let my_storage = Box::new(DataStorageDummy {});
     let ws = Box::new(ws_conn.get_connection()?);
-    let mut node2 = Node::new(my_storage, log.clone(), ws, rtc_spawner)?;
+    let mut node2 = Node::new(my_storage, ws, rtc_spawner)?;
 
     // Pass messages
     ws_conn.run_queue()?;
@@ -278,7 +261,7 @@ async fn connect_test_simple() -> Result<(), String> {
 
     let mut i = 0;
     loop {
-        log.info(&format!("Running queue: {}", i));
+        info!("Running queue: {}", i);
         node1.process().await?;
         node2.process().await?;
 
@@ -288,7 +271,7 @@ async fn connect_test_simple() -> Result<(), String> {
         //     break;
         // }
         if i == 12 {
-            log.info("Connection should be set up now");
+            info!("Connection should be set up now");
             node1.send(&node2.info().id, "ping".to_string())?;
             node2.send(&node1.info().id, "pong".to_string())?;
         }
@@ -298,26 +281,25 @@ async fn connect_test_simple() -> Result<(), String> {
         wait_ms(100).await;
     }
 
-    log.info("Waiting 2 seconds again");
+    info!("Waiting 2 seconds again");
     wait_ms(2000).await;
 
     Ok(())
 }
 
 async fn test_channel() -> Result<(), String> {
-    let log = ConsoleLogger {};
     let (tx, rx) = channel::<&str>();
     tx.send("one").map_err(|e| e.to_string())?;
     tx.send("two").map_err(|e| e.to_string())?;
-    log.info(&format!(
+    info!(
         "rx is: {:?}",
         rx.try_iter().collect::<Vec<&str>>()
-    ));
+    );
     tx.send("three").map_err(|e| e.to_string())?;
-    log.info(&format!(
+    info!(
         "rx is: {:?}",
         rx.try_iter().collect::<Vec<&str>>()
-    ));
+    );
     Ok(())
 }
 
@@ -325,14 +307,17 @@ async fn test_channel() -> Result<(), String> {
 async fn connect_test() {
     console_error_panic_hook::set_once();
 
-    let log = Box::new(ConsoleLogger {});
+    wasm_logger::init(wasm_logger::Config::default());
+
     match async {
         connect_test_base().await?;
         test_channel().await?;
         connect_test_simple().await
-    }.await {
-        Ok(_) => log.info("All OK"),
-        Err(e) => log.info(&format!("Something went wrong: {}", e)),
+    }
+    .await
+    {
+        Ok(_) => info!("All OK"),
+        Err(e) => info!("Something went wrong: {}", e),
     };
 }
 

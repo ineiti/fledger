@@ -1,19 +1,25 @@
-use crate::signal::{web_rtc::{ConnectionStateMap, MessageAnnounce, NodeStat, PeerInfo, WSSignalMessage, WebRTCSpawner, WebSocketMessage}, websocket::{WSMessage, WebSocketConnection}};
-use crate::{
-    node::{config::NodeInfo, ext_interface::Logger, types::U256},
-    signal::web_rtc::WebRTCConnectionState,
-};
-
+use log::info;
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Mutex,
 };
 use std::{collections::HashMap, sync::Arc};
 
-use WSSignalMessage::NodeStats;
-use node_connection::{NCInput, NodeConnection};
-
 use self::{connection_state::CSEnum, node_connection::NCOutput};
+use crate::signal::{
+    web_rtc::{
+        ConnectionStateMap, MessageAnnounce, NodeStat, PeerInfo, WSSignalMessage, WebRTCSpawner,
+        WebSocketMessage,
+    },
+    websocket::{WSMessage, WebSocketConnection},
+};
+use crate::{
+    node::{config::NodeInfo, types::U256},
+    signal::web_rtc::WebRTCConnectionState,
+};
+use node_connection::{NCInput, NodeConnection};
+use WSSignalMessage::NodeStats;
+
 pub mod connection_state;
 pub mod node_connection;
 
@@ -44,7 +50,6 @@ pub struct Network {
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
     connections: HashMap<U256, NodeConnection>,
     node_info: NodeInfo,
-    logger: Box<dyn Logger>,
 }
 
 /// Network combines a websocket to connect to the signal server with
@@ -52,7 +57,6 @@ pub struct Network {
 /// It supports setting up automatic connections to other nodes.
 impl Network {
     pub fn new(
-        logger: Box<dyn Logger>,
         node_info: NodeInfo,
         mut ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
@@ -60,10 +64,9 @@ impl Network {
         let (output_tx, output_rx) = channel::<NOutput>();
         let (input_tx, input_rx) = channel::<NInput>();
         let (ws_tx, ws_rx) = channel::<WSMessage>();
-        let log_clone = logger.clone();
         ws.set_cb_wsmessage(Box::new(move |msg| {
             if let Err(e) = ws_tx.send(msg) {
-                log_clone.info(&format!("Couldn't send msg over ws-channel: {}", e));
+                info!("Couldn't send msg over ws-channel: {}", e);
             }
         }));
         let net = Network {
@@ -77,7 +80,6 @@ impl Network {
             web_rtc: Arc::new(Mutex::new(web_rtc)),
             connections: HashMap::new(),
             node_info,
-            logger,
         };
         net
     }
@@ -104,7 +106,6 @@ impl Network {
     async fn process_websocket(&mut self) -> Result<(), String> {
         let msgs: Vec<WSMessage> = self.ws_rx.try_iter().collect();
         for msg in msgs {
-            // self.logger.info(&format!("dbg: Network::process_ws({:?})", msg));
             match msg {
                 WSMessage::MessageString(s) => {
                     self.process_msg(WebSocketMessage::from_str(&s)?.msg)
@@ -122,7 +123,6 @@ impl Network {
         for conn in conns {
             let outputs: Vec<NCOutput> = conn.1.output_rx.try_iter().collect();
             for output in outputs {
-                // self.logger.info(&format!("dbg: Network::process {:?}", output));
                 match output {
                     NCOutput::WebSocket(message, remote) => {
                         let (id_init, id_follow) = match remote {
@@ -140,10 +140,10 @@ impl Network {
                         .output_tx
                         .send(NOutput::WebRTC(conn.0.clone(), msg))
                         .map_err(|e| e.to_string())?,
-                    NCOutput::State(dir, c, sta) =>
-                        self.output_tx
-                            .send(NOutput::State(conn.0.clone(), dir, c, sta))
-                            .map_err(|e| e.to_string())?,
+                    NCOutput::State(dir, c, sta) => self
+                        .output_tx
+                        .send(NOutput::State(conn.0.clone(), dir, c, sta))
+                        .map_err(|e| e.to_string())?,
                 }
             }
             conn.1.process().await?;
@@ -160,7 +160,10 @@ impl Network {
     async fn process_msg(&mut self, msg: WSSignalMessage) -> Result<(), String> {
         match msg {
             WSSignalMessage::Challenge(version, challenge) => {
-                self.logger.info(&format!("Processing Challenge message version: {}", version));
+                info!(
+                    "Processing Challenge message version: {}",
+                    version
+                );
                 let ma = MessageAnnounce {
                     version,
                     challenge,
@@ -178,8 +181,6 @@ impl Network {
                 self.update_list(list)?;
             }
             WSSignalMessage::PeerSetup(pi) => {
-                // self.logger
-                //     .info(&format!("dbg: Network::Processing PeerSetup message: {}", pi.message));
                 let remote_node = match pi.get_remote(&self.node_info.id) {
                     Some(id) => id,
                     None => {
@@ -191,7 +192,6 @@ impl Network {
                     .connections
                     .entry(remote_node)
                     .or_insert(NodeConnection::new(
-                        self.logger.clone(),
                         Arc::clone(&self.web_rtc),
                     )?);
                 conn.input_tx
@@ -199,7 +199,7 @@ impl Network {
                     .map_err(|e| e.to_string())?;
             }
             ws => {
-                self.logger.info(&format!("Got unusable message: {:?}", ws));
+                info!("Got unusable message: {:?}", ws);
             }
         }
         Ok(())
@@ -217,7 +217,9 @@ impl Network {
             .filter(|entry| entry.id != self.node_info.id)
             .cloned()
             .collect();
-        self.output_tx.send(NOutput::UpdateList(list)).map_err(|e| e.to_string())
+        self.output_tx
+            .send(NOutput::UpdateList(list))
+            .map_err(|e| e.to_string())
     }
 
     fn ws_send(&mut self, msg: WSSignalMessage) -> Result<(), String> {
@@ -233,7 +235,6 @@ impl Network {
             .connections
             .entry(dst.clone())
             .or_insert(NodeConnection::new(
-                self.logger.clone(),
                 Arc::clone(&self.web_rtc),
             )?);
         conn.send(msg.clone())

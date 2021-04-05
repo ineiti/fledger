@@ -1,4 +1,4 @@
-use common::node::ext_interface::{DataStorage,Logger};
+use common::node::ext_interface::DataStorage;
 
 use web_sys::window;
 
@@ -24,25 +24,5 @@ impl DataStorage for LocalStorage {
             .unwrap()
             .set(key, value)
             .map_err(|e| e.as_string().unwrap())
-    }
-}
-
-pub struct ConsoleLogger {}
-
-impl Logger for ConsoleLogger {
-    fn info(&self, s: &str) {
-        console_log!("info: {}", s);
-    }
-
-    fn warn(&self, s: &str) {
-        console_warn!("warn: {}", s);
-    }
-
-    fn error(&self, s: &str) {
-        console_warn!(" err: {}", s);
-    }
-
-    fn clone(&self) -> Box<dyn Logger> {
-        Box::new(ConsoleLogger {})
     }
 }

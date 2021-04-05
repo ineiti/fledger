@@ -23,6 +23,7 @@ names = { path = "../vendor/names" }
 
 futures = ""
 backtrace = ""
+log = ""
 
 [dependencies.web-sys]
 version = "0.3.46"

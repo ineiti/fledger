@@ -1,16 +1,15 @@
-use crate::{
-    node::{
-        ext_interface::Logger,
-        network::connection_state::{CSEnum, CSInput, CSOutput, ConnectionState},
-    },
-    signal::web_rtc::{ConnectionStateMap, PeerMessage, WebRTCConnectionState},
-};
-
-use crate::signal::web_rtc::WebRTCSpawner;
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
 };
+
+use crate::{
+    node::{
+        network::connection_state::{CSEnum, CSInput, CSOutput, ConnectionState},
+    },
+    signal::web_rtc::{ConnectionStateMap, PeerMessage, WebRTCConnectionState},
+};
+use crate::signal::web_rtc::WebRTCSpawner;
 
 #[derive(Debug)]
 pub enum NCInput {
@@ -43,26 +42,23 @@ pub struct NodeConnection {
     input_rx: Receiver<NCInput>,
     msg_queue: Vec<String>,
 
-    _logger: Box<dyn Logger>,
     states: Vec<Option<ConnectionStateMap>>,
 }
 
 impl NodeConnection {
     pub fn new(
-        logger: Box<dyn Logger>,
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
     ) -> Result<NodeConnection, String> {
         let (output_tx, output_rx) = channel::<NCOutput>();
         let (input_tx, input_rx) = channel::<NCInput>();
         let nc = NodeConnection {
-            outgoing: ConnectionState::new(false, logger.clone(), Arc::clone(&web_rtc))?,
-            incoming: ConnectionState::new(true, logger.clone(), Arc::clone(&web_rtc))?,
+            outgoing: ConnectionState::new(false, Arc::clone(&web_rtc))?,
+            incoming: ConnectionState::new(true,Arc::clone(&web_rtc))?,
             output_tx,
             output_rx,
             input_tx,
             input_rx,
             msg_queue: vec![],
-            _logger: logger,
             states: vec![None, None],
         };
         Ok(nc)
@@ -85,7 +81,6 @@ impl NodeConnection {
     /// If the connection is in setup phase, the message is queued.
     /// If the connection is idle, an error is returned.
     pub fn send(&mut self, msg: String) -> Result<(), String> {
-        // self.logger.info("dbg: Sending to node");
         match self.get_connection_channel() {
             Some(chan) => {
                 // Correctly orders the message after already waiting messages and
@@ -144,7 +139,6 @@ impl NodeConnection {
         cmds: Vec<CSOutput>,
     ) -> Result<(), String> {
         for cmd in cmds {
-            // self.logger.info(&format!("dbg: NodeConnect::process {:?}", cmd));
             match cmd {
                 CSOutput::State(cs, stat) => {
                     let dir = if remote {
