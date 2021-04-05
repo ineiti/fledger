@@ -1,6 +1,6 @@
 #![recursion_limit = "1024"]
 
-use common::node::{ext_interface::Logger, logic::Stat, config::NODE_VERSION};
+use common::node::{ext_interface::Logger, logic::Stat, version::VERSION_STRING};
 use std::sync::Arc;
 use std::sync::Mutex;
 use yew::services::IntervalService;
@@ -217,7 +217,7 @@ impl Model {
     }
 
     fn get_version(&self) -> String {
-        format!("{:x}", NODE_VERSION)
+        VERSION_STRING.to_string()
     }
 
     fn nodes_reachable(&self) -> Html {

@@ -189,7 +189,7 @@ pub enum WSSignalMessage {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct NodeStat{
     pub id: U256,
-    pub version: u64,
+    pub version: String,
     pub ping_ms: u32,
     pub ping_rx: u32,
 }
