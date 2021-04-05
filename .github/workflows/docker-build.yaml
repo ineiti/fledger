@@ -3,6 +3,7 @@ on:
   push:
     branches:
     - main
+    - cache_npm
 
 jobs:
   build:
@@ -16,6 +17,8 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
+          node_modules
+          ~/.npm
         key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-build-
@@ -29,7 +32,15 @@ jobs:
       run: cargo build --release -p signal
 
     - name: Build flnode for docker server
-      run: cd cli/flnode; make build
+      run: |
+        cd cli/flnode
+        make build
+        cd run
+        if ! test -d node_modules; then
+          npm i @mapbox/node-pre-gyp
+          npm ci
+        fi
+
 
     - name: Build web server
       run: cd wasm/web; make build
