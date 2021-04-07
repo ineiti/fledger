@@ -217,9 +217,9 @@ impl Model {
                         if node.info().id != ni.id {
                             out.push(vec![
                                 format!("{}", ni.info),
-                                format!("{} / {}", stat.ping_rx, stat.ping_tx),
+                                format!("rx:{} tx:{}", stat.ping_rx, stat.ping_tx),
                                 format!("{}s", ((now - stat.last_contact) / 1000.).floor()),
-                                format!("{:?} / {:?}", stat.incoming, stat.outgoing),
+                                format!("in:{:?} out:{:?}", stat.incoming, stat.outgoing),
                             ]);
                         }
                     }
@@ -236,9 +236,9 @@ impl Model {
             <thead>
                 <tr>
                     <th>{"Name"}</th>
-                    <th>{"Count (rx/tx)"}</th>
+                    <th>{"Ping Count"}</th>
                     <th>{"Last ping"}</th>
-                    <th>{"Conn Stat (in/out)"}</th>
+                    <th>{"Conn. Type"}</th>
                 </tr>
             </thead>
             <tbody>

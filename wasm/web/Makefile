@@ -5,6 +5,7 @@ TARGET := --release
 build = wasm-pack build ${TARGET} --target web --out-name wasm \
 	--out-dir ./static -- $(FEATURES)
 
+serve: TARGET := --debug
 serve: ${wasm} ${miniserve}
 	${miniserve} ./static --index index.html
 
