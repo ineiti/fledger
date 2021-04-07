@@ -60,4 +60,4 @@ jobs:
       run: make update_version
 
     - name: Build all
-      run: cargo build --release
+      run: cargo build
