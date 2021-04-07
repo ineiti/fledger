@@ -1,4 +1,2 @@
-FROM joseluisq/static-web-server
-COPY wasm/web/static/ /var/www/
-ENV SERVER_NAME=fledger-web
-ENV SERVER_ROOT=/var/www
+FROM nginx
+COPY wasm/web/static/ /usr/share/nginx/html
