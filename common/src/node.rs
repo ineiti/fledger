@@ -2,7 +2,7 @@ use log::info;
 
 use crate::node::{
     config::{NodeConfig, NodeInfo},
-    ext_interface::DataStorage,
+    types::DataStorage,
     logic::Logic,
     network::{NOutput, Network},
     types::U256,
@@ -15,7 +15,7 @@ use self::{
 };
 
 pub mod config;
-pub mod ext_interface;
+pub mod types;
 pub mod logic;
 pub mod network;
 pub mod types;
