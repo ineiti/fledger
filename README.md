@@ -41,8 +41,8 @@ Currently the following components are available:
 - [Node](./common) - the actual code for the Fledger nodes
 
 As a first step, the WebRTC communication has been set up.
-This works now for Chrome, Firefox, and Safari, as well as in the CLI using a
-headless browser.
+This works now for Chrome, Firefox, and Safari, as well as in the CLI using
+node.
 
 ## Next steps
 
