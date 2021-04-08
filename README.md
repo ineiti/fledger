@@ -5,6 +5,8 @@ lightweight that you can run them in the browser.
 When running a node, each user must be able to receive _Mana_ in a reasonable
 timeframe (minutes), so she can use the ledger.
 
+For a more thorough introduction to the goals of fledger, see here: [Fledger Docs](https://fledg.re)
+
 A first use-case of Fledger is to have a decentralized webserver:
 1. A user clicks on the link to the website
 1. The browser downloads the fledger code
@@ -75,6 +77,10 @@ be set up.
 
 # Changelog
 
+- 0.3.0 - 2021-04-08
+  - More stable everything
+  - Clean up a lot of locking issues
+  - Fixing issues
 - 0.2.3 - 2021-03-04
   - Fix node Running
   - Add docker-compose.yaml
