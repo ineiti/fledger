@@ -5,7 +5,7 @@ use std::thread;
 use std::{sync::Arc, time::Duration};
 
 use common::{
-    node::types::U256,
+    types::U256,
     signal::websocket::{WSMessage, WebSocketConnectionSend, WebSocketServer},
 };
 

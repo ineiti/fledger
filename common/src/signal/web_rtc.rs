@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use web_sys::{RtcIceGatheringState, RtcIceConnectionState};
+use web_sys::{RtcIceConnectionState, RtcIceGatheringState};
 
-use crate::node::{config::NodeInfo, types::U256};
+use crate::{node::config::NodeInfo, types::U256};
 
 pub type WebRTCSpawner =
     Box<dyn Fn(WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, String>>;
@@ -45,7 +45,6 @@ impl fmt::Debug for WebRTCSetupCBMessage {
         Ok(())
     }
 }
-
 
 #[async_trait(?Send)]
 pub trait WebRTCConnection {
@@ -183,11 +182,11 @@ pub enum WSSignalMessage {
     ListIDsReply(Vec<NodeInfo>),
     ClearNodes,
     PeerSetup(PeerInfo),
-    NodeStats(Vec<NodeStat>)
+    NodeStats(Vec<NodeStat>),
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct NodeStat{
+pub struct NodeStat {
     pub id: U256,
     pub version: String,
     pub ping_ms: u32,

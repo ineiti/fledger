@@ -14,11 +14,12 @@ use std::{
 };
 
 use common::{
-    node::{config::NodeInfo, types::U256},
+    node::config::NodeInfo,
     signal::{
         web_rtc::{NodeStat, WSSignalMessage, WebSocketMessage},
         websocket::WSMessage,
     },
+    types::U256,
 };
 
 use dipstick::*;

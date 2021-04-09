@@ -11,7 +11,9 @@ use wasm_bindgen::prelude::*;
 use yew::{prelude::*, services::IntervalService};
 
 use common::node::{logic::Stat, version::VERSION_STRING};
-use wasm_lib::{storage::LocalStorage, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
+use wasm_lib::{
+    storage::LocalStorage, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
+};
 use web_sys::window;
 
 use common::node::Node;
@@ -170,7 +172,9 @@ impl Model {
     fn get_info(&self) -> String {
         if let Some(n) = self.node_copy() {
             if let Ok(node) = n.try_lock() {
-                return node.info().info;
+                if let Ok(i) = node.info() {
+                    return i.info;
+                }
             } else {
                 error!("get_info couldn't get lock");
             }
@@ -204,17 +208,16 @@ impl Model {
         VERSION_STRING.to_string()
     }
 
-    fn nodes_reachable(&self) -> Html {
+    fn nodes_stats(&self) -> Result<Vec<Vec<String>>, String> {
         let mut out = vec![];
         if let Some(n) = self.node_copy() {
             if let Ok(node) = n.try_lock() {
-                let mut stats: Vec<Stat> =
-                    node.logic.stats.iter().map(|(_k, v)| v.clone()).collect();
+                let mut stats: Vec<Stat> = node.stats()?.iter().map(|(_k, v)| v.clone()).collect();
                 stats.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
                 let now = Date::now();
                 for stat in stats {
                     if let Some(ni) = stat.node_info.as_ref() {
-                        if node.info().id != ni.id {
+                        if node.info()?.id != ni.id {
                             out.push(vec![
                                 format!("{}", ni.info),
                                 format!("rx:{} tx:{}", stat.ping_rx, stat.ping_tx),
@@ -228,31 +231,40 @@ impl Model {
                 error!("nodes_reachable couldn't get lock");
             }
         }
-        if out.len() == 0 {
-            return html! {<div>{"Fetching node list"}</div>};
-        }
-        return html! {
-        <table class={"styled-table"}>
-            <thead>
-                <tr>
-                    <th>{"Name"}</th>
-                    <th>{"Ping Count"}</th>
-                    <th>{"Last ping"}</th>
-                    <th>{"Conn. Type"}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {out.iter().map(|li|
-                    html!{
+        return Ok(out);
+    }
+
+    fn nodes_reachable(&self) -> Html {
+        match self.nodes_stats() {
+            Ok(out) => {
+                if out.len() == 0 {
+                    return html! {<div>{"Fetching node list"}</div>};
+                }
+                return html! {
+                <table class={"styled-table"}>
+                    <thead>
                         <tr>
-                            <td>{li[0].clone()}</td>
-                            <td>{li[1].clone()}</td>
-                            <td>{li[2].clone()}</td>
-                            <td>{li[3].clone()}</td>
+                            <th>{"Name"}</th>
+                            <th>{"Ping Count"}</th>
+                            <th>{"Last ping"}</th>
+                            <th>{"Conn. Type"}</th>
                         </tr>
-                    }).collect::<Html>()}
-            </tbody>
-        </table>};
+                    </thead>
+                    <tbody>
+                        {out.iter().map(|li|
+                            html!{
+                                <tr>
+                                    <td>{li[0].clone()}</td>
+                                    <td>{li[1].clone()}</td>
+                                    <td>{li[2].clone()}</td>
+                                    <td>{li[3].clone()}</td>
+                                </tr>
+                            }).collect::<Html>()}
+                    </tbody>
+                </table>};
+            },
+            Err(_e) => html! {<div>{"Error while fetching stats"}</div>},
+        }
     }
 
     fn node_copy<'a>(&self) -> Option<Arc<Mutex<Node>>> {

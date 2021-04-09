@@ -1,10 +1,12 @@
-use std::{cell::RefCell,
+use log::{error, info};
+use std::{
+    cell::RefCell,
     rc::Rc,
-    sync::{mpsc::channel, Arc, Mutex}};
-use log::{info, error};
+    sync::{mpsc::channel, Arc, Mutex},
+};
 
 use common::{
-    node::{ext_interface::DataStorage, types::U256, Node},
+    node::Node,
     signal::{
         web_rtc::{
             WSSignalMessage, WebRTCConnection, WebRTCConnectionSetup, WebRTCConnectionState,
@@ -12,6 +14,8 @@ use common::{
         },
         websocket::{MessageCallback, WSMessage, WebSocketConnection},
     },
+    types::DataStorage,
+    types::U256,
 };
 
 use wasm_bindgen_test::*;
@@ -73,8 +77,7 @@ impl WebSocketDummy {
                     }
                     _ => {}
                 },
-                Err(e) => 
-                    info!("Error while getting message: {}", e),
+                Err(e) => info!("Error while getting message: {}", e),
             });
         Ok(msgs_count)
     }
@@ -174,7 +177,7 @@ async fn connect_test_base() -> Result<(), String> {
     let ice1 = Arc::new(Mutex::new(vec![]));
     let conn1 = Arc::new(Mutex::new(None));
     let mut webrtc1 = WebRTCConnectionSetupWasm::new(WebRTCConnectionState::Initializer)?;
-    set_callback( &mut webrtc1, &ice1, &conn1).await;
+    set_callback(&mut webrtc1, &ice1, &conn1).await;
 
     // Second node
     let ice2 = Arc::new(Mutex::new(vec![]));
@@ -257,9 +260,9 @@ async fn connect_test_simple() -> Result<(), String> {
 
     // Pass messages
     ws_conn.run_queue()?;
-    node1.send(&node2.info().id, "ping".to_string())?;
+    node1.send(&node2.info()?.id, "ping".to_string())?;
 
-    let mut i = 0;
+    let mut i: i32 = 0;
     loop {
         info!("Running queue: {}", i);
         node1.process().await?;
@@ -272,8 +275,8 @@ async fn connect_test_simple() -> Result<(), String> {
         // }
         if i == 12 {
             info!("Connection should be set up now");
-            node1.send(&node2.info().id, "ping".to_string())?;
-            node2.send(&node1.info().id, "pong".to_string())?;
+            node1.send(&node2.info()?.id, "ping".to_string())?;
+            node2.send(&node1.info()?.id, "pong".to_string())?;
         }
         if i > 20 {
             break;
@@ -291,15 +294,9 @@ async fn test_channel() -> Result<(), String> {
     let (tx, rx) = channel::<&str>();
     tx.send("one").map_err(|e| e.to_string())?;
     tx.send("two").map_err(|e| e.to_string())?;
-    info!(
-        "rx is: {:?}",
-        rx.try_iter().collect::<Vec<&str>>()
-    );
+    info!("rx is: {:?}", rx.try_iter().collect::<Vec<&str>>());
     tx.send("three").map_err(|e| e.to_string())?;
-    info!(
-        "rx is: {:?}",
-        rx.try_iter().collect::<Vec<&str>>()
-    );
+    info!("rx is: {:?}", rx.try_iter().collect::<Vec<&str>>());
     Ok(())
 }
 

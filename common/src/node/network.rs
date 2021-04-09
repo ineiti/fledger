@@ -1,4 +1,4 @@
-use log::info;
+use log::{info, warn};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Mutex,
@@ -14,8 +14,9 @@ use crate::signal::{
     websocket::{WSMessage, WebSocketConnection},
 };
 use crate::{
-    node::{config::NodeInfo, types::U256},
+    node::config::NodeInfo,
     signal::web_rtc::WebRTCConnectionState,
+    types::{ProcessCallback, U256},
 };
 use node_connection::{NCInput, NodeConnection};
 use WSSignalMessage::NodeStats;
@@ -50,6 +51,7 @@ pub struct Network {
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
     connections: HashMap<U256, NodeConnection>,
     node_info: NodeInfo,
+    process: ProcessCallback,
 }
 
 /// Network combines a websocket to connect to the signal server with
@@ -60,13 +62,19 @@ impl Network {
         node_info: NodeInfo,
         mut ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
+        process: ProcessCallback,
     ) -> Network {
         let (output_tx, output_rx) = channel::<NOutput>();
         let (input_tx, input_rx) = channel::<NInput>();
         let (ws_tx, ws_rx) = channel::<WSMessage>();
+        let process_clone = process.clone();
         ws.set_cb_wsmessage(Box::new(move |msg| {
             if let Err(e) = ws_tx.send(msg) {
                 info!("Couldn't send msg over ws-channel: {}", e);
+            }
+            match process_clone.try_lock() {
+                Ok(mut p) => p(),
+                Err(_e) => warn!("network::process was locked"),
             }
         }));
         let net = Network {
@@ -80,32 +88,33 @@ impl Network {
             web_rtc: Arc::new(Mutex::new(web_rtc)),
             connections: HashMap::new(),
             node_info,
+            process,
         };
         net
     }
 
     /// Process all connections with their waiting messages.
-    pub async fn process(&mut self) -> Result<(), String> {
-        self.process_input().await?;
-        self.process_websocket().await?;
-        self.process_connections().await?;
-        Ok(())
+    pub async fn process(&mut self) -> Result<usize, String> {
+        Ok(self.process_input().await?
+            + self.process_websocket().await?
+            + self.process_connections().await?)
     }
 
-    async fn process_input(&mut self) -> Result<(), String> {
+    async fn process_input(&mut self) -> Result<usize, String> {
         let msgs: Vec<NInput> = self.input_rx.try_iter().collect();
+        let size = msgs.len();
         for msg in msgs {
             match msg {
                 NInput::SendStats(s) => self.ws_send(NodeStats(s))?,
                 NInput::WebRTC(id, msg) => self.send(&id, msg).await?,
             }
         }
-        Ok(())
+        Ok(size)
     }
 
-    async fn process_websocket(&mut self) -> Result<(), String> {
+    async fn process_websocket(&mut self) -> Result<usize, String> {
         let msgs: Vec<WSMessage> = self.ws_rx.try_iter().collect();
-        for msg in msgs {
+        for msg in &msgs {
             match msg {
                 WSMessage::MessageString(s) => {
                     self.process_msg(WebSocketMessage::from_str(&s)?.msg)
@@ -114,14 +123,16 @@ impl Network {
                 _ => {}
             }
         }
-        Ok(())
+        Ok(msgs.len())
     }
 
-    async fn process_connections(&mut self) -> Result<(), String> {
+    async fn process_connections(&mut self) -> Result<usize, String> {
         let mut ws_msgs = vec![];
+        let mut msgs = 0;
         let conns: Vec<(&U256, &mut NodeConnection)> = self.connections.iter_mut().collect();
         for conn in conns {
             let outputs: Vec<NCOutput> = conn.1.output_rx.try_iter().collect();
+            msgs += outputs.len();
             for output in outputs {
                 match output {
                     NCOutput::WebSocket(message, remote) => {
@@ -151,7 +162,7 @@ impl Network {
         for msg in ws_msgs {
             self.ws_send(msg)?;
         }
-        Ok(())
+        Ok(msgs)
     }
 
     /// Processes incoming messages from the signalling server.
@@ -160,10 +171,7 @@ impl Network {
     async fn process_msg(&mut self, msg: WSSignalMessage) -> Result<(), String> {
         match msg {
             WSSignalMessage::Challenge(version, challenge) => {
-                info!(
-                    "Processing Challenge message version: {}",
-                    version
-                );
+                info!("Processing Challenge message version: {}", version);
                 let ma = MessageAnnounce {
                     version,
                     challenge,
@@ -193,6 +201,7 @@ impl Network {
                     .entry(remote_node)
                     .or_insert(NodeConnection::new(
                         Arc::clone(&self.web_rtc),
+                        self.process.clone(),
                     )?);
                 conn.input_tx
                     .send(NCInput::WebSocket(pi.message, remote))
@@ -236,6 +245,7 @@ impl Network {
             .entry(dst.clone())
             .or_insert(NodeConnection::new(
                 Arc::clone(&self.web_rtc),
+                self.process.clone(),
             )?);
         conn.send(msg.clone())
     }

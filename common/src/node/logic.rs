@@ -10,7 +10,7 @@ fn now() -> f64 {
     Utc::now().timestamp_millis() as f64
 }
 
-use log::info;
+use log::{info};
 use std::{
     collections::HashMap,
     sync::mpsc::{channel, Receiver, Sender},
@@ -19,10 +19,12 @@ use std::{
 use super::{
     config::{NodeConfig, NodeInfo},
     network::connection_state::CSEnum,
-    types::U256,
     version::VERSION_STRING,
 };
-use crate::signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState};
+use crate::{
+    signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState},
+    types::U256,
+};
 
 #[derive(Debug)]
 pub enum LInput {
@@ -103,8 +105,9 @@ impl Logic {
         }
     }
 
-    pub async fn process(&mut self) -> Result<(), String> {
+    pub async fn process(&mut self) -> Result<usize, String> {
         let msgs: Vec<LInput> = self.input_rx.try_iter().collect();
+        let size = msgs.len();
         for msg in msgs {
             match msg {
                 LInput::WebRTC(id, msg) => self.rcv(id, msg),
@@ -143,7 +146,7 @@ impl Logic {
                 .send(LOutput::SendStats(stats))
                 .map_err(|e| e.to_string())?;
         }
-        Ok(())
+        Ok(size)
     }
 
     fn update_connection_state(

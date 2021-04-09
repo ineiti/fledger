@@ -4,7 +4,10 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 use wasm_lib::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
 
-use common::node::{types::DataStorage, logic::Stat, version::VERSION_STRING, Node};
+use common::{
+    node::{logic::Stat, version::VERSION_STRING, Node},
+    types::DataStorage,
+};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -41,19 +44,17 @@ async fn start(url: &str) -> Result<Node, JsValue> {
     let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
     let my_storage = Box::new(DummyDS {});
     let ws = WebSocketWasm::new(url)?;
-    let node = Node::new(my_storage, Box::new(ws), rtc_spawner)?;
-
-    Ok(node)
+    Node::new(my_storage, Box::new(ws), rtc_spawner).map_err(|e| JsValue::from(e))
 }
 
 async fn list_ping(n: &mut Node) -> Result<(), String> {
     n.list()?;
     n.ping("something").await?;
-    let mut nodes: Vec<Stat> = n.logic.stats.iter().map(|(_k, v)| v.clone()).collect();
+    let mut nodes: Vec<Stat> = n.stats()?.iter().map(|(_k, v)| v.clone()).collect();
     nodes.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
     for node in nodes {
         if let Some(info) = node.node_info.as_ref() {
-            if n.info().id != info.id {
+            if n.info()?.id != info.id {
                 info!(
                     "Node: name:{} age:{} ping:({}/{}) conn:({:?}/{:?})",
                     info.info,
@@ -92,13 +93,14 @@ pub async fn run_app() {
         }
     };
     info!("Started successfully");
-    let mut i = 0;
+    let mut i: i32 = 0;
     loop {
         i = i + 1;
         if let Err(e) = node.process().await {
             error!("Error while processing messages: {}", e);
         }
-        if i % 10 == 0 {
+
+        if i % 10 == 2 {
             info!("Waiting");
             if let Err(e) = list_ping(&mut node).await {
                 error!("Couldn't list or ping nodes: {}", e);

@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-
 use std::sync::{Arc, Mutex};
 
 use js_sys::Reflect;
@@ -7,7 +6,10 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
-use common::signal::web_rtc::{ConnectionStateMap ,WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCB, WebRTCSetupCBMessage};
+use common::signal::web_rtc::{
+    ConnectionStateMap, WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCB,
+    WebRTCSetupCBMessage,
+};
 
 use web_sys::{
     console::log_1, Event, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
@@ -15,10 +17,20 @@ use web_sys::{
     RtcSessionDescriptionInit, RtcSignalingState,
 };
 
-use crate::web_rtc_connection::{WebRTCConnectionWasm, get_state};
+use crate::web_rtc_connection::{get_state, WebRTCConnectionWasm};
 
 fn log(s: &str) {
     log_1(&JsValue::from_str(s));
+}
+
+#[cfg_attr(feature = "node", wasm_bindgen(
+    inline_js = "module.exports.wait_ms = function(ms){ return new Promise((r) => setTimeout(r, ms));}"
+))]
+#[cfg_attr(not(feature = "node"), wasm_bindgen(
+    inline_js = "export function wait_ms(ms){ return new Promise((r) => setTimeout(r, ms));}"
+))]
+extern "C" {
+    pub async fn wait_ms(ms: u32);
 }
 
 /// Structure for easy WebRTC handling without all the hassle of JS-internals.
@@ -132,7 +144,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     // Takes the answer string and finalizes the first part of the connection.
     async fn use_answer(&mut self, answer: String) -> Result<(), String> {
         self.is_initializer()?;
-        if self.rp_conn.signaling_state() == RtcSignalingState::Stable{
+        if self.rp_conn.signaling_state() == RtcSignalingState::Stable {
             return Ok(());
         }
         let mut answer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
@@ -171,8 +183,8 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
                 .await
                 {
                     log(&format!("Couldn't add ice candidate: {:?}", e));
-                // } else {
-                //     log("dbg: Added ice successfully");
+                    // } else {
+                    //     log("dbg: Added ice successfully");
                 }
                 Ok(())
             }
