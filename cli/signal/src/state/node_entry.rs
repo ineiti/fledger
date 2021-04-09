@@ -1,13 +1,14 @@
-use log::error;
 use futures::executor;
+use log::error;
 use std::{fmt, time::Instant};
 
 use common::{
-    node::{config::NodeInfo, types::U256},
+    node::config::NodeInfo,
     signal::{
         web_rtc::{WSSignalMessage, WebSocketMessage},
         websocket::WebSocketConnectionSend,
     },
+    types::U256,
 };
 
 pub struct NodeEntry {
@@ -25,10 +26,7 @@ impl fmt::Debug for NodeEntry {
 }
 
 impl NodeEntry {
-    pub fn new(
-        entry: U256,
-        conn: Box<dyn WebSocketConnectionSend>,
-    ) -> NodeEntry {
+    pub fn new(entry: U256, conn: Box<dyn WebSocketConnectionSend>) -> NodeEntry {
         let mut ne = NodeEntry {
             info: None,
             entry,

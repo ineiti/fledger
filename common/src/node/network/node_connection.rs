@@ -3,13 +3,12 @@ use std::sync::{
     Arc, Mutex,
 };
 
-use crate::{
-    node::{
-        network::connection_state::{CSEnum, CSInput, CSOutput, ConnectionState},
-    },
-    signal::web_rtc::{ConnectionStateMap, PeerMessage, WebRTCConnectionState},
-};
 use crate::signal::web_rtc::WebRTCSpawner;
+use crate::{
+    node::network::connection_state::{CSEnum, CSInput, CSOutput, ConnectionState},
+    signal::web_rtc::{ConnectionStateMap, PeerMessage, WebRTCConnectionState},
+    types::ProcessCallback,
+};
 
 #[derive(Debug)]
 pub enum NCInput {
@@ -48,12 +47,13 @@ pub struct NodeConnection {
 impl NodeConnection {
     pub fn new(
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
+        process: ProcessCallback,
     ) -> Result<NodeConnection, String> {
         let (output_tx, output_rx) = channel::<NCOutput>();
         let (input_tx, input_rx) = channel::<NCInput>();
         let nc = NodeConnection {
-            outgoing: ConnectionState::new(false, Arc::clone(&web_rtc))?,
-            incoming: ConnectionState::new(true,Arc::clone(&web_rtc))?,
+            outgoing: ConnectionState::new(false, Arc::clone(&web_rtc), process.clone())?,
+            incoming: ConnectionState::new(true, Arc::clone(&web_rtc), process.clone())?,
             output_tx,
             output_rx,
             input_tx,

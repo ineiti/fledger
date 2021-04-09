@@ -1,4 +1,4 @@
-use super::types::U256;
+use crate::types::U256;
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]

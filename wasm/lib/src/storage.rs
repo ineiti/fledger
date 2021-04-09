@@ -1,5 +1,5 @@
-use common::node::ext_interface::DataStorage;
 
+use common::types::DataStorage;
 use web_sys::window;
 
 pub struct LocalStorage {}

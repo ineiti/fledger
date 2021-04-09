@@ -1,5 +1,5 @@
 use core::fmt;
-use std::num::ParseIntError;
+use std::{num::ParseIntError, sync::{Arc, Mutex}};
 
 use rand::random;
 use serde::{Deserialize, Serialize};
@@ -63,3 +63,5 @@ pub trait DataStorage {
 
     fn save(&self, key: &str, value: &str) -> Result<(), String>;
 }
+
+pub type ProcessCallback = Arc<Mutex<Box<dyn FnMut()>>>;

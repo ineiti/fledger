@@ -1,15 +1,18 @@
-/// This handles one connection, either an incoming or an outgoing connection.
-use log::{info, error};
 use backtrace::Backtrace;
+/// This handles one connection, either an incoming or an outgoing connection.
+use log::{error, info, warn};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
 };
 use web_sys::RtcIceConnectionState;
 
-use crate::signal::web_rtc::{
-    ConnectionStateMap, PeerMessage, WebRTCConnection, WebRTCConnectionSetup,
-    WebRTCConnectionState, WebRTCSetupCBMessage, WebRTCSpawner,
+use crate::{
+    signal::web_rtc::{
+        ConnectionStateMap, PeerMessage, WebRTCConnection, WebRTCConnectionSetup,
+        WebRTCConnectionState, WebRTCSetupCBMessage, WebRTCSpawner,
+    },
+    types::ProcessCallback,
 };
 
 /// Represents the state of an incoming or outgoing connection.
@@ -52,6 +55,7 @@ pub struct ConnectionState {
     setup: Option<Box<dyn WebRTCConnectionSetup>>,
     connected: Option<Box<dyn WebRTCConnection>>,
     remote: bool,
+    process: ProcessCallback,
 }
 
 impl ConnectionState {
@@ -59,6 +63,7 @@ impl ConnectionState {
     pub fn new(
         remote: bool,
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
+        process: ProcessCallback,
     ) -> Result<ConnectionState, String> {
         let (output_tx, output_rx) = channel::<CSOutput>();
         let (input_tx, input_rx) = channel::<CSInput>();
@@ -72,6 +77,7 @@ impl ConnectionState {
             setup: None,
             connected: None,
             remote,
+            process,
         };
         if !remote {
             cs.input_tx
@@ -94,9 +100,6 @@ impl ConnectionState {
                 }
             };
         }
-        if self.state != CSEnum::Idle {
-            self.get_state().await?;
-        }
         Ok(())
     }
 
@@ -112,9 +115,14 @@ impl ConnectionState {
                     if self.remote { "incoming" } else { "outgoing" }
                 );
                 let chan = self.output_tx.clone();
+                let process = self.process.clone();
                 conn.set_cb_message(Box::new(move |msg| {
                     if let Err(e) = chan.send(CSOutput::WebRTCMessage(msg)) {
                         error!("Couldn't send WebRTCMessage to node: {}", e);
+                    }
+                    match process.try_lock() {
+                        Ok(mut p) => p(),
+                        Err(_e) => warn!("Couldn't call process"),
                     }
                 }));
                 self.connected = Some(conn);
@@ -232,9 +240,14 @@ impl ConnectionState {
         };
         let mut conn = self.web_rtc.lock().unwrap()(state)?;
         let sender = self.input_tx.clone();
+        let process = self.process.clone();
         conn.set_callback(Box::new(move |msg| {
             if let Err(e) = sender.send(CSInput::WebRTCSetup(msg)) {
                 error!("Couldn't send WebRTCSetup: {}", e);
+            }
+            match process.try_lock() {
+                Ok(mut p) => p(),
+                Err(_e) => warn!("Couldn't lock process"),
             }
         }))
         .await;
