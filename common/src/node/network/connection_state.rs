@@ -5,7 +5,7 @@ use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
 };
-use web_sys::RtcIceConnectionState;
+use web_sys::{RtcDataChannelState, RtcIceConnectionState};
 
 use crate::{
     signal::web_rtc::{
@@ -22,8 +22,8 @@ pub enum CSEnum {
     Idle,
     /// Connection is in progress, messages are being exchanged
     Setup,
-    /// Connecion is established, data can flow.
-    Connected,
+    /// A DataChannel is available, but it might still be closed
+    HasDataChannel,
 }
 
 /// Messages sent by the parent to ConnectionState.
@@ -103,6 +103,20 @@ impl ConnectionState {
         Ok(())
     }
 
+    /// This is a bit awkward, as the data channel can be received, but not yet been open.
+    pub async fn get_connection_open(&mut self) -> Result<bool, String> {
+        if self.state == CSEnum::HasDataChannel {
+            if let Some(conn) = self.connected.as_ref() {
+                if let Ok(state) = conn.get_state().await {
+                    if let Some(dc) = state.data_connection {
+                        return Ok(dc == RtcDataChannelState::Open);
+                    }
+                }
+            }
+        }
+        return Ok(false);
+    }
+
     fn web_rtc_setup(&mut self, s: WebRTCSetupCBMessage) -> Result<(), String> {
         match s {
             WebRTCSetupCBMessage::Ice(ice) => self
@@ -126,7 +140,7 @@ impl ConnectionState {
                     }
                 }));
                 self.connected = Some(conn);
-                self.state = CSEnum::Connected;
+                self.state = CSEnum::HasDataChannel;
                 self.output_tx
                     .send(CSOutput::State(self.state.clone(), None))
                     .map_err(|e| e.to_string())?;
@@ -138,12 +152,12 @@ impl ConnectionState {
     /// Returns the state of the connection, if available.
     async fn get_state(&mut self) -> Result<(), String> {
         let stat = match &self.state {
-            CSEnum::Connected => Some(self.connected.as_ref().unwrap().get_state().await?),
+            CSEnum::HasDataChannel => Some(self.connected.as_ref().unwrap().get_state().await?),
             CSEnum::Setup => Some(self.setup.as_ref().unwrap().get_state().await?),
             _ => None,
         };
         if let Some(s) = stat {
-            let reset = match s.connection {
+            let reset = match s.ice_connection {
                 RtcIceConnectionState::Failed => true,
                 RtcIceConnectionState::Disconnected => true,
                 RtcIceConnectionState::Closed => true,
@@ -216,7 +230,7 @@ impl ConnectionState {
             CSEnum::Idle => {
                 self.process_peer_message(PeerMessage::Init).await?;
             }
-            CSEnum::Connected => {
+            CSEnum::HasDataChannel => {
                 if let Err(err) = self.connected.as_ref().unwrap().send(msg) {
                     error!("While sending: {:?}", err);
                     self.start_connection(Some(

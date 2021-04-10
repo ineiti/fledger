@@ -43,7 +43,9 @@ impl WebRTCConnection for WebRTCConnectionWasm {
     }
 
     async fn get_state(&self) -> Result<ConnectionStateMap, String> {
-        get_state(self.conn.clone()).await
+        let mut csm = get_state(self.conn.clone()).await?;
+        csm.data_connection = Some(self.dc.ready_state());
+        Ok(csm)
     }
 }
 
@@ -74,8 +76,9 @@ pub async fn get_state(conn: RtcPeerConnection) -> Result<ConnectionStateMap, St
         _ => SignalingState::Setup,
     };
     Ok(ConnectionStateMap {
-        gathering: conn.ice_gathering_state(),
-        connection: conn.ice_connection_state(),
+        ice_gathering: conn.ice_gathering_state(),
+        ice_connection: conn.ice_connection_state(),
+        data_connection: None,
         signaling,
         delay_ms: 0,
         tx_bytes: 0,

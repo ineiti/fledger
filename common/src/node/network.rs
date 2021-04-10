@@ -247,7 +247,7 @@ impl Network {
                 Arc::clone(&self.web_rtc),
                 self.process.clone(),
             )?);
-        conn.send(msg.clone())
+        conn.send(msg.clone()).await
     }
 
     pub fn clear_nodes(&mut self) -> Result<(), String> {

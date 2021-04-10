@@ -163,7 +163,7 @@ impl Logic {
             let cs = match st {
                 CSEnum::Idle => ConnState::Idle,
                 CSEnum::Setup => ConnState::Setup,
-                CSEnum::Connected => {
+                CSEnum::HasDataChannel => {
                     if let Some(state_value) = state {
                         match state_value.type_local {
                             crate::signal::web_rtc::ConnType::Unknown => ConnState::Connected,

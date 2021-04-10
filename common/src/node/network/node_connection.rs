@@ -80,8 +80,8 @@ impl NodeConnection {
     /// Tries to send a message over the webrtc connection.
     /// If the connection is in setup phase, the message is queued.
     /// If the connection is idle, an error is returned.
-    pub fn send(&mut self, msg: String) -> Result<(), String> {
-        match self.get_connection_channel() {
+    pub async fn send(&mut self, msg: String) -> Result<(), String> {
+        match self.get_connection_channel().await? {
             Some(chan) => {
                 // Correctly orders the message after already waiting messages and
                 // avoids an if to check if the queue is full...
@@ -167,15 +167,13 @@ impl NodeConnection {
 
     /// Return a connected direction, preferably outgoing.
     /// Else return None.
-    fn get_connection_channel(&mut self) -> Option<Sender<CSInput>> {
-        match self.outgoing.state {
-            CSEnum::Connected => return Some(self.outgoing.input_tx.clone()),
-            _ => {}
+    async fn get_connection_channel(&mut self) -> Result<Option<Sender<CSInput>>, String> {
+        if self.outgoing.get_connection_open().await?{
+            return Ok(Some(self.outgoing.input_tx.clone()));
         }
-        match self.incoming.state {
-            CSEnum::Connected => return Some(self.incoming.input_tx.clone()),
-            _ => {}
+        if self.incoming.get_connection_open().await?{
+            return Ok(Some(self.incoming.input_tx.clone()));
         }
-        None
+        Ok(None)
     }
 }

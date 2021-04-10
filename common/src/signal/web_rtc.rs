@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use web_sys::{RtcIceConnectionState, RtcIceGatheringState};
+use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
 
 use crate::{node::config::NodeInfo, types::U256};
 
@@ -81,8 +81,9 @@ pub struct ConnectionStateMap {
     pub type_local: ConnType,
     pub type_remote: ConnType,
     pub signaling: SignalingState,
-    pub gathering: RtcIceGatheringState,
-    pub connection: RtcIceConnectionState,
+    pub ice_gathering: RtcIceGatheringState,
+    pub ice_connection: RtcIceConnectionState,
+    pub data_connection: Option<RtcDataChannelState>,
     pub rx_bytes: u64,
     pub tx_bytes: u64,
     pub delay_ms: u32,
