@@ -4,6 +4,8 @@ use std::{
     rc::Rc,
 };
 
+use log::{info, warn, debug, error};
+
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
@@ -22,7 +24,7 @@ pub struct WebSocketWasm {
 
 impl WebSocketWasm {
     pub fn new(addr: &str) -> Result<WebSocketWasm, JsValue> {
-        console_log!("connecting to: {}", addr);
+        info!("connecting to: {}", addr);
         let ws = WebSocket::new(addr)?;
         let mut wsw = WebSocketWasm {
             cb: Rc::new(RefCell::new(None)),
@@ -45,7 +47,7 @@ impl WebSocketWasm {
                     cb(WSMessage::MessageString(s));
                 }
             } else {
-                console_log!("message event, received Unknown: {:?}", e);
+                debug!("message event, received Unknown: {:?}", e);
             }
         }) as Box<dyn FnMut(MessageEvent)>);
         // set message event handler on WebSocket
@@ -55,7 +57,7 @@ impl WebSocketWasm {
 
         let cb_clone = self.cb.clone();
         let onerror_callback = Closure::wrap(Box::new(move |e: ErrorEvent| {
-            console_log!("error event: {:?}", e);
+            error!("error event: {:?}", e);
             if let Some(cb) = cb_clone.borrow_mut().as_deref_mut() {
                 let s: String = e.to_string().into();
                 cb(WSMessage::Error(s));
@@ -66,7 +68,7 @@ impl WebSocketWasm {
 
         let cb_clone = self.cb.clone();
         let onopen_callback = Closure::wrap(Box::new(move |_| {
-            console_log!("socket opened");
+            debug!("socket opened");
             if let Some(cb) = cb_clone.borrow_mut().as_deref_mut() {
                 cb(WSMessage::Opened("".to_string()));
             }
@@ -80,7 +82,7 @@ impl WebSocketWasm {
 impl WebSocketConnection for WebSocketWasm {
     fn send(&mut self, msg: String) -> Result<(), String> {
         if self.ws.ready_state() != WebSocket::OPEN {
-            console_log!("Websocket is not open - trying to reconnect");
+            warn!("Websocket is not open - trying to reconnect");
             self.reconnect()?;
             Err("Send while not connected".to_string())
         } else {
@@ -96,11 +98,11 @@ impl WebSocketConnection for WebSocketWasm {
     }
 
     fn reconnect(&mut self) -> Result<(), String> {
-        console_log!("Closing websocket first");
+        warn!("Reconnecting websocket");
         if let Err(e) = self.ws.close() {
-            console_log!("Error while closing: {:?}", e);
+            error!("Error while closing: {:?}", e);
         }
-        console_log!("Re-opening websocket");
+        debug!("Re-opening websocket");
         self.ws = WebSocket::new(&self.addr).map_err(|e| e.as_string().unwrap())?;
         self.attach_callbacks();
         Ok(())

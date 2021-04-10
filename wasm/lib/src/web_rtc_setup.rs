@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
+use log::{warn, error};
 
 use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
@@ -12,26 +13,12 @@ use common::signal::web_rtc::{
 };
 
 use web_sys::{
-    console::log_1, Event, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
+    Event, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
     RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
     RtcSessionDescriptionInit, RtcSignalingState,
 };
 
 use crate::web_rtc_connection::{get_state, WebRTCConnectionWasm};
-
-fn log(s: &str) {
-    log_1(&JsValue::from_str(s));
-}
-
-#[cfg_attr(feature = "node", wasm_bindgen(
-    inline_js = "module.exports.wait_ms = function(ms){ return new Promise((r) => setTimeout(r, ms));}"
-))]
-#[cfg_attr(not(feature = "node"), wasm_bindgen(
-    inline_js = "export function wait_ms(ms){ return new Promise((r) => setTimeout(r, ms));}"
-))]
-extern "C" {
-    pub async fn wait_ms(ms: u32);
-}
 
 /// Structure for easy WebRTC handling without all the hassle of JS-internals.
 pub struct WebRTCConnectionSetupWasm {
@@ -123,7 +110,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         let answer = match JsFuture::from(self.rp_conn.create_answer()).await {
             Ok(f) => f,
             Err(e) => {
-                log(&format!("Error answer: {:?}", e));
+                error!("Error answer: {:?}", e);
                 return Err(e.as_string().unwrap());
             }
         };
@@ -167,7 +154,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         let rp_clone = self.rp_conn.clone();
         let els: Vec<&str> = ice.split(":-:").collect();
         if els.len() != 3 || els[0] == "" {
-            log(&format!("wrong ice candidate string: {}", ice));
+            warn!("wrong ice candidate string: {}", ice);
             return Ok(());
         }
         let mut ric_init = RtcIceCandidateInit::new(els[0]);
@@ -175,16 +162,12 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         ric_init.sdp_m_line_index(Some(els[2].parse::<u16>().unwrap()));
         match RtcIceCandidate::new(&ric_init) {
             Ok(e) => {
-                // DEBUG: clean up logging once ICE stuff is more clear...
-                // log(&format!("dbg: Adding ice: {:?} / {:?}", els, e));
                 if let Err(e) = wasm_bindgen_futures::JsFuture::from(
                     rp_clone.add_ice_candidate_with_opt_rtc_ice_candidate(Some(&e)),
                 )
                 .await
                 {
-                    log(&format!("Couldn't add ice candidate: {:?}", e));
-                    // } else {
-                    //     log("dbg: Added ice successfully");
+                    warn!("Couldn't add ice candidate: {:?}", e);
                 }
                 Ok(())
             }
