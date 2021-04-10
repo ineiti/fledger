@@ -9,6 +9,9 @@ serve: TARGET := --debug
 serve: ${wasm} ${miniserve}
 	${miniserve} ./static --index index.html
 
+clean:
+	rm ${wasm}
+
 ${miniserve}:
 	cargo install miniserve
 

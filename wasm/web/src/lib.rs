@@ -68,7 +68,7 @@ impl Component for Model {
         match msg {
             Msg::Tick => {
                 self.counter += 1;
-                if self.counter % 5 == 0 || self.counter < 5 {
+                if self.counter % 10 == 1 {
                     self.node_list();
                     self.node_ping();
                 }
