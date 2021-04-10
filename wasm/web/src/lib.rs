@@ -12,7 +12,7 @@ use yew::{prelude::*, services::IntervalService};
 
 use common::node::{logic::Stat, version::VERSION_STRING};
 use wasm_lib::{
-    storage::LocalStorage, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
+    helpers::LocalStorage, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
 };
 use web_sys::window;
 

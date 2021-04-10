@@ -2,7 +2,6 @@ use async_trait::async_trait;
 
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{MessageEvent, RtcDataChannel, RtcPeerConnection, RtcSignalingState};
-// use web_sys::console::log_1;
 
 use common::signal::web_rtc::{
     ConnType, ConnectionStateMap, SignalingState, WebRTCConnection, WebRTCMessageCB,

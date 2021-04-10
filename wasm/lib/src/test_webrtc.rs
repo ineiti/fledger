@@ -20,7 +20,7 @@ use common::{
 
 use wasm_bindgen_test::*;
 
-use crate::logs::wait_ms;
+use crate::helpers::wait_ms;
 use crate::web_rtc_setup::WebRTCConnectionSetupWasm;
 
 #[derive(Debug)]

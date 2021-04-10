@@ -3,6 +3,7 @@ use log::{error, info};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 use wasm_lib::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
+use wasm_lib::helpers::wait_ms;
 
 use common::{
     node::{logic::Stat, version::VERSION_STRING, Node},
@@ -68,13 +69,6 @@ async fn list_ping(n: &mut Node) -> Result<(), String> {
         }
     }
     Ok(())
-}
-
-#[wasm_bindgen(
-    inline_js = "module.exports.wait_ms = function(ms){ return new Promise((r) => setTimeout(r, ms));}"
-)]
-extern "C" {
-    pub async fn wait_ms(ms: u32);
 }
 
 #[wasm_bindgen(start)]

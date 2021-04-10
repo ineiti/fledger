@@ -217,7 +217,8 @@ impl ConnectionState {
                 self.process_peer_message(PeerMessage::Init).await?;
             }
             CSEnum::Connected => {
-                if let Err(_) = self.connected.as_ref().unwrap().send(msg) {
+                if let Err(err) = self.connected.as_ref().unwrap().send(msg) {
+                    error!("While sending: {:?}", err);
                     self.start_connection(Some(
                         "Couldn't send over webrtc, resetting connection".to_string(),
                     ))
