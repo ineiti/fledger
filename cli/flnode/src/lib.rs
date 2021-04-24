@@ -94,7 +94,7 @@ pub async fn run_app() {
             error!("Error while processing messages: {}", e);
         }
 
-        if i % 10 == 2 {
+        if i % 3 == 2 {
             info!("Waiting");
             if let Err(e) = list_ping(&mut node).await {
                 error!("Couldn't list or ping nodes: {}", e);
