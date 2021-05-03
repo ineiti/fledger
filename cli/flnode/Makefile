@@ -26,7 +26,7 @@ run_remote: build
 build: ${wasm} run/node_modules
 
 run/node_modules:
-	cd run; npm ci
+	cd run && npm i @mapbox/node-pre-gyp && npm ci
 
 ${wasm}: ${src}
 	${build}

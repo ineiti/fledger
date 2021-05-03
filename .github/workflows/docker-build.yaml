@@ -38,12 +38,6 @@ jobs:
       run: |
         cd cli/flnode
         make build
-        cd run
-        if ! test -d node_modules; then
-          npm i @mapbox/node-pre-gyp
-          npm ci
-        fi
-
 
     - name: Build web server
       run: cd wasm/web; make build
