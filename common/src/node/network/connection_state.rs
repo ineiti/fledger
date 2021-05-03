@@ -9,7 +9,7 @@ use web_sys::{RtcDataChannelState, RtcIceConnectionState};
 
 use crate::{
     signal::web_rtc::{
-        ConnectionStateMap, PeerMessage, WebRTCConnection, WebRTCConnectionSetup,
+        ConnType, ConnectionStateMap, PeerMessage, WebRTCConnection, WebRTCConnectionSetup,
         WebRTCConnectionState, WebRTCSetupCBMessage, WebRTCSpawner,
     },
     types::ProcessCallback,
@@ -162,7 +162,7 @@ impl ConnectionState {
                 RtcIceConnectionState::Disconnected => true,
                 RtcIceConnectionState::Closed => true,
                 _ => false,
-            };
+            } || s.type_remote == ConnType::Unknown;
             if reset {
                 self.start_connection(Some("Found bad ConnetionState".into()))
                     .await?;
@@ -226,6 +226,7 @@ impl ConnectionState {
 
     /// Sends the message to the remote end.
     async fn send(&mut self, msg: String) -> Result<(), String> {
+        self.get_state().await?;
         match self.state {
             CSEnum::Idle => {
                 self.process_peer_message(PeerMessage::Init).await?;
