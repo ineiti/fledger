@@ -7,18 +7,23 @@ build = wasm-pack build ${TARGET} --target nodejs --out-name wasm \
 clean:
 	rm $(wasm)
 
-run: build_local run/node_modules
-	node run/main.js
+runa: build_local 
+	mkdir -p node1
+	cd node1 && node ../run/main.js
 
-run2: build_local run/node_modules
-	mkdir -p node{1,2}
-	cd node1 && node ../run/main.js &
+runb: build_local 
+	mkdir -p node2
 	cd node2 && node ../run/main.js
 
-run_remote: build run/node_modules
+runc: build_local 
 	node run/main.js
 
-build: ${wasm}
+run2: runa runb
+
+run_remote: build
+	node run/main.js
+
+build: ${wasm} run/node_modules
 
 run/node_modules:
 	cd run; npm ci
@@ -28,4 +33,4 @@ ${wasm}: ${src}
 
 build_local: FEATURES=--features local
 build_local: TARGET=--debug
-build_local: build
+build_local: build run/node_modules
