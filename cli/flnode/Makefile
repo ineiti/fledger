@@ -5,7 +5,7 @@ build = wasm-pack build ${TARGET} --target nodejs --out-name wasm \
 	--out-dir ./static -- $(FEATURES)
 
 clean:
-	rm $(wasm)
+	rm -f $(wasm)
 
 runa: build_local 
 	mkdir -p node1

@@ -1,6 +1,7 @@
-use backtrace::Backtrace;
 /// This handles one connection, either an incoming or an outgoing connection.
+
 use log::{error, info, warn};
+use backtrace::Backtrace;
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
@@ -105,6 +106,7 @@ impl ConnectionState {
 
     /// This is a bit awkward, as the data channel can be received, but not yet been open.
     pub async fn get_connection_open(&mut self) -> Result<bool, String> {
+        self.get_state().await?;
         if self.state == CSEnum::HasDataChannel {
             if let Some(conn) = self.connected.as_ref() {
                 if let Ok(state) = conn.get_state().await {
@@ -157,12 +159,15 @@ impl ConnectionState {
             _ => None,
         };
         if let Some(s) = stat {
-            let reset = match s.ice_connection {
+            let mut reset = match s.ice_connection {
                 RtcIceConnectionState::Failed => true,
                 RtcIceConnectionState::Disconnected => true,
                 RtcIceConnectionState::Closed => true,
                 _ => false,
             } || s.type_remote == ConnType::Unknown;
+            if let Some(state_dc) = s.data_connection.as_ref(){
+                reset = reset || state_dc == &RtcDataChannelState::Closed;
+            }
             if reset {
                 self.start_connection(Some("Found bad ConnetionState".into()))
                     .await?;
