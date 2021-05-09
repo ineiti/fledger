@@ -1,3 +1,5 @@
+use log::info;
+
 #[cfg(target_arch = "wasm32")]
 fn now() -> f64 {
     use js_sys::Date;
@@ -10,7 +12,6 @@ fn now() -> f64 {
     Utc::now().timestamp_millis() as f64
 }
 
-use log::{info};
 use std::{
     collections::HashMap,
     sync::mpsc::{channel, Receiver, Sender},
