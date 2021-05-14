@@ -169,7 +169,7 @@ impl ConnectionState {
                 reset = reset || state_dc == &RtcDataChannelState::Closed;
             }
             if reset {
-                self.start_connection(Some("Found bad ConnetionState".into()))
+                self.start_connection(Some("Found bad ConnectionState".into()))
                     .await?;
             }
         }
