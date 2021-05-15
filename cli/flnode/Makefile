@@ -18,7 +18,9 @@ runb: build_local
 runc: build_local 
 	node run/main.js
 
-run2: runa runb
+run2:
+	$(MAKE) runa &
+	$(MAKE) runb
 
 run_remote: build
 	node run/main.js
