@@ -6,7 +6,7 @@ use wasm_webrtc::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocke
 use wasm_webrtc::helpers::wait_ms;
 
 use common::{
-    node::{logic::Stat, version::VERSION_STRING, Node},
+    node::{logic::stats::StatNode, version::VERSION_STRING, Node},
     types::DataStorage,
 };
 
@@ -50,8 +50,8 @@ async fn start(url: &str) -> Result<Node, JsValue> {
 
 async fn list_ping(n: &mut Node) -> Result<(), String> {
     n.list()?;
-    n.ping("something").await?;
-    let mut nodes: Vec<Stat> = n.stats()?.iter().map(|(_k, v)| v.clone()).collect();
+    n.ping().await?;
+    let mut nodes: Vec<StatNode> = n.stats()?.iter().map(|(_k, v)| v.clone()).collect();
     nodes.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
     for node in nodes {
         if let Some(info) = node.node_info.as_ref() {

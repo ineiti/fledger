@@ -16,7 +16,7 @@ use crate::signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection};
 use crate::types::{DataStorage, U256};
 
 use self::{
-    logic::{LInput, LOutput, Stat},
+    logic::{LInput, LOutput, stats::StatNode},
     network::NInput,
 };
 
@@ -141,9 +141,9 @@ impl Node {
 
     /// TODO: remove ping and send - they should be called only by the Logic class.
     /// Pings all known nodes
-    pub async fn ping(&mut self, msg: &str) -> Result<(), String> {
+    pub async fn ping(&mut self) -> Result<(), String> {
         self.logic_tx
-            .send(LInput::PingAll(msg.to_string()))
+            .send(LInput::PingAll())
             .map_err(|e| e.to_string())
     }
 
@@ -174,9 +174,9 @@ impl Node {
     }
 
     /// Returns a copy of the logic stats
-    pub fn stats(&self) -> Result<HashMap<U256, Stat>, String> {
+    pub fn stats(&self) -> Result<HashMap<U256, StatNode>, String> {
         if let Ok(arc) = self.arc.try_lock() {
-            return Ok(arc.logic.stats.clone());
+            return Ok(arc.logic.stats.stats.clone());
         }
         Err("Couldn't lock arc".to_string())
     }

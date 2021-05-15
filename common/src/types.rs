@@ -1,8 +1,12 @@
 use core::fmt;
-use std::{num::ParseIntError, sync::{Arc, Mutex}};
+use std::{
+    num::ParseIntError,
+    sync::{Arc, Mutex},
+};
 
 use rand::random;
 use serde::{Deserialize, Serialize};
+use sha2::digest::{consts::U32, generic_array::GenericArray};
 
 /// Nicely formatted 256 bit structure
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
@@ -17,6 +21,12 @@ impl fmt::Display for U256 {
             f.write_fmt(format_args!("{:02x}", byte))?;
         }
         Ok(())
+    }
+}
+
+impl AsRef<[u8]> for U256 {
+    fn as_ref(&self) -> &[u8] {
+        return &self.0;
     }
 }
 
@@ -55,6 +65,17 @@ impl U256 {
         let mut u = U256 { 0: [0u8; 32] };
         v.iter().enumerate().for_each(|(i, b)| u.0[i] = *b);
         Ok(u)
+    }
+}
+
+impl From<GenericArray<u8, U32>> for U256 {
+    fn from(ga: GenericArray<u8, U32>) -> Self {
+        let mut u = U256 { 0: [0u8; 32] };
+        ga.as_slice()
+            .iter()
+            .enumerate()
+            .for_each(|(i, b)| u.0[i] = *b);
+        u
     }
 }
 
