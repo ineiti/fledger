@@ -250,13 +250,13 @@ async fn connect_test_simple() -> Result<(), String> {
     let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
     let my_storage = Box::new(DataStorageDummy {});
     let ws = Box::new(ws_conn.get_connection()?);
-    let mut node1 = Node::new(my_storage, ws, rtc_spawner)?;
+    let mut node1 = Node::new(my_storage, "test", ws, rtc_spawner)?;
 
     // Second node
     let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
     let my_storage = Box::new(DataStorageDummy {});
     let ws = Box::new(ws_conn.get_connection()?);
-    let mut node2 = Node::new(my_storage, ws, rtc_spawner)?;
+    let mut node2 = Node::new(my_storage, "test", ws, rtc_spawner)?;
 
     // Pass messages
     ws_conn.run_queue()?;

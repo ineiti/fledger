@@ -153,17 +153,16 @@ impl Model {
                 let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
                 let my_storage = Box::new(LocalStorage {});
                 let ws = WebSocketWasm::new(URL)?;
-                let mut node = Node::new(my_storage, Box::new(ws), rtc_spawner)?;
-                if let Some(window) = web_sys::window() {
+                let client = if let Some(window) = web_sys::window() {
                     let navigator = window.navigator();
-                    node.set_client(match navigator.user_agent() {
+                    match navigator.user_agent() {
                         Ok(p) => p,
                         Err(_) => "n/a".to_string(),
-                    });
-                }
-                node.save()?;
-
-                Ok(node)
+                    }
+                } else {
+                    "node".to_string()
+                };
+                Ok(Node::new(my_storage, &client, Box::new(ws), rtc_spawner)?)
             },
             link.callback(|n: Result<Node, JsValue>| Msg::Node(n)),
         ));

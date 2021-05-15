@@ -38,6 +38,8 @@ pub enum NOutput {
 pub enum NInput {
     WebRTC(U256, String),
     SendStats(Vec<NodeStat>),
+    ClearNodes,
+    UpdateList,
 }
 
 pub struct Network {
@@ -107,6 +109,8 @@ impl Network {
             match msg {
                 NInput::SendStats(s) => self.ws_send(NodeStats(s))?,
                 NInput::WebRTC(id, msg) => self.send(&id, msg).await?,
+                NInput::ClearNodes => self.ws_send(WSSignalMessage::ClearNodes)?,
+                NInput::UpdateList => self.ws_send(WSSignalMessage::ListIDsRequest)?,
             }
         }
         Ok(size)
@@ -183,7 +187,7 @@ impl Network {
                     }
                     .to_string(),
                 )?;
-                self.update_node_list()?;
+                self.input_tx.send(NInput::UpdateList).map_err(|e| e.to_string())?;
             }
             WSSignalMessage::ListIDsReply(list) => {
                 self.update_list(list)?;
@@ -212,11 +216,6 @@ impl Network {
             }
         }
         Ok(())
-    }
-
-    /// Requests a new node list from the server.
-    pub fn update_node_list(&mut self) -> Result<(), String> {
-        self.ws_send(WSSignalMessage::ListIDsRequest)
     }
 
     /// Stores a node list sent from the signalling server.
@@ -248,10 +247,6 @@ impl Network {
                 self.process.clone(),
             )?);
         conn.send(msg.clone()).await
-    }
-
-    pub fn clear_nodes(&mut self) -> Result<(), String> {
-        self.ws_send(WSSignalMessage::ClearNodes)
     }
 
     pub fn get_list(&self) -> Vec<NodeInfo> {

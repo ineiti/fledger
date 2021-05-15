@@ -45,7 +45,7 @@ async fn start(url: &str) -> Result<Node, JsValue> {
     let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
     let my_storage = Box::new(DummyDS {});
     let ws = WebSocketWasm::new(url)?;
-    Node::new(my_storage, Box::new(ws), rtc_spawner).map_err(|e| JsValue::from(e))
+    Node::new(my_storage, "node",  Box::new(ws), rtc_spawner).map_err(|e| JsValue::from(e))
 }
 
 async fn list_ping(n: &mut Node) -> Result<(), String> {
