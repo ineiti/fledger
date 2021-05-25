@@ -1,28 +1,15 @@
-use crate::types::U256;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TextMessage {
-    pub src: U256,
-    pub created: u64,
-    pub liked: u32,
-    pub msg: String,
-}
-
-impl TextMessage {
-    pub fn id(&self) -> U256 {
-        let mut id = Sha256::new();
-        id.update(&self.src);
-        id.finalize().into()
-    }
-}
+use super::text_messages::TextMessage;
+use crate::types::U256;
 
 #[derive(Debug, Serialize, Deserialize)]
 /// This is the command-set for version 1 of the protocol.
 pub enum MessageSendV1 {
     // Pings an OracleServer
     Ping(),
+    // Gets the Version of the OracleServers
+    VersionGet(),
     // Requests the updated list of all TextIDs available. This is best
     // sent to one of the Oracle Servers.
     TextIDsGet(),
@@ -43,6 +30,8 @@ pub enum MessageReplyV1 {
     TextIDs(Vec<[U256; 2]>),
     // The Text as known by the node.
     Text(TextMessage),
+    // The version of the requested node
+    Version(String),
     // Received command OK
     Ok(),
     // Error from one of the requests
@@ -64,7 +53,7 @@ impl From<&str> for Message {
     fn from(s: &str) -> Self {
         match serde_json::from_str(s) as Result<Message, serde_json::Error> {
             Ok(msg) => msg,
-            Err(_) => Message::Unknown(s.to_string())
+            Err(_) => Message::Unknown(s.to_string()),
         }
     }
 }
@@ -73,7 +62,7 @@ impl From<String> for Message {
     fn from(s: String) -> Self {
         match serde_json::from_str(&s) as Result<Message, serde_json::Error> {
             Ok(msg) => msg,
-            Err(_) => Message::Unknown(s)
+            Err(_) => Message::Unknown(s),
         }
     }
 }

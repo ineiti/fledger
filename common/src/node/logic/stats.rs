@@ -1,3 +1,7 @@
+/// A simple stats structure that keeps track of which pings it
+/// received.
+/// TODO: update with OKs received from pings, to be sure that the
+/// round-trip works, and that the rx- and tx-pings are actually correlated.
 use std::{collections::HashMap, sync::mpsc::Sender};
 
 #[cfg(target_arch = "wasm32")]
@@ -171,5 +175,46 @@ impl Stats {
             s.last_contact = now();
             s.ping_rx += 1;
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Stats;
+    use crate::node::{
+        config::{NodeConfig, NodeInfo},
+        logic::LOutput,
+    };
+    use flexi_logger::Logger;
+    use std::{collections::HashMap, sync::mpsc::channel, thread::sleep, time::Duration};
+
+    #[test]
+    /// Starts a Logic with two nodes, then receives ping only from one node.
+    /// The other node should be removed from the stats-list.
+    fn cleanup_stale_nodes() -> Result<(), String> {
+        Logger::with_str("debug").start().unwrap();
+
+        let n1 = NodeInfo::new();
+        let n2 = NodeInfo::new();
+        let mut nc = NodeConfig::new("".to_string())?;
+        nc.send_stats = Some(1f64);
+        nc.stats_ignore = Some(2f64);
+        let (tx, _rx) = channel::<LOutput>();
+
+        let mut ns = Stats {
+            stats: HashMap::new(),
+            last_stats: 0.,
+            node_config: nc.clone(),
+            output_tx: tx.clone(),
+        };
+
+        ns.store_nodes(vec![n1.clone(), n2.clone()]);
+        assert_eq!(2, ns.stats.len(), "Should have two nodes now");
+
+        sleep(Duration::from_millis(10));
+        ns.ping_rcv(n1.id.clone());
+        ns.send_stats()?;
+        assert_eq!(1, ns.stats.len(), "One node should disappear");
+        Ok(())
     }
 }
