@@ -16,7 +16,7 @@ use crate::signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection};
 use crate::types::{DataStorage, U256};
 
 use self::{
-    logic::{LInput, LOutput, stats::StatNode},
+    logic::{LInput, LOutput, stats::statnode::StatNode},
     network::NInput,
 };
 

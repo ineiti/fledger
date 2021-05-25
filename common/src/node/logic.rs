@@ -1,9 +1,6 @@
-use log::{debug, info, error};
+use log::{debug, error, info};
 
-use std::{
-    collections::HashMap,
-    sync::mpsc::{channel, Receiver, Sender},
-};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 use super::{
     config::{NodeConfig, NodeInfo},
@@ -55,12 +52,7 @@ impl Logic {
     pub fn new(node_config: NodeConfig) -> Logic {
         let (input_tx, input_rx) = channel::<LInput>();
         let (_output_tx, output_rx) = channel::<LOutput>();
-        let stats = Stats {
-            stats: HashMap::new(),
-            last_stats: 0.,
-            node_config: node_config.clone(),
-            output_tx: _output_tx.clone(),
-        };
+        let stats = Stats::new(node_config.clone(), _output_tx.clone());
         Logic {
             _node_config: node_config,
             stats,
@@ -93,7 +85,7 @@ impl Logic {
     fn rcv_sendv1(&mut self, from: U256, msg_id: U256, msg: MessageSendV1) -> Result<(), String> {
         debug!("got msg {:?} with id {:?} from {:?}", msg, msg_id, from);
         match msg {
-            MessageSendV1::Ping() => self.stats.ping_rcv(from),
+            MessageSendV1::Ping() => self.stats.ping_rcv(&from),
             MessageSendV1::TextIDsGet() => {}
             MessageSendV1::TextGet(_) => {}
             MessageSendV1::TextSet(_) => {}
@@ -108,7 +100,9 @@ impl Logic {
             MessageReplyV1::TextIDs(_) => {}
             MessageReplyV1::Text(_) => {}
             MessageReplyV1::Version(v) => {
-                if semver::Version::parse(&v).map_err(|e| e.to_string())?.major > VERSION_SEMVER.major {
+                if semver::Version::parse(&v).map_err(|e| e.to_string())?.major
+                    > VERSION_SEMVER.major
+                {
                     error!("Found node with higher major version - you should update yours, too!");
                 }
             }

@@ -86,3 +86,15 @@ pub trait DataStorage {
 }
 
 pub type ProcessCallback = Arc<Mutex<Box<dyn FnMut()>>>;
+
+#[cfg(target_arch = "wasm32")]
+pub fn now() -> f64 {
+    use js_sys::Date;
+    Date::now()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn now() -> f64 {
+    use chrono::Utc;
+    Utc::now().timestamp_millis() as f64
+}

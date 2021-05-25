@@ -6,7 +6,7 @@ use wasm_webrtc::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocke
 use wasm_webrtc::helpers::wait_ms;
 
 use common::{
-    node::{logic::stats::StatNode, version::VERSION_STRING, Node},
+    node::{logic::stats::statnode::StatNode, version::VERSION_STRING, Node},
     types::DataStorage,
 };
 
