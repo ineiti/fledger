@@ -1,7 +1,6 @@
-/// This handles one connection, either an incoming or an outgoing connection.
-
-use log::{error, info, warn};
 use backtrace::Backtrace;
+/// This handles one connection, either an incoming or an outgoing connection.
+use log::{error, info, warn};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
@@ -165,8 +164,12 @@ impl ConnectionState {
                 RtcIceConnectionState::Closed => true,
                 _ => false,
             } || s.type_remote == ConnType::Unknown;
-            if let Some(state_dc) = s.data_connection.as_ref(){
-                reset = reset || state_dc == &RtcDataChannelState::Closed;
+            if let Some(state_dc) = s.data_connection.as_ref() {
+                if self.state == CSEnum::HasDataChannel {
+                    reset = reset || state_dc == &RtcDataChannelState::Closed;
+                } else {
+                    warn!("Didn't set reset in CSEnum::Setup for state_dc: {:?}", state_dc);
+                }
             }
             if reset {
                 self.start_connection(Some("Found bad ConnectionState".into()))
