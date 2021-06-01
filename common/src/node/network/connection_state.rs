@@ -166,8 +166,10 @@ impl ConnectionState {
             } || s.type_remote == ConnType::Unknown;
             if let Some(state_dc) = s.data_connection.as_ref() {
                 if self.state == CSEnum::HasDataChannel {
-                    warn!("State_dc is: {:?}", state_dc);
                     reset = reset || state_dc == &RtcDataChannelState::Closed;
+                    if reset {
+                        warn!("State_dc is: {:?}", state_dc);
+                    }
                 } else {
                     warn!("Didn't set reset in CSEnum::Setup for state_dc: {:?}", state_dc);
                 }
