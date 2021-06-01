@@ -54,9 +54,9 @@ impl Logic {
         let (_output_tx, output_rx) = channel::<LOutput>();
         let stats = Stats::new(node_config.clone(), _output_tx.clone());
         Logic {
-            _node_config: node_config,
+            _node_config: node_config.clone(),
             stats,
-            text_messages: TextMessages::new(),
+            text_messages: TextMessages::new(_output_tx.clone(), node_config.clone()),
             input_tx,
             input_rx,
             _output_tx,
@@ -86,10 +86,14 @@ impl Logic {
         debug!("got msg {:?} with id {:?} from {:?}", msg, msg_id, from);
         match msg {
             MessageSendV1::Ping() => self.stats.ping_rcv(&from),
-            MessageSendV1::TextIDsGet() => {}
-            MessageSendV1::TextGet(_) => {}
-            MessageSendV1::TextSet(_) => {}
             MessageSendV1::VersionGet() => {}
+            MessageSendV1::TextMessage(msg) => {
+                if let Some(reply) = self.text_messages.handle_send(msg)? {
+                    let s = serde_json::to_string(&MessageReplyV1::TextMessage(reply))
+                        .map_err(|e| e.to_string())?;
+                    self._output_tx.send(LOutput::WebRTC(from, s));
+                }
+            }
         };
         Ok(())
     }
@@ -97,8 +101,7 @@ impl Logic {
     fn rcv_replyv1(&self, from: U256, msg_id: U256, msg: MessageReplyV1) -> Result<(), String> {
         debug!("got msg {:?} with id {:?} from {:?}", msg, msg_id, from);
         match msg {
-            MessageReplyV1::TextIDs(_) => {}
-            MessageReplyV1::Text(_) => {}
+            MessageReplyV1::TextMessage(msg) => self.text_messages.handle_reply(&from, msg)?,
             MessageReplyV1::Version(v) => {
                 if semver::Version::parse(&v).map_err(|e| e.to_string())?.major
                     > VERSION_SEMVER.major

@@ -25,6 +25,8 @@ pub struct NodeConfig {
     pub send_stats: Option<f64>,
     /// nodes that were not active for more than stats_ignore ms will not be sent
     pub stats_ignore: Option<f64>,
+    /// node capacities of what this node can do
+    pub node_capacities: Option<NodeCapacities>,
     /// our_node is the actual configuration of the node
     pub our_node: NodeInfo,
 }
@@ -43,6 +45,7 @@ impl NodeConfig {
         let mut nc = t.v1.unwrap_or(NodeConfig{
             our_node: NodeInfo::new(),
             send_stats: Some(30000.),
+            node_capacities: None,
             stats_ignore: Some(60000.),
         });
         nc.send_stats.replace(nc.send_stats.unwrap_or(30000.));

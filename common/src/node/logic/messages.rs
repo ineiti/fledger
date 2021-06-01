@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use super::text_messages::TextMessage;
 use crate::types::U256;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -10,32 +9,21 @@ pub enum MessageSendV1 {
     Ping(),
     // Gets the Version of the OracleServers
     VersionGet(),
-    // Requests the updated list of all TextIDs available. This is best
-    // sent to one of the Oracle Servers.
-    TextIDsGet(),
-    // Request a text from a node. If the node doesn't have this text
-    // available, it should respond with an Error.
-    TextGet(U256),
-    // Stores a new text on the Oracle Servers
-    TextSet(TextMessage),
+    // TextMessages
+    TextMessage(super::text_messages::SendMessagesV1),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 /// This is the command-set for version 1 of the protocol.
 pub enum MessageReplyV1 {
-    // Tuples of [NodeID ; TextID] indicating texts and where they should
-    // be read from.
-    // The NodeID can change from one TextIDsGet call to another, as nodes
-    // can be coming and going.
-    TextIDs(Vec<[U256; 2]>),
-    // The Text as known by the node.
-    Text(TextMessage),
     // The version of the requested node
     Version(String),
     // Received command OK
     Ok(),
     // Error from one of the requests
     Error(String),
+    // TextMessages
+    TextMessage(super::text_messages::ReplyMessagesV1),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
