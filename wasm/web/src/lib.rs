@@ -117,9 +117,10 @@ impl Component for Model {
                 <p>{"The state of the project is"}</p>
                 <ul>
                     <li>{"In process: learning Rust and making WebRTC work reliably"}</li>
-                    <li>{"Coming up: Set up Identity Chain"}</li>
-                    <li>{"Coming up: Add shard chains"}</li>
-                    <li>{"Coming up: Other chains: memory and secret"}</li>
+                    <li>{"Coming up: setting up of TURN server"}</li>
+                    <li>{"Coming up: simple half-centralized sharing of content"}</li>
+                    <li>{"Coming up: decentralized sharing with incentives"}</li>
+                    <li>{"Coming up: setting up chains for sharing tracking"}</li>
                 </ul>
                 <p>{"For more information, see the documentation: "}
                 <a href={"https://fledg.re/doc/index.html"} target={"other"}>{"Fledger - the blockchain that could"}</a>
