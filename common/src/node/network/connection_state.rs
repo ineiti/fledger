@@ -1,6 +1,5 @@
-use backtrace::Backtrace;
 /// This handles one connection, either an incoming or an outgoing connection.
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
@@ -52,7 +51,7 @@ pub struct ConnectionState {
     output_tx: Sender<CSOutput>,
     input_rx: Receiver<CSInput>,
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
-    setup: Option<Box<dyn WebRTCConnectionSetup>>,
+    conn_setup: Option<Box<dyn WebRTCConnectionSetup>>,
     connected: Option<Box<dyn WebRTCConnection>>,
     remote: bool,
     process: ProcessCallback,
@@ -74,7 +73,7 @@ impl ConnectionState {
             input_rx,
             input_tx,
             web_rtc,
-            setup: None,
+            conn_setup: None,
             connected: None,
             remote,
             process,
@@ -154,7 +153,7 @@ impl ConnectionState {
     async fn get_state(&mut self) -> Result<(), String> {
         let stat = match &self.state {
             CSEnum::HasDataChannel => Some(self.connected.as_ref().unwrap().get_state().await?),
-            CSEnum::Setup => Some(self.setup.as_ref().unwrap().get_state().await?),
+            CSEnum::Setup => Some(self.conn_setup.as_ref().unwrap().get_state().await?),
             _ => None,
         };
         if let Some(s) = stat {
@@ -198,30 +197,56 @@ impl ConnectionState {
 
     /// Process message from websocket connection to setup an 'incoming' webrtc connection.
     async fn process_peer_message(&mut self, pi_message: PeerMessage) -> Result<(), String> {
-        match &self.state {
-            CSEnum::Idle => {
-                if (matches!(pi_message, PeerMessage::Offer { .. }) && self.remote)
-                    || (matches!(pi_message, PeerMessage::Init) && !self.remote)
-                {
+        if self.conn_setup.is_none() {
+            debug!("Setting up new connection");
+            self.setup_new_connection().await?;
+        }
+
+        if self.state != CSEnum::Setup {
+            match pi_message{
+                PeerMessage::Init |
+                PeerMessage::Offer(_) => {
+                    warn!("Resetting connection for {:?}", pi_message);
                     self.setup_new_connection().await?;
-                    self.setup_peer_message(pi_message).await?;
-                } else {
-                    return Err(format!(
-                        "Wrong PeerMessage {:?} for new connection with remote = {} in {:?}",
-                        pi_message,
-                        self.remote,
-                        Backtrace::new()
-                    ));
-                }
+                },
+                _ => {}
             }
-            _ => {
-                if let Err(e) = self.setup_peer_message(pi_message).await {
-                    self.start_connection(Some(format!(
-                        "Couldn't set peer message, resetting connection: {}",
-                        e.to_string()
-                    )))
-                    .await?;
+        }
+
+        let setup = self.conn_setup.as_mut().expect("shouldn't be empty");
+        match pi_message {
+            PeerMessage::Init => {
+                if self.remote {
+                    return Err("Only Initializer can initialize".into());
                 }
+                let offer = setup.make_offer().await?;
+                self.output_tx
+                    .send(CSOutput::WebSocket(PeerMessage::Offer(offer)))
+                    .map_err(|e| e.to_string())?;
+            }
+            PeerMessage::Offer(offer) => {
+                if !self.remote {
+                    return Err("Only follower can treat offer".into());
+                }
+                let answer = setup.make_answer(offer).await?;
+                self.output_tx
+                    .send(CSOutput::WebSocket(PeerMessage::Answer(answer)))
+                    .map_err(|e| e.to_string())?;
+            }
+            PeerMessage::Answer(answer) => {
+                if self.remote {
+                    return Err("Only initializer can treat answer".into());
+                }
+                if self.state != CSEnum::Setup {
+                    return Err("Cannot use answer if not in CSEnum::Setup state".into());
+                }
+                setup.use_answer(answer).await?;
+            }
+            PeerMessage::IceCandidate(ice) => {
+                if self.state == CSEnum::Idle {
+                    warn!("Shouldn't be getting IceCandidates when Idle");
+                }
+                setup.ice_put(ice).await?;
             }
         }
         Ok(())
@@ -241,8 +266,7 @@ impl ConnectionState {
             error!("Cannot start incoming connection")
         } else {
             info!("Starting new connection");
-            self.setup_new_connection().await?;
-            self.setup_peer_message(PeerMessage::Init).await?;
+            self.process_peer_message(PeerMessage::Init).await?;
         }
         Ok(())
     }
@@ -294,45 +318,8 @@ impl ConnectionState {
         self.output_tx
             .send(CSOutput::State(self.state.clone(), None))
             .map_err(|e| e.to_string())?;
-        self.setup = Some(conn);
+        self.conn_setup = Some(conn);
         self.connected = None;
-        Ok(())
-    }
-
-    async fn setup_peer_message(&mut self, pi_message: PeerMessage) -> Result<(), String> {
-        if let Some(setup) = self.setup.as_mut() {
-            match pi_message {
-                PeerMessage::Init => {
-                    if self.remote {
-                        return Err("Only Initializer can initialize".into());
-                    }
-                    let offer = setup.make_offer().await?;
-                    self.output_tx
-                        .send(CSOutput::WebSocket(PeerMessage::Offer(offer)))
-                        .map_err(|e| e.to_string())?;
-                }
-                PeerMessage::Offer(offer) => {
-                    if !self.remote {
-                        return Err("Only follower can treat offer".into());
-                    }
-                    let answer = setup.make_answer(offer).await?;
-                    self.output_tx
-                        .send(CSOutput::WebSocket(PeerMessage::Answer(answer)))
-                        .map_err(|e| e.to_string())?;
-                }
-                PeerMessage::Answer(answer) => {
-                    if self.remote {
-                        return Err("Only initializer can treat answer".into());
-                    }
-                    setup.use_answer(answer).await?;
-                }
-                PeerMessage::IceCandidate(ice) => {
-                    setup.ice_put(ice).await?;
-                }
-            }
-        } else {
-            return Err("setup_peer_message cannot be called without self.setup".into());
-        }
         Ok(())
     }
 }
