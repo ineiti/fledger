@@ -162,8 +162,9 @@ impl ConnectionState {
                 RtcIceConnectionState::Failed => true,
                 RtcIceConnectionState::Disconnected => true,
                 RtcIceConnectionState::Closed => true,
+                RtcIceConnectionState::Connected => s.type_remote == ConnType::Unknown,
                 _ => false,
-            } || s.type_remote == ConnType::Unknown;
+            };
             if let Some(state_dc) = s.data_connection.as_ref() {
                 if self.state == CSEnum::HasDataChannel {
                     reset = reset || state_dc == &RtcDataChannelState::Closed;
