@@ -165,18 +165,28 @@ impl ConnectionState {
                 RtcIceConnectionState::Connected => s.type_remote == ConnType::Unknown,
                 _ => false,
             };
-            if let Some(state_dc) = s.data_connection.as_ref() {
-                if self.state == CSEnum::HasDataChannel {
-                    reset = reset || state_dc == &RtcDataChannelState::Closed;
-                    if reset {
-                        warn!("State_dc is: {:?}", state_dc);
+            if !self.remote {
+                // Only check the ChannelState for outgoing connections - ingoing connections will
+                // be reset by the remote peer.
+                if let Some(state_dc) = s.data_connection.as_ref() {
+                    if self.state == CSEnum::HasDataChannel {
+                        reset = reset || state_dc == &RtcDataChannelState::Closed;
+                        if reset {
+                            warn!("State_dc is: {:?}", state_dc);
+                        }
+                    } else {
+                        warn!(
+                            "Didn't set reset in CSEnum::Setup for state_dc: {:?}",
+                            state_dc
+                        );
                     }
-                } else {
-                    warn!("Didn't set reset in CSEnum::Setup for state_dc: {:?}", state_dc);
                 }
             }
             if reset {
-                warn!("Resetting with RtcIce: {:?} - type_remote: {:?}", s.ice_connection, s.type_remote);
+                warn!(
+                    "Resetting with RtcIce: {:?} - type_remote: {:?}",
+                    s.ice_connection, s.type_remote
+                );
                 self.start_connection(Some("Found bad ConnectionState".into()))
                     .await?;
             }

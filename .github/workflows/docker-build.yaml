@@ -85,6 +85,6 @@ jobs:
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         script: |
-          docker-compose down
           docker-compose pull
+          docker-compose down
           docker-compose up -d
