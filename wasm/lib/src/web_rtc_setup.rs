@@ -1,6 +1,8 @@
 use async_trait::async_trait;
+use web_sys::RtcConfiguration;
 use std::sync::{Arc, Mutex};
 use log::{warn, error};
+use serde::{Deserialize, Serialize};
 
 use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
@@ -27,6 +29,11 @@ pub struct WebRTCConnectionSetupWasm {
     callback: Arc<Mutex<Option<WebRTCSetupCB>>>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct IceServer{
+    urls: String,
+}
+
 impl WebRTCConnectionSetupWasm {
     /// Returns a new WebRTCConnection in either init or follower mode.
     /// One of the nodes connecting must be an init node, the other a follower node.
@@ -42,8 +49,16 @@ impl WebRTCConnectionSetupWasm {
     /// Followed by that they need to exchange the ice strings, in either order.
     /// Only after exchanging this information can the msg_send and msg_receive methods be used.
     pub fn new(nt: WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, String> {
+        // If no stun server is configured, only local IPs will be sent in the browser.
+        // At least the node webrtc does the correct thing...
+        let mut config = RtcConfiguration::new();
+        let servers_obj = vec![IceServer{
+            urls: "stun:stun.l.google.com:19302".to_string()
+        }];
+        let servers = JsValue::from_serde(&servers_obj).map_err(|e| e.to_string())?;
+        config.ice_servers(&servers);
         let rp_conn =
-            RtcPeerConnection::new().map_err(|e| format!("PeerConnection error: {:?}", e))?;
+            RtcPeerConnection::new_with_configuration(&config).map_err(|e| format!("PeerConnection error: {:?}", e))?;
         let rn = WebRTCConnectionSetupWasm {
             nt,
             rp_conn: rp_conn.clone(),
