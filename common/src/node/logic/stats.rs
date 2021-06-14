@@ -79,14 +79,14 @@ mod tests {
         config::{NodeConfig, NodeInfo},
         logic::LOutput,
     };
-    use flexi_logger::Logger;
+    use log::LevelFilter;
     use std::{sync::mpsc::channel, thread::sleep, time::Duration};
 
     #[test]
     /// Starts a Logic with two nodes, then receives ping only from one node.
     /// The other node should be removed from the stats-list.
     fn cleanup_stale_nodes() -> Result<(), String> {
-        Logger::with_str("debug").start().unwrap();
+        simple_logging::log_to_stderr(LevelFilter::Trace);
 
         let n1 = NodeInfo::new();
         let n2 = NodeInfo::new();

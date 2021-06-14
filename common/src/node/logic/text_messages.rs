@@ -1,18 +1,37 @@
-use std::{collections::HashMap, sync::mpsc::Sender};
-
-/// TextMessages is the structure that holds all known published TextMessages.
-use log::info;
-use sha2::{Digest, Sha256};
-
-use crate::{node::config::{NodeConfig, NodeInfo}, types::U256};
+use anyhow::Result;
+use log::trace;
 use serde::{Deserialize, Serialize};
+/// TextMessages is the structure that holds all known published TextMessages.
+use sha2::{Digest, Sha256};
+use std::{collections::HashMap, sync::mpsc::Sender};
+use thiserror::Error;
 
 use super::{messages::MessageReplyV1, LOutput};
+use super::{Message, MessageSendV1};
+use crate::{
+    node::config::{NodeConfig, NodeInfo},
+    types::{now, U256},
+};
+
+#[derive(Debug)]
+enum Msg {
+    Send(SendMessagesV1),
+    Reply(ReplyMessagesV1),
+}
 
 pub struct TextMessages {
     messages: HashMap<U256, TextMessage>,
+    nodes: Vec<NodeInfo>,
     out: Sender<LOutput>,
+    // maps a message-id to a list of nodes.
     nodes_msgs: HashMap<U256, Vec<U256>>,
+    cfg: NodeConfig,
+}
+
+#[derive(Error, Debug)]
+enum TMError {
+    #[error("Received an unknown message")]
+    UnknownMessage,
 }
 
 impl TextMessages {
@@ -20,51 +39,161 @@ impl TextMessages {
         Self {
             messages: HashMap::new(),
             nodes_msgs: HashMap::new(),
+            nodes: vec![],
             out,
+            cfg,
         }
     }
 
-    pub fn handle_send(&mut self, msg: SendMessagesV1) -> Result<Option<ReplyMessagesV1>, String> {
+    pub fn handle_send(&mut self, from: &U256, msg: SendMessagesV1) -> Result<()> {
+        trace!(
+            "{}: Handle send from {:?} with {:?}",
+            self.cfg.our_node.info,
+            from,
+            &msg
+        );
         match msg {
             SendMessagesV1::List() => {
-                let ids = vec![];
-                Ok(Some(ReplyMessagesV1::IDs(ids)))
+                let ids = self
+                    .nodes_msgs
+                    .clone()
+                    .into_iter()
+                    .map(|(id, nodes)| TextStorage { id, nodes })
+                    .collect();
+                self.send(from, Msg::Reply(ReplyMessagesV1::IDs(ids)))
             }
             SendMessagesV1::Get(id) => {
                 if let Some(text) = self.messages.get(&id) {
-                    Ok(Some(ReplyMessagesV1::Text(text.clone())))
+                    // Suppose that the other node will also have it, so add it to the nodes_msgs
+                    let nm =
+                        self.nodes_msgs
+                            .entry(id)
+                            .or_insert(vec![self.cfg.our_node.id.clone()]);
+                    nm.push(from.clone());
+                    self.send(from, Msg::Reply(ReplyMessagesV1::Text(text.clone())))
                 } else {
-                    Err("don't know this message".to_string())
+                    Err(TMError::UnknownMessage.into())
                 }
             }
             SendMessagesV1::Set(text) => {
+                // Create a list of nodes, starting with the sender node.
+                let mut list = vec![from.clone()];
+                for node in self.nodes.iter().filter(|n| &n.id != from) {
+                    // Send the text to all nodes other than the sender node and ourselves.
+                    self.send(&node.id, Msg::Reply(ReplyMessagesV1::Text(text.clone())))?;
+                    list.push(node.id.clone());
+                }
+                list.push(self.cfg.our_node.id.clone());
+                self.nodes_msgs.insert(text.id(), list);
                 self.messages.insert(text.id(), text);
-                Ok(None)
+                Ok(())
             }
         }
     }
 
-    pub fn handle_reply(&mut self, from: &U256, msg: ReplyMessagesV1) -> Result<(), String> {
+    /// If the node receives a TextMessage reply, handle it here.
+    pub fn handle_reply(&mut self, _from: &U256, msg: ReplyMessagesV1) -> Result<()> {
+        trace!(
+            "{}: Handle reply from {:?} with {:?}",
+            self.cfg.our_node.info,
+            _from,
+            &msg
+        );
         match msg {
             // Currently we just suppose that there is a central node storing all node-ids
             // and texts, so we can simply overwrite the ones we already have.
-            ReplyMessagesV1::IDs(list) => {}
-            ReplyMessagesV1::Text(_) => {}
+            ReplyMessagesV1::IDs(list) => {
+                // Only ask messages we don't have yet.
+                for ts in list.iter().filter(|ts| !self.messages.contains_key(&ts.id)) {
+                    // TODO: also send request to other nodes - the first one might not
+                    // be responding
+                    self.send(
+                        ts.nodes.get(0).unwrap(),
+                        Msg::Send(SendMessagesV1::Get(ts.id.clone())),
+                    )?;
+                }
+            }
+            ReplyMessagesV1::Text(tm) => {
+                self.messages.insert(tm.id(), tm);
+            }
         }
         Ok(())
     }
 
-    /// Updates all known nodes. Will send out requests to new nodes to store what
+    /// Updates all known nodes. Will send out requests to new nodes to know what
     /// messages are available in those nodes.
-    pub fn update_nodes(&mut self, nodes: Vec<NodeInfo>) {
-        
+    /// Only nodes different from this one will be stored.
+    /// Only new leaders will be asked for new messages.
+    pub fn update_nodes(&mut self, nodes: Vec<NodeInfo>) -> Result<()> {
+        trace!("{} update_nodes", self.cfg.our_node.info);
+        let new_nodes: Vec<NodeInfo> = nodes
+            .iter()
+            .filter(|n| n.id != self.cfg.our_node.id)
+            .cloned()
+            .collect();
+
+        // Contact only new leaders
+        for leader in new_nodes
+            .iter()
+            .filter(|n| !self.nodes.contains(n))
+            .filter(|n| matches!(&n.node_capacities, Some(nc) if nc.leader == Some(true)))
+        {
+            self.send(&leader.id, Msg::Send(SendMessagesV1::List()))?;
+        }
+
+        // Store new nodes, overwrite previous nodes
+        trace!("new nodes are: {:?}", new_nodes);
+        self.nodes = new_nodes;
+        Ok(())
     }
 
-    fn send<T: Serialize>(&self, to: &U256, msg: &T) -> Result<(), String> {
-        let str = serde_json::to_string(msg).map_err(|e| e.to_string())?;
+    /// Asks the leaders for new messages.
+    pub fn update_messages(&mut self) -> Result<()> {
+        for leader in self.get_leaders() {
+            self.send(&leader.id, Msg::Send(SendMessagesV1::List()))?;
+        }
+        Ok(())
+    }
+
+    /// Adds a new message to the list of messages and sends it to the leaders.
+    pub fn add_message(&mut self, msg: String) -> Result<()> {
+        let tm = TextMessage {
+            src: self.cfg.our_node.id.clone(),
+            created: now(),
+            liked: 0,
+            msg,
+        };
+        self.messages.insert(tm.id(), tm.clone());
+
+        // let mut ret = vec![];
+        for leader in self.get_leaders() {
+            self.send(&leader.id, Msg::Send(SendMessagesV1::Set(tm.clone())))?;
+        }
+        Ok(())
+    }
+
+    fn get_leaders(&self) -> Vec<NodeInfo> {
+        self.nodes
+            .iter()
+            .filter(|n| {
+                n.node_capacities
+                    .as_ref()
+                    .map_or(false, |m| m.leader.unwrap_or(false))
+            })
+            .cloned()
+            .collect()
+    }
+
+    // Wrapper call to send things over the LOutput
+    fn send(&self, to: &U256, msg: Msg) -> Result<()> {
+        let m = match msg {
+            Msg::Send(s) => Message::SendV1((U256::rnd(), MessageSendV1::TextMessage(s))),
+            Msg::Reply(r) => Message::ReplyV1((U256::rnd(), MessageReplyV1::TextMessage(r))),
+        };
+        let str = serde_json::to_string(&m)?;
         self.out
             .send(LOutput::WebRTC(to.clone(), str))
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.into())
     }
 }
 
@@ -100,7 +229,7 @@ pub struct TextStorage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextMessage {
     pub src: U256,
-    pub created: u64,
+    pub created: f64,
     pub liked: u64,
     pub msg: String,
 }
@@ -118,14 +247,171 @@ impl TextMessage {
 
 #[cfg(test)]
 mod tests {
-    use super::TextMessage;
-    use crate::types::U256;
+    use anyhow::{anyhow, Result};
+    use flexi_logger::LevelFilter;
+    use log::{debug, info, warn};
+    use std::sync::mpsc::{channel, Receiver, TryRecvError};
+
+    use super::{Message, TextMessage, TextMessages};
+    use crate::{
+        node::{
+            config::NodeConfig,
+            logic::{messages::MessageReplyV1, text_messages::MessageSendV1, LOutput},
+        },
+        types::U256,
+    };
+
+    struct TMTest {
+        cfg: NodeConfig,
+        queue: Receiver<LOutput>,
+        tm: TextMessages,
+    }
+
+    impl TMTest {
+        pub fn new(leader: bool) -> Result<Self> {
+            let (tx, queue) = channel::<LOutput>();
+            let mut cfg = NodeConfig::new("".into()).map_err(|e| anyhow!(e))?;
+            cfg.our_node.node_capacities.as_mut().unwrap().leader = Some(leader);
+            let tm = TextMessages::new(tx, cfg.clone());
+            Ok(TMTest { cfg, queue, tm })
+        }
+    }
+
+    /// Processes all messages from all nodes until no messages are left.
+    fn process(tms: &mut Vec<&mut TMTest>) -> Result<()> {
+        loop {
+            let mut msgs: Vec<(U256, U256, String)> = vec![];
+            for tm in tms.iter() {
+                for msg in tm.queue.try_iter() {
+                    match msg {
+                        LOutput::WebRTC(to, m) => msgs.push((tm.cfg.our_node.id.clone(), to, m)),
+                        _ => warn!("Unsupported message received"),
+                    }
+                }
+            }
+
+            if msgs.len() == 0 {
+                debug!("No messages found - stopping");
+                break;
+            }
+
+            for (from, to, s) in msgs {
+                let msg: Message = serde_json::from_str(&s)?;
+                if let Some(tm) = tms.into_iter().find(|tm| tm.cfg.our_node.id == to) {
+                    debug!("Got message {:?} for {}", s, to);
+                    match msg {
+                        Message::SendV1((_msg_id, msg_send)) => match msg_send {
+                            MessageSendV1::TextMessage(smv) => tm.tm.handle_send(&from, smv)?,
+                            _ => warn!("Ignoring message {:?}", msg_send),
+                        },
+                        Message::ReplyV1((_msg_id, msg_reply)) => match msg_reply {
+                            MessageReplyV1::TextMessage(rmv) => tm.tm.handle_reply(&from, rmv)?,
+                            _ => warn!("Ignoring message {:?}", msg_reply),
+                        },
+                        Message::Unknown(s) => warn!("Got Message::Unknown({})", s),
+                    }
+                } else {
+                    warn!("Got message for unknown node {:?}", to)
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_new_msg() -> Result<()> {
+        simple_logging::log_to_stderr(LevelFilter::Trace);
+
+        let mut leader = TMTest::new(true)?;
+        let mut follower1 = TMTest::new(false)?;
+        let mut follower2 = TMTest::new(false)?;
+
+        let all_nodes = vec![
+            leader.cfg.our_node.clone(),
+            follower1.cfg.our_node.clone(),
+            follower2.cfg.our_node.clone(),
+        ];
+
+        assert_eq!(leader.tm.messages.len(), 0);
+        assert_eq!(follower1.tm.messages.len(), 0);
+        assert_eq!(follower2.tm.messages.len(), 0);
+
+        info!("Adding a first message to the follower 1");
+        let msg1 = String::from("1st Message");
+        follower1.tm.add_message(msg1.clone())?;
+        if !matches!(follower1.queue.try_recv(), Err(TryRecvError::Empty)) {
+            panic!("queue should be empty");
+        }
+
+        // Add a new message to follower 1 and verify it's stored in the leader
+        follower1.tm.update_nodes(all_nodes.clone())?;
+        leader.tm.update_nodes(all_nodes[0..2].to_vec())?;
+        if matches!(leader.queue.try_recv(), Ok(_)) {
+            panic!("leader queue should be empty");
+        }
+        let msg2 = String::from("2nd Message");
+        follower1.tm.add_message(msg2.clone())?;
+        process(&mut vec![&mut follower1, &mut leader])?;
+        assert_eq!(1, leader.tm.messages.len());
+        let tm1_id = leader.tm.messages.keys().next().unwrap().clone();
+        assert_eq!(2, leader.tm.nodes_msgs.get(&tm1_id).unwrap().len());
+
+        // Let the follower2 catch up on the new messages
+        info!("Follower2 catches up");
+        follower2.tm.update_nodes(all_nodes.clone())?;
+        process(&mut vec![&mut follower1, &mut follower2, &mut leader])?;
+        assert_eq!(follower2.tm.messages.len(), 1);
+        assert_eq!(2, follower1.tm.nodes_msgs.get(&tm1_id).unwrap().len());
+
+        // Follower2 also creates their message
+        info!("Follower2 creates new message");
+        let msg3 = String::from("3rd Message");
+        leader.tm.update_nodes(all_nodes.clone())?;
+        follower2.tm.add_message(msg3)?;
+        process(&mut vec![&mut follower1, &mut follower2, &mut leader])?;
+        for msg in &follower1.tm.messages {
+            info!("Message is: {:?}", msg.1);
+        }
+        assert_eq!(follower1.tm.messages.len(), 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_update_nodes() -> Result<()> {
+        simple_logging::log_to_stderr(LevelFilter::Trace);
+
+        let leader = TMTest::new(true)?;
+        let mut follower1 = TMTest::new(false)?;
+
+        let all_nodes = vec![leader.cfg.our_node.clone(), follower1.cfg.our_node.clone()];
+
+        // Update nodes twice - first should send a message to the leader,
+        // second update_nodes should come out empty, because no new
+        // leader is found.
+        follower1.tm.update_nodes(all_nodes.clone())?;
+        if matches!(follower1.queue.try_recv(), Err(_)) {
+            panic!("queue should have one message");
+        }
+        assert_eq!(1, follower1.tm.nodes.len());
+
+        follower1.tm.update_nodes(all_nodes.clone())?;
+        if matches!(follower1.queue.try_recv(), Ok(_)) {
+            panic!("queue should be empty now");
+        }
+        assert_eq!(1, follower1.tm.nodes.len());
+
+        follower1.tm.update_nodes(vec![])?;
+        assert_eq!(0, follower1.tm.nodes.len());
+
+        Ok(())
+    }
 
     #[test]
     fn test_id() {
         let tm1 = TextMessage {
             src: U256::rnd(),
-            created: 0u64,
+            created: 0f64,
             liked: 0u64,
             msg: "test message".to_string(),
         };
@@ -136,7 +422,7 @@ mod tests {
         assert_ne!(tm1.id(), tm2.id());
 
         tm2 = tm1.clone();
-        tm2.created = 1u64;
+        tm2.created = 1f64;
         assert_ne!(tm1.id(), tm2.id());
 
         tm2 = tm1.clone();

@@ -87,21 +87,21 @@ impl Logic {
         match msg {
             MessageSendV1::Ping() => self.stats.ping_rcv(&from),
             MessageSendV1::VersionGet() => {}
-            MessageSendV1::TextMessage(msg) => {
-                if let Some(reply) = self.text_messages.handle_send(msg)? {
-                    let s = serde_json::to_string(&MessageReplyV1::TextMessage(reply))
-                        .map_err(|e| e.to_string())?;
-                    self._output_tx.send(LOutput::WebRTC(from, s));
-                }
-            }
+            MessageSendV1::TextMessage(msg) => self
+                .text_messages
+                .handle_send(&from, msg)
+                .map_err(|e| e.to_string())?,
         };
         Ok(())
     }
 
-    fn rcv_replyv1(&self, from: U256, msg_id: U256, msg: MessageReplyV1) -> Result<(), String> {
+    fn rcv_replyv1(&mut self, from: U256, msg_id: U256, msg: MessageReplyV1) -> Result<(), String> {
         debug!("got msg {:?} with id {:?} from {:?}", msg, msg_id, from);
         match msg {
-            MessageReplyV1::TextMessage(msg) => self.text_messages.handle_reply(&from, msg)?,
+            MessageReplyV1::TextMessage(msg) => self
+                .text_messages
+                .handle_reply(&from, msg)
+                .map_err(|e| e.to_string())?,
             MessageReplyV1::Version(v) => {
                 if semver::Version::parse(&v).map_err(|e| e.to_string())?.major
                     > VERSION_SEMVER.major

@@ -20,7 +20,7 @@ It does not use any blockchain yet, but relies on a set of trusted servers.
 ## How it works
 
 1. You connect to the fledger network
-2. Your node starts downloading other people's webpage and hosts them, providing your node with Mana by doing so
+2. Your node starts downloading other people's webpages and hosts them, providing your node with Mana by doing so
 3. You write your one-file webpage and publish it to the network, providing it with some of the Mana you got
 4. As soon as your node disconnects, your webpage will be served by other nodes
 5. Everytime your webpage is served, some Mana is used. When it drops to 0, your page will be deleted
@@ -61,8 +61,8 @@ Current thinking of how versions will be handled:
   - every node downloads the last 100 texts
   - nodes need to ping regularly the trusted servers
   - the servers offer a list of most reliable nodes to download the pages from
-    - the Oracle Servers put themselves at the end, so they can be used, but have lowest priority
-  - the OS keep track of statistics of how many pages where downloaded by whom
+    - the trusted servers put themselves at the end, so they can be used, but have lowest priority
+  - the trusted servers keep track of statistics of how many pages where downloaded by whom
   - a small editor to write the text in md-format or html
 2. adding a simple javascript smart contract
   - offer callbacks to the wasm for
@@ -78,4 +78,3 @@ Current thinking of how versions will be handled:
 4. add a smart-contract callback that can be run on the OS
   - for updating the list
   - node sends request to OS, OS returns list of verifying nodes, node sends contract to nodes for verification,
-    
