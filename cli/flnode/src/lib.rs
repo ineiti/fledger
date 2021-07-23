@@ -2,8 +2,8 @@ use js_sys::Date;
 use log::{error, info};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
-use wasm_lib::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
-use wasm_lib::helpers::wait_ms;
+use wasm_webrtc::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
+use wasm_webrtc::helpers::wait_ms;
 
 use common::{
     node::{logic::Stat, version::VERSION_STRING, Node},

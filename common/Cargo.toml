@@ -14,7 +14,7 @@ toml = "0.5"
 rand = "0.8.0"
 async-trait = "0.1.42"
 
-# The "js" is to make sure it also works for the flnode and wasm/web
+# The "js" is to make sure it also works for the flnode and web crates
 getrandom = { version = "0.2", features = ["js"] }
 names = { path = "../vendor/names" }
 

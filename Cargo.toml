@@ -3,8 +3,8 @@
 members = [
     "cli/signal",
     "cli/flnode",
-    "wasm/web",
-    "wasm/lib",
+    "wasm-webrtc",
     "common",
-    "vendor/names"
+    "vendor/names",
+    "web"
 ]

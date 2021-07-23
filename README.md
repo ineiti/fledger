@@ -36,7 +36,7 @@ What it will never do:
 
 Currently the following components are available:
 - [Signal server](./cli/signal) - for the webRTC rendez-vous
-- [Web node](./wasm/web) - for running the node in a browser
+- [Web node](./web) - for running the node in a browser
 - [CLI node](./cli/node) - for running a node in a CLI
 - [Node](./common) - the actual code for the Fledger nodes
 
@@ -74,6 +74,15 @@ that contains the private key of your node.
 Do not lose this private key, as it is used to move around the Mana you get.
 The only time you need it will be once the server <-> browser connection will
 be set up.
+
+## Running it locally for testing
+
+If rust, wasm-pack, and npm is installed in a recent version, you can simply
+run it locally by calling:
+
+```bash
+make serve_local
+```
 
 # Changelog
 

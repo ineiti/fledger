@@ -30,7 +30,7 @@ jobs:
 
     - name: Run wasm-test
       run: |
-        cd wasm/lib/src
+        cd wasm-webrtc
         wasm-pack test --chrome --headless
 
   build-test:

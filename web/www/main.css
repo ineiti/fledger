@@ -1,3 +1,7 @@
+.hidden {
+  display: none;
+}
+
 .main {
   margin: auto;
   width: 50%;

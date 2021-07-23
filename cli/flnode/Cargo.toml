@@ -16,7 +16,7 @@ local = []
 
 [dependencies]
 common = {path = "../../common"}
-wasm-lib = {path = "../../wasm/lib", features=["node"]}
+wasm-webrtc = {path = "../../wasm-webrtc", features=["node"]}
 wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
 js-sys = "0.3.46"
 wasm-bindgen-futures = "0.4.19"
