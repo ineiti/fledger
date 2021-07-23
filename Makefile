@@ -5,5 +5,6 @@ serve_local:
 	pkill -f signal
 	cargo build
 	cargo run --bin signal &
-	make -C wasm/web clean build_local serve &
+	make -C web clean build_local serve &
 	make -C cli/flnode run2
+	open localhost:8080

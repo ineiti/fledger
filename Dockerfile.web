@@ -1,2 +1,2 @@
 FROM nginx
-COPY wasm/web/static/ /usr/share/nginx/html
+COPY web/www/dist/ /usr/share/nginx/html

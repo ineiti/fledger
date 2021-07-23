@@ -40,7 +40,7 @@ jobs:
         make build
 
     - name: Build web server
-      run: cd wasm/web; make build
+      run: cd web; make build
 
     - name: Docker build signal
       uses: mr-smithers-excellent/docker-build-push@v5
