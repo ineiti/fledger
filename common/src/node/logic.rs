@@ -7,7 +7,7 @@ use super::{
     network::connection_state::CSEnum,
 };
 use crate::{
-    node::version::VERSION_SEMVER,
+    node::version::version_semver,
     signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState},
     types::U256,
 };
@@ -104,7 +104,7 @@ impl Logic {
                 .map_err(|e| e.to_string())?,
             MessageReplyV1::Version(v) => {
                 if semver::Version::parse(&v).map_err(|e| e.to_string())?.major
-                    > VERSION_SEMVER.major
+                    > version_semver().major
                 {
                     error!("Found node with higher major version - you should update yours, too!");
                 }

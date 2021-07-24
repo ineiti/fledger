@@ -17,7 +17,6 @@ async-trait = "0.1.42"
 # The "js" is to make sure it also works for the flnode and web crates
 getrandom = { version = "0.2", features = ["js"] }
 names = { path = "../vendor/names" }
-simple-logging = "2.0.2"
 anyhow = "1.0"
 thiserror = "1.0"
 

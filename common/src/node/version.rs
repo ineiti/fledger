@@ -1,8 +1,5 @@
-pub const VERSION_SEMVER: semver::Version = semver::Version {
-    major: 0,
-    minor: 2,
-    patch: 0,
-    pre: vec![],
-    build: vec![],
-};
+pub fn version_semver() -> semver::Version{
+    semver::Version::parse(VERSION_STRING).unwrap()
+}
+
 pub const VERSION_STRING: &str = "0.2.0";

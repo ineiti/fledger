@@ -9,7 +9,7 @@ use wasm_webrtc::{
 };
 use web_sys::window;
 
-use common::node::{Node, config::NodeInfo, logic::Stat, version::VERSION_STRING};
+use common::node::{Node, config::NodeInfo, logic::stats::statnode::StatNode, version::VERSION_STRING};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -75,7 +75,7 @@ impl FledgerWeb {
             if let Some(n) = no.as_mut() {
                 n.list().map_err(|e| anyhow!(e))?;
                 if ping {
-                    n.ping("Ping from the web").await.map_err(|e| anyhow!(e))?;
+                    n.ping().await.map_err(|e| anyhow!(e))?;
                 }
                 n.process().await.map_err(|e| anyhow!(e))?;
             } else {
