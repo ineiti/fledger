@@ -1,15 +1,15 @@
 use anyhow::{anyhow, Result};
 use js_sys::Date;
+use log::{debug, error, info, warn};
 use regex::Regex;
 use std::sync::{Arc, Mutex};
-use web_sys::window;
-use log::{error, info, warn, debug};
 use wasm_bindgen::prelude::*;
 use wasm_webrtc::{
     helpers::LocalStorage, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
 };
+use web_sys::window;
 
-use common::node::{Node, config::NodeInfo, logic::Stat};
+use common::node::{config::NodeInfo, logic::Stat, Node};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -20,6 +20,7 @@ const URL: &str = "ws://localhost:8765";
 #[wasm_bindgen]
 pub struct FledgerWeb {
     node: Arc<Mutex<Option<Node>>>,
+    counter: u32,
 }
 
 #[wasm_bindgen]
@@ -33,6 +34,7 @@ impl FledgerWeb {
 
         let fw = Self {
             node: Arc::new(Mutex::new(None)),
+            counter: 0u32,
         };
 
         let node_cl = fw.node.clone();
@@ -48,27 +50,31 @@ impl FledgerWeb {
     pub fn tick(&mut self) -> FledgerState {
         let mut fs = FledgerState::empty();
         if let Ok(mut no) = self.node.try_lock() {
-            if let Some(n) = no.as_mut(){
-                match FledgerState::new(n){
+            if let Some(n) = no.as_mut() {
+                match FledgerState::new(n) {
                     Ok(f) => fs = f,
                     Err(e) => error!("Couldn't create state: {:?}", e),
                 }
             }
         }
-        let noc = Arc::clone(&self.node);
-        wasm_bindgen_futures::spawn_local(async move {
-            if let Ok(mut no) = noc.try_lock() {
-                if let Some(n) = no.as_mut() {
-                    if let Err(e) = n.ping(&"something").await {
-                        error!("while sending ping: {:?}", e);
-                    } else {
-                        debug!("Pinged the nodes");
+        self.counter += 1;
+        if self.counter >= 3 {
+            self.counter = 0;
+            let noc = Arc::clone(&self.node);
+            wasm_bindgen_futures::spawn_local(async move {
+                if let Ok(mut no) = noc.try_lock() {
+                    if let Some(n) = no.as_mut() {
+                        if let Err(e) = n.ping(&"something").await {
+                            error!("while sending ping: {:?}", e);
+                        } else {
+                            debug!("Pinged the nodes");
+                        }
                     }
+                } else {
+                    warn!("Couldn't lock node");
                 }
-            } else {
-                warn!("Couldn't lock node");
-            }
-        });
+            });
+        }
         fs
     }
 }
@@ -123,7 +129,7 @@ impl FledgerWeb {
 #[wasm_bindgen]
 pub struct FledgerState {
     info: NodeInfo,
-    stats: String
+    stats: String,
 }
 
 #[wasm_bindgen]
@@ -132,7 +138,7 @@ impl FledgerState {
         self.info.info.clone()
     }
 
-    pub fn get_stats_table(&self) -> String{
+    pub fn get_stats_table(&self) -> String {
         self.stats.clone()
     }
 }
@@ -140,32 +146,41 @@ impl FledgerState {
 impl FledgerState {
     fn new(node: &Node) -> Result<Self> {
         let mut stats_vec = vec![];
-        let mut stats_node: Vec<Stat> = node.stats().map_err(|e| anyhow!(e))?.iter().map(|(_k, v)| v.clone()).collect();
+        let mut stats_node: Vec<Stat> = node
+            .stats()
+            .map_err(|e| anyhow!(e))?
+            .iter()
+            .map(|(_k, v)| v.clone())
+            .collect();
         stats_node.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
         let now = Date::now();
         for stat in stats_node {
             if let Some(ni) = stat.node_info.as_ref() {
                 if node.info().map_err(|e| anyhow!(e))?.id != ni.id {
-                    stats_vec.push(vec![format!("{}", ni.info),
-                        format!("rx:{} tx:{}", stat.ping_rx, stat.ping_tx),
-                        format!("{}s", ((now - stat.last_contact) / 1000.).floor()),
-                        format!("in:{:?} out:{:?}", stat.incoming, stat.outgoing),
-                    ].join("</td><td>"));
+                    stats_vec.push(
+                        vec![
+                            format!("{}", ni.info),
+                            format!("rx:{} tx:{}", stat.ping_rx, stat.ping_tx),
+                            format!("{}s", ((now - stat.last_contact) / 1000.).floor()),
+                            format!("in:{:?} out:{:?}", stat.incoming, stat.outgoing),
+                        ]
+                        .join("</td><td>"),
+                    );
                 }
             }
         }
         let stats = format!("<tr><td>{}</td></tr>", stats_vec.join("</td></tr><tr><td>"));
 
-        Ok(Self{
+        Ok(Self {
             info: node.info().unwrap_or(NodeInfo::new()),
-            stats
+            stats,
         })
     }
 
     fn empty() -> Self {
         Self {
             info: NodeInfo::new(),
-            stats: String::from("")
+            stats: String::from(""),
         }
     }
 }
