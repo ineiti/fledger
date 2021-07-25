@@ -9,7 +9,13 @@ use wasm_webrtc::{
 };
 use web_sys::window;
 
+<<<<<<< HEAD
 use common::node::{Node, config::NodeInfo, logic::stats::statnode::StatNode, version::VERSION_STRING};
+=======
+use common::node::{
+    config::NodeInfo, logic::stats::statnode::StatNode, version::VERSION_STRING, Node,
+};
+>>>>>>> a1defc0 (wip)
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -155,7 +161,7 @@ impl FledgerState {
 impl FledgerState {
     fn new(node: &Node) -> Result<Self> {
         let mut stats_vec = vec![];
-        let mut stats_node: Vec<Stat> = node
+        let mut stats_node: Vec<StatNode> = node
             .stats()
             .map_err(|e| anyhow!(e))?
             .iter()

@@ -61,3 +61,6 @@ flexi_logger = ""
 wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
 js-sys = "0.3.46"
 wasm-bindgen-futures = "0.4.19"
+
+[dev-dependencies]
+simple-logging = "2.0.2"
