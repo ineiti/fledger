@@ -3,7 +3,7 @@ use core::f64;
 
 use std::{collections::HashMap, sync::mpsc::Sender};
 
-use crate::{node::{config::NodeInfo, logic::{LOutput, messages::{Message, MessageSendV1}}, network::connection_state::CSEnum, version::VERSION_STRING}, signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState}, types::{now, U256}};
+use crate::{node::{config::NodeInfo, logic::{LOutput, messages::{Message, MessageV1}}, network::connection_state::CSEnum, version::VERSION_STRING}, signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState}, types::{now, U256}};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConnState {
@@ -132,7 +132,7 @@ impl StatNodes {
         for stat in self.nodes.iter_mut() {
             if let Some(ni) = stat.1.node_info.as_ref() {
                 if our_id != &ni.id {
-                    let msg_send = Message::SendV1((U256::rnd(), MessageSendV1::Ping()));
+                    let msg_send = Message::V1(MessageV1::Ping());
                     out.send(LOutput::WebRTC(ni.id.clone(), msg_send.to_string()?))
                         .map_err(|e| e.to_string())?;
                     stat.1.ping_tx += 1;

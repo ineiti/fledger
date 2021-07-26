@@ -6,18 +6,11 @@ use sha2::{Digest, Sha256};
 use std::{collections::HashMap, sync::mpsc::Sender};
 use thiserror::Error;
 
-use super::{messages::MessageReplyV1, LOutput};
-use super::{Message, MessageSendV1};
+use super::{messages::{MessageV1, Message}, LOutput};
 use crate::{
     node::config::{NodeConfig, NodeInfo},
     types::{now, U256},
 };
-
-#[derive(Debug)]
-enum Msg {
-    Send(SendMessagesV1),
-    Reply(ReplyMessagesV1),
-}
 
 pub struct TextMessages {
     messages: HashMap<U256, TextMessage>,
@@ -45,7 +38,7 @@ impl TextMessages {
         }
     }
 
-    pub fn handle_send(&mut self, from: &U256, msg: SendMessagesV1) -> Result<()> {
+    pub fn handle_msg(&mut self, from: &U256, msg: TextMessageV1) -> Result<()> {
         trace!(
             "{}: Handle send from {:?} with {:?}",
             self.cfg.our_node.info,
@@ -53,16 +46,16 @@ impl TextMessages {
             &msg
         );
         match msg {
-            SendMessagesV1::List() => {
+            TextMessageV1::List() => {
                 let ids = self
                     .nodes_msgs
                     .clone()
                     .into_iter()
                     .map(|(id, nodes)| TextStorage { id, nodes })
                     .collect();
-                self.send(from, Msg::Reply(ReplyMessagesV1::IDs(ids)))
+                self.send(from, TextMessageV1::IDs(ids))
             }
-            SendMessagesV1::Get(id) => {
+            TextMessageV1::Get(id) => {
                 if let Some(text) = self.messages.get(&id) {
                     // Suppose that the other node will also have it, so add it to the nodes_msgs
                     let nm =
@@ -70,17 +63,17 @@ impl TextMessages {
                             .entry(id)
                             .or_insert(vec![self.cfg.our_node.id.clone()]);
                     nm.push(from.clone());
-                    self.send(from, Msg::Reply(ReplyMessagesV1::Text(text.clone())))
+                    self.send(from, TextMessageV1::Text(text.clone()))
                 } else {
                     Err(TMError::UnknownMessage.into())
                 }
             }
-            SendMessagesV1::Set(text) => {
+            TextMessageV1::Set(text) => {
                 // Create a list of nodes, starting with the sender node.
                 let mut list = vec![from.clone()];
                 for node in self.nodes.iter().filter(|n| &n.id != from) {
                     // Send the text to all nodes other than the sender node and ourselves.
-                    self.send(&node.id, Msg::Reply(ReplyMessagesV1::Text(text.clone())))?;
+                    self.send(&node.id, TextMessageV1::Text(text.clone()))?;
                     list.push(node.id.clone());
                 }
                 list.push(self.cfg.our_node.id.clone());
@@ -88,36 +81,25 @@ impl TextMessages {
                 self.messages.insert(text.id(), text);
                 Ok(())
             }
-        }
-    }
-
-    /// If the node receives a TextMessage reply, handle it here.
-    pub fn handle_reply(&mut self, _from: &U256, msg: ReplyMessagesV1) -> Result<()> {
-        trace!(
-            "{}: Handle reply from {:?} with {:?}",
-            self.cfg.our_node.info,
-            _from,
-            &msg
-        );
-        match msg {
             // Currently we just suppose that there is a central node storing all node-ids
             // and texts, so we can simply overwrite the ones we already have.
-            ReplyMessagesV1::IDs(list) => {
+            TextMessageV1::IDs(list) => {
                 // Only ask messages we don't have yet.
                 for ts in list.iter().filter(|ts| !self.messages.contains_key(&ts.id)) {
                     // TODO: also send request to other nodes - the first one might not
                     // be responding
                     self.send(
                         ts.nodes.get(0).unwrap(),
-                        Msg::Send(SendMessagesV1::Get(ts.id.clone())),
+                        TextMessageV1::Get(ts.id.clone()),
                     )?;
                 }
+                Ok(())
             }
-            ReplyMessagesV1::Text(tm) => {
+            TextMessageV1::Text(tm) => {
                 self.messages.insert(tm.id(), tm);
+                Ok(())
             }
         }
-        Ok(())
     }
 
     /// Updates all known nodes. Will send out requests to new nodes to know what
@@ -138,7 +120,7 @@ impl TextMessages {
             .filter(|n| !self.nodes.contains(n))
             .filter(|n| matches!(&n.node_capacities, Some(nc) if nc.leader == Some(true)))
         {
-            self.send(&leader.id, Msg::Send(SendMessagesV1::List()))?;
+            self.send(&leader.id, TextMessageV1::List())?;
         }
 
         // Store new nodes, overwrite previous nodes
@@ -150,7 +132,7 @@ impl TextMessages {
     /// Asks the leaders for new messages.
     pub fn update_messages(&mut self) -> Result<()> {
         for leader in self.get_leaders() {
-            self.send(&leader.id, Msg::Send(SendMessagesV1::List()))?;
+            self.send(&leader.id, TextMessageV1::List())?;
         }
         Ok(())
     }
@@ -167,7 +149,7 @@ impl TextMessages {
 
         // let mut ret = vec![];
         for leader in self.get_leaders() {
-            self.send(&leader.id, Msg::Send(SendMessagesV1::Set(tm.clone())))?;
+            self.send(&leader.id, TextMessageV1::Set(tm.clone()))?;
         }
         Ok(())
     }
@@ -185,11 +167,8 @@ impl TextMessages {
     }
 
     // Wrapper call to send things over the LOutput
-    fn send(&self, to: &U256, msg: Msg) -> Result<()> {
-        let m = match msg {
-            Msg::Send(s) => Message::SendV1((U256::rnd(), MessageSendV1::TextMessage(s))),
-            Msg::Reply(r) => Message::ReplyV1((U256::rnd(), MessageReplyV1::TextMessage(r))),
-        };
+    fn send(&self, to: &U256, msg: TextMessageV1) -> Result<()> {
+        let m = Message::V1(MessageV1::TextMessage(msg));
         let str = serde_json::to_string(&m)?;
         self.out
             .send(LOutput::WebRTC(to.clone(), str))
@@ -198,7 +177,7 @@ impl TextMessages {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SendMessagesV1 {
+pub enum TextMessageV1 {
     // Requests the updated list of all TextIDs available. This is best
     // sent to one of the Oracle Servers.
     List(),
@@ -207,10 +186,6 @@ pub enum SendMessagesV1 {
     Get(U256),
     // Stores a new text on the Oracle Servers
     Set(TextMessage),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ReplyMessagesV1 {
     // Tuples of [NodeID ; TextID] indicating texts and where they should
     // be read from.
     // The NodeID can change from one TextIDsGet call to another, as nodes
@@ -256,7 +231,7 @@ mod tests {
     use crate::{
         node::{
             config::NodeConfig,
-            logic::{messages::MessageReplyV1, text_messages::MessageSendV1, LOutput},
+            logic::{messages::MessageV1, LOutput},
         },
         types::U256,
     };
@@ -300,13 +275,9 @@ mod tests {
                 if let Some(tm) = tms.into_iter().find(|tm| tm.cfg.our_node.id == to) {
                     debug!("Got message {:?} for {}", s, to);
                     match msg {
-                        Message::SendV1((_msg_id, msg_send)) => match msg_send {
-                            MessageSendV1::TextMessage(smv) => tm.tm.handle_send(&from, smv)?,
+                        Message::V1(msg_send) => match msg_send {
+                            MessageV1::TextMessage(smv) => tm.tm.handle_msg(&from, smv)?,
                             _ => warn!("Ignoring message {:?}", msg_send),
-                        },
-                        Message::ReplyV1((_msg_id, msg_reply)) => match msg_reply {
-                            MessageReplyV1::TextMessage(rmv) => tm.tm.handle_reply(&from, rmv)?,
-                            _ => warn!("Ignoring message {:?}", msg_reply),
                         },
                         Message::Unknown(s) => warn!("Got Message::Unknown({})", s),
                     }

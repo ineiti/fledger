@@ -9,13 +9,7 @@ use wasm_webrtc::{
 };
 use web_sys::window;
 
-<<<<<<< HEAD
 use common::node::{Node, config::NodeInfo, logic::stats::statnode::StatNode, version::VERSION_STRING};
-=======
-use common::node::{
-    config::NodeInfo, logic::stats::statnode::StatNode, version::VERSION_STRING, Node,
-};
->>>>>>> a1defc0 (wip)
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";

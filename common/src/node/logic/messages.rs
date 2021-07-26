@@ -1,38 +1,27 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::U256;
-
 #[derive(Debug, Serialize, Deserialize)]
 /// This is the command-set for version 1 of the protocol.
-pub enum MessageSendV1 {
-    // Pings an OracleServer
-    Ping(),
-    // Gets the Version of the OracleServers
-    VersionGet(),
-    // TextMessages
-    TextMessage(super::text_messages::SendMessagesV1),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-/// This is the command-set for version 1 of the protocol.
-pub enum MessageReplyV1 {
+pub enum MessageV1 {
     // The version of the requested node
     Version(String),
     // Received command OK
     Ok(),
     // Error from one of the requests
     Error(String),
+    // Pings an OracleServer
+    Ping(),
+    // Gets the Version of the OracleServers
+    VersionGet(),
     // TextMessages
-    TextMessage(super::text_messages::ReplyMessagesV1),
+    TextMessage(super::text_messages::TextMessageV1),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Message {
-    /// Used to send a message to another node.
-    /// The U256 is used as an index to identify the message.
-    SendV1((U256, MessageSendV1)),
-    /// The reply to the messages.
-    ReplyV1((U256, MessageReplyV1)),
+    /// Version1 of messages - new messages can be added, but changes to existing
+    /// types need to be backwards-compatible
+    V1(MessageV1),
     /// Unknown message
     Unknown(String),
 }

@@ -7,7 +7,7 @@ use super::{
     network::connection_state::CSEnum,
 };
 use crate::{
-    node::version::version_semver,
+    node::version::VERSION_STRING,
     signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState},
     types::U256,
 };
@@ -82,35 +82,25 @@ impl Logic {
         Ok(size)
     }
 
-    fn rcv_sendv1(&mut self, from: U256, msg_id: U256, msg: MessageSendV1) -> Result<(), String> {
-        debug!("got msg {:?} with id {:?} from {:?}", msg, msg_id, from);
+    fn rcv_msg(&mut self, from: U256, msg: MessageV1) -> Result<(), String> {
+        debug!("got msg {:?} from {:?}", msg, from);
         match msg {
-            MessageSendV1::Ping() => self.stats.ping_rcv(&from),
-            MessageSendV1::VersionGet() => {}
-            MessageSendV1::TextMessage(msg) => self
+            MessageV1::Ping() => self.stats.ping_rcv(&from),
+            MessageV1::VersionGet() => {}
+            MessageV1::TextMessage(msg) => self
                 .text_messages
-                .handle_send(&from, msg)
+                .handle_msg(&from, msg)
                 .map_err(|e| e.to_string())?,
-        };
-        Ok(())
-    }
-
-    fn rcv_replyv1(&mut self, from: U256, msg_id: U256, msg: MessageReplyV1) -> Result<(), String> {
-        debug!("got msg {:?} with id {:?} from {:?}", msg, msg_id, from);
-        match msg {
-            MessageReplyV1::TextMessage(msg) => self
-                .text_messages
-                .handle_reply(&from, msg)
-                .map_err(|e| e.to_string())?,
-            MessageReplyV1::Version(v) => {
+            MessageV1::Version(v) => {
+                let version_semver = semver::Version::parse(VERSION_STRING).unwrap();
                 if semver::Version::parse(&v).map_err(|e| e.to_string())?.major
-                    > version_semver().major
+                    > version_semver.major
                 {
                     error!("Found node with higher major version - you should update yours, too!");
                 }
             }
-            MessageReplyV1::Ok() => {}
-            MessageReplyV1::Error(_) => {}
+            MessageV1::Ok() => {}
+            MessageV1::Error(_) => {}
         }
         Ok(())
     }
@@ -119,8 +109,7 @@ impl Logic {
         info!("Received message from WebRTC: {}", msg_str);
         let msg: Message = msg_str.into();
         match msg {
-            Message::SendV1((msg_id, send)) => self.rcv_sendv1(id, msg_id, send),
-            Message::ReplyV1((msg_id, rcv)) => self.rcv_replyv1(id, msg_id, rcv),
+            Message::V1(send) => self.rcv_msg(id, send),
             Message::Unknown(s) => Err(s),
         }
     }
