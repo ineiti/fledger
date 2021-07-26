@@ -9,7 +9,7 @@ use wasm_webrtc::{
 };
 use web_sys::window;
 
-use common::node::{config::NodeInfo, logic::Stat, Node};
+use common::node::{Node, config::NodeInfo, logic::Stat, version::VERSION_STRING};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -140,6 +140,10 @@ impl FledgerState {
 
     pub fn get_stats_table(&self) -> String {
         self.stats.clone()
+    }
+
+    pub fn get_version(&self) -> String {
+        VERSION_STRING.to_string()
     }
 }
 

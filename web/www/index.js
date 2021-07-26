@@ -21,7 +21,8 @@ function update_html(state) {
         el_table_stats.classList.add("hidden");
     } else {
         el_fetching.classList.add("hidden");
-        document.getElementById("table_stats").innerHTML = stats_table;
+        document.getElementById("node_stats").innerHTML = stats_table;
     }
     document.getElementById("node_info").innerHTML = state.get_node_name();
+    document.getElementById("version").innerHTML = state.get_version();
 }
