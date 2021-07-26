@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use js_sys::Date;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use regex::Regex;
 use std::sync::{Arc, Mutex};
 use wasm_bindgen::prelude::*;
@@ -57,29 +57,34 @@ impl FledgerWeb {
                 }
             }
         }
+        let noc = Arc::clone(&self.node);
         self.counter += 1;
-        if self.counter >= 3 {
-            self.counter = 0;
-            let noc = Arc::clone(&self.node);
-            wasm_bindgen_futures::spawn_local(async move {
-                if let Ok(mut no) = noc.try_lock() {
-                    if let Some(n) = no.as_mut() {
-                        if let Err(e) = n.ping(&"something").await {
-                            error!("while sending ping: {:?}", e);
-                        } else {
-                            debug!("Pinged the nodes");
-                        }
-                    }
-                } else {
-                    warn!("Couldn't lock node");
-                }
-            });
-        }
+        let ping = self.counter & 3 == 0;
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Err(e) = Self::update_node(noc, ping).await {
+                error!("Couldn't update node: {:?}", e);
+            };
+        });
         fs
     }
 }
 
 impl FledgerWeb {
+    async fn update_node(noc: Arc<Mutex<Option<Node>>>, ping: bool) -> Result<()>{
+        if let Ok(mut no) = noc.try_lock() {
+            if let Some(n) = no.as_mut() {
+                n.list().map_err(|e| anyhow!(e))?;
+                if ping {
+                    n.ping("Ping from the web").await.map_err(|e| anyhow!(e))?;
+                }
+                n.process().await.map_err(|e| anyhow!(e))?;
+            } else {
+                warn!("Couldn't lock node");
+            }
+        };
+        Ok(())
+    }
+
     async fn node_start(node_mutex: Arc<Mutex<Option<Node>>>) -> Result<()> {
         let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
         let my_storage = Box::new(LocalStorage {});
