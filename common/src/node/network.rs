@@ -1,3 +1,7 @@
+use ed25519_dalek::Keypair;
+use ed25519_dalek::{Signature, Signer};
+use rand::rngs::OsRng;
+
 use log::{info, warn};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
@@ -176,10 +180,22 @@ impl Network {
         match msg {
             WSSignalMessage::Challenge(version, challenge) => {
                 info!("Processing Challenge message version: {}", version);
+                // let mut csprng = OsRng {};
+                // let keypair: Keypair = Keypair::generate(&mut csprng);
+                // let message: &[u8] = b"This is a test of the tsunami alert system.";
+                // let signature: Signature = keypair.sign(message);
+
                 let ma = MessageAnnounce {
                     version,
                     challenge,
                     node_info: self.node_info.clone(),
+                    signature: self
+                        .node_info
+                        .get_keypair()
+                        .map_err(|e| e.to_string())?
+                        .sign(&challenge.to_bytes())
+                        .to_bytes()
+                        .to_vec(),
                 };
                 self.ws.send(
                     WebSocketMessage {
@@ -187,7 +203,9 @@ impl Network {
                     }
                     .to_string(),
                 )?;
-                self.input_tx.send(NInput::UpdateList).map_err(|e| e.to_string())?;
+                self.input_tx
+                    .send(NInput::UpdateList)
+                    .map_err(|e| e.to_string())?;
             }
             WSSignalMessage::ListIDsReply(list) => {
                 self.update_list(list)?;

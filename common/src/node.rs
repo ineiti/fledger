@@ -189,7 +189,7 @@ impl Node {
     }
 }
 
-/// NodeArc hodsl the network and logic structure, so that they 
+/// NodeArc hodsl the network and logic structure, so that they
 impl NodeArc {
     pub async fn process(&mut self) -> Result<usize, String> {
         Ok(self.process_logic()?

@@ -1,4 +1,7 @@
 use crate::types::U256;
+use ed25519_dalek::{Keypair, SignatureError};
+use rand::rngs::OsRng;
+
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -6,16 +9,24 @@ pub struct NodeInfo {
     pub id: U256,
     pub info: String,
     pub client: String,
+    pub keypair_bytes: Vec<u8>,
 }
 
 impl NodeInfo {
     /// Creates a new NodeInfo with a random id.
     pub fn new() -> NodeInfo {
+        let mut csprng = OsRng {};
+
         NodeInfo {
             id: U256::rnd(),
             info: names::Generator::default().next().unwrap().to_string(),
             client: "Node".to_string(),
+            keypair_bytes: Keypair::generate(&mut csprng).to_bytes().to_vec(),
         }
+    }
+
+    pub fn get_keypair(&self) -> Result<Keypair, SignatureError> {
+        Keypair::from_bytes(&self.keypair_bytes)
     }
 }
 
@@ -40,7 +51,7 @@ impl NodeConfig {
             Toml { v1: None }
         };
 
-        let mut nc = t.v1.unwrap_or(NodeConfig{
+        let mut nc = t.v1.unwrap_or(NodeConfig {
             our_node: NodeInfo::new(),
             send_stats: Some(30000.),
             stats_ignore: Some(60000.),
