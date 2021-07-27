@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
 
+use ed25519_dalek::{Signature, Signer};
+
 use crate::{node::config::NodeInfo, types::U256};
 
 pub type WebRTCSpawner =
@@ -213,4 +215,5 @@ pub struct MessageAnnounce {
     pub version: u64,
     pub challenge: U256,
     pub node_info: NodeInfo,
+    pub signature: Vec<u8>,
 }
