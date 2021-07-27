@@ -1,11 +1,14 @@
 use core::fmt;
-use std::{num::ParseIntError, sync::{Arc, Mutex}};
+use std::{
+    num::ParseIntError,
+    sync::{Arc, Mutex},
+};
 
 use rand::random;
 use serde::{Deserialize, Serialize};
 
 /// Nicely formatted 256 bit structure
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct U256([u8; 32]);
 
 impl fmt::Display for U256 {
@@ -55,6 +58,10 @@ impl U256 {
         let mut u = U256 { 0: [0u8; 32] };
         v.iter().enumerate().for_each(|(i, b)| u.0[i] = *b);
         Ok(u)
+    }
+
+    pub fn to_bytes(self) -> [u8; 32] {
+        self.0
     }
 }
 

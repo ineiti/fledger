@@ -1,37 +1,37 @@
 [package]
-name = "common"
-version = "0.1.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 edition = "2018"
+name = "common"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_derive = "1.0"
-toml = "0.5"
-rand = "0.8.0"
 async-trait = "0.1.42"
+rand = {version = "0.7.3"}
+serde = {version = "1.0", features = ["derive"]}
+serde_derive = "1.0"
+serde_json = "1.0"
+toml = "0.5"
 
 # The "js" is to make sure it also works for the flnode and web crates
-getrandom = { version = "0.2", features = ["js"] }
-names = { path = "../vendor/names" }
+getrandom = {version = "0.2", features = ["js"]}
+names = {path = "../vendor/names"}
 
-futures = ""
 backtrace = ""
+futures = ""
 log = ""
 
+# TODO rewrite using the built in serde of dalek, (https://docs.rs/ed25519-dalek/1.0.1/ed25519_dalek/#using-serde)
+ed25519-dalek = {version = "", features = ["serde"]}
+
 [dependencies.web-sys]
-version = "0.3.46"
 features = [
   "Storage",
-
   "Request",
   "RequestInit",
   "RequestMode",
   "Response",
-
   "MessageEvent",
   "RtcPeerConnection",
   "RtcSignalingState",
@@ -45,15 +45,15 @@ features = [
   "RtcDataChannel",
   "RtcDataChannelEvent",
   "RtcDataChannelState",
-
   "Navigator",
 ]
+version = "0.3.46"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = ""
 flexi_logger = ""
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
 js-sys = "0.3.46"
+wasm-bindgen = {version = "0.2.69", features = ["serde-serialize"]}
 wasm-bindgen-futures = "0.4.19"

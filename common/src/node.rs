@@ -84,7 +84,7 @@ impl Node {
         // Or find a better way to start processing the queues if the WebRTC receives a message...
         let cb: Box<dyn FnMut()> = Box::new(|| error!("Called while not initialized"));
         let node_process = Arc::new(Mutex::new(cb));
-        let network = Network::new(config.our_node.clone(), ws, web_rtc, node_process.clone());
+        let network = Network::new(config.clone(), ws, web_rtc, node_process.clone());
         let network_tx = network.input_tx.clone();
         let logic = Logic::new(config.clone());
         let logic_tx = logic.input_tx.clone();
@@ -189,7 +189,7 @@ impl Node {
     }
 }
 
-/// NodeArc hodsl the network and logic structure, so that they 
+/// NodeArc hodsl the network and logic structure, so that they
 impl NodeArc {
     pub async fn process(&mut self) -> Result<usize, String> {
         Ok(self.process_logic()?
