@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-use web_sys::RtcConfiguration;
-use std::sync::{Arc, Mutex};
-use log::{warn, error};
+use log::{error, warn};
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
+use web_sys::RtcConfiguration;
 
 use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
@@ -15,9 +15,9 @@ use common::signal::web_rtc::{
 };
 
 use web_sys::{
-    Event, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
-    RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
-    RtcSessionDescriptionInit, RtcSignalingState,
+    Event, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate, RtcIceCandidateInit,
+    RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit,
+    RtcSignalingState,
 };
 
 use crate::web_rtc_connection::{get_state, WebRTCConnectionWasm};
@@ -30,8 +30,10 @@ pub struct WebRTCConnectionSetupWasm {
 }
 
 #[derive(Serialize, Deserialize)]
-struct IceServer{
-    urls: String,
+struct IceServer<'a> {
+    urls: &'a str,
+    username: Option<&'a str>,
+    credential: Option<&'a str>,
 }
 
 impl WebRTCConnectionSetupWasm {
@@ -52,13 +54,22 @@ impl WebRTCConnectionSetupWasm {
         // If no stun server is configured, only local IPs will be sent in the browser.
         // At least the node webrtc does the correct thing...
         let mut config = RtcConfiguration::new();
-        let servers_obj = vec![IceServer{
-            urls: "stun:stun.l.google.com:19302".to_string()
-        }];
+        let servers_obj = vec![
+            IceServer {
+                urls: "stun:stun.l.google.com:19302",
+                username: None,
+                credential: None,
+            },
+            IceServer {
+                urls: "turn:web.fledg.re:3478",
+                username: Some("something"),
+                credential: Some("something"),
+            },
+        ];
         let servers = JsValue::from_serde(&servers_obj).map_err(|e| e.to_string())?;
         config.ice_servers(&servers);
-        let rp_conn =
-            RtcPeerConnection::new_with_configuration(&config).map_err(|e| format!("PeerConnection error: {:?}", e))?;
+        let rp_conn = RtcPeerConnection::new_with_configuration(&config)
+            .map_err(|e| format!("PeerConnection error: {:?}", e))?;
         let rn = WebRTCConnectionSetupWasm {
             nt,
             rp_conn: rp_conn.clone(),
