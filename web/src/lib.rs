@@ -2,14 +2,21 @@ use anyhow::{anyhow, Result};
 use js_sys::Date;
 use log::{error, info, warn};
 use regex::Regex;
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    convert::TryInto,
+    sync::{Arc, Mutex},
+};
 use wasm_bindgen::prelude::*;
 use wasm_webrtc::{
     helpers::LocalStorage, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
 };
 use web_sys::window;
 
-use common::node::{Node, config::NodeInfo, logic::stats::statnode::StatNode, version::VERSION_STRING};
+use common::{
+    node::{config::NodeInfo, logic::stats::statnode::StatNode, version::VERSION_STRING, Node},
+    types::U256,
+};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -70,7 +77,7 @@ impl FledgerWeb {
 }
 
 impl FledgerWeb {
-    async fn update_node(noc: Arc<Mutex<Option<Node>>>, ping: bool) -> Result<()>{
+    async fn update_node(noc: Arc<Mutex<Option<Node>>>, ping: bool) -> Result<()> {
         if let Ok(mut no) = noc.try_lock() {
             if let Some(n) = no.as_mut() {
                 n.list().map_err(|e| anyhow!(e))?;
@@ -134,7 +141,7 @@ impl FledgerWeb {
 #[wasm_bindgen]
 pub struct FledgerState {
     info: NodeInfo,
-    stats: String,
+    stats: HashMap<U256, StatNode>,
 }
 
 #[wasm_bindgen]
@@ -144,28 +151,23 @@ impl FledgerState {
     }
 
     pub fn get_stats_table(&self) -> String {
-        self.stats.clone()
+        match self.get_stats_table_result() {
+            Ok(str) => str,
+            Err(e) => {
+                error!("Couldn't get result: {:?}", e);
+                format!("")
+            }
+        }
     }
 
-    pub fn get_version(&self) -> String {
-        VERSION_STRING.to_string()
-    }
-}
-
-impl FledgerState {
-    fn new(node: &Node) -> Result<Self> {
-        let mut stats_vec = vec![];
-        let mut stats_node: Vec<StatNode> = node
-            .stats()
-            .map_err(|e| anyhow!(e))?
-            .iter()
-            .map(|(_k, v)| v.clone())
-            .collect();
+    fn get_stats_table_result(&self) -> Result<String> {
+        let mut stats_node: Vec<StatNode> = self.stats.iter().map(|(_k, v)| v.clone()).collect();
         stats_node.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
         let now = Date::now();
+        let mut stats_vec = vec![];
         for stat in stats_node {
             if let Some(ni) = stat.node_info.as_ref() {
-                if node.info().map_err(|e| anyhow!(e))?.id != ni.id {
+                if self.info.id != ni.id {
                     stats_vec.push(
                         vec![
                             format!("{}", ni.info),
@@ -178,18 +180,67 @@ impl FledgerState {
                 }
             }
         }
-        let stats = format!("<tr><td>{}</td></tr>", stats_vec.join("</td></tr><tr><td>"));
+        Ok(format!(
+            "<tr><td>{}</td></tr>",
+            stats_vec.join("</td></tr><tr><td>")
+        ))
+    }
 
+    pub fn get_version(&self) -> String {
+        VERSION_STRING.to_string()
+    }
+
+    pub fn get_nodes_online(&self) -> u32 {
+        self.stats.len().try_into().unwrap_or(0)
+    }
+
+    pub fn get_msgs_system(&self) -> u32 {
+        0
+    }
+
+    pub fn get_msgs_local(&self) -> u32 {
+        0
+    }
+
+    pub fn get_msgs(&self) -> FledgerMessages{
+        FledgerMessages::new()
+    }
+
+    pub fn get_mana(&self) -> u32 {
+        0
+    }
+}
+
+impl FledgerState {
+    fn new(node: &Node) -> Result<Self> {
         Ok(Self {
             info: node.info().unwrap_or(NodeInfo::new()),
-            stats,
+            stats: node.stats().map_err(|e| anyhow!(e))?,
         })
     }
 
     fn empty() -> Self {
         Self {
             info: NodeInfo::new(),
-            stats: String::from(""),
+            stats: HashMap::new(),
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub struct FledgerMessage {
+    pub text: String,
+}
+
+#[wasm_bindgen]
+pub struct FledgerMessages {
+    pub msgs: Vec<FledgerMessage>,
+}
+
+impl FledgerMessages {
+    fn new() -> Self {
+        &FledgerMessages{
+            msgs: vec![]
         }
     }
 }

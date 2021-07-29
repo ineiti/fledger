@@ -1,7 +1,8 @@
+/// TextMessages is the structure that holds all known published TextMessages.
+
 use anyhow::Result;
 use log::trace;
 use serde::{Deserialize, Serialize};
-/// TextMessages is the structure that holds all known published TextMessages.
 use sha2::{Digest, Sha256};
 use std::{collections::HashMap, sync::mpsc::Sender};
 use thiserror::Error;

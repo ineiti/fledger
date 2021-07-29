@@ -8,6 +8,10 @@ setInterval(() => {
     update_html(state);
 }, 1000);
 
+function sh(tag, str) {
+    document.getElementById(tag).innerHTML = str;
+}
+
 function update_html(state) {
     let stats_table = state.get_stats_table();
     if (stats_table === "") {
@@ -21,8 +25,12 @@ function update_html(state) {
         el_table_stats.classList.add("hidden");
     } else {
         el_fetching.classList.add("hidden");
-        document.getElementById("node_stats").innerHTML = stats_table;
+        sh("node_stats", stats_table);
     }
-    document.getElementById("node_info").innerHTML = state.get_node_name();
-    document.getElementById("version").innerHTML = state.get_version();
+    sh("node_info", state.get_node_name());
+    sh("version", state.get_version());
+    sh("nodes_online", state.get_nodes_online());
+    sh("msgs_system", state.get_msgs_system());
+    sh("msgs_local", state.get_msgs_local());
+    sh("mana", state.get_mana());
 }
