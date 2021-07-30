@@ -127,6 +127,7 @@ impl Internal {
         match msg_ws.msg {
             // Node sends his information to the server
             WSSignalMessage::Announce(msg_ann) => {
+                // TODO Check Signature
                 info!("Storing node {:?}", msg_ann.node_info);
                 let id = msg_ann.node_info.id.clone();
                 self.nodes.retain(|_, ni| {
