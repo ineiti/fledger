@@ -22,7 +22,8 @@ backtrace = ""
 futures = ""
 log = ""
 
-ed25519-dalek = ""
+# TODO rewrite using the built in serde of dalek, (https://docs.rs/ed25519-dalek/1.0.1/ed25519_dalek/#using-serde)
+ed25519-dalek = {version = "", features = ["serde"]}
 
 [dependencies.web-sys]
 features = [
