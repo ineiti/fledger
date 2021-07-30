@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
 
-use ed25519_dalek::{Signature, Signer};
-
 use crate::{node::config::NodeInfo, types::U256};
 
 pub type WebRTCSpawner =
