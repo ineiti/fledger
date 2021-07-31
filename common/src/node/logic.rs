@@ -119,12 +119,12 @@ impl Logic {
         }
 
         // Send statistics to the signalling server
-        if now() > self.last_stats + self.node_config.send_stats.unwrap() {
+        if now() > self.last_stats + self.node_config.send_stats {
             self.last_stats = now();
             let expired: Vec<U256> = self
                 .stats
                 .iter()
-                .filter(|(_k, v)| now() - v.last_contact > self.node_config.stats_ignore.unwrap())
+                .filter(|(_k, v)| now() - v.last_contact > self.node_config.stats_ignore)
                 .map(|(k, _v)| k.clone())
                 .collect();
             for k in expired {
@@ -135,7 +135,7 @@ impl Logic {
                 .stats
                 .iter()
                 // Ignore our node and nodes that are inactive
-                .filter(|(k, _v)| k != &&self.node_config.our_node.id)
+                .filter(|(k, _v)| k != &&self.node_config.our_node.get_id())
                 .map(|(k, v)| NodeStat {
                     id: k.clone(),
                     version: VERSION_STRING.to_string(),
@@ -190,7 +190,7 @@ impl Logic {
         for ni in nodes {
             let s = self
                 .stats
-                .entry(ni.id.clone())
+                .entry(ni.get_id())
                 .or_insert_with(|| Stat::new(None));
             s.node_info = Some(ni);
         }
@@ -199,9 +199,9 @@ impl Logic {
     fn ping_all(&mut self, msg: String) -> Result<(), String> {
         for stat in self.stats.iter_mut() {
             if let Some(ni) = stat.1.node_info.as_ref() {
-                if self.node_config.our_node.id != ni.id {
+                if self.node_config.our_node.get_id() != ni.get_id() {
                     self.output_tx
-                        .send(LOutput::WebRTC(ni.id.clone(), msg.clone()))
+                        .send(LOutput::WebRTC(ni.get_id(), msg.clone()))
                         .map_err(|e| e.to_string())?;
                     stat.1.ping_tx += 1;
                 }
@@ -225,7 +225,7 @@ impl Logic {
 #[cfg(test)]
 mod tests {
     use super::{LInput, Logic};
-    use crate::node::config::{NodeConfig, NodeInfo};
+    use crate::node::config::{NodeConfig};
     use flexi_logger::Logger;
     use futures::executor;
     use std::{thread::sleep, time::Duration};
@@ -236,11 +236,13 @@ mod tests {
     fn cleanup_stale_nodes() -> Result<(), String> {
         Logger::with_str("debug").start().unwrap();
 
-        let n1 = NodeInfo::new();
-        let n2 = NodeInfo::new();
-        let mut nc = NodeConfig::new("".to_string())?;
-        nc.send_stats = Some(1f64);
-        nc.stats_ignore = Some(2f64);
+        let nc1 = NodeConfig::new();
+        let n1 = nc1.our_node;
+        let nc2 = NodeConfig::new();
+        let n2 = nc2.our_node;
+        let mut nc = NodeConfig::new();
+        nc.send_stats = 1f64;
+        nc.stats_ignore = 2f64;
 
         let mut logic = Logic::new(nc);
         logic
@@ -253,7 +255,7 @@ mod tests {
         sleep(Duration::from_millis(10));
         logic
             .input_tx
-            .send(LInput::WebRTC(n1.id.clone(), "ping".to_string()))
+            .send(LInput::WebRTC(n1.get_id(), "ping".to_string()))
             .map_err(|e| e.to_string())?;
         executor::block_on(logic.process())?;
         assert_eq!(1, logic.stats.len(), "One node should disappear");

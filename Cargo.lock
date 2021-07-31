@@ -1401,6 +1401,7 @@ dependencies = [
  "common",
  "csv",
  "dipstick",
+ "ed25519-dalek",
  "flexi_logger",
  "futures",
  "log",

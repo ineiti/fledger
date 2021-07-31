@@ -1,3 +1,5 @@
+use ed25519_dalek::Verifier;
+
 use bimap::BiMap;
 use csv::Writer;
 use futures::executor;
@@ -127,12 +129,15 @@ impl Internal {
         match msg_ws.msg {
             // Node sends his information to the server
             WSSignalMessage::Announce(msg_ann) => {
-                // TODO Check Signature
+                if let Err(e) = msg_ann.node_info.pubkey.verify(&chal.to_bytes(), &msg_ann.signature){
+                    warn!("Got node with wrong signature: {:?}", e);
+                    return;
+                }
                 info!("Storing node {:?}", msg_ann.node_info);
-                let id = msg_ann.node_info.id.clone();
+                let id = msg_ann.node_info.get_id();
                 self.nodes.retain(|_, ni| {
                     if let Some(info) = ni.info.clone() {
-                        return info.id != id;
+                        return info.get_id() != id;
                     }
                     return true;
                 });
@@ -141,7 +146,7 @@ impl Internal {
                         info!("Serializing node {}", s);
                     }
                     let ni = msg_ann.node_info.clone();
-                    if let Err(e) = f.write_record(&[ni.id.to_string(), ni.info, ni.client]) {
+                    if let Err(e) = f.write_record(&[ni.get_id().to_string(), ni.info, ni.client]) {
                         error!("While serializing node: {}", e);
                     } else {
                         if let Err(e) = f.flush() {
@@ -150,7 +155,7 @@ impl Internal {
                     }
                 }
                 self.pub_chal
-                    .insert(msg_ann.node_info.id.clone(), chal.clone());
+                    .insert(msg_ann.node_info.get_id(), chal.clone());
                 self.nodes
                     .entry(chal.clone())
                     .and_modify(|ne| ne.info = Some(msg_ann.node_info));
@@ -201,7 +206,7 @@ impl Internal {
                     for n in ns.iter() {
                         let node_id = match self.nodes.get(&chal) {
                             Some(ne) => match ne.info.as_ref() {
-                                Some(info) => info.id.clone(),
+                                Some(info) => info.get_id(),
                                 None => U256::rnd(),
                             },
                             None => U256::rnd(),
