@@ -65,6 +65,12 @@ impl U256 {
     }
 }
 
+impl From<[u8; 32]> for U256 {
+    fn from(b: [u8; 32]) -> Self {
+        U256{0: b}
+    }
+}
+
 pub trait DataStorage {
     fn load(&self, key: &str) -> Result<String, String>;
 

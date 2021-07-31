@@ -1,89 +1,188 @@
 use crate::types::U256;
-use ed25519_dalek::{Keypair, SignatureError};
+use ed25519_dalek::{Keypair, PublicKey};
 use rand::rngs::OsRng;
+use std::convert::TryFrom;
 
 use serde_derive::{Deserialize, Serialize};
 
+/// NodeInfo is the public information of the node.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct NodeInfo {
-    pub id: U256,
     pub info: String,
     pub client: String,
-    pub pubkey_bytes: Vec<u8>,
+    pub pubkey: PublicKey,
 }
 
 impl NodeInfo {
-    /// Creates a new NodeInfo with a random id, and a particular public key.
-    pub fn new_from_key(pubkey_bytes: Vec<u8>) -> NodeInfo {
+    /// Creates a new NodeInfo with a random name.
+    pub fn new(pubkey: PublicKey) -> NodeInfo {
         NodeInfo {
-            id: U256::rnd(),
             info: names::Generator::default().next().unwrap().to_string(),
             client: "Node".to_string(),
-            pubkey_bytes: pubkey_bytes,
+            pubkey,
         }
     }
 
-    /// Creates a new NodeInfo with a random id and key.
-    pub fn new() -> NodeInfo {
-        let mut csprng = OsRng {};
-        let keypair = Keypair::generate(&mut csprng);
-        NodeInfo {
-            id: U256::rnd(),
-            info: names::Generator::default().next().unwrap().to_string(),
-            client: "Node".to_string(),
-            pubkey_bytes: keypair.public.to_bytes().to_vec(),
-        }
+    /// Returns the unique id, based on the public key.
+    pub fn get_id(&self) -> U256 {
+        self.pubkey.to_bytes().into()
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+impl TryFrom<NodeInfoToml> for NodeInfo {
+    type Error = String;
+    fn try_from(nit: NodeInfoToml) -> Result<Self, String> {
+        Ok(NodeInfo {
+            info: nit.info,
+            client: nit.client,
+            pubkey: nit.pubkey.ok_or("No public key".to_string())?.clone(),
+        })
+    }
+}
+
+/// NodeConfig is stored on the node itself and contains the private key.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct NodeConfig {
     /// interval in ms between sending two statistics of connected nodes. 0 == disabled
-    pub send_stats: Option<f64>,
+    pub send_stats: f64,
     /// nodes that were not active for more than stats_ignore ms will not be sent
-    pub stats_ignore: Option<f64>,
+    pub stats_ignore: f64,
     /// our_node is the actual configuration of the node
     pub our_node: NodeInfo,
     /// the cryptographic keypair as a vector of bytes
-    pub keypair_bytes: Vec<u8>,
+    pub keypair: Keypair,
 }
 
 impl NodeConfig {
-    /// Parses the string as a config for the node. If the ledger is not available, it returns an error.
-    /// If the our_node is missing, it is created.
-    pub fn new(str: String) -> Result<NodeConfig, String> {
-        let t: Toml = if str.len() > 0 {
-            toml::from_str(str.as_str()).map_err(|e| e.to_string())?
-        } else {
-            // Toml { v1: None }
-            Toml { v1: None }
-        };
+    /// Returns a new NodeConfig
+    pub fn new() -> Self {
         let mut csprng = OsRng {};
         let keypair = Keypair::generate(&mut csprng);
-        let mut nc = t.v1.unwrap_or(NodeConfig {
-            our_node: NodeInfo::new_from_key(keypair.public.to_bytes().to_vec()),
-            send_stats: Some(30000.),
-            stats_ignore: Some(60000.),
-            keypair_bytes: keypair.to_bytes().to_vec(),
-        });
-        nc.send_stats.replace(nc.send_stats.unwrap_or(30000.));
-        nc.stats_ignore.replace(nc.stats_ignore.unwrap_or(60000.));
-        Ok(nc)
+        NodeConfig {
+            our_node: NodeInfo::new(keypair.public),
+            send_stats: 30000.,
+            stats_ignore: 60000.,
+            keypair,
+        }
     }
 
+    /// Returns a toml representation of the config.
     pub fn to_string(&self) -> Result<String, String> {
         toml::to_string(&Toml {
-            v1: Some(self.clone()),
+            v1: Some(self.into()),
         })
         .map_err(|e| e.to_string())
     }
+}
 
-    pub fn get_keypair(&self) -> Result<Keypair, SignatureError> {
-        Keypair::from_bytes(&self.keypair_bytes)
+impl Clone for NodeConfig {
+    fn clone(&self) -> Self {
+        let keypair = Keypair::from_bytes(&self.keypair.to_bytes()).unwrap();
+        NodeConfig {
+            send_stats: self.send_stats,
+            stats_ignore: self.stats_ignore,
+            our_node: self.our_node.clone(),
+            keypair,
+        }
     }
 }
 
+/// Parses the string as a config for the node. If the ledger is not available, it returns an error.
+/// If the our_node is missing, it is created.
+impl TryFrom<String> for NodeConfig {
+    type Error = String;
+    fn try_from(str: String) -> Result<Self, String> {
+        let t: Toml = if str.len() > 0 {
+            toml::from_str(str.as_str()).map_err(|e| e.to_string())?
+        } else {
+            Toml { v1: None }
+        };
+
+        if t.v1.is_none() {
+            return Ok(NodeConfig::new());
+        }
+        let nct = t.v1.unwrap();
+        let keypair = match nct.keypair {
+            Some(kp) => kp,
+            None => {
+                let mut csprng = OsRng {};
+                Keypair::generate(&mut csprng)
+            }
+        };
+        let our_node = match nct.our_node {
+            Some(mut on) => {
+                on.pubkey.replace(keypair.public.clone());
+                NodeInfo::try_from(on)?
+            }
+            None => NodeInfo::new(keypair.public.clone()),
+        };
+        Ok(NodeConfig {
+            our_node,
+            send_stats: nct.send_stats.unwrap_or(30000.),
+            stats_ignore: nct.stats_ignore.unwrap_or(60000.),
+            keypair,
+        })
+    }
+}
+
+/// Toml representation of the NodeConfig
+#[derive(Debug, Deserialize, Serialize)]
+struct NodeConfigToml {
+    pub send_stats: Option<f64>,
+    pub stats_ignore: Option<f64>,
+    pub keypair: Option<Keypair>,
+    pub our_node: Option<NodeInfoToml>,
+}
+
+impl From<&NodeConfig> for NodeConfigToml {
+    fn from(nc: &NodeConfig) -> Self {
+        NodeConfigToml {
+            send_stats: Some(nc.send_stats),
+            stats_ignore: Some(nc.stats_ignore),
+            our_node: Some((&nc.our_node).into()),
+            keypair: Some(Keypair::from_bytes(&nc.keypair.to_bytes()).unwrap()),
+        }
+    }
+}
+
+/// Toml representation of the NodeInfo
+#[derive(Debug, Deserialize, Serialize)]
+struct NodeInfoToml {
+    pub id: Option<U256>,
+    pub info: String,
+    pub client: String,
+    pub pubkey: Option<PublicKey>,
+}
+
+impl From<&NodeInfo> for NodeInfoToml {
+    fn from(ni: &NodeInfo) -> Self {
+        NodeInfoToml {
+            id: None,
+            info: ni.info.clone(),
+            client: ni.client.clone(),
+            pubkey: Some(ni.pubkey.clone()),
+        }
+    }
+}
+
+/// What is stored on the node. If the configuration is too different,
+/// a new version has to be added.
 #[derive(Debug, Deserialize, Serialize)]
 struct Toml {
-    v1: Option<NodeConfig>,
+    v1: Option<NodeConfigToml>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn save_load() -> Result<(), String>{
+        let nc = NodeConfig::new();
+        let nc_str = nc.to_string()?;
+        let nc_clone = NodeConfig::try_from(nc_str)?;
+        assert_eq!(nc.keypair.to_bytes(), nc_clone.keypair.to_bytes());
+        assert_eq!(nc.our_node.pubkey.to_bytes(), nc_clone.our_node.pubkey.to_bytes());
+        Ok(())
+    }
 }

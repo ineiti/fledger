@@ -9,7 +9,7 @@ use wasm_webrtc::{
 };
 use web_sys::window;
 
-use common::node::{Node, config::NodeInfo, logic::Stat, version::VERSION_STRING};
+use common::node::{Node, logic::Stat, version::VERSION_STRING};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -133,14 +133,14 @@ impl FledgerWeb {
 
 #[wasm_bindgen]
 pub struct FledgerState {
-    info: NodeInfo,
+    info: String,
     stats: String,
 }
 
 #[wasm_bindgen]
 impl FledgerState {
     pub fn get_node_name(&self) -> String {
-        self.info.info.clone()
+        self.info.clone()
     }
 
     pub fn get_stats_table(&self) -> String {
@@ -165,7 +165,7 @@ impl FledgerState {
         let now = Date::now();
         for stat in stats_node {
             if let Some(ni) = stat.node_info.as_ref() {
-                if node.info().map_err(|e| anyhow!(e))?.id != ni.id {
+                if node.info().map_err(|e| anyhow!(e))?.get_id() != ni.get_id() {
                     stats_vec.push(
                         vec![
                             format!("{}", ni.info),
@@ -180,15 +180,19 @@ impl FledgerState {
         }
         let stats = format!("<tr><td>{}</td></tr>", stats_vec.join("</td></tr><tr><td>"));
 
+        let info = match node.info(){
+            Ok(info) => info.info,
+            Err(_) => String::from("Loading"),
+        };
         Ok(Self {
-            info: node.info().unwrap_or(NodeInfo::new()),
+            info,
             stats,
         })
     }
 
     fn empty() -> Self {
         Self {
-            info: NodeInfo::new(),
+            info: String::from("Loading"),
             stats: String::from(""),
         }
     }

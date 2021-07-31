@@ -144,8 +144,8 @@ impl Network {
                 match output {
                     NCOutput::WebSocket(message, remote) => {
                         let (id_init, id_follow) = match remote {
-                            true => (conn.0.clone(), self.node_config.our_node.id.clone()),
-                            false => (self.node_config.our_node.id.clone(), conn.0.clone()),
+                            true => (conn.0.clone(), self.node_config.our_node.get_id()),
+                            false => (self.node_config.our_node.get_id(), conn.0.clone()),
                         };
                         let peer_info = PeerInfo {
                             id_init,
@@ -179,22 +179,11 @@ impl Network {
         match msg {
             WSSignalMessage::Challenge(version, challenge) => {
                 info!("Processing Challenge message version: {}", version);
-                // let mut csprng = OsRng {};
-                // let keypair: Keypair = Keypair::generate(&mut csprng);
-                // let message: &[u8] = b"This is a test of the tsunami alert system.";
-                // let signature: Signature = keypair.sign(message);
-
                 let ma = MessageAnnounce {
                     version,
                     challenge,
                     node_info: self.node_config.our_node.clone(),
-                    signature: self
-                        .node_config
-                        .get_keypair()
-                        .map_err(|e| e.to_string())?
-                        .sign(&challenge.to_bytes())
-                        .to_bytes()
-                        .to_vec(),
+                    signature: self.node_config.keypair.sign(&challenge.to_bytes()),
                 };
                 self.ws.send(
                     WebSocketMessage {
@@ -210,7 +199,7 @@ impl Network {
                 self.update_list(list)?;
             }
             WSSignalMessage::PeerSetup(pi) => {
-                let remote_node = match pi.get_remote(&self.node_config.our_node.id) {
+                let remote_node = match pi.get_remote(&self.node_config.our_node.get_id()) {
                     Some(id) => id,
                     None => {
                         return Err("Got alien PeerSetup".to_string());
@@ -239,7 +228,7 @@ impl Network {
     fn update_list(&mut self, list: Vec<NodeInfo>) -> Result<(), String> {
         self.list = list
             .iter()
-            .filter(|entry| entry.id != self.node_config.our_node.id)
+            .filter(|entry| entry.get_id() != self.node_config.our_node.get_id())
             .cloned()
             .collect();
         self.output_tx
