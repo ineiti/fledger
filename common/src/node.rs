@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -70,12 +71,12 @@ impl Node {
                 "".to_string()
             }
         };
-        let mut config = NodeConfig::new(config_str)?;
+        let mut config = NodeConfig::try_from(config_str)?;
         config.our_node.client = client.to_string();
         storage.save(CONFIG_NAME, &config.to_string()?)?;
         info!(
             "Starting node: {} = {}",
-            config.our_node.info, config.our_node.id
+            config.our_node.info, config.our_node.get_id()
         );
 
         // Circular chicken-egg problem: the NodeArc needs a Network. But the Network

@@ -140,14 +140,14 @@ impl FledgerWeb {
 
 #[wasm_bindgen]
 pub struct FledgerState {
-    info: NodeInfo,
-    stats: HashMap<U256, StatNode>,
+    info: String,
+    stats: String,
 }
 
 #[wasm_bindgen]
 impl FledgerState {
     pub fn get_node_name(&self) -> String {
-        self.info.info.clone()
+        self.info.clone()
     }
 
     pub fn get_stats_table(&self) -> String {
@@ -167,7 +167,7 @@ impl FledgerState {
         let mut stats_vec = vec![];
         for stat in stats_node {
             if let Some(ni) = stat.node_info.as_ref() {
-                if self.info.id != ni.id {
+                if self.info.get_id() != ni.get_id() {
                     stats_vec.push(
                         vec![
                             format!("{}", ni.info),
@@ -213,9 +213,13 @@ impl FledgerState {
 
 impl FledgerState {
     fn new(node: &Node) -> Result<Self> {
+        let info = match node.info(){
+            Ok(info) => info.info,
+            Err(_) => String::from("Loading"),
+        };
         Ok(Self {
-            info: node.info().unwrap_or(NodeInfo::new()),
-            stats: node.stats().map_err(|e| anyhow!(e))?,
+            info,
+            stats,
         })
     }
 

@@ -260,7 +260,7 @@ async fn connect_test_simple() -> Result<(), String> {
 
     // Pass messages
     ws_conn.run_queue()?;
-    node1.send(&node2.info()?.id, "ping".to_string())?;
+    node1.send(&node2.info()?.get_id(), "ping".to_string())?;
 
     let mut i: i32 = 0;
     loop {
@@ -275,8 +275,8 @@ async fn connect_test_simple() -> Result<(), String> {
         // }
         if i == 12 {
             info!("Connection should be set up now");
-            node1.send(&node2.info()?.id, "ping".to_string())?;
-            node2.send(&node1.info()?.id, "pong".to_string())?;
+            node1.send(&node2.info()?.get_id(), "ping".to_string())?;
+            node2.send(&node1.info()?.get_id(), "pong".to_string())?;
         }
         if i > 20 {
             break;

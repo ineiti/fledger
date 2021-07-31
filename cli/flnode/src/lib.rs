@@ -55,7 +55,7 @@ async fn list_ping(n: &mut Node) -> Result<(), String> {
     nodes.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
     for node in nodes {
         if let Some(info) = node.node_info.as_ref() {
-            if n.info()?.id != info.id {
+            if n.info()?.get_id() != info.get_id() {
                 info!(
                     "Node: name:{} age:{} ping:({}/{}) conn:({:?}/{:?})",
                     info.info,
