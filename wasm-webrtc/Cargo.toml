@@ -9,23 +9,23 @@ node = []
 
 [dependencies]
 common = {path = "../common"}
-wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"]  }
-js-sys = "0.3.46"
-wasm-bindgen-futures = "0.4.19"
-serde = { version = "1.0.80", features = ["derive"] }
-serde_derive = "^1.0.59"
-serde_json = "1.0.59"
-yew = "0.17.4"
-getrandom = { version = "0.2", features = ["js"] }
+wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
+js-sys = "0.3.51"
+wasm-bindgen-futures = "0.4.24"
+serde = { version = "1.0.127", features = ["derive"] }
+serde_derive = "1.0.127"
+serde_json = "1.0.66"
+yew = "0.18.0"
+getrandom = { version = "0.2.3", features = ["js"] }
 console_error_panic_hook = "0.1.6"
 
-async-trait = ""
-wasm-bindgen-test = ""
-wasm-logger = ""
-log = ""
+async-trait = "0.1.51"
+wasm-bindgen-test = "0.3.24"
+wasm-logger = "0.2.0"
+log = "0.4.14"
 
 [dependencies.web-sys]
-version = "0.3.46"
+version = "0.3.51"
 features = [
   'Headers',
   'Request',
