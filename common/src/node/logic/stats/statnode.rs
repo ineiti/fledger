@@ -123,7 +123,7 @@ impl StatNodes {
     pub fn update(&mut self, ni: NodeInfo) {
         let s = self
             .nodes
-            .entry(ni.id.clone())
+            .entry(ni.get_id().clone())
             .or_insert_with(|| StatNode::new(None, now()));
         s.node_info = Some(ni);
     }
@@ -131,9 +131,9 @@ impl StatNodes {
     pub fn ping_all(&mut self, our_id: &U256, out: Sender<LOutput>) -> Result<(), String> {
         for stat in self.nodes.iter_mut() {
             if let Some(ni) = stat.1.node_info.as_ref() {
-                if our_id != &ni.id {
+                if our_id != &ni.get_id() {
                     let msg_send = Message::V1(MessageV1::Ping());
-                    out.send(LOutput::WebRTC(ni.id.clone(), msg_send.to_string()?))
+                    out.send(LOutput::WebRTC(ni.get_id().clone(), msg_send.to_string()?))
                         .map_err(|e| e.to_string())?;
                     stat.1.ping_tx += 1;
                 }

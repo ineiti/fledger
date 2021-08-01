@@ -112,7 +112,8 @@ impl WebSocketConnectionSend for UnixWSConnection {
 
 fn main() {
     let cfg = Config::from_args();
-    Logger::with_str("error, signal=".to_string() + cfg.logger_str())
+    Logger::try_with_str("error, signal=".to_string() + cfg.logger_str())
+        .unwrap()
         .start()
         .unwrap();
     let ws = Box::new(UnixWebSocket::new());

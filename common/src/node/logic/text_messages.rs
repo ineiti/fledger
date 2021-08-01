@@ -62,7 +62,7 @@ impl TextMessages {
                     let nm =
                         self.nodes_msgs
                             .entry(id)
-                            .or_insert(vec![self.cfg.our_node.id.clone()]);
+                            .or_insert(vec![self.cfg.our_node.get_id()]);
                     nm.push(from.clone());
                     self.send(from, TextMessageV1::Text(text.clone()))
                 } else {
@@ -72,12 +72,12 @@ impl TextMessages {
             TextMessageV1::Set(text) => {
                 // Create a list of nodes, starting with the sender node.
                 let mut list = vec![from.clone()];
-                for node in self.nodes.iter().filter(|n| &n.id != from) {
+                for node in self.nodes.iter().filter(|n| &n.get_id() != from) {
                     // Send the text to all nodes other than the sender node and ourselves.
-                    self.send(&node.id, TextMessageV1::Text(text.clone()))?;
-                    list.push(node.id.clone());
+                    self.send(&node.get_id(), TextMessageV1::Text(text.clone()))?;
+                    list.push(node.get_id().clone());
                 }
-                list.push(self.cfg.our_node.id.clone());
+                list.push(self.cfg.our_node.get_id().clone());
                 self.nodes_msgs.insert(text.id(), list);
                 self.messages.insert(text.id(), text);
                 Ok(())
@@ -111,7 +111,7 @@ impl TextMessages {
         trace!("{} update_nodes", self.cfg.our_node.info);
         let new_nodes: Vec<NodeInfo> = nodes
             .iter()
-            .filter(|n| n.id != self.cfg.our_node.id)
+            .filter(|n| n.get_id() != self.cfg.our_node.get_id())
             .cloned()
             .collect();
 
@@ -119,9 +119,9 @@ impl TextMessages {
         for leader in new_nodes
             .iter()
             .filter(|n| !self.nodes.contains(n))
-            .filter(|n| matches!(&n.node_capacities, Some(nc) if nc.leader == Some(true)))
+            .filter(|n| n.node_capacities.leader == true)
         {
-            self.send(&leader.id, TextMessageV1::List())?;
+            self.send(&leader.get_id(), TextMessageV1::List())?;
         }
 
         // Store new nodes, overwrite previous nodes
@@ -133,7 +133,7 @@ impl TextMessages {
     /// Asks the leaders for new messages.
     pub fn update_messages(&mut self) -> Result<()> {
         for leader in self.get_leaders() {
-            self.send(&leader.id, TextMessageV1::List())?;
+            self.send(&leader.get_id(), TextMessageV1::List())?;
         }
         Ok(())
     }
@@ -141,7 +141,7 @@ impl TextMessages {
     /// Adds a new message to the list of messages and sends it to the leaders.
     pub fn add_message(&mut self, msg: String) -> Result<()> {
         let tm = TextMessage {
-            src: self.cfg.our_node.id.clone(),
+            src: self.cfg.our_node.get_id(),
             created: now(),
             liked: 0,
             msg,
@@ -150,7 +150,7 @@ impl TextMessages {
 
         // let mut ret = vec![];
         for leader in self.get_leaders() {
-            self.send(&leader.id, TextMessageV1::Set(tm.clone()))?;
+            self.send(&leader.get_id(), TextMessageV1::Set(tm.clone()))?;
         }
         Ok(())
     }
@@ -159,9 +159,7 @@ impl TextMessages {
         self.nodes
             .iter()
             .filter(|n| {
-                n.node_capacities
-                    .as_ref()
-                    .map_or(false, |m| m.leader.unwrap_or(false))
+                n.node_capacities.leader
             })
             .cloned()
             .collect()
@@ -246,8 +244,8 @@ mod tests {
     impl TMTest {
         pub fn new(leader: bool) -> Result<Self> {
             let (tx, queue) = channel::<LOutput>();
-            let mut cfg = NodeConfig::new("".into()).map_err(|e| anyhow!(e))?;
-            cfg.our_node.node_capacities.as_mut().unwrap().leader = Some(leader);
+            let mut cfg = NodeConfig::new();
+            cfg.our_node.node_capacities.leader = Some(leader);
             let tm = TextMessages::new(tx, cfg.clone());
             Ok(TMTest { cfg, queue, tm })
         }
@@ -260,7 +258,7 @@ mod tests {
             for tm in tms.iter() {
                 for msg in tm.queue.try_iter() {
                     match msg {
-                        LOutput::WebRTC(to, m) => msgs.push((tm.cfg.our_node.id.clone(), to, m)),
+                        LOutput::WebRTC(to, m) => msgs.push((tm.cfg.our_node.get_id(), to, m)),
                         _ => warn!("Unsupported message received"),
                     }
                 }
@@ -273,7 +271,7 @@ mod tests {
 
             for (from, to, s) in msgs {
                 let msg: Message = serde_json::from_str(&s)?;
-                if let Some(tm) = tms.into_iter().find(|tm| tm.cfg.our_node.id == to) {
+                if let Some(tm) = tms.into_iter().find(|tm| tm.cfg.our_node.get_id() == to) {
                     debug!("Got message {:?} for {}", s, to);
                     match msg {
                         Message::V1(msg_send) => match msg_send {

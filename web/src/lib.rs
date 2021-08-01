@@ -3,7 +3,6 @@ use js_sys::Date;
 use log::{error, info, warn};
 use regex::Regex;
 use std::{
-    collections::HashMap,
     convert::TryInto,
     sync::{Arc, Mutex},
 };
@@ -13,10 +12,7 @@ use wasm_webrtc::{
 };
 use web_sys::window;
 
-use common::{
-    node::{config::NodeInfo, logic::stats::statnode::StatNode, version::VERSION_STRING, Node},
-    types::U256,
-};
+use common::node::{logic::stats::statnode::StatNode, version::VERSION_STRING, Node};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -151,39 +147,7 @@ impl FledgerState {
     }
 
     pub fn get_stats_table(&self) -> String {
-        match self.get_stats_table_result() {
-            Ok(str) => str,
-            Err(e) => {
-                error!("Couldn't get result: {:?}", e);
-                format!("")
-            }
-        }
-    }
-
-    fn get_stats_table_result(&self) -> Result<String> {
-        let mut stats_node: Vec<StatNode> = self.stats.iter().map(|(_k, v)| v.clone()).collect();
-        stats_node.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
-        let now = Date::now();
-        let mut stats_vec = vec![];
-        for stat in stats_node {
-            if let Some(ni) = stat.node_info.as_ref() {
-                if self.info.get_id() != ni.get_id() {
-                    stats_vec.push(
-                        vec![
-                            format!("{}", ni.info),
-                            format!("rx:{} tx:{}", stat.ping_rx, stat.ping_tx),
-                            format!("{}s", ((now - stat.last_contact) / 1000.).floor()),
-                            format!("in:{:?} out:{:?}", stat.incoming, stat.outgoing),
-                        ]
-                        .join("</td><td>"),
-                    );
-                }
-            }
-        }
-        Ok(format!(
-            "<tr><td>{}</td></tr>",
-            stats_vec.join("</td></tr><tr><td>")
-        ))
+        self.stats.clone()
     }
 
     pub fn get_version(&self) -> String {
@@ -202,7 +166,7 @@ impl FledgerState {
         0
     }
 
-    pub fn get_msgs(&self) -> FledgerMessages{
+    pub fn get_msgs(&self) -> FledgerMessages {
         FledgerMessages::new()
     }
 
@@ -213,38 +177,74 @@ impl FledgerState {
 
 impl FledgerState {
     fn new(node: &Node) -> Result<Self> {
-        let info = match node.info(){
+        let info = match node.info() {
             Ok(info) => info.info,
             Err(_) => String::from("Loading"),
         };
         Ok(Self {
             info,
-            stats,
+            stats: FledgerState::get_stats_table_result(node)?,
         })
+    }
+
+    fn get_stats_table_result(node: &Node) -> Result<String> {
+        let mut stats_node: Vec<StatNode> = node
+            .stats()
+            .map_err(|e| anyhow!(e))?
+            .iter()
+            .map(|(_k, v)| v.clone())
+            .collect();
+        stats_node.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
+        let now = Date::now();
+        let mut stats_vec = vec![];
+        for stat in stats_node {
+            if let Some(ni) = stat.node_info.as_ref() {
+                if node.info().map_err(|e| anyhow!(e))?.get_id() != ni.get_id() {
+                    stats_vec.push(
+                        vec![
+                            format!("{}", ni.info),
+                            format!("rx:{} tx:{}", stat.ping_rx, stat.ping_tx),
+                            format!("{}s", ((now - stat.last_contact) / 1000.).floor()),
+                            format!("in:{:?} out:{:?}", stat.incoming, stat.outgoing),
+                        ]
+                        .join("</td><td>"),
+                    );
+                }
+            }
+        }
+        Ok(format!(
+            "<tr><td>{}</td></tr>",
+            stats_vec.join("</td></tr><tr><td>")
+        ))
     }
 
     fn empty() -> Self {
         Self {
-            info: NodeInfo::new(),
-            stats: HashMap::new(),
+            info: String::from(""),
+            stats: String::from(""),
         }
     }
 }
 
 #[wasm_bindgen]
 pub struct FledgerMessage {
-    pub text: String,
+    text: String,
 }
 
 #[wasm_bindgen]
 pub struct FledgerMessages {
-    pub msgs: Vec<FledgerMessage>,
+    msgs: Vec<FledgerMessage>,
 }
 
 impl FledgerMessages {
     fn new() -> Self {
-        &FledgerMessages{
-            msgs: vec![]
-        }
+        FledgerMessages { msgs: vec![] }
+    }
+}
+
+#[wasm_bindgen]
+impl FledgerMessages {
+    pub fn get_messages(&self) -> String {
+        self.msgs.iter().map(|fm| fm.text.clone()).collect::<Vec<String>>().join(",")
     }
 }

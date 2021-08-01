@@ -34,10 +34,10 @@ impl Stats {
 
     pub fn send_stats(&mut self) -> Result<(), String> {
         // Send statistics to the signalling server
-        if self.stats.tick(self.node_config.send_stats.unwrap()) {
-            self.stats.expire(self.node_config.stats_ignore.unwrap());
+        if self.stats.tick(self.node_config.send_stats) {
+            self.stats.expire(self.node_config.stats_ignore);
 
-            let stats: Vec<NodeStat> = self.stats.collect(&&self.node_config.our_node.id);
+            let stats: Vec<NodeStat> = self.stats.collect(&&self.node_config.our_node.get_id());
             self.output_tx
                 .send(LOutput::SendStats(stats))
                 .map_err(|e| e.to_string())?;
@@ -64,7 +64,7 @@ impl Stats {
 
     pub fn ping_all(&mut self) -> Result<(), String> {
         self.stats
-            .ping_all(&&self.node_config.our_node.id, self.output_tx.clone())
+            .ping_all(&&self.node_config.our_node.get_id(), self.output_tx.clone())
     }
 
     pub fn ping_rcv(&mut self, from: &U256) {
@@ -76,7 +76,7 @@ impl Stats {
 mod tests {
     use super::Stats;
     use crate::node::{
-        config::{NodeConfig, NodeInfo},
+        config::{NodeConfig},
         logic::LOutput,
     };
     use log::LevelFilter;
@@ -88,11 +88,13 @@ mod tests {
     fn cleanup_stale_nodes() -> Result<(), String> {
         simple_logging::log_to_stderr(LevelFilter::Trace);
 
-        let n1 = NodeInfo::new();
-        let n2 = NodeInfo::new();
-        let mut nc = NodeConfig::new("".to_string())?;
-        nc.send_stats = Some(1f64);
-        nc.stats_ignore = Some(2f64);
+        let nc1 = NodeConfig::new();
+        let n1 = nc1.our_node;
+        let nc2 = NodeConfig::new();
+        let n2 = nc2.our_node;
+        let mut nc = NodeConfig::new();
+        nc.send_stats = 1f64;
+        nc.stats_ignore = 2f64;
         let (tx, _rx) = channel::<LOutput>();
 
         let mut ns = Stats::new(nc.clone(), tx.clone());
@@ -101,7 +103,7 @@ mod tests {
         assert_eq!(2, ns.stats.len(), "Should have two nodes now");
 
         sleep(Duration::from_millis(10));
-        ns.ping_rcv(&n1.id);
+        ns.ping_rcv(&n1.get_id());
         ns.send_stats()?;
         assert_eq!(1, ns.stats.len(), "One node should disappear");
         Ok(())
