@@ -1,4 +1,7 @@
 use crate::types::U256;
+use ed25519_dalek::{Keypair, SignatureError};
+use rand::rngs::OsRng;
+
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -10,18 +13,33 @@ pub struct NodeInfo {
     pub info: String,
     /// What client this node runs on - "Node" or the navigator id
     pub client: String,
+    /// The public key in bytes
+    pub pubkey_bytes: Vec<u8>,
     /// node capacities of what this node can do
-    pub node_capacities: Option<NodeCapacities>,
+    pub node_capacities: NodeCapacities,
 }
 
 impl NodeInfo {
-    /// Creates a new NodeInfo with a random id.
-    pub fn new() -> NodeInfo {
+    /// Creates a new NodeInfo with a random id, and a particular public key.
+    pub fn new_from_key(pubkey_bytes: Vec<u8>) -> NodeInfo {
         NodeInfo {
             id: U256::rnd(),
             info: names::Generator::default().next().unwrap().to_string(),
             client: "Node".to_string(),
-            node_capacities: Some(NodeCapacities::new()),
+            pubkey_bytes: pubkey_bytes,
+        }
+    }
+
+    /// Creates a new NodeInfo with a random id and key.
+    pub fn new() -> NodeInfo {
+        let mut csprng = OsRng {};
+        let keypair = Keypair::generate(&mut csprng);
+        NodeInfo {
+            id: U256::rnd(),
+            info: names::Generator::default().next().unwrap().to_string(),
+            client: "Node".to_string(),
+            node_capacities: NodeCapacities::new(),
+            pubkey_bytes: keypair.public.to_bytes().to_vec(),
         }
     }
 
@@ -68,6 +86,8 @@ pub struct NodeConfig {
     pub stats_ignore: Option<f64>,
     /// our_node is the actual configuration of the node
     pub our_node: NodeInfo,
+    /// the cryptographic keypair as a vector of bytes
+    pub keypair_bytes: Vec<u8>,
 }
 
 impl NodeConfig {
@@ -80,11 +100,13 @@ impl NodeConfig {
             // Toml { v1: None }
             Toml { v1: None }
         };
-
+        let mut csprng = OsRng {};
+        let keypair = Keypair::generate(&mut csprng);
         let mut nc = t.v1.unwrap_or(NodeConfig {
-            our_node: NodeInfo::new(),
-            send_stats: None,
-            stats_ignore: None,
+            our_node: NodeInfo::new_from_key(keypair.public.to_bytes().to_vec()),
+            send_stats: Some(30000.),
+            stats_ignore: Some(60000.),
+            keypair_bytes: keypair.to_bytes().to_vec(),
         });
         nc.set_defaults();
         nc.our_node.set_defaults();
@@ -102,6 +124,10 @@ impl NodeConfig {
     pub fn set_defaults(&mut self){
         self.send_stats.get_or_insert(30000.);
         self.stats_ignore.get_or_insert(60000.);
+    }
+    
+    pub fn get_keypair(&self) -> Result<Keypair, SignatureError> {
+        Keypair::from_bytes(&self.keypair_bytes)
     }
 }
 

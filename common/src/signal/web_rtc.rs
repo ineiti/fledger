@@ -213,4 +213,5 @@ pub struct MessageAnnounce {
     pub version: u64,
     pub challenge: U256,
     pub node_info: NodeInfo,
+    pub signature: Vec<u8>,
 }
