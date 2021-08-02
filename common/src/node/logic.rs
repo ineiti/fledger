@@ -1,4 +1,4 @@
-use log::{error, debug, trace, info};
+use log::{error, debug, trace};
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 
