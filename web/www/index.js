@@ -30,9 +30,9 @@ function update_html(state) {
     sh("version", state.get_version());
     sh("messages", state.get_msgs())
     sh("nodes_online", state.nodes_online);
-    sh("msgs_system", state.msgs_system);
-    sh("msgs_local", state.msgs_local);
-    sh("mana", state.mana);
+//     sh("msgs_system", state.msgs_system);
+//     sh("msgs_local", state.msgs_local);
+//     sh("mana", state.mana);
 }
 
 document.getElementById("send_msg").addEventListener("click", event => {
