@@ -17,7 +17,7 @@ use crate::signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection};
 use crate::types::{DataStorage, U256};
 
 use self::{
-    logic::{LInput, LOutput, Stat},
+    logic::{stats::statnode::StatNode, LInput, LOutput, text_messages::TextMessage},
     network::NInput,
 };
 
@@ -76,7 +76,8 @@ impl Node {
         storage.save(CONFIG_NAME, &config.to_string()?)?;
         info!(
             "Starting node: {} = {}",
-            config.our_node.info, config.our_node.get_id()
+            config.our_node.info,
+            config.our_node.get_id()
         );
 
         // Circular chicken-egg problem: the NodeArc needs a Network. But the Network
@@ -142,9 +143,9 @@ impl Node {
 
     /// TODO: remove ping and send - they should be called only by the Logic class.
     /// Pings all known nodes
-    pub async fn ping(&mut self, msg: &str) -> Result<(), String> {
+    pub async fn ping(&mut self) -> Result<(), String> {
         self.logic_tx
-            .send(LInput::PingAll(msg.to_string()))
+            .send(LInput::PingAll())
             .map_err(|e| e.to_string())
     }
 
@@ -175,9 +176,28 @@ impl Node {
     }
 
     /// Returns a copy of the logic stats
-    pub fn stats(&self) -> Result<HashMap<U256, Stat>, String> {
+    pub fn stats(&self) -> Result<HashMap<U256, StatNode>, String> {
         if let Ok(arc) = self.arc.try_lock() {
-            return Ok(arc.logic.stats.clone());
+            return Ok(arc.logic.stats.stats.clone());
+        }
+        Err("Couldn't lock arc".to_string())
+    }
+
+    pub fn add_message(&self, msg: String) -> Result<(), String> {
+        self.logic_tx
+            .send(LInput::AddMessage(msg))
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn get_messages(&self) -> Result<Vec<TextMessage>, String> {
+        if let Ok(arc) = self.arc.try_lock() {
+            return Ok(arc
+                .logic
+                .text_messages
+                .messages
+                .iter()
+                .map(|(_k, v)| v.clone())
+                .collect());
         }
         Err("Couldn't lock arc".to_string())
     }

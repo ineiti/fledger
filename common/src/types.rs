@@ -6,6 +6,7 @@ use std::{
 
 use rand::random;
 use serde::{Deserialize, Serialize};
+use sha2::digest::{consts::U32, generic_array::GenericArray};
 
 /// Nicely formatted 256 bit structure
 #[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Eq, Hash)]
@@ -20,6 +21,12 @@ impl fmt::Display for U256 {
             f.write_fmt(format_args!("{:02x}", byte))?;
         }
         Ok(())
+    }
+}
+
+impl AsRef<[u8]> for U256 {
+    fn as_ref(&self) -> &[u8] {
+        return &self.0;
     }
 }
 
@@ -65,6 +72,17 @@ impl U256 {
     }
 }
 
+impl From<GenericArray<u8, U32>> for U256 {
+    fn from(ga: GenericArray<u8, U32>) -> Self {
+        let mut u = U256 { 0: [0u8; 32] };
+        ga.as_slice()
+            .iter()
+            .enumerate()
+            .for_each(|(i, b)| u.0[i] = *b);
+        u
+    }
+}
+
 impl From<[u8; 32]> for U256 {
     fn from(b: [u8; 32]) -> Self {
         U256{0: b}
@@ -78,3 +96,15 @@ pub trait DataStorage {
 }
 
 pub type ProcessCallback = Arc<Mutex<Box<dyn FnMut()>>>;
+
+#[cfg(target_arch = "wasm32")]
+pub fn now() -> f64 {
+    use js_sys::Date;
+    Date::now()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn now() -> f64 {
+    use chrono::Utc;
+    Utc::now().timestamp_millis() as f64
+}

@@ -1,43 +1,36 @@
-use log::info;
+use log::{error, debug, trace, info};
 
-#[cfg(target_arch = "wasm32")]
-fn now() -> f64 {
-    use js_sys::Date;
-    Date::now()
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn now() -> f64 {
-    use chrono::Utc;
-    Utc::now().timestamp_millis() as f64
-}
-
-use std::{
-    collections::HashMap,
-    sync::mpsc::{channel, Receiver, Sender},
-};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 use super::{
     config::{NodeConfig, NodeInfo},
     network::connection_state::CSEnum,
-    version::VERSION_STRING,
 };
 use crate::{
+    node::version::VERSION_STRING,
     signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState},
     types::U256,
 };
+
+mod messages;
+pub mod stats;
+pub mod text_messages;
+use messages::*;
+use stats::*;
+pub use text_messages::*;
 
 #[derive(Debug)]
 pub enum LInput {
     WebRTC(U256, String),
     SetNodes(Vec<NodeInfo>),
-    PingAll(String),
+    PingAll(),
     ConnStat(
         U256,
         WebRTCConnectionState,
         CSEnum,
         Option<ConnectionStateMap>,
     ),
+    AddMessage(String),
 }
 
 #[derive(Debug)]
@@ -46,63 +39,31 @@ pub enum LOutput {
     SendStats(Vec<NodeStat>),
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum ConnState {
-    Idle,
-    Setup,
-    Connected,
-    TURN,
-    STUN,
-    Host,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Stat {
-    pub node_info: Option<NodeInfo>,
-    pub ping_rx: u32,
-    pub ping_tx: u32,
-    pub last_contact: f64,
-    pub incoming: ConnState,
-    pub outgoing: ConnState,
-    pub client_info: String,
-}
-
-impl Stat {
-    pub fn new(node_info: Option<NodeInfo>) -> Stat {
-        Stat {
-            node_info,
-            ping_rx: 0,
-            ping_tx: 0,
-            last_contact: now(),
-            incoming: ConnState::Idle,
-            outgoing: ConnState::Idle,
-            client_info: "N/A".to_string(),
-        }
-    }
-}
-
 pub struct Logic {
-    pub stats: HashMap<U256, Stat>,
+    pub stats: Stats,
+    pub text_messages: TextMessages,
     pub input_tx: Sender<LInput>,
     pub output_rx: Receiver<LOutput>,
     input_rx: Receiver<LInput>,
-    output_tx: Sender<LOutput>,
-    node_config: NodeConfig,
-    last_stats: f64,
+    _output_tx: Sender<LOutput>,
+    _node_config: NodeConfig,
+    counter: u32,
 }
 
 impl Logic {
     pub fn new(node_config: NodeConfig) -> Logic {
         let (input_tx, input_rx) = channel::<LInput>();
-        let (output_tx, output_rx) = channel::<LOutput>();
+        let (_output_tx, output_rx) = channel::<LOutput>();
+        let stats = Stats::new(node_config.clone(), _output_tx.clone());
         Logic {
-            node_config,
-            stats: HashMap::new(),
+            _node_config: node_config.clone(),
+            stats,
+            text_messages: TextMessages::new(_output_tx.clone(), node_config.clone()),
             input_tx,
             input_rx,
-            output_tx,
+            _output_tx,
             output_rx,
-            last_stats: 0.,
+            counter: 0,
         }
     }
 
@@ -111,154 +72,62 @@ impl Logic {
         let size = msgs.len();
         for msg in msgs {
             match msg {
-                LInput::WebRTC(id, msg) => self.rcv(id, msg),
-                LInput::SetNodes(nodes) => self.store_nodes(nodes),
-                LInput::PingAll(msg) => self.ping_all(msg)?,
-                LInput::ConnStat(id, dir, c, stm) => self.update_connection_state(id, dir, c, stm),
+                LInput::WebRTC(id, msg) => self.rcv(id, msg)?,
+                LInput::SetNodes(nodes) => {
+                    self.stats.store_nodes(nodes.clone());
+                    self.text_messages.update_nodes(nodes).map_err(|e| e.to_string())?;
+                }
+                LInput::PingAll() => self.stats.ping_all()?,
+                LInput::ConnStat(id, dir, c, stm) => {
+                    self.stats.update_connection_state(id, dir, c, stm)
+                }
+                LInput::AddMessage(msg) => self
+                    .text_messages
+                    .add_message(msg)
+                    .map_err(|e| e.to_string())?,
             }
         }
-
-        // Send statistics to the signalling server
-        if now() > self.last_stats + self.node_config.send_stats {
-            self.last_stats = now();
-            let expired: Vec<U256> = self
-                .stats
-                .iter()
-                .filter(|(_k, v)| now() - v.last_contact > self.node_config.stats_ignore)
-                .map(|(k, _v)| k.clone())
-                .collect();
-            for k in expired {
-                self.stats.remove(&k);
-            }
-
-            let stats: Vec<NodeStat> = self
-                .stats
-                .iter()
-                // Ignore our node and nodes that are inactive
-                .filter(|(k, _v)| k != &&self.node_config.our_node.get_id())
-                .map(|(k, v)| NodeStat {
-                    id: k.clone(),
-                    version: VERSION_STRING.to_string(),
-                    ping_ms: 0u32,
-                    ping_rx: v.ping_rx,
-                })
-                .collect();
-            self.output_tx
-                .send(LOutput::SendStats(stats))
+        // TODO: don't use a counter here, as the `process` is called a variable number
+        // of times per second.
+        self.counter += 1;
+        if self.counter % 100 == 0 {
+            self.text_messages
+                .update_messages()
                 .map_err(|e| e.to_string())?;
         }
+        self.stats.send_stats()?;
         Ok(size)
     }
 
-    fn update_connection_state(
-        &mut self,
-        id: U256,
-        dir: WebRTCConnectionState,
-        st: CSEnum,
-        state: Option<ConnectionStateMap>,
-    ) {
-        self.stats
-            .entry(id.clone())
-            .or_insert_with(|| Stat::new(None));
-        self.stats.entry(id.clone()).and_modify(|s| {
-            let cs = match st {
-                CSEnum::Idle => ConnState::Idle,
-                CSEnum::Setup => ConnState::Setup,
-                CSEnum::HasDataChannel => {
-                    if let Some(state_value) = state {
-                        match state_value.type_local {
-                            crate::signal::web_rtc::ConnType::Unknown => ConnState::Connected,
-                            crate::signal::web_rtc::ConnType::Host => ConnState::Host,
-                            crate::signal::web_rtc::ConnType::STUNPeer => ConnState::STUN,
-                            crate::signal::web_rtc::ConnType::STUNServer => ConnState::STUN,
-                            crate::signal::web_rtc::ConnType::TURN => ConnState::TURN,
-                        }
-                    } else {
-                        ConnState::Connected
-                    }
-                }
-            };
-            if dir == WebRTCConnectionState::Initializer {
-                s.outgoing = cs;
-            } else {
-                s.incoming = cs;
-            }
-        });
-    }
-
-    fn store_nodes(&mut self, nodes: Vec<NodeInfo>) {
-        for ni in nodes {
-            let s = self
-                .stats
-                .entry(ni.get_id())
-                .or_insert_with(|| Stat::new(None));
-            s.node_info = Some(ni);
-        }
-    }
-
-    fn ping_all(&mut self, msg: String) -> Result<(), String> {
-        for stat in self.stats.iter_mut() {
-            if let Some(ni) = stat.1.node_info.as_ref() {
-                if self.node_config.our_node.get_id() != ni.get_id() {
-                    self.output_tx
-                        .send(LOutput::WebRTC(ni.get_id(), msg.clone()))
-                        .map_err(|e| e.to_string())?;
-                    stat.1.ping_tx += 1;
+    fn rcv_msg(&mut self, from: U256, msg: MessageV1) -> Result<(), String> {
+        debug!("got msg {} from {:?}", msg, from);
+        match msg {
+            MessageV1::Ping() => self.stats.ping_rcv(&from),
+            MessageV1::VersionGet() => {}
+            MessageV1::TextMessage(msg) => self
+                .text_messages
+                .handle_msg(&from, msg)
+                .map_err(|e| e.to_string())?,
+            MessageV1::Version(v) => {
+                let version_semver = semver::Version::parse(VERSION_STRING).unwrap();
+                if semver::Version::parse(&v).map_err(|e| e.to_string())?.major
+                    > version_semver.major
+                {
+                    error!("Found node with higher major version - you should update yours, too!");
                 }
             }
+            MessageV1::Ok() => {}
+            MessageV1::Error(_) => {}
         }
         Ok(())
     }
 
-    fn rcv(&mut self, id: U256, msg: String) {
-        info!("Received message from WebRTC: {}", msg);
-        self.stats
-            .entry(id.clone())
-            .or_insert_with(|| Stat::new(None));
-        self.stats.entry(id.clone()).and_modify(|s| {
-            s.last_contact = now();
-            s.ping_rx += 1;
-        });
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{LInput, Logic};
-    use crate::node::config::{NodeConfig};
-    use flexi_logger::Logger;
-    use futures::executor;
-    use std::{thread::sleep, time::Duration};
-
-    #[test]
-    /// Starts a Logic with two nodes, then receives ping only from one node.
-    /// The other node should be removed from the stats-list.
-    fn cleanup_stale_nodes() -> Result<(), String> {
-        Logger::with_str("debug").start().unwrap();
-
-        let nc1 = NodeConfig::new();
-        let n1 = nc1.our_node;
-        let nc2 = NodeConfig::new();
-        let n2 = nc2.our_node;
-        let mut nc = NodeConfig::new();
-        nc.send_stats = 1f64;
-        nc.stats_ignore = 2f64;
-
-        let mut logic = Logic::new(nc);
-        logic
-            .input_tx
-            .send(LInput::SetNodes(vec![n1.clone(), n2.clone()]))
-            .map_err(|e| e.to_string())?;
-        executor::block_on(logic.process())?;
-        assert_eq!(2, logic.stats.len(), "Should have two nodes now");
-
-        sleep(Duration::from_millis(10));
-        logic
-            .input_tx
-            .send(LInput::WebRTC(n1.get_id(), "ping".to_string()))
-            .map_err(|e| e.to_string())?;
-        executor::block_on(logic.process())?;
-        assert_eq!(1, logic.stats.len(), "One node should disappear");
-        Ok(())
+    fn rcv(&mut self, id: U256, msg_str: String) -> Result<(), String> {
+        trace!("Received message from WebRTC: {}", msg_str);
+        let msg: Message = msg_str.into();
+        match msg {
+            Message::V1(send) => self.rcv_msg(id, send),
+            Message::Unknown(s) => Err(s),
+        }
     }
 }

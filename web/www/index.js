@@ -5,14 +5,17 @@ console.log("started fledger web");
 
 setInterval(() => {
     const state = fw.tick();
-    update_html(state);
+    if (state !== undefined){
+        update_html(state);
+    }
 }, 1000);
 
+function sh(tag, str) {
+    document.getElementById(tag).innerHTML = str;
+}
+
 function update_html(state) {
-    let stats_table = state.get_stats_table();
-    if (stats_table === "") {
-        return;
-    }
+    let stats_table = state.get_node_table();
     let el_fetching = document.getElementById("fetching");
     let el_table_stats = document.getElementById("table_stats");
     el_table_stats.classList.remove("hidden");
@@ -21,8 +24,22 @@ function update_html(state) {
         el_table_stats.classList.add("hidden");
     } else {
         el_fetching.classList.add("hidden");
-        document.getElementById("node_stats").innerHTML = stats_table;
+        sh("node_stats", stats_table);
     }
-    document.getElementById("node_info").innerHTML = state.get_node_name();
-    document.getElementById("version").innerHTML = state.get_version();
+    sh("node_info", state.get_node_name());
+    sh("version", state.get_version());
+    sh("messages", state.get_msgs())
+    sh("nodes_online", state.nodes_online);
+    sh("msgs_system", state.msgs_system);
+    sh("msgs_local", state.msgs_local);
+    sh("mana", state.mana);
 }
+
+document.getElementById("send_msg").addEventListener("click", event => {
+    let msg = document.getElementById("your_message").value;
+    if (msg == ""){
+        alert("Please enter some message");
+        return;
+    }
+    fw.send_msg(msg);
+});

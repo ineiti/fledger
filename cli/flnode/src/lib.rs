@@ -1,12 +1,12 @@
 use js_sys::Date;
-use log::{error, info};
+use log::{error, info, trace};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 use wasm_webrtc::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
 use wasm_webrtc::helpers::wait_ms;
 
 use common::{
-    node::{logic::Stat, version::VERSION_STRING, Node},
+    node::{logic::stats::statnode::StatNode, version::VERSION_STRING, Node},
     types::DataStorage,
 };
 
@@ -50,8 +50,8 @@ async fn start(url: &str) -> Result<Node, JsValue> {
 
 async fn list_ping(n: &mut Node) -> Result<(), String> {
     n.list()?;
-    n.ping("something").await?;
-    let mut nodes: Vec<Stat> = n.stats()?.iter().map(|(_k, v)| v.clone()).collect();
+    n.ping().await?;
+    let mut nodes: Vec<StatNode> = n.stats()?.iter().map(|(_k, v)| v.clone()).collect();
     nodes.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
     for node in nodes {
         if let Some(info) = node.node_info.as_ref() {
@@ -98,6 +98,10 @@ pub async fn run_app() {
             info!("Waiting");
             if let Err(e) = list_ping(&mut node).await {
                 error!("Couldn't list or ping nodes: {}", e);
+            }
+            match node.get_messages(){
+                Ok(msgs) => trace!("Got messages: {:?}", msgs),
+                Err(e) => error!("While getting messages: {:?}", e),
             }
         }
         wait_ms(1000).await;
