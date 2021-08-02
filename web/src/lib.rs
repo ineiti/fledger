@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use js_sys::Date;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use regex::Regex;
 use std::sync::{Arc, Mutex};
 use wasm_bindgen::prelude::*;
@@ -9,7 +9,12 @@ use wasm_webrtc::{
 };
 use web_sys::window;
 
-use common::node::{Node, logic::Stat, version::VERSION_STRING};
+use common::node::{
+    config::NodeInfo,
+    logic::{stats::statnode::StatNode, TextMessage},
+    version::VERSION_STRING,
+    Node,
+};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -21,6 +26,7 @@ const URL: &str = "ws://localhost:8765";
 pub struct FledgerWeb {
     node: Arc<Mutex<Option<Node>>>,
     counter: u32,
+    msgs: Vec<String>,
 }
 
 #[wasm_bindgen]
@@ -35,6 +41,7 @@ impl FledgerWeb {
         let fw = Self {
             node: Arc::new(Mutex::new(None)),
             counter: 0u32,
+            msgs: vec![],
         };
 
         let node_cl = fw.node.clone();
@@ -47,12 +54,19 @@ impl FledgerWeb {
         fw
     }
 
-    pub fn tick(&mut self) -> FledgerState {
-        let mut fs = FledgerState::empty();
+    pub fn tick(&mut self) -> Option<FledgerState> {
+        let mut fs = None;
         if let Ok(mut no) = self.node.try_lock() {
             if let Some(n) = no.as_mut() {
+                if self.msgs.len() > 0 {
+                    let msg = self.msgs.remove(0);
+                    debug!("Sending message {}", msg);
+                    if let Err(e) = n.add_message(msg) {
+                        error!("Couldn't add message: {:?}", e);
+                    }
+                }
                 match FledgerState::new(n) {
-                    Ok(f) => fs = f,
+                    Ok(f) => fs = Some(f),
                     Err(e) => error!("Couldn't create state: {:?}", e),
                 }
             }
@@ -67,15 +81,19 @@ impl FledgerWeb {
         });
         fs
     }
+
+    pub fn send_msg(&mut self, msg: String) {
+        self.msgs.push(msg);
+    }
 }
 
 impl FledgerWeb {
-    async fn update_node(noc: Arc<Mutex<Option<Node>>>, ping: bool) -> Result<()>{
+    async fn update_node(noc: Arc<Mutex<Option<Node>>>, ping: bool) -> Result<()> {
         if let Ok(mut no) = noc.try_lock() {
             if let Some(n) = no.as_mut() {
                 n.list().map_err(|e| anyhow!(e))?;
                 if ping {
-                    n.ping("Ping from the web").await.map_err(|e| anyhow!(e))?;
+                    n.ping().await.map_err(|e| anyhow!(e))?;
                 }
                 n.process().await.map_err(|e| anyhow!(e))?;
             } else {
@@ -133,39 +151,66 @@ impl FledgerWeb {
 
 #[wasm_bindgen]
 pub struct FledgerState {
-    info: String,
-    stats: String,
+    info: NodeInfo,
+    stats: Vec<StatNode>,
+    msgs: FledgerMessages,
+    pub nodes_online: u32,
+    pub msgs_system: u32,
+    pub msgs_local: u32,
+    pub mana: u32,
 }
 
 #[wasm_bindgen]
 impl FledgerState {
     pub fn get_node_name(&self) -> String {
-        self.info.clone()
+        self.info.info.clone()
     }
 
-    pub fn get_stats_table(&self) -> String {
-        self.stats.clone()
+    pub fn get_node_table(&self) -> String {
+        match self.get_node_table_result() {
+            Ok(res) => res,
+            Err(_) => String::from(""),
+        }
     }
 
     pub fn get_version(&self) -> String {
         VERSION_STRING.to_string()
     }
+
+    pub fn get_msgs(&self) -> String {
+        self.msgs.get_messages()
+    }
 }
 
 impl FledgerState {
     fn new(node: &Node) -> Result<Self> {
-        let mut stats_vec = vec![];
-        let mut stats_node: Vec<Stat> = node
+        let info = node.info().map_err(|e| anyhow!(e))?;
+        let stats: Vec<StatNode> = node
             .stats()
             .map_err(|e| anyhow!(e))?
             .iter()
             .map(|(_k, v)| v.clone())
             .collect();
-        stats_node.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
+        let msgs = node.get_messages().map_err(|e| anyhow!(e))?;
+        Ok(Self {
+            info,
+            msgs: FledgerMessages::new(msgs),
+            nodes_online: stats.len() as u32,
+            msgs_system: 0,
+            msgs_local: 0,
+            mana: 0,
+            stats,
+        })
+    }
+
+    fn get_node_table_result(&self) -> Result<String> {
+        let mut node_stats = self.stats.clone();
+        node_stats.sort_by(|a, b| b.last_contact.partial_cmp(&a.last_contact).unwrap());
         let now = Date::now();
-        for stat in stats_node {
+        let mut stats_vec = vec![];
+        for stat in node_stats {
             if let Some(ni) = stat.node_info.as_ref() {
-                if node.info().map_err(|e| anyhow!(e))?.get_id() != ni.get_id() {
+                if self.info.get_id() != ni.get_id() {
                     stats_vec.push(
                         vec![
                             format!("{}", ni.info),
@@ -178,22 +223,54 @@ impl FledgerState {
                 }
             }
         }
-        let stats = format!("<tr><td>{}</td></tr>", stats_vec.join("</td></tr><tr><td>"));
-
-        let info = match node.info(){
-            Ok(info) => info.info,
-            Err(_) => String::from("Loading"),
-        };
-        Ok(Self {
-            info,
-            stats,
-        })
+        Ok(format!(
+            "<tr><td>{}</td></tr>",
+            stats_vec.join("</td></tr><tr><td>")
+        ))
     }
+}
 
-    fn empty() -> Self {
-        Self {
-            info: String::from("Loading"),
-            stats: String::from(""),
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct FledgerMessage {
+    from: String,
+    text: String,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct FledgerMessages {
+    msgs: Vec<FledgerMessage>,
+}
+
+impl FledgerMessages {
+    fn new(mut msgs: Vec<TextMessage>) -> Self {
+        msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
+        FledgerMessages {
+            msgs: msgs
+                .iter()
+                .map(|msg| FledgerMessage { 
+                    from: msg.node_info.clone(),
+                    text: msg.msg.clone() 
+                })
+                .collect(),
         }
+    }
+}
+
+#[wasm_bindgen]
+impl FledgerMessages {
+    pub fn get_messages(&self) -> String {
+        if self.msgs.len() == 0 {
+            return String::from("No messages");
+        }
+        format!(
+            "<ul><li>{}</li></ul>",
+            self.msgs
+                .iter()
+                .map(|fm| format!("{}: {}", fm.from.clone(), fm.text.clone()))
+                .collect::<Vec<String>>()
+                .join("</li><li>")
+        )
     }
 }

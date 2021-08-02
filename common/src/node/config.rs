@@ -2,15 +2,19 @@ use crate::types::U256;
 use ed25519_dalek::{Keypair, PublicKey};
 use rand::rngs::OsRng;
 use std::convert::TryFrom;
-
 use serde_derive::{Deserialize, Serialize};
 
 /// NodeInfo is the public information of the node.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct NodeInfo {
+    /// Free text info, limited to 256 characters
     pub info: String,
+    /// What client this node runs on - "Node" or the navigator id
     pub client: String,
+    /// the public key of the node
     pub pubkey: PublicKey,
+    /// node capacities of what this node can do
+    pub node_capacities: NodeCapacities,
 }
 
 impl NodeInfo {
@@ -20,6 +24,7 @@ impl NodeInfo {
             info: names::Generator::default().next().unwrap().to_string(),
             client: "Node".to_string(),
             pubkey,
+            node_capacities: NodeCapacities::new(),
         }
     }
 
@@ -36,7 +41,39 @@ impl TryFrom<NodeInfoToml> for NodeInfo {
             info: nit.info,
             client: nit.client,
             pubkey: nit.pubkey.ok_or("No public key".to_string())?.clone(),
+            node_capacities: nit.node_capacities.into(),
         })
+    }
+}
+
+impl PartialEq for NodeInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_id() == other.get_id()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+/// This holds all boolean node capacities. Currently the following are implemented:
+/// - leader: indicates a node that will store all relevant messages and serve them to clients
+pub struct NodeCapacities {
+    pub leader: bool,
+}
+
+impl NodeCapacities {
+    /// Returns an initialized structure
+    pub fn new() -> Self {
+        Self { leader: false }
+    }
+}
+
+impl From<Option<NodeCapacitiesToml>> for NodeCapacities {
+    fn from(nct: Option<NodeCapacitiesToml>) -> Self {
+        match nct {
+            Some(n) => Self {
+                leader: n.leader.unwrap_or(false),
+            },
+            None => NodeCapacities::new(),
+        }
     }
 }
 
@@ -152,6 +189,7 @@ struct NodeInfoToml {
     pub info: String,
     pub client: String,
     pub pubkey: Option<PublicKey>,
+    pub node_capacities: Option<NodeCapacitiesToml>,
 }
 
 impl From<&NodeInfo> for NodeInfoToml {
@@ -161,6 +199,21 @@ impl From<&NodeInfo> for NodeInfoToml {
             info: ni.info.clone(),
             client: ni.client.clone(),
             pubkey: Some(ni.pubkey.clone()),
+            node_capacities: Some(NodeCapacitiesToml::from(&ni.node_capacities)),
+        }
+    }
+}
+
+/// Toml representation of capacities
+#[derive(Debug, Deserialize, Serialize)]
+struct NodeCapacitiesToml {
+    pub leader: Option<bool>,
+}
+
+impl From<&NodeCapacities> for NodeCapacitiesToml {
+    fn from(nc: &NodeCapacities) -> Self {
+        Self {
+            leader: Some(nc.leader),
         }
     }
 }
@@ -177,12 +230,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn save_load() -> Result<(), String>{
+    fn save_load() -> Result<(), String> {
         let nc = NodeConfig::new();
         let nc_str = nc.to_string()?;
         let nc_clone = NodeConfig::try_from(nc_str)?;
         assert_eq!(nc.keypair.to_bytes(), nc_clone.keypair.to_bytes());
-        assert_eq!(nc.our_node.pubkey.to_bytes(), nc_clone.our_node.pubkey.to_bytes());
+        assert_eq!(
+            nc.our_node.pubkey.to_bytes(),
+            nc_clone.our_node.pubkey.to_bytes()
+        );
         Ok(())
     }
 }
