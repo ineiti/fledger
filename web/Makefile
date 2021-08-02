@@ -2,7 +2,7 @@ WASM_FLAGS :=
 
 build:
 	wasm-pack build -- ${WASM_FLAGS}
-	cd www && ( npm ci && npm run build && cp main.css dist )
+	cd www && ( npm ci && npm run build && cp main.css bootstrap.min.css dist )
 
 clean:
 	rm -rf www/dist
