@@ -1,5 +1,4 @@
 /// TextMessages is the structure that holds all known published TextMessages.
-use anyhow::Result;
 use log::{info, trace};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -28,9 +27,13 @@ pub struct TextMessages {
 }
 
 #[derive(Error, Debug)]
-enum TMError {
+pub enum TMError {
     #[error("Received an unknown message")]
     UnknownMessage,
+    #[error("While sending through output queue")]
+    OutputQueue,
+    #[error(transparent)]
+    Serde(#[from] serde_json::Error)
 }
 
 impl TextMessages {
@@ -44,7 +47,7 @@ impl TextMessages {
         }
     }
 
-    pub fn handle_msg(&mut self, from: &U256, msg: TextMessageV1) -> Result<()> {
+    pub fn handle_msg(&mut self, from: &U256, msg: TextMessageV1) -> Result<(), TMError> {
         info!(
             "{}: Handle msg from {:?} with {}",
             self.cfg.our_node.info, from, &msg
@@ -69,7 +72,7 @@ impl TextMessages {
                     nm.push(from.clone());
                     self.send(from, TextMessageV1::Text(text.clone()))
                 } else {
-                    Err(TMError::UnknownMessage.into())
+                    Err(TMError::UnknownMessage)
                 }
             }
             TextMessageV1::Set(text) => {
@@ -142,7 +145,7 @@ impl TextMessages {
     /// messages are available in those nodes.
     /// Only nodes different from this one will be stored.
     /// Only new leaders will be asked for new messages.
-    pub fn update_nodes(&mut self, nodes: Vec<NodeInfo>) -> Result<()> {
+    pub fn update_nodes(&mut self, nodes: Vec<NodeInfo>) -> Result<(), TMError> {
         trace!("{} update_nodes", self.cfg.our_node.info);
         let new_nodes: Vec<NodeInfo> = nodes
             .iter()
@@ -166,7 +169,7 @@ impl TextMessages {
     }
 
     /// Asks all nodes for new messages.
-    pub fn update_messages(&mut self) -> Result<()> {
+    pub fn update_messages(&mut self) -> Result<(), TMError> {
         for node in self.nodes.iter() {
             self.send(&node.get_id(), TextMessageV1::List())?;
         }
@@ -174,7 +177,7 @@ impl TextMessages {
     }
 
     /// Adds a new message to the list of messages and sends it to the leaders.
-    pub fn add_message(&mut self, msg: String) -> Result<()> {
+    pub fn add_message(&mut self, msg: String) -> Result<(), TMError> {
         let tm = TextMessage {
             node_info: self.cfg.our_node.info.clone(),
             src: self.cfg.our_node.get_id(),
@@ -203,12 +206,12 @@ impl TextMessages {
     }
 
     // Wrapper call to send things over the LOutput
-    fn send(&self, to: &U256, msg: TextMessageV1) -> Result<()> {
+    fn send(&self, to: &U256, msg: TextMessageV1) -> Result<(), TMError> {
         let m = Message::V1(MessageV1::TextMessage(msg));
         let str = serde_json::to_string(&m)?;
         self.out
             .send(LOutput::WebRTC(to.clone(), str))
-            .map_err(|e| e.into())
+            .map_err(|_| TMError::OutputQueue)
     }
 }
 

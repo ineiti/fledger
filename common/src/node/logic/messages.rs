@@ -59,7 +59,7 @@ impl From<String> for Message {
 }
 
 impl Message {
-    pub fn to_string(&self) -> Result<String, String> {
-        serde_json::to_string(self).map_err(|e| e.to_string())
+    pub fn to_string(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
     }
 }

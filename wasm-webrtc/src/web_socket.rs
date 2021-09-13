@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use common::signal::websocket::WSError;
 use std::{
     cell::RefCell,
     rc::Rc,
@@ -23,9 +24,9 @@ pub struct WebSocketWasm {
 }
 
 impl WebSocketWasm {
-    pub fn new(addr: &str) -> Result<WebSocketWasm, JsValue> {
+    pub fn new(addr: &str) -> Result<WebSocketWasm, WSError> {
         info!("connecting to: {}", addr);
-        let ws = WebSocket::new(addr)?;
+        let ws = WebSocket::new(addr).map_err(|e| WSError::Underlying(format!("{:?}", e)))?;
         let mut wsw = WebSocketWasm {
             cb: Rc::new(RefCell::new(None)),
             ws: ws.clone(),
@@ -80,15 +81,15 @@ impl WebSocketWasm {
 
 #[async_trait(?Send)]
 impl WebSocketConnection for WebSocketWasm {
-    fn send(&mut self, msg: String) -> Result<(), String> {
+    fn send(&mut self, msg: String) -> Result<(), WSError> {
         if self.ws.ready_state() != WebSocket::OPEN {
             warn!("Websocket is not open - trying to reconnect");
             self.reconnect()?;
-            Err("Send while not connected".to_string())
+            Err(WSError::Underlying("Send while not connected".into()))
         } else {
                 self.ws
                     .send_with_str(&msg)
-                    .map_err(|e| format!("Error while sending: {:?}", e))?;
+                    .map_err(|e| WSError::Underlying(format!("Error while sending: {:?}", e)))?;
             Ok(())
         }
     }
@@ -97,13 +98,13 @@ impl WebSocketConnection for WebSocketWasm {
         self.cb.borrow_mut().replace(cb);
     }
 
-    fn reconnect(&mut self) -> Result<(), String> {
+    fn reconnect(&mut self) -> Result<(), WSError> {
         warn!("Reconnecting websocket");
         if let Err(e) = self.ws.close() {
             error!("Error while closing: {:?}", e);
         }
         debug!("Re-opening websocket");
-        self.ws = WebSocket::new(&self.addr).map_err(|e| e.as_string().unwrap())?;
+        self.ws = WebSocket::new(&self.addr).map_err(|e| WSError::Underlying(format!("{:?}", e)))?;
         self.attach_callbacks();
         Ok(())
     }

@@ -1,9 +1,13 @@
+use common::node::NodeError;
+use common::signal::websocket::WSError;
+use common::types::StorageError;
 use js_sys::Date;
 use log::{error, info, trace};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 use wasm_webrtc::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
 use wasm_webrtc::helpers::wait_ms;
+use thiserror::Error;
 
 use common::{
     node::{logic::stats::statnode::StatNode, version::VERSION_STRING, Node},
@@ -31,24 +35,32 @@ const STORAGE_NAME: &str = "fledger.toml";
 struct DummyDS {}
 
 impl DataStorage for DummyDS {
-    fn load(&self, _key: &str) -> Result<String, String> {
-        fsread(STORAGE_NAME).map_err(|e| format!("While reading file: {:?}", e))
+    fn load(&self, _key: &str) -> Result<String, StorageError> {
+        Ok(fsread(STORAGE_NAME).map_err(|e| StorageError::Underlying(format!("While reading file: {:?}", e)))?)
     }
 
-    fn save(&self, _key: &str, value: &str) -> Result<(), String> {
+    fn save(&self, _key: &str, value: &str) -> Result<(), StorageError> {
         fswrite(STORAGE_NAME, value);
         Ok(())
     }
 }
 
-async fn start(url: &str) -> Result<Node, JsValue> {
+#[derive(Debug, Error)]
+enum StartError{
+    #[error(transparent)]
+    Node(#[from]NodeError),
+    #[error(transparent)]
+    WS(#[from]WSError),
+}
+
+async fn start(url: &str) -> Result<Node, StartError> {
     let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
     let my_storage = Box::new(DummyDS {});
     let ws = WebSocketWasm::new(url)?;
-    Node::new(my_storage, "node",  Box::new(ws), rtc_spawner).map_err(|e| JsValue::from(e))
+    Ok(Node::new(my_storage, "node",  Box::new(ws), rtc_spawner)?)
 }
 
-async fn list_ping(n: &mut Node) -> Result<(), String> {
+async fn list_ping(n: &mut Node) -> Result<(), NodeError> {
     n.list()?;
     n.ping().await?;
     let mut nodes: Vec<StatNode> = n.stats()?.iter().map(|(_k, v)| v.clone()).collect();

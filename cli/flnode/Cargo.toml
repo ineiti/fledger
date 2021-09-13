@@ -32,6 +32,7 @@ regex = "1.5.4"
 urlencoding = "2.1.0"
 wasm-logger = "0.2.0"
 log = "0.4.14"
+thiserror = "1.0.6"
 
 [dependencies.web-sys]
 version = "0.3.51"
