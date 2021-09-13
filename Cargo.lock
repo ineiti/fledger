@@ -471,6 +471,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "thiserror",
  "urlencoding",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -1273,6 +1274,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "structopt",
+ "thiserror",
  "tungstenite",
 ]
 
@@ -1711,6 +1713,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",

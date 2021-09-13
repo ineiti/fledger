@@ -1,13 +1,14 @@
 use async_trait::async_trait;
+use common::signal::web_rtc::SetupError;
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use web_sys::RtcConfiguration;
 
 use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
+use web_sys::RtcConfiguration;
 
 use common::signal::web_rtc::{
     ConnectionStateMap, WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCB,
@@ -50,7 +51,7 @@ impl WebRTCConnectionSetupWasm {
     /// Once two nodes are set up, they need to exchang the offer and the answer string.
     /// Followed by that they need to exchange the ice strings, in either order.
     /// Only after exchanging this information can the msg_send and msg_receive methods be used.
-    pub fn new(nt: WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, String> {
+    pub fn new(nt: WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, SetupError> {
         // If no stun server is configured, only local IPs will be sent in the browser.
         // At least the node webrtc does the correct thing...
         let mut config = RtcConfiguration::new();
@@ -66,10 +67,11 @@ impl WebRTCConnectionSetupWasm {
                 credential: Some("something"),
             },
         ];
-        let servers = JsValue::from_serde(&servers_obj).map_err(|e| e.to_string())?;
+        let servers =
+            JsValue::from_serde(&servers_obj).map_err(|e| SetupError::Underlying(e.to_string()))?;
         config.ice_servers(&servers);
         let rp_conn = RtcPeerConnection::new_with_configuration(&config)
-            .map_err(|e| format!("PeerConnection error: {:?}", e))?;
+            .map_err(|e| SetupError::Underlying(format!("PeerConnection error: {:?}", e)))?;
         let rn = WebRTCConnectionSetupWasm {
             nt,
             rp_conn: rp_conn.clone(),
@@ -86,16 +88,16 @@ impl WebRTCConnectionSetupWasm {
 
     // Making sure the struct is in correct state
 
-    fn is_initializer(&self) -> Result<(), String> {
+    fn is_initializer(&self) -> Result<(), SetupError> {
         if self.nt != WebRTCConnectionState::Initializer {
-            return Err("This method is only available to the Initializer".to_string());
+            return Err(SetupError::Underlying("This method is only available to the Initializer".to_string()));
         }
         Ok(())
     }
 
-    fn is_follower(&self) -> Result<(), String> {
+    fn is_follower(&self) -> Result<(), SetupError> {
         if self.nt != WebRTCConnectionState::Follower {
-            return Err("This method is only available to the Follower".to_string());
+            return Err(SetupError::Underlying("This method is only available to the Follower".to_string()));
         }
         Ok(())
     }
@@ -104,13 +106,13 @@ impl WebRTCConnectionSetupWasm {
 #[async_trait(?Send)]
 impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     // Returns the offer string that needs to be sent to the `Follower` node.
-    async fn make_offer(&mut self) -> Result<String, String> {
+    async fn make_offer(&mut self) -> Result<String, SetupError> {
         self.is_initializer()?;
         let offer = JsFuture::from(self.rp_conn.create_offer())
             .await
-            .map_err(|e| e.as_string().unwrap())?;
+            .map_err(|e| SetupError::Underlying(format!("{:?}", e)))?;
         let offer_sdp = Reflect::get(&offer, &JsValue::from_str("sdp"))
-            .map_err(|e| e.as_string().unwrap())?
+            .map_err(|e| SetupError::Underlying(format!("{:?}", e)))?
             .as_string()
             .unwrap();
 
@@ -119,29 +121,29 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         let sld_promise = self.rp_conn.set_local_description(&offer_obj);
         JsFuture::from(sld_promise)
             .await
-            .map_err(|e| e.as_string().unwrap())?;
+            .map_err(|e| SetupError::Underlying(format!("{:?}", e)))?;
         Ok(offer_sdp)
     }
 
     // Takes the offer string
-    async fn make_answer(&mut self, offer: String) -> Result<String, String> {
+    async fn make_answer(&mut self, offer: String) -> Result<String, SetupError> {
         self.is_follower()?;
         let mut offer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
         offer_obj.sdp(&offer);
         let srd_promise = self.rp_conn.set_remote_description(&offer_obj);
         JsFuture::from(srd_promise)
             .await
-            .map_err(|e| e.as_string().unwrap())?;
+            .map_err(|e| SetupError::Underlying(e.as_string().unwrap()))?;
 
         let answer = match JsFuture::from(self.rp_conn.create_answer()).await {
             Ok(f) => f,
             Err(e) => {
                 error!("Error answer: {:?}", e);
-                return Err(e.as_string().unwrap());
+                return Err(SetupError::Underlying(e.as_string().unwrap()));
             }
         };
         let answer_sdp = Reflect::get(&answer, &JsValue::from_str("sdp"))
-            .map_err(|e| e.as_string().unwrap())?
+            .map_err(|e| SetupError::Underlying(e.as_string().unwrap()))?
             .as_string()
             .unwrap();
 
@@ -150,12 +152,12 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         let sld_promise = self.rp_conn.set_local_description(&answer_obj);
         JsFuture::from(sld_promise)
             .await
-            .map_err(|e| e.as_string().unwrap())?;
+            .map_err(|e| SetupError::Underlying(e.as_string().unwrap()))?;
         Ok(answer_sdp)
     }
 
     // Takes the answer string and finalizes the first part of the connection.
-    async fn use_answer(&mut self, answer: String) -> Result<(), String> {
+    async fn use_answer(&mut self, answer: String) -> Result<(), SetupError> {
         self.is_initializer()?;
         if self.rp_conn.signaling_state() == RtcSignalingState::Stable {
             return Ok(());
@@ -165,7 +167,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         let srd_promise = self.rp_conn.set_remote_description(&answer_obj);
         JsFuture::from(srd_promise)
             .await
-            .map_err(|e| format!("{:?}", e))?;
+            .map_err(|e| SetupError::Underlying(format!("{:?}", e)))?;
         Ok(())
     }
 
@@ -175,7 +177,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     }
 
     // Sends the ICE string to the WebRTC.
-    async fn ice_put(&mut self, ice: String) -> Result<(), String> {
+    async fn ice_put(&mut self, ice: String) -> Result<(), SetupError> {
         // self.is_not_setup()?;
         let rp_clone = self.rp_conn.clone();
         let els: Vec<&str> = ice.split(":-:").collect();
@@ -197,13 +199,13 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
                 }
                 Ok(())
             }
-            Err(e) => Err(format!("Couldn't consume ice: {:?}", e)),
+            Err(e) => Err(SetupError::Underlying(format!("Couldn't consume ice: {:?}", e))),
         }
-        .map_err(|js| js.to_string())
+        .map_err(|js| SetupError::Underlying(js.to_string()))
     }
 
-    async fn get_state(&self) -> Result<ConnectionStateMap, String> {
-        get_state(self.rp_conn.clone()).await
+    async fn get_state(&self) -> Result<ConnectionStateMap, SetupError> {
+        Ok(get_state(self.rp_conn.clone()).await.map_err(|e| SetupError::Underlying(format!("{:?}", e)))?)
     }
 }
 

@@ -3,6 +3,17 @@ use ed25519_dalek::{Keypair, PublicKey};
 use rand::rngs::OsRng;
 use std::convert::TryFrom;
 use serde_derive::{Deserialize, Serialize};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ConfigError{
+    #[error("Didn't find public key")]
+    PublicKeyMissing,
+    #[error(transparent)]
+    DecodeToml1(#[from] toml::de::Error),
+    #[error(transparent)]
+    DecodeToml2(#[from] toml::ser::Error)
+}
 
 /// NodeInfo is the public information of the node.
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -35,17 +46,17 @@ impl NodeInfo {
 }
 
 impl TryFrom<NodeInfoToml> for NodeInfo {
-    type Error = String;
-    fn try_from(nit: NodeInfoToml) -> Result<Self, String> {
+    type Error = ConfigError;
+    fn try_from(nit: NodeInfoToml) -> Result<Self, ConfigError> {
         Ok(NodeInfo {
             info: nit.info,
             client: nit.client,
-            pubkey: nit.pubkey.ok_or("No public key".to_string())?.clone(),
+            pubkey: nit.pubkey.ok_or(ConfigError::PublicKeyMissing)?.clone(),
             node_capacities: nit.node_capacities.into(),
         })
     }
 }
-
+ 
 impl PartialEq for NodeInfo {
     fn eq(&self, other: &Self) -> bool {
         self.get_id() == other.get_id()
@@ -104,11 +115,11 @@ impl NodeConfig {
     }
 
     /// Returns a toml representation of the config.
-    pub fn to_string(&self) -> Result<String, String> {
-        toml::to_string(&Toml {
+    pub fn to_string(&self) -> Result<String, ConfigError> {
+        let str = toml::to_string(&Toml {
             v1: Some(self.into()),
-        })
-        .map_err(|e| e.to_string())
+        })?;
+        Ok(str)
     }
 }
 
@@ -127,10 +138,10 @@ impl Clone for NodeConfig {
 /// Parses the string as a config for the node. If the ledger is not available, it returns an error.
 /// If the our_node is missing, it is created.
 impl TryFrom<String> for NodeConfig {
-    type Error = String;
-    fn try_from(str: String) -> Result<Self, String> {
+    type Error = ConfigError;
+    fn try_from(str: String) -> Result<Self, ConfigError> {
         let t: Toml = if str.len() > 0 {
-            toml::from_str(str.as_str()).map_err(|e| e.to_string())?
+            toml::from_str(str.as_str())?
         } else {
             Toml { v1: None }
         };
@@ -230,7 +241,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn save_load() -> Result<(), String> {
+    fn save_load() -> Result<(), ConfigError> {
         let nc = NodeConfig::new();
         let nc_str = nc.to_string()?;
         let nc_clone = NodeConfig::try_from(nc_str)?;

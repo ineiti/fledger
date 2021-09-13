@@ -4,27 +4,38 @@ use std::{
     pin::Pin,
     sync::{mpsc::Sender, Arc, Mutex},
 };
-
 use futures::Future;
+use thiserror::Error;
+
 use log::{error, info, trace};
 
-use crate::node::{
-    config::{NodeConfig, NodeInfo},
-    logic::Logic,
-    network::{NOutput, Network},
+use self::logic::LogicError;
+use self::{
+    config::{ConfigError, NodeConfig, NodeInfo},
+    network::{NetworkError,NOutput, Network, NInput},
+    logic::{stats::statnode::StatNode, LInput, LOutput, Logic, text_messages::TextMessage},
 };
 use crate::signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection};
-use crate::types::{DataStorage, U256};
-
-use self::{
-    logic::{stats::statnode::StatNode, LInput, LOutput, text_messages::TextMessage},
-    network::NInput,
-};
+use crate::types::{DataStorage, StorageError, U256};
 
 pub mod config;
 pub mod logic;
 pub mod network;
 pub mod version;
+
+#[derive(Error, Debug)]
+pub enum NodeError{
+    #[error("Couldn't get lock")]
+    Lock,
+    #[error(transparent)]
+    Config(#[from] ConfigError),
+    #[error(transparent)]
+    Storage(#[from] StorageError),
+    #[error(transparent)]
+    Network(#[from] NetworkError),
+    #[error(transparent)]
+    Logic(#[from] LogicError),
+}
 
 /// The node structure holds it all together. It is the main structure of the project.
 pub struct Node {
@@ -63,7 +74,7 @@ impl Node {
         client: &str,
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
-    ) -> Result<Node, String> {
+    ) -> Result<Node, NodeError> {
         let config_str = match storage.load(CONFIG_NAME) {
             Ok(s) => s,
             Err(_) => {
@@ -123,48 +134,48 @@ impl Node {
     }
 
     /// Return a copy of the current node information
-    pub fn info(&self) -> Result<NodeInfo, String> {
+    pub fn info(&self) -> Result<NodeInfo, NodeError> {
         Ok(self.config.clone().our_node)
     }
 
     /// TODO: this is only for development
-    pub fn clear(&mut self) -> Result<(), String> {
+    pub fn clear(&mut self) -> Result<(), NodeError> {
         self.network_tx
             .send(NInput::ClearNodes)
-            .map_err(|e| e.to_string())
+            .map_err(|_| NodeError::Network(NetworkError::InputQueue))
     }
 
     /// Requests a list of all connected nodes
-    pub fn list(&mut self) -> Result<(), String> {
+    pub fn list(&mut self) -> Result<(), NodeError> {
         self.network_tx
             .send(NInput::UpdateList)
-            .map_err(|e| e.to_string())
+            .map_err(|_| NodeError::Network(NetworkError::InputQueue))
     }
 
     /// TODO: remove ping and send - they should be called only by the Logic class.
     /// Pings all known nodes
-    pub async fn ping(&mut self) -> Result<(), String> {
+    pub async fn ping(&mut self) -> Result<(), NodeError> {
         self.logic_tx
             .send(LInput::PingAll())
-            .map_err(|e| e.to_string())
+            .map_err(|_| NodeError::Logic(LogicError::InputQueue))
     }
 
     /// Sends a message over webrtc to a node. The node must already be connected
     /// through websocket to the signalling server. If the connection is not set up
     /// yet, the network stack will set up a connection with the remote node.
-    pub fn send(&mut self, dst: &U256, msg: String) -> Result<(), String> {
+    pub fn send(&mut self, dst: &U256, msg: String) -> Result<(), NodeError> {
         self.network_tx
             .send(NInput::WebRTC(dst.clone(), msg))
-            .map_err(|e| e.to_string())
+            .map_err(|_| NodeError::Network(NetworkError::InputQueue))
     }
 
     /// Start processing of network and logic messages, in case they haven't been
     /// called automatically.
-    pub async fn process(&mut self) -> Result<usize, String> {
+    pub async fn process(&mut self) -> Result<usize, NodeError> {
         if let Ok(mut arc) = self.arc.try_lock() {
             return arc.process().await;
         }
-        Err("Couldn't get lock for NodeArc".into())
+        Err(NodeError::Lock)
     }
 
     /// Gets the current list of available nodes
@@ -176,20 +187,20 @@ impl Node {
     }
 
     /// Returns a copy of the logic stats
-    pub fn stats(&self) -> Result<HashMap<U256, StatNode>, String> {
+    pub fn stats(&self) -> Result<HashMap<U256, StatNode>, NodeError> {
         if let Ok(arc) = self.arc.try_lock() {
             return Ok(arc.logic.stats.stats.clone());
         }
-        Err("Couldn't lock arc".to_string())
+        Err(NodeError::Lock)
     }
 
-    pub fn add_message(&self, msg: String) -> Result<(), String> {
+    pub fn add_message(&self, msg: String) -> Result<(), NodeError> {
         self.logic_tx
             .send(LInput::AddMessage(msg))
-            .map_err(|e| e.to_string())
+            .map_err(|_| NodeError::Logic(LogicError::InputQueue))
     }
 
-    pub fn get_messages(&self) -> Result<Vec<TextMessage>, String> {
+    pub fn get_messages(&self) -> Result<Vec<TextMessage>, NodeError> {
         if let Ok(arc) = self.arc.try_lock() {
             return Ok(arc
                 .logic
@@ -199,27 +210,28 @@ impl Node {
                 .map(|(_k, v)| v.clone())
                 .collect());
         }
-        Err("Couldn't lock arc".to_string())
+        Err(NodeError::Lock)
     }
 
     /// Static method
 
     /// Updates the config of the node
-    pub fn set_config(storage: Box<dyn DataStorage>, config: &str) -> Result<(), String> {
-        storage.save(CONFIG_NAME, config)
+    pub fn set_config(storage: Box<dyn DataStorage>, config: &str) -> Result<(), NodeError> {
+        storage.save(CONFIG_NAME, config)?;
+        Ok(())
     }
 }
 
 /// NodeArc hodsl the network and logic structure, so that they
 impl NodeArc {
-    pub async fn process(&mut self) -> Result<usize, String> {
+    pub async fn process(&mut self) -> Result<usize, NodeError> {
         Ok(self.process_logic()?
             + self.process_network()?
             + self.logic.process().await?
             + self.network.process().await?)
     }
 
-    fn process_network(&mut self) -> Result<usize, String> {
+    fn process_network(&mut self) -> Result<usize, NodeError> {
         let msgs: Vec<NOutput> = self.network.output_rx.try_iter().collect();
         let size = msgs.len();
         for msg in msgs {
@@ -228,24 +240,24 @@ impl NodeArc {
                     self.logic
                         .input_tx
                         .send(LInput::WebRTC(id, msg))
-                        .map_err(|e| e.to_string())?;
+                        .map_err(|_| NodeError::Logic(LogicError::InputQueue))?;
                 }
                 NOutput::UpdateList(list) => self
                     .logic
                     .input_tx
                     .send(LInput::SetNodes(list))
-                    .map_err(|e| e.to_string())?,
+                    .map_err(|_| NodeError::Logic(LogicError::InputQueue))?,
                 NOutput::State(id, dir, c, s) => self
                     .logic
                     .input_tx
                     .send(LInput::ConnStat(id, dir, c, s))
-                    .map_err(|e| e.to_string())?,
+                    .map_err(|_| NodeError::Logic(LogicError::InputQueue))?,
             }
         }
         Ok(size)
     }
 
-    fn process_logic(&mut self) -> Result<usize, String> {
+    fn process_logic(&mut self) -> Result<usize, NodeError> {
         let msgs: Vec<LOutput> = self.logic.output_rx.try_iter().collect();
         let size = msgs.len();
         for msg in msgs {
@@ -254,12 +266,12 @@ impl NodeArc {
                     .network
                     .input_tx
                     .send(NInput::WebRTC(id, msg))
-                    .map_err(|e| e.to_string())?,
+                    .map_err(|_| NodeError::Logic(LogicError::InputQueue))?,
                 LOutput::SendStats(s) => self
                     .network
                     .input_tx
                     .send(NInput::SendStats(s))
-                    .map_err(|e| e.to_string())?,
+                    .map_err(|_| NodeError::Logic(LogicError::InputQueue))?,
             }
         }
         Ok(size)

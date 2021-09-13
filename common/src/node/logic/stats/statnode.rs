@@ -1,9 +1,18 @@
-use core::f64;
 /// StatNode handles the statistics that are taken for the nodes. 
 
+use core::f64;
 use std::{collections::HashMap, sync::mpsc::Sender};
+use thiserror::Error;
 
 use crate::{node::{config::NodeInfo, logic::{LOutput, messages::{Message, MessageV1}}, network::connection_state::CSEnum, version::VERSION_STRING}, signal::web_rtc::{ConnectionStateMap, NodeStat, WebRTCConnectionState}, types::{now, U256}};
+
+#[derive(Debug, Error)]
+pub enum SNError{
+    #[error("While sending through Output Queue")]
+    OutputQueue,
+    #[error(transparent)]
+    Serde(#[from] serde_json::Error)
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConnState {
@@ -128,13 +137,13 @@ impl StatNodes {
         s.node_info = Some(ni);
     }
 
-    pub fn ping_all(&mut self, our_id: &U256, out: Sender<LOutput>) -> Result<(), String> {
+    pub fn ping_all(&mut self, our_id: &U256, out: Sender<LOutput>) -> Result<(), SNError> {
         for stat in self.nodes.iter_mut() {
             if let Some(ni) = stat.1.node_info.as_ref() {
                 if our_id != &ni.get_id() {
                     let msg_send = Message::V1(MessageV1::Ping());
                     out.send(LOutput::WebRTC(ni.get_id().clone(), msg_send.to_string()?))
-                        .map_err(|e| e.to_string())?;
+                        .map_err(|_| SNError::OutputQueue)?;
                     stat.1.ping_tx += 1;
                 }
             }

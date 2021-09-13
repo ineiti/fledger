@@ -14,6 +14,7 @@ use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
+use thiserror::Error;
 
 use common::{
     node::config::NodeInfo,
@@ -29,6 +30,16 @@ use dipstick::*;
 use super::node_entry::NodeEntry;
 use crate::config::Config;
 
+#[derive(Debug, Error)]
+pub enum ISError{
+    #[error("During file access: {0}")]
+    File(String),
+    #[error("Destination not reachable")]
+    Unreachable,
+    #[error("Unknown challenge")]
+    UnknownChallenge,
+}
+
 pub struct Internal {
     pub nodes: HashMap<U256, NodeEntry>,
     pub stats: HashMap<U256, Vec<Vec<NodeStat>>>,
@@ -41,7 +52,7 @@ pub struct Internal {
 }
 
 impl Internal {
-    pub fn new(config: Config) -> Result<Arc<Mutex<Internal>>, String> {
+    pub fn new(config: Config) -> Result<Arc<Mutex<Internal>>, ISError> {
         let mut graphite = None;
         if let Some(url) = config.graphite_host_port.as_ref() {
             if let Some(path) = config.graphite_path.as_ref() {
@@ -65,7 +76,7 @@ impl Internal {
                         .append(true)
                         .create(true)
                         .open(name)
-                        .map_err(|e| e.to_string())?,
+                        .map_err(|e| ISError::File(e.to_string()))?,
                 )),
                 None => None,
             },
@@ -75,9 +86,9 @@ impl Internal {
                         .append(true)
                         .create(true)
                         .open(name)
-                        .map_err(|e| e.to_string())?,
+                        .map_err(|e| ISError::File(e.to_string()))?,
                 )),
-                None => None,
+                None => None, 
             },
         }));
         Ok(int)
@@ -261,7 +272,7 @@ impl Internal {
 
     /// Tries to send a message to the indicated node.
     /// If the node is not reachable, an error will be returned.
-    pub fn send_message(&mut self, id: &U256, msg: WSSignalMessage) -> Result<(), String> {
+    pub fn send_message(&mut self, id: &U256, msg: WSSignalMessage) -> Result<(), ISError> {
         let msg_str = serde_json::to_string(&WebSocketMessage { msg }).unwrap();
         if let Some(chal) = self.pub_to_chal(id) {
             match self.nodes.entry(chal.clone()) {
@@ -271,10 +282,10 @@ impl Internal {
                     }
                     Ok(())
                 }
-                Entry::Vacant(_) => Err("Destination not reachable".to_string()),
+                Entry::Vacant(_) => Err(ISError::Unreachable),
             }
         } else {
-            Err("Don't know this challenge".to_string())
+            Err(ISError::UnknownChallenge)
         }
     }
 

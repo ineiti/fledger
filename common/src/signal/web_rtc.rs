@@ -3,33 +3,46 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
+use thiserror::Error;
 
 use crate::{node::config::NodeInfo, types::U256};
 
+#[derive(Debug, Error)]
+pub enum SetupError {
+    #[error("Spawning failed: {0}")]
+    SpawnFail(String),
+    #[error("Couldn't setup: {0}")]
+    SetupFail(String),
+    #[error("Invalid state: {0}")]
+    InvalidState(String),
+    #[error("From underlying system: {0}")]
+    Underlying(String),
+}
+
 pub type WebRTCSpawner =
-    Box<dyn Fn(WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, String>>;
+    Box<dyn Fn(WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, SetupError>>;
 
 pub type WebRTCSetupCB = Box<dyn Fn(WebRTCSetupCBMessage)>;
 
 #[async_trait(?Send)]
 pub trait WebRTCConnectionSetup {
     /// Returns the offer string that needs to be sent to the `Follower` node.
-    async fn make_offer(&mut self) -> Result<String, String>;
+    async fn make_offer(&mut self) -> Result<String, SetupError>;
 
     /// Takes the offer string
-    async fn make_answer(&mut self, offer: String) -> Result<String, String>;
+    async fn make_answer(&mut self, offer: String) -> Result<String, SetupError>;
 
     /// Takes the answer string and finalizes the first part of the connection.
-    async fn use_answer(&mut self, answer: String) -> Result<(), String>;
+    async fn use_answer(&mut self, answer: String) -> Result<(), SetupError>;
 
     /// Returns either an ice string or a connection
     async fn set_callback(&mut self, cb: WebRTCSetupCB);
 
     /// Sends the ICE string to the WebRTC.
-    async fn ice_put(&mut self, ice: String) -> Result<(), String>;
+    async fn ice_put(&mut self, ice: String) -> Result<(), SetupError>;
 
     /// Return some statistics on the connection
-    async fn get_state(&self) -> Result<ConnectionStateMap, String>;
+    async fn get_state(&self) -> Result<ConnectionStateMap, SetupError>;
 }
 
 pub enum WebRTCSetupCBMessage {
@@ -47,17 +60,27 @@ impl fmt::Debug for WebRTCSetupCBMessage {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum ConnectionError {
+    #[error("Sending failed: {0}")]
+    FailSend(String),
+    #[error("Unknown State: {0}")]
+    UnknownState(String),
+    #[error("In underlying system: {0}")]
+    Underlying(String)
+}
+
 #[async_trait(?Send)]
 pub trait WebRTCConnection {
     /// Send a message to the other node. This call blocks until the message
     /// is queued.
-    fn send(&self, s: String) -> Result<(), String>;
+    fn send(&self, s: String) -> Result<(), ConnectionError>;
 
     /// Sets the callback for incoming messages.
     fn set_cb_message(&self, cb: WebRTCMessageCB);
 
     /// Return some statistics on the connection
-    async fn get_state(&self) -> Result<ConnectionStateMap, String>;
+    async fn get_state(&self) -> Result<ConnectionStateMap, ConnectionError>;
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -157,8 +180,8 @@ pub struct WebSocketMessage {
 }
 
 impl WebSocketMessage {
-    pub fn from_str(s: &str) -> Result<WebSocketMessage, String> {
-        serde_json::from_str(s).map_err(|err| err.to_string())
+    pub fn from_str(s: &str) -> Result<WebSocketMessage, serde_json::Error> {
+        serde_json::from_str(s)
     }
 
     pub fn to_string(&self) -> String {

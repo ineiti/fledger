@@ -3,9 +3,7 @@ use async_trait::async_trait;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{MessageEvent, RtcDataChannel, RtcPeerConnection, RtcSignalingState};
 
-use common::signal::web_rtc::{
-    ConnType, ConnectionStateMap, SignalingState, WebRTCConnection, WebRTCMessageCB,
-};
+use common::signal::web_rtc::{ConnType, ConnectionError, ConnectionStateMap, SignalingState, WebRTCConnection, WebRTCMessageCB};
 
 pub struct WebRTCConnectionWasm {
     dc: RtcDataChannel,
@@ -22,8 +20,8 @@ impl WebRTCConnectionWasm {
 impl WebRTCConnection for WebRTCConnectionWasm {
     /// Send a message to the other node. This call blocks until the message
     /// is queued.
-    fn send(&self, s: String) -> Result<(), String> {
-        self.dc.send_with_str(&s).map_err(|e| format!("{:?}", e))
+    fn send(&self, s: String) -> Result<(), ConnectionError> {
+        Ok(self.dc.send_with_str(&s).map_err(|e| ConnectionError::Underlying(format!("{:?}", e)))?)
     }
 
     /// Sets the callback for incoming messages.
@@ -42,14 +40,14 @@ impl WebRTCConnection for WebRTCConnectionWasm {
         onmessage_callback.forget();
     }
 
-    async fn get_state(&self) -> Result<ConnectionStateMap, String> {
+    async fn get_state(&self) -> Result<ConnectionStateMap, ConnectionError> {
         let mut csm = get_state(self.conn.clone()).await?;
         csm.data_connection = Some(self.dc.ready_state());
         Ok(csm)
     }
 }
 
-pub async fn get_state(conn: RtcPeerConnection) -> Result<ConnectionStateMap, String> {
+pub async fn get_state(conn: RtcPeerConnection) -> Result<ConnectionStateMap, ConnectionError> {
     let conn_stats: js_sys::Map = wasm_bindgen_futures::JsFuture::from(conn.get_stats())
         .await
         .unwrap()

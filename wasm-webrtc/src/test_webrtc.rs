@@ -2,26 +2,38 @@ use log::{error, info};
 use std::{
     cell::RefCell,
     rc::Rc,
-    sync::{mpsc::channel, Arc, Mutex},
+    sync::{
+        mpsc::channel,
+        Arc, Mutex,
+    },
 };
+use thiserror::Error;
 
 use common::{
-    node::Node,
+    node::{Node, NodeError},
     signal::{
         web_rtc::{
-            WSSignalMessage, WebRTCConnection, WebRTCConnectionSetup, WebRTCConnectionState,
-            WebRTCSetupCBMessage, WebSocketMessage,
+            ConnectionError, SetupError, WSSignalMessage, WebRTCConnection, WebRTCConnectionSetup,
+            WebRTCConnectionState, WebRTCSetupCBMessage, WebSocketMessage,
         },
-        websocket::{MessageCallback, WSMessage, WebSocketConnection},
+        websocket::{MessageCallback, WSError, WSMessage, WebSocketConnection},
     },
-    types::DataStorage,
     types::U256,
+    types::{DataStorage, StorageError},
 };
 
 use wasm_bindgen_test::*;
 
 use crate::helpers::wait_ms;
 use crate::web_rtc_setup::WebRTCConnectionSetupWasm;
+
+#[derive(Debug, Error)]
+pub enum WSDError {
+    #[error("Limited to 2 nodes")]
+    TwoNodesOnly,
+    #[error("No callback defined yet")]
+    MissingCallback,
+}
 
 #[derive(Debug)]
 struct Message {
@@ -44,10 +56,10 @@ impl WebSocketDummy {
         }
     }
 
-    fn get_connection(&mut self) -> Result<WebSocketConnectionDummy, String> {
+    fn get_connection(&mut self) -> Result<WebSocketConnectionDummy, WSDError> {
         let id = self.callbacks.len() as u32;
         if id > 1 {
-            return Err("currently only supports 2 nodes".to_string());
+            return Err(WSDError::TwoNodesOnly);
         }
         let wscd = WebSocketConnectionDummy::new(Rc::clone(&self.msg_queue), id);
         self.callbacks.push(Rc::clone(&wscd.cb));
@@ -61,7 +73,7 @@ impl WebSocketDummy {
         Ok(wscd)
     }
 
-    fn run_queue(&mut self) -> Result<usize, String> {
+    fn run_queue(&mut self) -> usize {
         let msgs: Vec<Message> = self.msg_queue.borrow_mut().drain(..).collect();
         let msgs_count = msgs.len();
         msgs.iter()
@@ -79,12 +91,12 @@ impl WebSocketDummy {
                 },
                 Err(e) => info!("Error while getting message: {}", e),
             });
-        Ok(msgs_count)
+        msgs_count
     }
 
-    fn send_message(&mut self, id: usize, msg: String) -> Result<(), String> {
+    fn send_message(&mut self, id: usize, msg: String) -> Result<(), WSDError> {
         if self.callbacks.len() <= id {
-            return Err("no callback defined yet".to_string());
+            return Err(WSDError::MissingCallback);
         }
         if let Some(cb_ref) = self.callbacks.get_mut(id) {
             if let Some(cb) = cb_ref.borrow_mut().as_mut() {
@@ -92,7 +104,7 @@ impl WebSocketDummy {
                 return Ok(());
             }
         }
-        Err("no callback defined yet".to_string())
+        Err(WSDError::MissingCallback)
     }
 }
 
@@ -117,7 +129,7 @@ impl WebSocketConnection for WebSocketConnectionDummy {
         self.cb.borrow_mut().replace(cb);
     }
 
-    fn send(&mut self, msg: String) -> Result<(), String> {
+    fn send(&mut self, msg: String) -> Result<(), WSError> {
         let queue = Rc::clone(&self.msg_queue);
         queue.borrow_mut().push(Message {
             id: self.id,
@@ -126,7 +138,7 @@ impl WebSocketConnection for WebSocketConnectionDummy {
         Ok(())
     }
 
-    fn reconnect(&mut self) -> Result<(), String> {
+    fn reconnect(&mut self) -> Result<(), WSError> {
         todo!()
     }
 }
@@ -134,11 +146,11 @@ impl WebSocketConnection for WebSocketConnectionDummy {
 pub struct DataStorageDummy {}
 
 impl DataStorage for DataStorageDummy {
-    fn load(&self, _key: &str) -> Result<String, String> {
+    fn load(&self, _key: &str) -> Result<String, StorageError> {
         Ok("".to_string())
     }
 
-    fn save(&self, _key: &str, _value: &str) -> Result<(), String> {
+    fn save(&self, _key: &str, _value: &str) -> Result<(), StorageError> {
         Ok(())
     }
 }
@@ -171,7 +183,21 @@ async fn set_callback(
         .await;
 }
 
-async fn connect_test_base() -> Result<(), String> {
+#[derive(Debug, Error)]
+enum CombinedError {
+    #[error(transparent)]
+    Setup(#[from] SetupError),
+    #[error(transparent)]
+    Connection(#[from] ConnectionError),
+    #[error("Couldn't send through queue")]
+    SendQueue,
+    #[error(transparent)]
+    Node(#[from] NodeError),
+    #[error(transparent)]
+    WSD(#[from] WSDError),
+}
+
+async fn connect_test_base() -> Result<(), CombinedError> {
     info!("Setting up nodes");
     // First node
     let ice1 = Arc::new(Mutex::new(vec![]));
@@ -243,7 +269,7 @@ async fn connect_test_base() -> Result<(), String> {
     Ok(())
 }
 
-async fn connect_test_simple() -> Result<(), String> {
+async fn connect_test_simple() -> Result<(), CombinedError> {
     let mut ws_conn = WebSocketDummy::new();
 
     // First node
@@ -259,7 +285,7 @@ async fn connect_test_simple() -> Result<(), String> {
     let mut node2 = Node::new(my_storage, "test", ws, rtc_spawner)?;
 
     // Pass messages
-    ws_conn.run_queue()?;
+    ws_conn.run_queue();
     node1.send(&node2.info()?.get_id(), "ping".to_string())?;
 
     let mut i: i32 = 0;
@@ -269,7 +295,7 @@ async fn connect_test_simple() -> Result<(), String> {
         node2.process().await?;
 
         i = i + 1;
-        ws_conn.run_queue()?;
+        ws_conn.run_queue();
         // if ws_conn.run_queue()? == 0 {
         //     break;
         // }
@@ -290,12 +316,12 @@ async fn connect_test_simple() -> Result<(), String> {
     Ok(())
 }
 
-async fn test_channel() -> Result<(), String> {
+async fn test_channel() -> Result<(), CombinedError> {
     let (tx, rx) = channel::<&str>();
-    tx.send("one").map_err(|e| e.to_string())?;
-    tx.send("two").map_err(|e| e.to_string())?;
+    tx.send("one").map_err(|_| CombinedError::SendQueue)?;
+    tx.send("two").map_err(|_| CombinedError::SendQueue)?;
     info!("rx is: {:?}", rx.try_iter().collect::<Vec<&str>>());
-    tx.send("three").map_err(|e| e.to_string())?;
+    tx.send("three").map_err(|_| CombinedError::SendQueue)?;
     info!("rx is: {:?}", rx.try_iter().collect::<Vec<&str>>());
     Ok(())
 }

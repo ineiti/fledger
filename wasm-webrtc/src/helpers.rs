@@ -1,30 +1,30 @@
 use wasm_bindgen::prelude::*;
 use web_sys::window;
 
-use common::types::DataStorage;
+use common::types::{DataStorage, StorageError};
 
 pub struct LocalStorage {}
 
 impl DataStorage for LocalStorage {
-    fn load(&self, key: &str) -> Result<String, String> {
-        window()
+    fn load(&self, key: &str) -> Result<String, StorageError> {
+        Ok(window()
             .unwrap()
             .local_storage()
-            .map_err(|e| e.as_string().unwrap())?
+            .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))?
             .unwrap()
             .get(key)
-            .map(|s| s.unwrap_or("".to_string()))
-            .map_err(|e| e.as_string().unwrap())
+            .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))?
+            .unwrap_or("".to_string()))
     }
 
-    fn save(&self, key: &str, value: &str) -> Result<(), String> {
+    fn save(&self, key: &str, value: &str) -> Result<(), StorageError> {
         window()
             .unwrap()
             .local_storage()
-            .map_err(|e| e.as_string().unwrap())?
+            .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))?
             .unwrap()
             .set(key, value)
-            .map_err(|e| e.as_string().unwrap())
+            .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))
     }
 }
 

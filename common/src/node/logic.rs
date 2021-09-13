@@ -1,6 +1,6 @@
 use log::{error, debug, trace};
-
 use std::sync::mpsc::{channel, Receiver, Sender};
+use thiserror::Error;
 
 use super::{
     config::{NodeConfig, NodeInfo},
@@ -18,6 +18,20 @@ pub mod text_messages;
 use messages::*;
 use stats::*;
 pub use text_messages::*;
+
+#[derive(Error, Debug)]
+pub enum LogicError {
+    #[error("While sending to input queue")]
+    InputQueue,
+    #[error("Unknown message `{0}`")]
+    Unknown(String),
+    #[error(transparent)]  
+    Stats(#[from] StatsError),
+    #[error(transparent)]
+    TextMessage(#[from] TMError),
+    #[error(transparent)]
+    Semver(#[from]semver::Error),
+}
 
 #[derive(Debug)]
 pub enum LInput {
@@ -67,7 +81,7 @@ impl Logic {
         }
     }
 
-    pub async fn process(&mut self) -> Result<usize, String> {
+    pub async fn process(&mut self) -> Result<usize, LogicError> {
         let msgs: Vec<LInput> = self.input_rx.try_iter().collect();
         let size = msgs.len();
         for msg in msgs {
@@ -75,7 +89,7 @@ impl Logic {
                 LInput::WebRTC(id, msg) => self.rcv(id, msg)?,
                 LInput::SetNodes(nodes) => {
                     self.stats.store_nodes(nodes.clone());
-                    self.text_messages.update_nodes(nodes).map_err(|e| e.to_string())?;
+                    self.text_messages.update_nodes(nodes)?;
                 }
                 LInput::PingAll() => self.stats.ping_all()?,
                 LInput::ConnStat(id, dir, c, stm) => {
@@ -83,8 +97,7 @@ impl Logic {
                 }
                 LInput::AddMessage(msg) => self
                     .text_messages
-                    .add_message(msg)
-                    .map_err(|e| e.to_string())?,
+                    .add_message(msg)?,
             }
         }
         // TODO: don't use a counter here, as the `process` is called a variable number
@@ -92,25 +105,23 @@ impl Logic {
         self.counter += 1;
         if self.counter % 100 == 0 {
             self.text_messages
-                .update_messages()
-                .map_err(|e| e.to_string())?;
+                .update_messages()?;
         }
         self.stats.send_stats()?;
         Ok(size)
     }
 
-    fn rcv_msg(&mut self, from: U256, msg: MessageV1) -> Result<(), String> {
+    fn rcv_msg(&mut self, from: U256, msg: MessageV1) -> Result<(), LogicError> {
         debug!("got msg {} from {:?}", msg, from);
         match msg {
             MessageV1::Ping() => self.stats.ping_rcv(&from),
             MessageV1::VersionGet() => {}
             MessageV1::TextMessage(msg) => self
                 .text_messages
-                .handle_msg(&from, msg)
-                .map_err(|e| e.to_string())?,
+                .handle_msg(&from, msg)?,
             MessageV1::Version(v) => {
                 let version_semver = semver::Version::parse(VERSION_STRING).unwrap();
-                if semver::Version::parse(&v).map_err(|e| e.to_string())?.major
+                if semver::Version::parse(&v)?.major
                     > version_semver.major
                 {
                     error!("Found node with higher major version - you should update yours, too!");
@@ -122,12 +133,12 @@ impl Logic {
         Ok(())
     }
 
-    fn rcv(&mut self, id: U256, msg_str: String) -> Result<(), String> {
+    fn rcv(&mut self, id: U256, msg_str: String) -> Result<(), LogicError> {
         trace!("Received message from WebRTC: {}", msg_str);
         let msg: Message = msg_str.into();
         match msg {
             Message::V1(send) => self.rcv_msg(id, send),
-            Message::Unknown(s) => Err(s),
+            Message::Unknown(s) => Err(LogicError::Unknown(s)),
         }
     }
 }

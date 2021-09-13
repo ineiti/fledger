@@ -15,9 +15,7 @@ use std::{
 };
 use tungstenite::{accept, protocol::Role, Message, WebSocket};
 
-use common::signal::websocket::{
-    MessageCallbackSend, NewConnectionCallback, WSMessage, WebSocketConnectionSend, WebSocketServer,
-};
+use common::signal::websocket::{MessageCallbackSend, NewConnectionCallback, WSError, WSMessage, WebSocketConnectionSend, WebSocketServer};
 use config::Config;
 
 use state::ServerState;
@@ -65,8 +63,8 @@ unsafe impl Send for UnixWSConnection {}
 unsafe impl Sync for UnixWSConnection {}
 
 impl UnixWSConnection {
-    fn new(stream: TcpStream) -> Result<Box<UnixWSConnection>, String> {
-        let websocket = accept(stream).map_err(|e| e.to_string())?;
+    fn new(stream: TcpStream) -> Result<Box<UnixWSConnection>, WSError> {
+        let websocket = accept(stream).map_err(|e| WSError::Underlying(e.to_string()))?;
         let mut uwsc = Box::new(UnixWSConnection {
             websocket,
             cb: Arc::new(Mutex::new(None)),
@@ -102,10 +100,10 @@ impl WebSocketConnectionSend for UnixWSConnection {
         cb_lock.replace(cb);
     }
 
-    async fn send(&mut self, msg: String) -> Result<(), String> {
+    async fn send(&mut self, msg: String) -> Result<(), WSError> {
         self.websocket
             .write_message(Message::Text(msg))
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| WSError::Underlying(e.to_string()))?;
         Ok(())
     }
 }

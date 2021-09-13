@@ -2,13 +2,22 @@ use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
 };
+use thiserror::Error;
 
 use crate::signal::web_rtc::WebRTCSpawner;
 use crate::{
-    node::network::connection_state::{CSEnum, CSInput, CSOutput, ConnectionState},
+    node::network::connection_state::{CSError, CSEnum, CSInput, CSOutput, ConnectionState},
     signal::web_rtc::{ConnectionStateMap, PeerMessage, WebRTCConnectionState},
     types::ProcessCallback,
 };
+
+#[derive(Error, Debug)]
+pub enum NCError{
+    #[error(transparent)]
+    ConnectionState(#[from] CSError),
+    #[error("Couldn't use output queue")]
+    OutputQueue,
+}
 
 #[derive(Debug)]
 pub enum NCInput {
@@ -48,7 +57,7 @@ impl NodeConnection {
     pub fn new(
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
         process: ProcessCallback,
-    ) -> Result<NodeConnection, String> {
+    ) -> Result<NodeConnection, NCError> {
         let (output_tx, output_rx) = channel::<NCOutput>();
         let (input_tx, input_rx) = channel::<NCInput>();
         let nc = NodeConnection {
@@ -66,7 +75,7 @@ impl NodeConnection {
 
     /// Processes all messages waiting from the submodules, and calls the submodules to
     /// process waiting messages.
-    pub async fn process(&mut self) -> Result<(), String> {
+    pub async fn process(&mut self) -> Result<(), NCError> {
         self.process_connection(true, self.incoming.output_rx.try_iter().collect())
             .await?;
         self.process_connection(false, self.outgoing.output_rx.try_iter().collect())
@@ -80,14 +89,14 @@ impl NodeConnection {
     /// Tries to send a message over the webrtc connection.
     /// If the connection is in setup phase, the message is queued.
     /// If the connection is idle, an error is returned.
-    pub async fn send(&mut self, msg: String) -> Result<(), String> {
+    pub async fn send(&mut self, msg: String) -> Result<(), NCError> {
         match self.get_connection_channel().await? {
             Some(chan) => {
                 // Correctly orders the message after already waiting messages and
                 // avoids an if to check if the queue is full...
                 self.msg_queue.push(msg);
                 for m in self.msg_queue.splice(.., vec![]).collect::<Vec<String>>() {
-                    chan.send(CSInput::Send(m)).map_err(|e| e.to_string())?;
+                    chan.send(CSInput::Send(m)).map_err(|_| NCError::ConnectionState(CSError::InputQueue))?;
                 }
                 Ok(())
             }
@@ -97,7 +106,7 @@ impl NodeConnection {
                     self.outgoing
                         .input_tx
                         .send(CSInput::StartConnection)
-                        .map_err(|e| e.to_string())?;
+                        .map_err(|_| NCError::ConnectionState(CSError::InputQueue))?;
                 }
                 Ok(())
             }
@@ -107,14 +116,14 @@ impl NodeConnection {
     /// Return the stats of outgoing / incoming connection. Every time this method
     /// is called, a new state is requested. But the returned state is the last one
     /// received.
-    pub async fn get_stats(&self) -> Result<Vec<Option<ConnectionStateMap>>, String> {
+    pub async fn get_stats(&self) -> Result<Vec<Option<ConnectionStateMap>>, NCError> {
         for chan in &[&self.incoming.input_tx, &self.outgoing.input_tx] {
-            chan.send(CSInput::GetState).map_err(|e| e.to_string())?;
+            chan.send(CSInput::GetState).map_err(|_| NCError::ConnectionState(CSError::InputQueue))?;
         }
         Ok(self.states.clone())
     }
 
-    async fn process_incoming(&mut self) -> Result<(), String> {
+    async fn process_incoming(&mut self) -> Result<(), NCError> {
         let msgs: Vec<NCInput> = self.input_rx.try_iter().collect();
         for msg in msgs {
             match msg {
@@ -124,11 +133,11 @@ impl NodeConnection {
         Ok(())
     }
 
-    async fn process_ws(&mut self, ws_msg: PeerMessage, remote: bool) -> Result<(), String> {
+    async fn process_ws(&mut self, ws_msg: PeerMessage, remote: bool) -> Result<(), NCError> {
         let msg = CSInput::ProcessPeerMessage(ws_msg);
         match remote {
-            false => self.outgoing.input_tx.send(msg).map_err(|e| e.to_string()),
-            true => self.incoming.input_tx.send(msg).map_err(|e| e.to_string()),
+            false => self.outgoing.input_tx.send(msg).map_err(|_| NCError::ConnectionState(CSError::InputQueue)),
+            true => self.incoming.input_tx.send(msg).map_err(|_| NCError::ConnectionState(CSError::InputQueue)),
         }
     }
 
@@ -137,7 +146,7 @@ impl NodeConnection {
         &mut self,
         remote: bool,
         cmds: Vec<CSOutput>,
-    ) -> Result<(), String> {
+    ) -> Result<(), NCError> {
         for cmd in cmds {
             match cmd {
                 CSOutput::State(cs, stat) => {
@@ -150,16 +159,16 @@ impl NodeConnection {
                     };
                     self.output_tx
                         .send(NCOutput::State(dir, cs, stat))
-                        .map_err(|e| e.to_string())?;
+                        .map_err(|_| NCError::OutputQueue)?;
                 }
                 CSOutput::WebSocket(msg) => self
                     .output_tx
                     .send(NCOutput::WebSocket(msg, remote))
-                    .map_err(|e| e.to_string())?,
+                    .map_err(|_| NCError::OutputQueue)?,
                 CSOutput::WebRTCMessage(msg) => self
                     .output_tx
                     .send(NCOutput::WebRTCMessage(msg))
-                    .map_err(|e| e.to_string())?,
+                    .map_err(|_| NCError::OutputQueue)?,
             }
         }
         Ok(())
@@ -167,7 +176,7 @@ impl NodeConnection {
 
     /// Return a connected direction, preferably outgoing.
     /// Else return None.
-    async fn get_connection_channel(&mut self) -> Result<Option<Sender<CSInput>>, String> {
+    async fn get_connection_channel(&mut self) -> Result<Option<Sender<CSInput>>, NCError> {
         if self.outgoing.get_connection_open().await?{
             return Ok(Some(self.outgoing.input_tx.clone()));
         }

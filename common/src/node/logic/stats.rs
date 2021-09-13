@@ -3,6 +3,9 @@
 /// TODO: update with OKs received from pings, to be sure that the
 /// round-trip works, and that the rx- and tx-pings are actually correlated.
 use std::sync::mpsc::Sender;
+use thiserror::Error;
+
+use self::statnode::SNError;
 
 use super::LOutput;
 use crate::{
@@ -16,6 +19,14 @@ use crate::{
 
 pub mod statnode;
 use statnode::{ConnState, StatNodes};
+
+#[derive(Debug, Error)]
+pub enum StatsError{
+    #[error("While sending to output queue")]
+    OutputQueue,
+    #[error(transparent)]
+    StatNode(#[from] SNError)
+}
 
 pub struct Stats {
     pub stats: StatNodes,
@@ -32,7 +43,7 @@ impl Stats {
         };
     }
 
-    pub fn send_stats(&mut self) -> Result<(), String> {
+    pub fn send_stats(&mut self) -> Result<(), StatsError> {
         // Send statistics to the signalling server
         if self.stats.tick(self.node_config.send_stats) {
             self.stats.expire(self.node_config.stats_ignore);
@@ -40,7 +51,7 @@ impl Stats {
             let stats: Vec<NodeStat> = self.stats.collect(&&self.node_config.our_node.get_id());
             self.output_tx
                 .send(LOutput::SendStats(stats))
-                .map_err(|e| e.to_string())?;
+                .map_err(|_| StatsError::OutputQueue)?;
         }
         Ok(())
     }
@@ -62,9 +73,10 @@ impl Stats {
         }
     }
 
-    pub fn ping_all(&mut self) -> Result<(), String> {
+    pub fn ping_all(&mut self) -> Result<(), StatsError> {
         self.stats
-            .ping_all(&&self.node_config.our_node.get_id(), self.output_tx.clone())
+            .ping_all(&&self.node_config.our_node.get_id(), self.output_tx.clone())?;
+            Ok(())
     }
 
     pub fn ping_rcv(&mut self, from: &U256) {
@@ -74,7 +86,7 @@ impl Stats {
 
 #[cfg(test)]
 mod tests {
-    use super::Stats;
+    use super::*;
     use crate::node::{
         config::{NodeConfig},
         logic::LOutput,
@@ -85,7 +97,7 @@ mod tests {
     #[test]
     /// Starts a Logic with two nodes, then receives ping only from one node.
     /// The other node should be removed from the stats-list.
-    fn cleanup_stale_nodes() -> Result<(), String> {
+    fn cleanup_stale_nodes() -> Result<(), StatsError> {
         simple_logging::log_to_stderr(LevelFilter::Trace);
 
         let nc1 = NodeConfig::new();

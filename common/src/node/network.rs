@@ -6,26 +6,40 @@ use std::sync::{
     Mutex,
 };
 use std::{collections::HashMap, sync::Arc};
+use thiserror::Error;
 
 use self::{connection_state::CSEnum, node_connection::NCOutput};
-use crate::signal::{
-    web_rtc::{
+use crate::signal::{web_rtc::{
         ConnectionStateMap, MessageAnnounce, NodeStat, PeerInfo, WSSignalMessage, WebRTCSpawner,
         WebSocketMessage,
-    },
-    websocket::{WSMessage, WebSocketConnection},
-};
+    }, websocket::{WSError, WSMessage, WebSocketConnection}};
 use crate::{
     node::config::NodeConfig,
     node::config::NodeInfo,
     signal::web_rtc::WebRTCConnectionState,
     types::{ProcessCallback, U256},
 };
-use node_connection::{NCInput, NodeConnection};
+use node_connection::{NCError, NCInput, NodeConnection};
 use WSSignalMessage::NodeStats;
 
 pub mod connection_state;
 pub mod node_connection;
+
+#[derive(Error, Debug)]
+pub enum NetworkError {
+    #[error("Couldn't put in output queue")]
+    OutputQueue,
+    #[error("Couldn't read from input queue")]
+    InputQueue,
+    #[error("Got alien PeerSetup")]
+    AlienPeerSetup,
+    #[error(transparent)]
+    WebSocket(#[from] WSError),
+    #[error(transparent)]
+    SerdeJSON(#[from] serde_json::Error),
+    #[error(transparent)]
+    NodeConnection(#[from] NCError),
+}
 
 pub enum NOutput {
     WebRTC(U256, String),
@@ -99,13 +113,13 @@ impl Network {
     }
 
     /// Process all connections with their waiting messages.
-    pub async fn process(&mut self) -> Result<usize, String> {
+    pub async fn process(&mut self) -> Result<usize, NetworkError> {
         Ok(self.process_input().await?
             + self.process_websocket().await?
             + self.process_connections().await?)
     }
 
-    async fn process_input(&mut self) -> Result<usize, String> {
+    async fn process_input(&mut self) -> Result<usize, NetworkError> {
         let msgs: Vec<NInput> = self.input_rx.try_iter().collect();
         let size = msgs.len();
         for msg in msgs {
@@ -119,7 +133,7 @@ impl Network {
         Ok(size)
     }
 
-    async fn process_websocket(&mut self) -> Result<usize, String> {
+    async fn process_websocket(&mut self) -> Result<usize, NetworkError> {
         let msgs: Vec<WSMessage> = self.ws_rx.try_iter().collect();
         for msg in &msgs {
             match msg {
@@ -133,7 +147,7 @@ impl Network {
         Ok(msgs.len())
     }
 
-    async fn process_connections(&mut self) -> Result<usize, String> {
+    async fn process_connections(&mut self) -> Result<usize, NetworkError> {
         let mut ws_msgs = vec![];
         let mut msgs = 0;
         let conns: Vec<(&U256, &mut NodeConnection)> = self.connections.iter_mut().collect();
@@ -157,11 +171,11 @@ impl Network {
                     NCOutput::WebRTCMessage(msg) => self
                         .output_tx
                         .send(NOutput::WebRTC(conn.0.clone(), msg))
-                        .map_err(|e| e.to_string())?,
+                        .map_err(|_| NetworkError::OutputQueue)?,
                     NCOutput::State(dir, c, sta) => self
                         .output_tx
                         .send(NOutput::State(conn.0.clone(), dir, c, sta))
-                        .map_err(|e| e.to_string())?,
+                        .map_err(|_| NetworkError::OutputQueue)?,
                 }
             }
             conn.1.process().await?;
@@ -175,7 +189,7 @@ impl Network {
     /// Processes incoming messages from the signalling server.
     /// This can be either messages requested by this node, or connection
     /// setup requests from another node.
-    async fn process_msg(&mut self, msg: WSSignalMessage) -> Result<(), String> {
+    async fn process_msg(&mut self, msg: WSSignalMessage) -> Result<(), NetworkError> {
         match msg {
             WSSignalMessage::Challenge(version, challenge) => {
                 info!("Processing Challenge message version: {}", version);
@@ -193,7 +207,7 @@ impl Network {
                 )?;
                 self.input_tx
                     .send(NInput::UpdateList)
-                    .map_err(|e| e.to_string())?;
+                    .map_err(|_| NetworkError::InputQueue)?;
             }
             WSSignalMessage::ListIDsReply(list) => {
                 self.update_list(list)?;
@@ -202,7 +216,7 @@ impl Network {
                 let remote_node = match pi.get_remote(&self.node_config.our_node.get_id()) {
                     Some(id) => id,
                     None => {
-                        return Err("Got alien PeerSetup".to_string());
+                        return Err(NetworkError::AlienPeerSetup);
                     }
                 };
                 let remote = remote_node == pi.id_init;
@@ -215,7 +229,7 @@ impl Network {
                     )?);
                 conn.input_tx
                     .send(NCInput::WebSocket(pi.message, remote))
-                    .map_err(|e| e.to_string())?;
+                    .map_err(|_| NetworkError::InputQueue)?;
             }
             ws => {
                 info!("Got unusable message: {:?}", ws);
@@ -225,7 +239,7 @@ impl Network {
     }
 
     /// Stores a node list sent from the signalling server.
-    fn update_list(&mut self, list: Vec<NodeInfo>) -> Result<(), String> {
+    fn update_list(&mut self, list: Vec<NodeInfo>) -> Result<(), NetworkError> {
         self.list = list
             .iter()
             .filter(|entry| entry.get_id() != self.node_config.our_node.get_id())
@@ -233,18 +247,19 @@ impl Network {
             .collect();
         self.output_tx
             .send(NOutput::UpdateList(list))
-            .map_err(|e| e.to_string())
+            .map_err(|_| NetworkError::OutputQueue)
     }
 
-    fn ws_send(&mut self, msg: WSSignalMessage) -> Result<(), String> {
-        self.ws.send(WebSocketMessage { msg }.to_string())
+    fn ws_send(&mut self, msg: WSSignalMessage) -> Result<(), NetworkError> {
+        self.ws.send(WebSocketMessage { msg }.to_string())?;
+        Ok(())
     }
 
     /// Sends a message to the node dst.
     /// If no connection is active yet, a new one will be created.
     /// NodeConnection will take care of putting the message in a queue while
     /// the setup is finishing.
-    async fn send(&mut self, dst: &U256, msg: String) -> Result<(), String> {
+    async fn send(&mut self, dst: &U256, msg: String) -> Result<(), NetworkError> {
         let conn = self
             .connections
             .entry(dst.clone())
@@ -252,7 +267,8 @@ impl Network {
                 Arc::clone(&self.web_rtc),
                 self.process.clone(),
             )?);
-        conn.send(msg.clone()).await
+        conn.send(msg.clone()).await?;
+        Ok(())
     }
 
     pub fn get_list(&self) -> Vec<NodeInfo> {

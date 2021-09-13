@@ -120,7 +120,7 @@ impl FledgerWeb {
         if let Ok(mut node) = node_mutex.try_lock() {
             *node = Some(
                 Node::new(my_storage, &client, Box::new(ws), rtc_spawner)
-                    .map_err(|e| anyhow!("Couldn't create node: {:?}", e.as_str()))?,
+                    .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?,
             );
         }
         Ok(())

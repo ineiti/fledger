@@ -3,10 +3,21 @@ use std::{
     num::ParseIntError,
     sync::{Arc, Mutex},
 };
+use thiserror::Error;
 
 use rand::random;
 use serde::{Deserialize, Serialize};
 use sha2::digest::{consts::U32, generic_array::GenericArray};
+
+#[derive(Error, Debug)]
+pub enum StorageError{
+    #[error("Give no more than 64 hexadecimal characters")]
+    HexTooLong,
+    #[error(transparent)]
+    ParseInt(#[from] ParseIntError),
+    #[error("From the underlying storage: {0}")]
+    Underlying(String)
+}
 
 /// Nicely formatted 256 bit structure
 #[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Eq, Hash)]
@@ -53,15 +64,14 @@ impl U256 {
     /// So
     ///   `U256.from_str("1234") == U256.from_str("123400")`
     /// something
-    pub fn from_str(s: &str) -> Result<U256, String> {
+    pub fn from_str(s: &str) -> Result<U256, StorageError> {
         if s.len() > 64 {
-            return Err("give no more than 64 hex chars".to_string());
+            return Err(StorageError::HexTooLong);
         }
         let v: Vec<u8> = (0..s.len())
             .step_by(2)
             .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
-            .collect::<Result<Vec<u8>, ParseIntError>>()
-            .map_err(|e| e.to_string())?;
+            .collect::<Result<Vec<u8>, ParseIntError>>()?;
         let mut u = U256 { 0: [0u8; 32] };
         v.iter().enumerate().for_each(|(i, b)| u.0[i] = *b);
         Ok(u)
@@ -90,9 +100,9 @@ impl From<[u8; 32]> for U256 {
 }
 
 pub trait DataStorage {
-    fn load(&self, key: &str) -> Result<String, String>;
+    fn load(&self, key: &str) -> Result<String, StorageError>;
 
-    fn save(&self, key: &str, value: &str) -> Result<(), String>;
+    fn save(&self, key: &str, value: &str) -> Result<(), StorageError>;
 }
 
 pub type ProcessCallback = Arc<Mutex<Box<dyn FnMut()>>>;

@@ -15,6 +15,8 @@ use internal::Internal;
 use node_entry::NodeEntry;
 use crate::config::Config;
 
+use self::internal::ISError;
+
 pub struct ServerState {
     int: Arc<Mutex<Internal>>,
     config: Config,
@@ -25,7 +27,7 @@ pub struct ServerState {
 /// - listen for incoming websocket requests
 /// - handle webrtc signalling setup
 impl ServerState {
-    pub fn new(config: Config, mut ws: Box<dyn WebSocketServer>) -> Result<ServerState, String> {
+    pub fn new(config: Config, mut ws: Box<dyn WebSocketServer>) -> Result<ServerState, ISError> {
         let ss = ServerState {
             int: Internal::new(config.clone())?,
             config,
