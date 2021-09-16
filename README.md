@@ -86,6 +86,13 @@ make serve_local
 
 # Changelog
 
+```
+- 0.4.1 - 2021-09-16
+  - Using thiserror::Error instead of String
+- 0.4.0 - 2021-07-27
+  - Added signature to the connection with the signal-server, thanks to
+      Bolton Bailey <bolton.bailey@gmail.com>
+    during the IC3 Hackathon
 - 0.3.0 - 2021-04-08
   - More stable everything
   - Clean up a lot of locking issues
@@ -108,3 +115,4 @@ make serve_local
     - implement connection in Node
 - 0.0 - 2020-12-xx
   - start the idea
+```
