@@ -1,26 +1,31 @@
+use crate::{broker::Subsystem, node::logic::messages::NodeMessage, types::block_on};
 use ed25519_dalek::Signer;
+use std::sync::mpsc::{channel, Sender};
 
 use log::{info, warn};
-use std::sync::{
-    mpsc::{channel, Receiver, Sender},
-    Mutex,
+use std::{
+    collections::HashMap,
+    sync::{mpsc::Receiver, Arc, Mutex},
 };
-use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
-use self::{connection_state::CSEnum, node_connection::NCOutput};
-use crate::signal::{web_rtc::{
-        ConnectionStateMap, MessageAnnounce, NodeStat, PeerInfo, WSSignalMessage, WebRTCSpawner,
-        WebSocketMessage,
-    }, websocket::{WSError, WSMessage, WebSocketConnection}};
+use self::connection_state::CSEnum;
 use crate::{
-    node::config::NodeConfig,
-    node::config::NodeInfo,
-    signal::web_rtc::WebRTCConnectionState,
-    types::{ProcessCallback, U256},
+    broker::{BInput, Broker, BrokerError, BrokerMessage, SubsystemListener},
+    node::{
+        config::{NodeConfig, NodeInfo},
+        node_data::NodeData,
+    },
+    signal::{
+        web_rtc::{
+            ConnType, MessageAnnounce, NodeStat, SignalingState, WSSignalMessage,
+            WebRTCConnectionState, WebRTCSpawner, WebSocketMessage,
+        },
+        websocket::{WSError, WSMessage, WebSocketConnection},
+    },
+    types::U256,
 };
-use node_connection::{NCError, NCInput, NodeConnection};
-use WSSignalMessage::NodeStats;
+use node_connection::{NCError, NodeConnection};
 
 pub mod connection_state;
 pub mod node_connection;
@@ -33,104 +38,121 @@ pub enum NetworkError {
     InputQueue,
     #[error("Got alien PeerSetup")]
     AlienPeerSetup,
+    #[error("Couldn't get lock")]
+    Lock,
+    #[error("Connection not found")]
+    ConnectionMissing,
     #[error(transparent)]
     WebSocket(#[from] WSError),
     #[error(transparent)]
     SerdeJSON(#[from] serde_json::Error),
     #[error(transparent)]
     NodeConnection(#[from] NCError),
+    #[error(transparent)]
+    Broker(#[from] BrokerError),
 }
 
-pub enum NOutput {
-    WebRTC(U256, String),
-    UpdateList(Vec<NodeInfo>),
-    State(
-        U256,
-        WebRTCConnectionState,
-        CSEnum,
-        Option<ConnectionStateMap>,
-    ),
+pub struct NetworkState {
+    pub list: Vec<NodeInfo>,
 }
 
-pub enum NInput {
-    WebRTC(U256, String),
-    SendStats(Vec<NodeStat>),
-    ClearNodes,
-    UpdateList,
+impl NetworkState {
+    pub fn new() -> Self {
+        Self { list: vec![] }
+    }
 }
 
 pub struct Network {
-    pub output_rx: Receiver<NOutput>,
-    pub input_tx: Sender<NInput>,
-    output_tx: Sender<NOutput>,
-    input_rx: Receiver<NInput>,
-    list: Vec<NodeInfo>,
+    inner: Arc<Mutex<Inner>>,
+    broker_tx: Sender<BrokerMessage>,
+}
+
+impl Network {
+    pub fn new(
+        node_data: Arc<Mutex<NodeData>>,
+        ws: Box<dyn WebSocketConnection>,
+        web_rtc: WebRTCSpawner,
+    ) {
+        let mut broker = node_data.lock().expect("Get NodeData").broker.clone();
+        let (broker_tx, broker_rx) = channel::<BrokerMessage>();
+        broker
+            .add_subsystem(Subsystem::Handler(Box::new(Self {
+                inner: Arc::new(Mutex::new(Inner::new(broker_rx, node_data, ws, web_rtc))),
+                broker_tx,
+            })))
+            .expect("Couldn't add subsystem");
+    }
+}
+
+impl SubsystemListener for Network {
+    fn messages(&mut self, bms: Vec<&BrokerMessage>) -> Vec<BInput> {
+        let inner_cl = Arc::clone(&self.inner);
+        for bm in bms.iter().map(|&b| b.clone()) {
+            self.broker_tx.send(bm).expect("Send broker message");
+        }
+        block_on(async move {
+            // Because block_on puts things in the background for wasm, it's not
+            // really blocking, and multiple calls will arrive here at the same
+            // time.
+            if let Ok(mut inner) = inner_cl.try_lock() {
+                if let Err(e) = inner.process_broker().await {
+                    log::error!("While processing broker messages: {:?}", e);
+                }
+                if let Err(e) = inner.process_websocket().await {
+                    log::error!("While processing websockte message: {:?}", e);
+                }
+            }
+        });
+
+        vec![]
+    }
+}
+
+struct Inner {
     ws: Box<dyn WebSocketConnection>,
     ws_rx: Receiver<WSMessage>,
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
     connections: HashMap<U256, NodeConnection>,
+    node_data: Arc<Mutex<NodeData>>,
     node_config: NodeConfig,
-    process: ProcessCallback,
+    broker: Broker,
+    broker_rx: Receiver<BrokerMessage>,
 }
 
-/// Network combines a websocket to connect to the signal server with
+/// Inner combines a websocket to connect to the signal server with
 /// a WebRTC trait to connect to other nodes.
 /// It supports setting up automatic connections to other nodes.
-impl Network {
+impl Inner {
     pub fn new(
-        node_config: NodeConfig,
+        broker_rx: Receiver<BrokerMessage>,
+        node_data: Arc<Mutex<NodeData>>,
         mut ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
-        process: ProcessCallback,
-    ) -> Network {
-        let (output_tx, output_rx) = channel::<NOutput>();
-        let (input_tx, input_rx) = channel::<NInput>();
+    ) -> Self {
         let (ws_tx, ws_rx) = channel::<WSMessage>();
-        let process_clone = process.clone();
-        ws.set_cb_wsmessage(Box::new(move |msg| {
-            if let Err(e) = ws_tx.send(msg) {
-                info!("Couldn't send msg over ws-channel: {}", e);
-            }
-            match process_clone.try_lock() {
-                Ok(mut p) => p(),
-                Err(_e) => warn!("network::process was locked"),
-            }
-        }));
-        let net = Network {
-            list: vec![],
-            output_tx,
-            output_rx,
-            input_tx,
-            input_rx,
+        let (node_config, broker) = {
+            let nsl = node_data.lock().unwrap();
+            let mut broker_clone = nsl.broker.clone();
+            ws.set_cb_wsmessage(Box::new(move |msg| {
+                if let Err(e) = ws_tx.send(msg) {
+                    warn!("Couldn't send msg over ws-channel: {}", e);
+                }
+                if let Err(_) = broker_clone.process() {
+                    warn!("Couldn't process broker");
+                }
+            }));
+            (nsl.node_config.clone(), nsl.broker.clone())
+        };
+        Self {
             ws,
             ws_rx,
+            broker_rx,
             web_rtc: Arc::new(Mutex::new(web_rtc)),
             connections: HashMap::new(),
             node_config,
-            process,
-        };
-        net
-    }
-
-    /// Process all connections with their waiting messages.
-    pub async fn process(&mut self) -> Result<usize, NetworkError> {
-        Ok(self.process_input().await?
-            + self.process_websocket().await?
-            + self.process_connections().await?)
-    }
-
-    async fn process_input(&mut self) -> Result<usize, NetworkError> {
-        let msgs: Vec<NInput> = self.input_rx.try_iter().collect();
-        let size = msgs.len();
-        for msg in msgs {
-            match msg {
-                NInput::SendStats(s) => self.ws_send(NodeStats(s))?,
-                NInput::WebRTC(id, msg) => self.send(&id, msg).await?,
-                NInput::ClearNodes => self.ws_send(WSSignalMessage::ClearNodes)?,
-                NInput::UpdateList => self.ws_send(WSSignalMessage::ListIDsRequest)?,
-            }
+            node_data,
+            broker,
         }
-        Ok(size)
     }
 
     async fn process_websocket(&mut self) -> Result<usize, NetworkError> {
@@ -145,45 +167,6 @@ impl Network {
             }
         }
         Ok(msgs.len())
-    }
-
-    async fn process_connections(&mut self) -> Result<usize, NetworkError> {
-        let mut ws_msgs = vec![];
-        let mut msgs = 0;
-        let conns: Vec<(&U256, &mut NodeConnection)> = self.connections.iter_mut().collect();
-        for conn in conns {
-            let outputs: Vec<NCOutput> = conn.1.output_rx.try_iter().collect();
-            msgs += outputs.len();
-            for output in outputs {
-                match output {
-                    NCOutput::WebSocket(message, remote) => {
-                        let (id_init, id_follow) = match remote {
-                            true => (conn.0.clone(), self.node_config.our_node.get_id()),
-                            false => (self.node_config.our_node.get_id(), conn.0.clone()),
-                        };
-                        let peer_info = PeerInfo {
-                            id_init,
-                            id_follow,
-                            message,
-                        };
-                        ws_msgs.push(WSSignalMessage::PeerSetup(peer_info));
-                    }
-                    NCOutput::WebRTCMessage(msg) => self
-                        .output_tx
-                        .send(NOutput::WebRTC(conn.0.clone(), msg))
-                        .map_err(|_| NetworkError::OutputQueue)?,
-                    NCOutput::State(dir, c, sta) => self
-                        .output_tx
-                        .send(NOutput::State(conn.0.clone(), dir, c, sta))
-                        .map_err(|_| NetworkError::OutputQueue)?,
-                }
-            }
-            conn.1.process().await?;
-        }
-        for msg in ws_msgs {
-            self.ws_send(msg)?;
-        }
-        Ok(msgs)
     }
 
     /// Processes incoming messages from the signalling server.
@@ -205,9 +188,7 @@ impl Network {
                     }
                     .to_string(),
                 )?;
-                self.input_tx
-                    .send(NInput::UpdateList)
-                    .map_err(|_| NetworkError::InputQueue)?;
+                self.ws_send(WSSignalMessage::ListIDsRequest)?;
             }
             WSSignalMessage::ListIDsReply(list) => {
                 self.update_list(list)?;
@@ -219,17 +200,10 @@ impl Network {
                         return Err(NetworkError::AlienPeerSetup);
                     }
                 };
-                let remote = remote_node == pi.id_init;
-                let conn = self
-                    .connections
-                    .entry(remote_node)
-                    .or_insert(NodeConnection::new(
-                        Arc::clone(&self.web_rtc),
-                        self.process.clone(),
-                    )?);
-                conn.input_tx
-                    .send(NCInput::WebSocket(pi.message, remote))
-                    .map_err(|_| NetworkError::InputQueue)?;
+                self.get_connection(&remote_node)
+                    .await?
+                    .process_ws(pi)
+                    .await?;
             }
             ws => {
                 info!("Got unusable message: {:?}", ws);
@@ -238,16 +212,46 @@ impl Network {
         Ok(())
     }
 
+    async fn process_broker(&mut self) -> Result<(), NetworkError> {
+        let bms: Vec<BrokerMessage> = self.broker_rx.try_iter().collect();
+        for bm in bms {
+            match bm {
+                BrokerMessage::Network(BrokerNetwork::WebRTC(id, msg)) => {
+                    self.send(&id, msg.clone()).await?
+                }
+                BrokerMessage::Network(BrokerNetwork::SendStats(ss)) => {
+                    self.ws_send(WSSignalMessage::NodeStats(ss.clone()))?
+                }
+                BrokerMessage::Network(BrokerNetwork::ClearNodes) => {
+                    self.ws_send(WSSignalMessage::ClearNodes)?
+                }
+                BrokerMessage::Network(BrokerNetwork::UpdateListRequest) => {
+                    self.ws_send(WSSignalMessage::ListIDsRequest)?
+                }
+                BrokerMessage::Network(BrokerNetwork::WebSocket(msg)) => self.ws_send(msg)?,
+                _ => continue,
+            };
+        }
+        Ok(())
+    }
+
     /// Stores a node list sent from the signalling server.
     fn update_list(&mut self, list: Vec<NodeInfo>) -> Result<(), NetworkError> {
-        self.list = list
+        self.node_data
+            .try_lock()
+            .expect("locking")
+            .network_state
+            .list = list
             .iter()
             .filter(|entry| entry.get_id() != self.node_config.our_node.get_id())
             .cloned()
             .collect();
-        self.output_tx
-            .send(NOutput::UpdateList(list))
-            .map_err(|_| NetworkError::OutputQueue)
+        let res = self
+            .broker
+            .emit_bm(BrokerMessage::Network(BrokerNetwork::UpdateList(list)))
+            .map(|_| ())
+            .map_err(|_| NetworkError::OutputQueue);
+        res
     }
 
     fn ws_send(&mut self, msg: WSSignalMessage) -> Result<(), NetworkError> {
@@ -260,18 +264,58 @@ impl Network {
     /// NodeConnection will take care of putting the message in a queue while
     /// the setup is finishing.
     async fn send(&mut self, dst: &U256, msg: String) -> Result<(), NetworkError> {
-        let conn = self
-            .connections
-            .entry(dst.clone())
-            .or_insert(NodeConnection::new(
-                Arc::clone(&self.web_rtc),
-                self.process.clone(),
-            )?);
-        conn.send(msg.clone()).await?;
+        // log::debug!("Sending {}", msg);
+        self.get_connection(dst).await?.send(msg.clone()).await?;
         Ok(())
     }
 
-    pub fn get_list(&self) -> Vec<NodeInfo> {
-        self.list.clone()
+    /// Returns a connection to the given id. If the connection does not exist yet, it will
+    /// start a new connection and put the message in a queue to be sent once the connection
+    /// is established.
+    async fn get_connection(&mut self, id: &U256) -> Result<&mut NodeConnection, NetworkError> {
+        if !self.connections.contains_key(id) {
+            self.connections.insert(
+                id.clone(),
+                NodeConnection::new(
+                    Arc::clone(&self.web_rtc),
+                    self.broker.clone(),
+                    self.node_config.our_node.get_id(),
+                    id.clone(),
+                )
+                .await?,
+            );
+        }
+        self.connections
+            .get_mut(&id)
+            .ok_or(NetworkError::ConnectionMissing)
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BrokerNetwork {
+    WebRTC(U256, String),
+    WebSocket(WSSignalMessage),
+    SendStats(Vec<NodeStat>),
+    UpdateList(Vec<NodeInfo>),
+    ClearNodes,
+    UpdateListRequest,
+    ConnectionState(NetworkConnectionState),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct NetworkConnectionState {
+    pub id: U256,
+    pub dir: WebRTCConnectionState,
+    pub c: CSEnum,
+    pub s: Option<ConnStats>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConnStats {
+    pub type_local: ConnType,
+    pub type_remote: ConnType,
+    pub signaling: SignalingState,
+    pub rx_bytes: u64,
+    pub tx_bytes: u64,
+    pub delay_ms: u32,
 }

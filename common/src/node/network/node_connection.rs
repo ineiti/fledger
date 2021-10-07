@@ -1,34 +1,19 @@
-use std::sync::{
-    mpsc::{channel, Receiver, Sender},
-    Arc, Mutex,
-};
+use crate::{signal::web_rtc::PeerInfo, types::U256};
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
-use crate::signal::web_rtc::WebRTCSpawner;
 use crate::{
-    node::network::connection_state::{CSError, CSEnum, CSInput, CSOutput, ConnectionState},
-    signal::web_rtc::{ConnectionStateMap, PeerMessage, WebRTCConnectionState},
-    types::ProcessCallback,
+    broker::Broker,
+    node::network::connection_state::{CSEnum, CSError, ConnectionState},
+    signal::web_rtc::WebRTCSpawner,
 };
 
 #[derive(Error, Debug)]
-pub enum NCError{
+pub enum NCError {
     #[error(transparent)]
     ConnectionState(#[from] CSError),
     #[error("Couldn't use output queue")]
     OutputQueue,
-}
-
-#[derive(Debug)]
-pub enum NCInput {
-    WebSocket(PeerMessage, bool),
-}
-
-#[derive(Debug)]
-pub enum NCOutput {
-    WebSocket(PeerMessage, bool),
-    WebRTCMessage(String),
-    State(WebRTCConnectionState, CSEnum, Option<ConnectionStateMap>),
 }
 
 /// There might be up to two connections per remote node.
@@ -43,146 +28,85 @@ pub struct NodeConnection {
     // incoming connections are connections initiated from another node.
     pub incoming: ConnectionState,
 
-    // channels for communicating with this module
-    pub output_rx: Receiver<NCOutput>,
-    pub input_tx: Sender<NCInput>,
-    output_tx: Sender<NCOutput>,
-    input_rx: Receiver<NCInput>,
-    msg_queue: Vec<String>,
+    id_remote: U256,
 
-    states: Vec<Option<ConnectionStateMap>>,
+    msg_queue: Vec<String>,
 }
 
 impl NodeConnection {
-    pub fn new(
+    pub async fn new(
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
-        process: ProcessCallback,
+        broker: Broker,
+        id_local: U256,
+        id_remote: U256,
     ) -> Result<NodeConnection, NCError> {
-        let (output_tx, output_rx) = channel::<NCOutput>();
-        let (input_tx, input_rx) = channel::<NCInput>();
         let nc = NodeConnection {
-            outgoing: ConnectionState::new(false, Arc::clone(&web_rtc), process.clone())?,
-            incoming: ConnectionState::new(true, Arc::clone(&web_rtc), process.clone())?,
-            output_tx,
-            output_rx,
-            input_tx,
-            input_rx,
+            outgoing: ConnectionState::new(
+                false,
+                Arc::clone(&web_rtc),
+                broker.clone(),
+                id_local,
+                id_remote,
+            )
+            .await?,
+            incoming: ConnectionState::new(
+                true,
+                Arc::clone(&web_rtc),
+                broker.clone(),
+                id_local,
+                id_remote,
+            )
+            .await?,
+            id_remote,
             msg_queue: vec![],
-            states: vec![None, None],
         };
         Ok(nc)
-    }
-
-    /// Processes all messages waiting from the submodules, and calls the submodules to
-    /// process waiting messages.
-    pub async fn process(&mut self) -> Result<(), NCError> {
-        self.process_connection(true, self.incoming.output_rx.try_iter().collect())
-            .await?;
-        self.process_connection(false, self.outgoing.output_rx.try_iter().collect())
-            .await?;
-        self.process_incoming().await?;
-        self.incoming.process().await?;
-        self.outgoing.process().await?;
-        Ok(())
     }
 
     /// Tries to send a message over the webrtc connection.
     /// If the connection is in setup phase, the message is queued.
     /// If the connection is idle, an error is returned.
     pub async fn send(&mut self, msg: String) -> Result<(), NCError> {
-        match self.get_connection_channel().await? {
-            Some(chan) => {
+        let conn_result = {
+            if self.outgoing.get_connection_open().await? {
+                Some(&mut self.outgoing)
+            } else {
+                if self.incoming.get_connection_open().await? {
+                    Some(&mut self.incoming)
+                } else {
+                    None
+                }
+            }
+        };
+        match conn_result {
+            Some(conn) => {
                 // Correctly orders the message after already waiting messages and
                 // avoids an if to check if the queue is full...
                 self.msg_queue.push(msg);
                 for m in self.msg_queue.splice(.., vec![]).collect::<Vec<String>>() {
-                    chan.send(CSInput::Send(m)).map_err(|_| NCError::ConnectionState(CSError::InputQueue))?;
-                }
-                Ok(())
-            }
-            None => {
-                if self.outgoing.state == CSEnum::Idle {
-                    self.msg_queue.push(msg);
-                    self.outgoing
-                        .input_tx
-                        .send(CSInput::StartConnection)
+                    conn.send(m)
+                        .await
                         .map_err(|_| NCError::ConnectionState(CSError::InputQueue))?;
                 }
                 Ok(())
             }
-        }
-    }
-
-    /// Return the stats of outgoing / incoming connection. Every time this method
-    /// is called, a new state is requested. But the returned state is the last one
-    /// received.
-    pub async fn get_stats(&self) -> Result<Vec<Option<ConnectionStateMap>>, NCError> {
-        for chan in &[&self.incoming.input_tx, &self.outgoing.input_tx] {
-            chan.send(CSInput::GetState).map_err(|_| NCError::ConnectionState(CSError::InputQueue))?;
-        }
-        Ok(self.states.clone())
-    }
-
-    async fn process_incoming(&mut self) -> Result<(), NCError> {
-        let msgs: Vec<NCInput> = self.input_rx.try_iter().collect();
-        for msg in msgs {
-            match msg {
-                NCInput::WebSocket(pi, remote) => self.process_ws(pi, remote).await?,
-            }
-        }
-        Ok(())
-    }
-
-    async fn process_ws(&mut self, ws_msg: PeerMessage, remote: bool) -> Result<(), NCError> {
-        let msg = CSInput::ProcessPeerMessage(ws_msg);
-        match remote {
-            false => self.outgoing.input_tx.send(msg).map_err(|_| NCError::ConnectionState(CSError::InputQueue)),
-            true => self.incoming.input_tx.send(msg).map_err(|_| NCError::ConnectionState(CSError::InputQueue)),
-        }
-    }
-
-    /// Processes incoming messages from a connection.
-    async fn process_connection(
-        &mut self,
-        remote: bool,
-        cmds: Vec<CSOutput>,
-    ) -> Result<(), NCError> {
-        for cmd in cmds {
-            match cmd {
-                CSOutput::State(cs, stat) => {
-                    let dir = if remote {
-                        self.states[1] = stat;
-                        WebRTCConnectionState::Follower
-                    } else {
-                        self.states[0] = stat;
-                        WebRTCConnectionState::Initializer
-                    };
-                    self.output_tx
-                        .send(NCOutput::State(dir, cs, stat))
-                        .map_err(|_| NCError::OutputQueue)?;
+            None => {
+                if self.outgoing.get_connection_state() == CSEnum::Idle {
+                    self.msg_queue.push(msg);
+                    self.outgoing.start_connection(None).await?;
                 }
-                CSOutput::WebSocket(msg) => self
-                    .output_tx
-                    .send(NCOutput::WebSocket(msg, remote))
-                    .map_err(|_| NCError::OutputQueue)?,
-                CSOutput::WebRTCMessage(msg) => self
-                    .output_tx
-                    .send(NCOutput::WebRTCMessage(msg))
-                    .map_err(|_| NCError::OutputQueue)?,
+                Ok(())
             }
         }
-        Ok(())
     }
 
-    /// Return a connected direction, preferably outgoing.
-    /// Else return None.
-    async fn get_connection_channel(&mut self) -> Result<Option<Sender<CSInput>>, NCError> {
-        if self.outgoing.get_connection_open().await?{
-            return Ok(Some(self.outgoing.input_tx.clone()));
+    pub async fn process_ws(&mut self, pi: PeerInfo) -> Result<(), NCError> {
+        match self.id_remote == pi.id_init {
+            false => &mut self.outgoing,
+            true => &mut self.incoming,
         }
-        if self.incoming.get_connection_open().await?{
-            return Ok(Some(self.incoming.input_tx.clone()));
-        }
-        Ok(None)
+        .process_peer_message(pi.message)
+        .await?;
+        Ok(())
     }
 }

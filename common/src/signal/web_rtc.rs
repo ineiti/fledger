@@ -1,9 +1,9 @@
-use ed25519_dalek::Signature;
 use async_trait::async_trait;
+use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
 use thiserror::Error;
+use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
 
 use crate::{node::config::NodeInfo, types::U256};
 
@@ -22,7 +22,7 @@ pub enum SetupError {
 pub type WebRTCSpawner =
     Box<dyn Fn(WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, SetupError>>;
 
-pub type WebRTCSetupCB = Box<dyn Fn(WebRTCSetupCBMessage)>;
+pub type WebRTCSetupCB = Box<dyn FnMut(WebRTCSetupCBMessage)>;
 
 #[async_trait(?Send)]
 pub trait WebRTCConnectionSetup {
@@ -67,7 +67,7 @@ pub enum ConnectionError {
     #[error("Unknown State: {0}")]
     UnknownState(String),
     #[error("In underlying system: {0}")]
-    Underlying(String)
+    Underlying(String),
 }
 
 #[async_trait(?Send)]
@@ -83,7 +83,7 @@ pub trait WebRTCConnection {
     async fn get_state(&self) -> Result<ConnectionStateMap, ConnectionError>;
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ConnType {
     Unknown,
     Host,
@@ -92,7 +92,7 @@ pub enum ConnType {
     TURN,
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum SignalingState {
     Closed,
     Setup,
@@ -116,7 +116,7 @@ pub struct ConnectionStateMap {
 pub type WebRTCMessageCB = Box<dyn FnMut(String)>;
 
 /// What type of node this is
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum WebRTCConnectionState {
     Initializer,
     Follower,
@@ -141,7 +141,7 @@ impl std::fmt::Display for PeerMessage {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct PeerInfo {
     pub id_init: U256,
     pub id_follow: U256,
@@ -150,7 +150,7 @@ pub struct PeerInfo {
 
 impl std::fmt::Display for PeerInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "init: {} - follow: {}", self.id_init, self.id_follow)
+        write!(f, "init: {} - {}", self.id_init, self.message)
     }
 }
 
@@ -199,7 +199,7 @@ impl WebSocketMessage {
 /// server will send a 'PeerReply' to the corresponding node, which will continue
 /// the protocol by sending its own PeerRequest.
 /// - Done is a standard message that can be sent back to indicate all is well.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub enum WSSignalMessage {
     Challenge(u64, U256),
     Announce(MessageAnnounce),
@@ -210,7 +210,7 @@ pub enum WSSignalMessage {
     NodeStats(Vec<NodeStat>),
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct NodeStat {
     pub id: U256,
     pub version: String,
@@ -232,7 +232,7 @@ impl std::fmt::Display for WSSignalMessage {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct MessageAnnounce {
     pub version: u64,
     pub challenge: U256,

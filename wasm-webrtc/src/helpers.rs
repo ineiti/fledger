@@ -17,7 +17,7 @@ impl DataStorage for LocalStorage {
             .unwrap_or("".to_string()))
     }
 
-    fn save(&self, key: &str, value: &str) -> Result<(), StorageError> {
+    fn save(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
         window()
             .unwrap()
             .local_storage()

@@ -5,8 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
 use js_sys::Reflect;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::RtcConfiguration;
 
@@ -90,14 +89,18 @@ impl WebRTCConnectionSetupWasm {
 
     fn is_initializer(&self) -> Result<(), SetupError> {
         if self.nt != WebRTCConnectionState::Initializer {
-            return Err(SetupError::Underlying("This method is only available to the Initializer".to_string()));
+            return Err(SetupError::Underlying(
+                "This method is only available to the Initializer".to_string(),
+            ));
         }
         Ok(())
     }
 
     fn is_follower(&self) -> Result<(), SetupError> {
         if self.nt != WebRTCConnectionState::Follower {
-            return Err(SetupError::Underlying("This method is only available to the Follower".to_string()));
+            return Err(SetupError::Underlying(
+                "This method is only available to the Follower".to_string(),
+            ));
         }
         Ok(())
     }
@@ -108,7 +111,8 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     // Returns the offer string that needs to be sent to the `Follower` node.
     async fn make_offer(&mut self) -> Result<String, SetupError> {
         self.is_initializer()?;
-        let offer = JsFuture::from(self.rp_conn.create_offer())
+        let co = self.rp_conn.create_offer();
+        let offer = JsFuture::from(co)
             .await
             .map_err(|e| SetupError::Underlying(format!("{:?}", e)))?;
         let offer_sdp = Reflect::get(&offer, &JsValue::from_str("sdp"))
@@ -178,8 +182,6 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
 
     // Sends the ICE string to the WebRTC.
     async fn ice_put(&mut self, ice: String) -> Result<(), SetupError> {
-        // self.is_not_setup()?;
-        let rp_clone = self.rp_conn.clone();
         let els: Vec<&str> = ice.split(":-:").collect();
         if els.len() != 3 || els[0] == "" {
             warn!("wrong ice candidate string: {}", ice);
@@ -190,22 +192,28 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
         ric_init.sdp_m_line_index(Some(els[2].parse::<u16>().unwrap()));
         match RtcIceCandidate::new(&ric_init) {
             Ok(e) => {
-                if let Err(e) = wasm_bindgen_futures::JsFuture::from(
-                    rp_clone.add_ice_candidate_with_opt_rtc_ice_candidate(Some(&e)),
+                if let Err(err) = wasm_bindgen_futures::JsFuture::from(
+                    self.rp_conn
+                        .add_ice_candidate_with_opt_rtc_ice_candidate(Some(&e)),
                 )
                 .await
                 {
-                    warn!("Couldn't add ice candidate: {:?}", e);
+                    warn!("Couldn't add ice candidate: {:?}", err);
                 }
                 Ok(())
             }
-            Err(e) => Err(SetupError::Underlying(format!("Couldn't consume ice: {:?}", e))),
+            Err(err) => Err(SetupError::Underlying(format!(
+                "Couldn't consume ice: {:?}",
+                err
+            ))),
         }
         .map_err(|js| SetupError::Underlying(js.to_string()))
     }
 
     async fn get_state(&self) -> Result<ConnectionStateMap, SetupError> {
-        Ok(get_state(self.rp_conn.clone()).await.map_err(|e| SetupError::Underlying(format!("{:?}", e)))?)
+        Ok(get_state(self.rp_conn.clone())
+            .await
+            .map_err(|e| SetupError::Underlying(format!("{:?}", e)))?)
     }
 }
 
@@ -220,7 +228,7 @@ fn ice_start(rp_conn: &RtcPeerConnection, callback: Arc<Mutex<Option<WebRTCSetup
                         candidate.sdp_mid().unwrap(),
                         candidate.sdp_m_line_index().unwrap()
                     );
-                    if let Some(cb) = callback.lock().unwrap().as_ref() {
+                    if let Some(cb) = callback.lock().unwrap().as_mut() {
                         cb(WebRTCSetupCBMessage::Ice(cand.clone()));
                     }
                 }
@@ -249,14 +257,16 @@ fn dc_create_follow(rp_conn: RtcPeerConnection, cb: Arc<Mutex<Option<WebRTCSetup
 fn dc_set_onopen(
     dc: &mut Option<RtcDataChannel>,
     rp_conn: &mut Option<RtcPeerConnection>,
-    cb: Arc<Mutex<Option<WebRTCSetupCB>>>,
+    callback: Arc<Mutex<Option<WebRTCSetupCB>>>,
 ) {
     let dcc = dc.take().unwrap();
     let mut dccc = Some(dcc.clone());
     let mut rpc = Some(rp_conn.take().unwrap());
     let ondatachannel_open = Closure::wrap(Box::new(move |_ev: Event| {
         let conn = WebRTCConnectionWasm::new(dccc.take().unwrap(), rpc.take().unwrap());
-        cb.lock().unwrap().as_ref().unwrap()(WebRTCSetupCBMessage::Connection(conn));
+        if let Some(cb) = callback.lock().unwrap().as_mut() {
+            cb(WebRTCSetupCBMessage::Connection(conn));
+        }
     }) as Box<dyn FnMut(Event)>);
     dcc.set_onopen(Some(ondatachannel_open.as_ref().unchecked_ref()));
     ondatachannel_open.forget();

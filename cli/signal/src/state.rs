@@ -1,19 +1,20 @@
-use log::{error, debug};
-use std::sync::mpsc::channel;
-use std::sync::Mutex;
-use std::thread;
-use std::{sync::Arc, time::Duration};
+use log::{debug, error};
+use std::{
+    sync::{mpsc::channel, Arc, Mutex},
+    thread,
+    time::Duration,
+};
 
 use common::{
-    types::U256,
     signal::websocket::{WSMessage, WebSocketConnectionSend, WebSocketServer},
+    types::U256,
 };
 
 mod internal;
 mod node_entry;
+use crate::config::Config;
 use internal::Internal;
 use node_entry::NodeEntry;
-use crate::config::Config;
 
 use self::internal::ISError;
 
@@ -46,7 +47,7 @@ impl ServerState {
         let int_clone = Arc::clone(&int);
         let (tx, rx) = channel::<WSMessage>();
         conn.set_cb_wsmessage(Box::new(move |cb| {
-            if let Err(e) = tx.send(cb){
+            if let Err(e) = tx.send(cb) {
                 error!("Couldn't send over channel: {}", e);
                 return;
             }

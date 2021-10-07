@@ -1,22 +1,25 @@
 use crate::types::U256;
 use ed25519_dalek::{Keypair, PublicKey};
 use rand::rngs::OsRng;
-use std::convert::TryFrom;
 use serde_derive::{Deserialize, Serialize};
+use std::{
+    convert::TryFrom,
+    fmt::{Debug, Error, Formatter},
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ConfigError{
+pub enum ConfigError {
     #[error("Didn't find public key")]
     PublicKeyMissing,
     #[error(transparent)]
     DecodeToml1(#[from] toml::de::Error),
     #[error(transparent)]
-    DecodeToml2(#[from] toml::ser::Error)
+    DecodeToml2(#[from] toml::ser::Error),
 }
 
 /// NodeInfo is the public information of the node.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct NodeInfo {
     /// Free text info, limited to 256 characters
     pub info: String,
@@ -56,7 +59,24 @@ impl TryFrom<NodeInfoToml> for NodeInfo {
         })
     }
 }
- 
+
+impl Debug for NodeInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        let pubkey: String = self
+            .pubkey
+            .to_bytes()
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect();
+
+        write!(
+            f,
+            "NodeInfo: {{ info: '{}', client: '{}', node_capacities: {:?}, pubkey: {} }}",
+            self.info, self.client, self.node_capacities, pubkey
+        )
+    }
+}
+
 impl PartialEq for NodeInfo {
     fn eq(&self, other: &Self) -> bool {
         self.get_id() == other.get_id()

@@ -1,7 +1,8 @@
+use crate::{node::logic::text_messages::TextMessageV1, types::U256};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 /// This is the command-set for version 1 of the protocol.
 pub enum MessageV1 {
     // The version of the requested node
@@ -15,10 +16,10 @@ pub enum MessageV1 {
     // Gets the Version of the OracleServers
     VersionGet(),
     // TextMessages
-    TextMessage(super::text_messages::TextMessageV1),
+    TextMessage(TextMessageV1),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum Message {
     /// Version1 of messages - new messages can be added, but changes to existing
     /// types need to be backwards-compatible
@@ -62,4 +63,10 @@ impl Message {
     pub fn to_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct NodeMessage {
+    pub id: U256,
+    pub msg: Message,
 }
