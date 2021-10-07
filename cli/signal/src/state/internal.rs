@@ -6,12 +6,8 @@ use futures::executor;
 use log::{debug, error, info, warn};
 use std::{
     collections::{hash_map::Entry, HashMap},
-    sync::Arc,
-};
-use std::{
-    fs::File,
-    fs::OpenOptions,
-    sync::Mutex,
+    fs::{File, OpenOptions},
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use thiserror::Error;
@@ -31,7 +27,7 @@ use super::node_entry::NodeEntry;
 use crate::config::Config;
 
 #[derive(Debug, Error)]
-pub enum ISError{
+pub enum ISError {
     #[error("During file access: {0}")]
     File(String),
     #[error("Destination not reachable")]
@@ -88,7 +84,7 @@ impl Internal {
                         .open(name)
                         .map_err(|e| ISError::File(e.to_string()))?,
                 )),
-                None => None, 
+                None => None,
             },
         }));
         Ok(int)
@@ -140,7 +136,11 @@ impl Internal {
         match msg_ws.msg {
             // Node sends his information to the server
             WSSignalMessage::Announce(msg_ann) => {
-                if let Err(e) = msg_ann.node_info.pubkey.verify(&chal.to_bytes(), &msg_ann.signature){
+                if let Err(e) = msg_ann
+                    .node_info
+                    .pubkey
+                    .verify(&chal.to_bytes(), &msg_ann.signature)
+                {
                     warn!("Got node with wrong signature: {:?}", e);
                     return;
                 }

@@ -11,7 +11,7 @@ use web_sys::window;
 
 use common::node::{
     config::NodeInfo,
-    logic::{stats::statnode::StatNode, TextMessage},
+    logic::{stats::StatNode, text_messages::TextMessage},
     version::VERSION_STRING,
     Node,
 };
@@ -73,9 +73,8 @@ impl FledgerWeb {
         }
         let noc = Arc::clone(&self.node);
         self.counter += 1;
-        let ping = self.counter & 3 == 0;
         wasm_bindgen_futures::spawn_local(async move {
-            if let Err(e) = Self::update_node(noc, ping).await {
+            if let Err(e) = Self::update_node(noc).await {
                 error!("Couldn't update node: {:?}", e);
             };
         });
@@ -88,13 +87,10 @@ impl FledgerWeb {
 }
 
 impl FledgerWeb {
-    async fn update_node(noc: Arc<Mutex<Option<Node>>>, ping: bool) -> Result<()> {
+    async fn update_node(noc: Arc<Mutex<Option<Node>>>) -> Result<()> {
         if let Ok(mut no) = noc.try_lock() {
             if let Some(n) = no.as_mut() {
                 n.list().map_err(|e| anyhow!(e))?;
-                if ping {
-                    n.ping().await.map_err(|e| anyhow!(e))?;
-                }
                 n.process().await.map_err(|e| anyhow!(e))?;
             } else {
                 warn!("Couldn't lock node");
@@ -249,9 +245,9 @@ impl FledgerMessages {
         FledgerMessages {
             msgs: msgs
                 .iter()
-                .map(|msg| FledgerMessage { 
+                .map(|msg| FledgerMessage {
                     from: msg.node_info.clone(),
-                    text: msg.msg.clone() 
+                    text: msg.msg.clone(),
                 })
                 .collect(),
         }

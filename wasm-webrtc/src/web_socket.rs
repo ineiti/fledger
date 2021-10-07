@@ -1,19 +1,12 @@
 use async_trait::async_trait;
 use common::signal::websocket::WSError;
-use std::{
-    cell::RefCell,
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
-use log::{info, warn, debug, error};
+use log::{debug, error, info, warn};
 
-use wasm_bindgen::prelude::Closure;
-use wasm_bindgen::JsCast;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 
-use web_sys::ErrorEvent;
-use web_sys::MessageEvent;
-use web_sys::WebSocket;
+use web_sys::{ErrorEvent, MessageEvent, WebSocket};
 
 use common::signal::websocket::{MessageCallback, WSMessage, WebSocketConnection};
 
@@ -87,9 +80,9 @@ impl WebSocketConnection for WebSocketWasm {
             self.reconnect()?;
             Err(WSError::Underlying("Send while not connected".into()))
         } else {
-                self.ws
-                    .send_with_str(&msg)
-                    .map_err(|e| WSError::Underlying(format!("Error while sending: {:?}", e)))?;
+            self.ws
+                .send_with_str(&msg)
+                .map_err(|e| WSError::Underlying(format!("Error while sending: {:?}", e)))?;
             Ok(())
         }
     }
@@ -104,7 +97,8 @@ impl WebSocketConnection for WebSocketWasm {
             error!("Error while closing: {:?}", e);
         }
         debug!("Re-opening websocket");
-        self.ws = WebSocket::new(&self.addr).map_err(|e| WSError::Underlying(format!("{:?}", e)))?;
+        self.ws =
+            WebSocket::new(&self.addr).map_err(|e| WSError::Underlying(format!("{:?}", e)))?;
         self.attach_callbacks();
         Ok(())
     }

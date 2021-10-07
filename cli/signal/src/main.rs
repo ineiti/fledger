@@ -15,7 +15,10 @@ use std::{
 };
 use tungstenite::{accept, protocol::Role, Message, WebSocket};
 
-use common::signal::websocket::{MessageCallbackSend, NewConnectionCallback, WSError, WSMessage, WebSocketConnectionSend, WebSocketServer};
+use common::signal::websocket::{
+    MessageCallbackSend, NewConnectionCallback, WSError, WSMessage, WebSocketConnectionSend,
+    WebSocketServer,
+};
 use config::Config;
 
 use state::ServerState;
@@ -118,7 +121,6 @@ fn main() {
     let port = cfg.port;
     match ServerState::new(cfg, ws) {
         Ok(state) => {
-            info!("Something something 123456789abc");
             info!("Server started and listening on port {}", port);
             state.wait_done();
         }

@@ -20,6 +20,7 @@ runc: build_local
 
 run2:
 	$(MAKE) runa &
+	sleep .5
 	$(MAKE) runb
 
 run_remote: build

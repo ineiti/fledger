@@ -1,30 +1,41 @@
-use std::convert::TryFrom;
+use crate::{
+    broker::BrokerMessage,
+    node::{
+        logic::text_messages::{AddMessage, TextMessages},
+        network::BrokerNetwork,
+        timer::Timer,
+    },
+};
 use std::{
     collections::HashMap,
-    pin::Pin,
-    sync::{mpsc::Sender, Arc, Mutex},
+    convert::TryFrom,
+    sync::{Arc, Mutex},
 };
-use futures::Future;
 use thiserror::Error;
 
-use log::{error, info, trace};
+use log::{error, info};
 
-use self::logic::LogicError;
 use self::{
     config::{ConfigError, NodeConfig, NodeInfo},
-    network::{NetworkError,NOutput, Network, NInput},
-    logic::{stats::statnode::StatNode, LInput, LOutput, Logic, text_messages::TextMessage},
+    logic::{stats::StatNode, text_messages::TextMessage},
+    network::{Network, NetworkError},
 };
-use crate::signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection};
-use crate::types::{DataStorage, StorageError, U256};
+use crate::{
+    broker::{Broker, BrokerError},
+    node::{logic::stats::Stats, node_data::NodeData},
+    signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection},
+    types::{DataStorage, StorageError, U256},
+};
 
 pub mod config;
 pub mod logic;
 pub mod network;
+pub mod node_data;
+pub mod timer;
 pub mod version;
 
 #[derive(Error, Debug)]
-pub enum NodeError{
+pub enum NodeError {
     #[error("Couldn't get lock")]
     Lock,
     #[error(transparent)]
@@ -34,35 +45,16 @@ pub enum NodeError{
     #[error(transparent)]
     Network(#[from] NetworkError),
     #[error(transparent)]
-    Logic(#[from] LogicError),
+    Broker(#[from] BrokerError),
 }
 
 /// The node structure holds it all together. It is the main structure of the project.
 pub struct Node {
-    arc: Arc<Mutex<NodeArc>>,
-    config: NodeConfig,
-    network_tx: Sender<NInput>,
-    logic_tx: Sender<LInput>,
-}
-
-struct NodeArc {
-    network: Network,
-    logic: Logic,
+    node_data: Arc<Mutex<NodeData>>,
+    broker: Broker,
 }
 
 pub const CONFIG_NAME: &str = "nodeConfig";
-
-#[cfg(target_arch = "wasm32")]
-fn spawn_block(f: Pin<Box<dyn Future<Output = ()>>>) {
-    wasm_bindgen_futures::spawn_local(f);
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-// fn spawn_block(f: dyn std::future::Future){
-// fn spawn_block(f: Box<dyn FnMut() -> Box<dyn Future<Output=()>>>){
-fn spawn_block(f: Pin<Box<dyn Future<Output = ()>>>) {
-    futures::executor::block_on(f);
-}
 
 impl Node {
     /// Create new node by loading the config from the storage.
@@ -70,7 +62,7 @@ impl Node {
     /// new messages from the signalling server and from other nodes.
     /// The actual logic is handled in Logic.
     pub fn new(
-        storage: Box<dyn DataStorage>,
+        mut storage: Box<dyn DataStorage>,
         client: &str,
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
@@ -91,121 +83,69 @@ impl Node {
             config.our_node.get_id()
         );
 
-        // Circular chicken-egg problem: the NodeArc needs a Network. But the Network
-        // needs the callback that contains NodeArc...
-        // This should be replaced by a `set_cb` call to network and all dependencies.
-        // Or find a better way to start processing the queues if the WebRTC receives a message...
-        let cb: Box<dyn FnMut()> = Box::new(|| error!("Called while not initialized"));
-        let node_process = Arc::new(Mutex::new(cb));
-        let network = Network::new(config.clone(), ws, web_rtc, node_process.clone());
-        let network_tx = network.input_tx.clone();
-        let logic = Logic::new(config.clone());
-        let logic_tx = logic.input_tx.clone();
-        let arc = Arc::new(Mutex::new(NodeArc { network, logic }));
+        let node_data = NodeData::new(config, storage);
+        let broker = {
+            Network::new(Arc::clone(&node_data), ws, web_rtc);
+            Stats::new(Arc::clone(&node_data));
+            TextMessages::new(Arc::clone(&node_data));
+            node_data.lock().unwrap().broker.clone()
+        };
+        Timer::new(broker.clone());
 
-        // Now that NodeArc is initialized, the process callback can be updated with the
-        // real function.
-        let arc_clone = arc.clone();
-        *node_process.lock().unwrap() = Box::new(move || {
-            let ac = arc_clone.clone();
-            spawn_block(Box::pin(async move {
-                match ac.try_lock() {
-                    Err(_e) => trace!("ArcNode is busy"),
-                    Ok(mut nm) => loop {
-                        match nm.process().await {
-                            Err(e) => error!("While executing Node.process: {}", e),
-                            Ok(msgs) => {
-                                if msgs == 0 {
-                                    break;
-                                }
-                            }
-                        }
-                    },
-                }
-            }))
-        }) as Box<dyn FnMut()>;
-
-        Ok(Node {
-            arc,
-            config,
-            network_tx,
-            logic_tx,
-        })
+        Ok(Node { node_data, broker })
     }
 
     /// Return a copy of the current node information
     pub fn info(&self) -> Result<NodeInfo, NodeError> {
-        Ok(self.config.clone().our_node)
+        let state = self.node_data.lock().map_err(|_| NodeError::Lock)?;
+        Ok(state.node_config.clone().our_node)
     }
 
     /// TODO: this is only for development
     pub fn clear(&mut self) -> Result<(), NodeError> {
-        self.network_tx
-            .send(NInput::ClearNodes)
-            .map_err(|_| NodeError::Network(NetworkError::InputQueue))
+        Ok(self
+            .broker
+            .emit_bm(BrokerMessage::Network(BrokerNetwork::ClearNodes))
+            .map(|_| ())?)
     }
 
     /// Requests a list of all connected nodes
     pub fn list(&mut self) -> Result<(), NodeError> {
-        self.network_tx
-            .send(NInput::UpdateList)
-            .map_err(|_| NodeError::Network(NetworkError::InputQueue))
-    }
-
-    /// TODO: remove ping and send - they should be called only by the Logic class.
-    /// Pings all known nodes
-    pub async fn ping(&mut self) -> Result<(), NodeError> {
-        self.logic_tx
-            .send(LInput::PingAll())
-            .map_err(|_| NodeError::Logic(LogicError::InputQueue))
-    }
-
-    /// Sends a message over webrtc to a node. The node must already be connected
-    /// through websocket to the signalling server. If the connection is not set up
-    /// yet, the network stack will set up a connection with the remote node.
-    pub fn send(&mut self, dst: &U256, msg: String) -> Result<(), NodeError> {
-        self.network_tx
-            .send(NInput::WebRTC(dst.clone(), msg))
-            .map_err(|_| NodeError::Network(NetworkError::InputQueue))
+        Ok(self
+            .broker
+            .emit_bm(BrokerMessage::Network(BrokerNetwork::UpdateListRequest))
+            .map(|_| ())?)
     }
 
     /// Start processing of network and logic messages, in case they haven't been
     /// called automatically.
     pub async fn process(&mut self) -> Result<usize, NodeError> {
-        if let Ok(mut arc) = self.arc.try_lock() {
-            return arc.process().await;
-        }
-        Err(NodeError::Lock)
+        Ok(self.broker.process()?)
     }
 
     /// Gets the current list of available nodes
-    pub fn get_list(&mut self) -> Vec<NodeInfo> {
-        if let Ok(arc) = self.arc.try_lock() {
-            return arc.network.get_list();
-        }
-        vec![]
+    pub fn get_list(&mut self) -> Result<Vec<NodeInfo>, NodeError> {
+        let nd = self.node_data.lock().map_err(|_| NodeError::Lock)?;
+        Ok(nd.network_state.list.clone())
     }
 
     /// Returns a copy of the logic stats
     pub fn stats(&self) -> Result<HashMap<U256, StatNode>, NodeError> {
-        if let Ok(arc) = self.arc.try_lock() {
-            return Ok(arc.logic.stats.stats.clone());
-        }
-        Err(NodeError::Lock)
+        let nd = self.node_data.try_lock().map_err(|_| NodeError::Lock)?;
+        Ok(nd.stats.nodes.clone())
     }
 
     pub fn add_message(&self, msg: String) -> Result<(), NodeError> {
-        self.logic_tx
-            .send(LInput::AddMessage(msg))
-            .map_err(|_| NodeError::Logic(LogicError::InputQueue))
+        self.broker
+            .enqueue_bm(BrokerMessage::TextMessage(AddMessage { msg }));
+        Ok(())
     }
 
     pub fn get_messages(&self) -> Result<Vec<TextMessage>, NodeError> {
-        if let Ok(arc) = self.arc.try_lock() {
-            return Ok(arc
-                .logic
-                .text_messages
+        if let Ok(nd) = self.node_data.try_lock() {
+            return Ok(nd
                 .messages
+                .storage
                 .iter()
                 .map(|(_k, v)| v.clone())
                 .collect());
@@ -216,64 +156,8 @@ impl Node {
     /// Static method
 
     /// Updates the config of the node
-    pub fn set_config(storage: Box<dyn DataStorage>, config: &str) -> Result<(), NodeError> {
+    pub fn set_config(mut storage: Box<dyn DataStorage>, config: &str) -> Result<(), NodeError> {
         storage.save(CONFIG_NAME, config)?;
         Ok(())
-    }
-}
-
-/// NodeArc hodsl the network and logic structure, so that they
-impl NodeArc {
-    pub async fn process(&mut self) -> Result<usize, NodeError> {
-        Ok(self.process_logic()?
-            + self.process_network()?
-            + self.logic.process().await?
-            + self.network.process().await?)
-    }
-
-    fn process_network(&mut self) -> Result<usize, NodeError> {
-        let msgs: Vec<NOutput> = self.network.output_rx.try_iter().collect();
-        let size = msgs.len();
-        for msg in msgs {
-            match msg {
-                NOutput::WebRTC(id, msg) => {
-                    self.logic
-                        .input_tx
-                        .send(LInput::WebRTC(id, msg))
-                        .map_err(|_| NodeError::Logic(LogicError::InputQueue))?;
-                }
-                NOutput::UpdateList(list) => self
-                    .logic
-                    .input_tx
-                    .send(LInput::SetNodes(list))
-                    .map_err(|_| NodeError::Logic(LogicError::InputQueue))?,
-                NOutput::State(id, dir, c, s) => self
-                    .logic
-                    .input_tx
-                    .send(LInput::ConnStat(id, dir, c, s))
-                    .map_err(|_| NodeError::Logic(LogicError::InputQueue))?,
-            }
-        }
-        Ok(size)
-    }
-
-    fn process_logic(&mut self) -> Result<usize, NodeError> {
-        let msgs: Vec<LOutput> = self.logic.output_rx.try_iter().collect();
-        let size = msgs.len();
-        for msg in msgs {
-            match msg {
-                LOutput::WebRTC(id, msg) => self
-                    .network
-                    .input_tx
-                    .send(NInput::WebRTC(id, msg))
-                    .map_err(|_| NodeError::Logic(LogicError::InputQueue))?,
-                LOutput::SendStats(s) => self
-                    .network
-                    .input_tx
-                    .send(NInput::SendStats(s))
-                    .map_err(|_| NodeError::Logic(LogicError::InputQueue))?,
-            }
-        }
-        Ok(size)
     }
 }

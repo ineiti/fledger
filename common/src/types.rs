@@ -1,8 +1,6 @@
 use core::fmt;
-use std::{
-    num::ParseIntError,
-    sync::{Arc, Mutex},
-};
+use futures::Future;
+use std::num::ParseIntError;
 use thiserror::Error;
 
 use rand::random;
@@ -10,13 +8,13 @@ use serde::{Deserialize, Serialize};
 use sha2::digest::{consts::U32, generic_array::GenericArray};
 
 #[derive(Error, Debug)]
-pub enum StorageError{
+pub enum StorageError {
     #[error("Give no more than 64 hexadecimal characters")]
     HexTooLong,
     #[error(transparent)]
     ParseInt(#[from] ParseIntError),
     #[error("From the underlying storage: {0}")]
-    Underlying(String)
+    Underlying(String),
 }
 
 /// Nicely formatted 256 bit structure
@@ -95,17 +93,15 @@ impl From<GenericArray<u8, U32>> for U256 {
 
 impl From<[u8; 32]> for U256 {
     fn from(b: [u8; 32]) -> Self {
-        U256{0: b}
+        U256 { 0: b }
     }
 }
 
 pub trait DataStorage {
     fn load(&self, key: &str) -> Result<String, StorageError>;
 
-    fn save(&self, key: &str, value: &str) -> Result<(), StorageError>;
+    fn save(&mut self, key: &str, value: &str) -> Result<(), StorageError>;
 }
-
-pub type ProcessCallback = Arc<Mutex<Box<dyn FnMut()>>>;
 
 #[cfg(target_arch = "wasm32")]
 pub fn now() -> f64 {
@@ -117,4 +113,18 @@ pub fn now() -> f64 {
 pub fn now() -> f64 {
     use chrono::Utc;
     Utc::now().timestamp_millis() as f64
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn block_on<F: Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn block_on<F: Future<Output = ()>>(f: F) {
+    futures::executor::block_on(f);
+}
+
+pub fn type_to_string<T>(_: &T) -> String {
+    format!("{}", std::any::type_name::<T>())
 }

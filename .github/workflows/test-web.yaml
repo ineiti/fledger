@@ -31,7 +31,7 @@ jobs:
     - name: Run wasm-test
       run: |
         cd wasm-webrtc
-        wasm-pack test --chrome --headless
+        WASM_BINDGEN_TEST_TIMEOUT=120 wasm-pack test --chrome --headless
 
   build-test:
     runs-on: ubuntu-latest

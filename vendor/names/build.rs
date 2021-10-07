@@ -1,7 +1,9 @@
-use std::env;
-use std::fs::File;
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::path::Path;
+use std::{
+    env,
+    fs::File,
+    io::{self, BufRead, BufReader, BufWriter, Write},
+    path::Path,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = env::var("OUT_DIR")?;

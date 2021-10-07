@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum WSError{
+pub enum WSError {
     #[error("In underlying system: {0}")]
-    Underlying(String)
+    Underlying(String),
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
