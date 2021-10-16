@@ -20,26 +20,39 @@ const URL: &str = "ws://localhost:8765";
 
 #[wasm_bindgen(
     inline_js = "module.exports.fswrite = function(name, str) { fs.writeFileSync(name, str); }
-    module.exports.fsread = function(name) { return fs.readFileSync(name, {encoding: 'utf-8'}); }"
+    module.exports.fsread = function(name) { return fs.readFileSync(name, {encoding: 'utf-8'}); }
+    module.exports.fsexists = function(name) { return fs.existsSync(name); }"
 )]
 extern "C" {
     pub fn fswrite(name: &str, str: &str);
     #[wasm_bindgen(catch)]
     pub fn fsread(name: &str) -> Result<String, JsValue>;
+    pub fn fsexists(name: &str) -> bool;
 }
 
-const STORAGE_NAME: &str = "fledger.toml";
+const STORAGE_NAME: &str = "fledger";
 
 struct DummyDS {}
 
+impl DummyDS {
+    fn name(&self, key: &str) -> String {
+        format!("{}_{}.toml", STORAGE_NAME, key)
+    }
+}
+
 impl DataStorage for DummyDS {
-    fn load(&self, _key: &str) -> Result<String, StorageError> {
-        Ok(fsread(STORAGE_NAME)
-            .map_err(|e| StorageError::Underlying(format!("While reading file: {:?}", e)))?)
+    fn load(&self, key: &str) -> Result<String, StorageError> {
+        let name = &self.name(key);
+        Ok(if fsexists(name) {
+            fsread(name)
+                .map_err(|e| StorageError::Underlying(format!("While reading file: {:?}", e)))?
+        } else {
+            "".into()
+        })
     }
 
-    fn save(&mut self, _key: &str, value: &str) -> Result<(), StorageError> {
-        fswrite(STORAGE_NAME, value);
+    fn save(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
+        fswrite(&self.name(key), value);
         Ok(())
     }
 }

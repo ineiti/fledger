@@ -1,6 +1,7 @@
 use crate::{
     broker::{BInput, BrokerMessage, Subsystem, SubsystemListener},
-    node::{network::BrokerNetwork, timer::BrokerTimer, NodeData},
+    node::{network::BrokerNetwork, timer::BrokerTimer, BrokerError, NodeData},
+    types::StorageError,
 };
 use log::{info, trace};
 use serde::{Deserialize, Serialize};
@@ -19,7 +20,9 @@ use crate::{
 };
 
 const MESSAGE_MAXIMUM: usize = 20;
+const TEXT_MESSAGE_KEY: &str = "text_message";
 
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TextMessagesStorage {
     pub storage: HashMap<U256, TextMessage>,
 }
@@ -28,6 +31,44 @@ impl TextMessagesStorage {
     pub fn new() -> Self {
         Self {
             storage: HashMap::new(),
+        }
+    }
+
+    pub fn load(&mut self, data: &str) -> Result<(), TMError> {
+        if data.len() > 0 {
+            let msg_vec: Vec<TextMessage> = serde_json::from_str(data)?;
+            self.storage.clear();
+            for msg in msg_vec {
+                self.storage.insert(msg.id(), msg);
+            }
+        } else {
+            self.storage = HashMap::new();
+        }
+        Ok(())
+    }
+
+    pub fn save(&self) -> Result<String, TMError> {
+        let msg_vec: Vec<TextMessage> = self.storage.iter().map(|(_k, v)| v).cloned().collect();
+        Ok(serde_json::to_string(&msg_vec)?.into())
+    }
+
+    // Limit the number of messages to MESSAGE_MAXIMUM,
+    // returns the ids of deleted messages.
+    pub fn limit_messages(&mut self) -> Vec<U256> {
+        if self.storage.len() > MESSAGE_MAXIMUM {
+            let mut msgs = self
+                .storage
+                .iter()
+                .map(|(_k, v)| v.clone())
+                .collect::<Vec<TextMessage>>();
+            msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
+            msgs.drain(0..MESSAGE_MAXIMUM);
+            for msg in msgs.iter() {
+                self.storage.remove(&msg.id());
+            }
+            msgs.iter().map(|msg| msg.id()).collect()
+        } else {
+            vec![]
         }
     }
 }
@@ -54,6 +95,10 @@ pub enum TMError {
     OutputQueue,
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
+    #[error(transparent)]
+    Storage(#[from] StorageError),
+    #[error(transparent)]
+    Broker(#[from] BrokerError),
 }
 
 impl SubsystemListener for TextMessages {
@@ -87,25 +132,38 @@ impl SubsystemListener for TextMessages {
 }
 
 impl TextMessages {
-    pub fn new(node_data: Arc<Mutex<NodeData>>) {
+    pub fn new(node_data: Arc<Mutex<NodeData>>) -> Result<(), TMError> {
         let mut broker = node_data.lock().unwrap().broker.clone();
-        broker
-            .add_subsystem(Subsystem::Handler(Box::new(Self::new_self(
+        Ok(
+            broker.add_subsystem(Subsystem::Handler(Box::new(Self::new_self(
                 node_data,
                 broker.clone_tx(),
-            ))))
-            .unwrap();
+            )?)))?,
+        )
     }
 
-    fn new_self(node_data: Arc<Mutex<NodeData>>, broker_tx: Sender<BInput>) -> Self {
-        let cfg = node_data.lock().unwrap().node_config.clone();
-        Self {
+    fn new_self(
+        node_data: Arc<Mutex<NodeData>>,
+        broker_tx: Sender<BInput>,
+    ) -> Result<Self, TMError> {
+        let (cfg, nodes_msgs) = {
+            let mut node_data = node_data.lock().unwrap();
+            let data = node_data.storage.load(TEXT_MESSAGE_KEY)?;
+            node_data.messages.load(&data)?;
+            let mut nodes_msgs = HashMap::new();
+            let cfg = node_data.node_config.clone();
+            for (_, tm) in node_data.messages.storage.iter() {
+                nodes_msgs.insert(tm.id(), vec![cfg.our_node.get_id()]);
+            }
+            (cfg, nodes_msgs)
+        };
+        Ok(Self {
             node_data,
             broker_tx,
-            nodes_msgs: HashMap::new(),
+            nodes_msgs,
             nodes: vec![],
             cfg,
-        }
+        })
     }
 
     fn handle_msg(&mut self, from: &U256, msg: TextMessageV1) -> Result<(), TMError> {
@@ -142,12 +200,7 @@ impl TextMessages {
                 }
                 list.push(self.cfg.our_node.get_id().clone());
                 self.nodes_msgs.insert(text.id(), list);
-                self.node_data
-                    .lock()
-                    .unwrap()
-                    .messages
-                    .storage
-                    .insert(text.id(), text);
+                self.insert_message(text)?;
                 Ok(())
             }
             // Currently we just suppose that there is a central node storing all node-ids
@@ -175,12 +228,6 @@ impl TextMessages {
             // we do know about this message.
             TextMessageV1::Text(tm) => {
                 let tmid = tm.id();
-                self.node_data
-                    .lock()
-                    .unwrap()
-                    .messages
-                    .storage
-                    .insert(tmid, tm);
                 let mut prev_nodes = self.nodes_msgs.remove(&tmid).unwrap_or(vec![]);
                 if prev_nodes
                     .iter()
@@ -190,35 +237,9 @@ impl TextMessages {
                     prev_nodes.push(self.cfg.our_node.get_id());
                 }
                 self.nodes_msgs.insert(tmid, prev_nodes.clone());
+                self.insert_message(tm)?;
 
-                self.limit_messages();
                 Ok(())
-            }
-        }
-    }
-
-    // Limit the number of messages to MESSAGE_MAXIMUM
-    fn limit_messages(&mut self) {
-        if self.node_data.lock().unwrap().messages.storage.len() > MESSAGE_MAXIMUM {
-            let mut msgs = self
-                .node_data
-                .lock()
-                .unwrap()
-                .messages
-                .storage
-                .iter()
-                .map(|(_k, v)| v.clone())
-                .collect::<Vec<TextMessage>>();
-            msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
-            msgs.drain(0..MESSAGE_MAXIMUM);
-            for msg in msgs {
-                self.node_data
-                    .lock()
-                    .unwrap()
-                    .messages
-                    .storage
-                    .remove(&msg.id());
-                self.nodes_msgs.remove(&msg.id());
             }
         }
     }
@@ -267,15 +288,9 @@ impl TextMessages {
             liked: 0,
             msg,
         };
-        self.node_data
-            .lock()
-            .unwrap()
-            .messages
-            .storage
-            .insert(tm.id(), tm.clone());
         self.nodes_msgs
             .insert(tm.id(), vec![self.cfg.our_node.get_id()]);
-        self.limit_messages();
+        self.insert_message(tm.clone())?;
 
         for leader in self.get_leaders() {
             info!("Sending message to leader {:?}", leader);
@@ -302,6 +317,17 @@ impl TextMessages {
                 str,
             ))))
             .map_err(|_| TMError::OutputQueue)
+    }
+
+    fn insert_message(&mut self, text: TextMessage) -> Result<(), TMError> {
+        let mut node_data = self.node_data.lock().expect("Getting node_data");
+        node_data.messages.storage.insert(text.id(), text);
+        for msg in node_data.messages.limit_messages() {
+            self.nodes_msgs.remove(&msg);
+        }
+
+        let data = node_data.messages.save()?;
+        Ok(node_data.storage.save(TEXT_MESSAGE_KEY, &data)?)
     }
 }
 
@@ -366,7 +392,7 @@ impl TextMessage {
 mod tests {
     use crate::{
         broker::{BInput, BrokerMessage},
-        node::{node_data::TempDS, NodeData},
+        node::{logic::text_messages::TextMessagesStorage, node_data::TempDS, NodeData, TMError},
     };
     use anyhow::Result;
     use flexi_logger::LevelFilter;
@@ -390,17 +416,17 @@ mod tests {
     }
 
     impl TMTest {
-        pub fn new(leader: bool) -> Self {
+        pub fn new(leader: bool) -> Result<Self, TMError> {
             let mut cfg = NodeConfig::new();
             cfg.our_node.node_capacities.leader = leader;
             let nd = NodeData::new(cfg.clone(), TempDS::new());
             let (tx, rx) = channel::<BInput>();
-            TMTest {
-                tm: TextMessages::new_self(Arc::clone(&nd), tx),
+            Ok(TMTest {
+                tm: TextMessages::new_self(Arc::clone(&nd), tx)?,
                 rx,
                 cfg,
                 nd,
-            }
+            })
         }
 
         pub fn empty_queue(&mut self) -> bool {
@@ -451,9 +477,9 @@ mod tests {
     fn test_new_msg() -> Result<()> {
         simple_logging::log_to_stderr(LevelFilter::Trace);
 
-        let mut leader = TMTest::new(true);
-        let mut follower1 = TMTest::new(false);
-        let mut follower2 = TMTest::new(false);
+        let mut leader = TMTest::new(true)?;
+        let mut follower1 = TMTest::new(false)?;
+        let mut follower2 = TMTest::new(false)?;
 
         let all_nodes = vec![
             leader.cfg.our_node.clone(),
@@ -472,7 +498,7 @@ mod tests {
             panic!("queue should be empty");
         }
 
-        // Add a new message to follower 1 and verify it's stored in the leader
+        info!("Add a new message to follower 1 and verify it's stored in the leader");
         follower1.tm.update_nodes(&all_nodes)?;
         leader.tm.update_nodes(&all_nodes[0..2].to_vec())?;
         if !leader.empty_queue() {
@@ -495,8 +521,7 @@ mod tests {
             .clone();
         assert_eq!(2, leader.tm.nodes_msgs.get(&tm1_id).unwrap().len());
 
-        // Let the follower2 catch up on the new messages
-        info!("Follower2 catches up");
+        info!("Let the follower2 catch up on the new messages");
         follower2.tm.update_nodes(&all_nodes)?;
         process(&mut vec![&mut follower1, &mut follower2, &mut leader])?;
         assert_eq!(
@@ -540,8 +565,8 @@ mod tests {
     fn test_update_nodes() -> Result<()> {
         simple_logging::log_to_stderr(LevelFilter::Trace);
 
-        let leader = TMTest::new(true);
-        let mut follower1 = TMTest::new(false);
+        let leader = TMTest::new(true)?;
+        let mut follower1 = TMTest::new(false)?;
 
         let all_nodes = vec![leader.cfg.our_node.clone(), follower1.cfg.our_node.clone()];
 
@@ -592,5 +617,27 @@ mod tests {
         tm2 = tm1.clone();
         tm2.msg = "short test".to_string();
         assert_ne!(tm1.id(), tm2.id());
+    }
+
+    #[test]
+    fn test_load_save() -> Result<(), TMError> {
+        simple_logging::log_to_stderr(LevelFilter::Trace);
+
+        let mut tms = TextMessagesStorage::new();
+        let tm1 = TextMessage {
+            node_info: String::from(""),
+            src: U256::rnd(),
+            created: 0f64,
+            liked: 0u64,
+            msg: "test message".to_string(),
+        };
+        tms.storage.insert(tm1.id(), tm1);
+
+        let data = tms.save()?;
+
+        let mut tms_clone = TextMessagesStorage::new();
+        tms_clone.load(&data)?;
+        assert_eq!(tms, tms_clone);
+        Ok(())
     }
 }
