@@ -60,4 +60,7 @@ jobs:
       run: make update_version
 
     - name: Build all
-      run: cargo build
+      run: |
+        cargo build
+        make -C web build_local
+        make -C cli/flnode build
