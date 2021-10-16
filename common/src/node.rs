@@ -1,7 +1,7 @@
 use crate::{
     broker::BrokerMessage,
     node::{
-        logic::text_messages::{AddMessage, TextMessages},
+        logic::text_messages::{AddMessage, TMError, TextMessages},
         network::BrokerNetwork,
         timer::Timer,
     },
@@ -46,6 +46,8 @@ pub enum NodeError {
     Network(#[from] NetworkError),
     #[error(transparent)]
     Broker(#[from] BrokerError),
+    #[error(transparent)]
+    TextMessage(#[from] TMError),
 }
 
 /// The node structure holds it all together. It is the main structure of the project.
@@ -87,7 +89,7 @@ impl Node {
         let broker = {
             Network::new(Arc::clone(&node_data), ws, web_rtc);
             Stats::new(Arc::clone(&node_data));
-            TextMessages::new(Arc::clone(&node_data));
+            TextMessages::new(Arc::clone(&node_data))?;
             node_data.lock().unwrap().broker.clone()
         };
         Timer::new(broker.clone());

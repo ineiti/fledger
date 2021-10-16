@@ -64,3 +64,5 @@ simple-logging = "2.0.2"
 tokio = {version = "1", features = ["rt", "macros"]}
 # simple_logger = {version = "1.13.0", features = ["stderr"]}
 simplelog = "0.10"
+anyhow = "1"
+flexi_logger = "0.19"
