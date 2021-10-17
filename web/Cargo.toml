@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 local = []
 
 [dependencies]
+chrono = "0.4"
 anyhow = "1.0.42"
 js-sys = "0.3.51"
 regex = "1.5.4"

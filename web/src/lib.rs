@@ -1,8 +1,12 @@
 use anyhow::{anyhow, Result};
+use chrono::{prelude::DateTime, Utc};
 use js_sys::Date;
 use log::{debug, error, info, warn};
 use regex::Regex;
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, UNIX_EPOCH},
+};
 use wasm_bindgen::prelude::*;
 use wasm_webrtc::{
     helpers::LocalStorage, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
@@ -230,6 +234,7 @@ impl FledgerState {
 #[derive(Clone)]
 pub struct FledgerMessage {
     from: String,
+    date: String,
     text: String,
 }
 
@@ -240,17 +245,22 @@ pub struct FledgerMessages {
 }
 
 impl FledgerMessages {
-    fn new(mut msgs: Vec<TextMessage>) -> Self {
-        msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
-        FledgerMessages {
-            msgs: msgs
-                .iter()
-                .map(|msg| FledgerMessage {
-                    from: msg.node_info.clone(),
-                    text: msg.msg.clone(),
-                })
-                .collect(),
+    fn new(mut tm_msgs: Vec<TextMessage>) -> Self {
+        tm_msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
+        let mut msgs = vec![];
+        for msg in tm_msgs {
+            let d = UNIX_EPOCH + Duration::from_secs(msg.created as u64 / 1000);
+            // Create DateTime from SystemTime
+            let datetime = DateTime::<Utc>::from(d);
+            // Formats the combined date and time with the specified format string.
+            let date = datetime.format("%A, the %d of %B at %H:%M:%S").to_string();
+            msgs.push(FledgerMessage {
+                from: msg.node_info.clone(),
+                text: msg.msg.clone(),
+                date,
+            })
         }
+        FledgerMessages { msgs }
     }
 }
 
@@ -264,7 +274,12 @@ impl FledgerMessages {
             "<ul><li>{}</li></ul>",
             self.msgs
                 .iter()
-                .map(|fm| format!("{}: {}", fm.from.clone(), fm.text.clone()))
+                .map(|fm| format!(
+                    "{} wrote on {}:<br><pre>{}</pre>",
+                    fm.from.clone(),
+                    fm.date.clone(),
+                    fm.text.clone()
+                ))
                 .collect::<Vec<String>>()
                 .join("</li><li>")
         )
