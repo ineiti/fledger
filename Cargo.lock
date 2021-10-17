@@ -367,6 +367,7 @@ name = "fledger-web"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "common",
  "console_error_panic_hook",
  "js-sys",
