@@ -38,6 +38,20 @@ impl NodeIDs {
         self.remove(nodes, true)
     }
 
+    // Checks whether any of the the nodes in the two NodeIDs match.
+    // Returns 'true' if at least one match is found.
+    // Returns 'false' if no matches are found.
+    pub fn contains_any(&self, other: &NodeIDs) -> bool {
+        for node in &self.0 {
+            for node_other in &other.0 {
+                if node == node_other {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     fn remove(&mut self, nodes: &NodeIDs, exists: bool) -> NodeIDs {
         let mut ret = vec![];
         let mut i = 0;
