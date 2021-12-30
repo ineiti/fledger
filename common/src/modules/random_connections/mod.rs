@@ -1,7 +1,9 @@
-use crate::modules::NodeID;
-use crate::modules::NodeIDs;
-use core::cmp::min;
+use super::nodeids::NodeID;
+use super::nodeids::NodeIDs;
 use rand::seq::SliceRandom;
+
+mod nodes;
+use nodes::*;
 
 /// RandomConnections listens for new available nodes and then chooses
 /// to randomly connect to a set number of nodes.
@@ -12,90 +14,9 @@ pub struct Module {
     all_nodes: NodeIDs,
 }
 
-#[derive(PartialEq, Clone, Debug)]
-struct NodeTime {
-    id: NodeID,
-    ticks: u32,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-struct Nodes(Vec<NodeTime>);
-
-impl Nodes {
-    fn new() -> Nodes {
-        Self { 0: vec![] }
-    }
-
-    fn get_nodes(&self) -> NodeIDs {
-        NodeIDs {
-            0: self.0.iter().map(|n| n.id.clone()).collect(),
-        }
-    }
-
-    fn remove_missing(&mut self, nodes: &NodeIDs) -> NodeIDs {
-        let removed = self.get_nodes().remove_missing(nodes);
-        self.0.retain(|nt| !removed.0.contains(&nt.id));
-        removed
-    }
-
-    fn add_new(&mut self, nodes: Vec<NodeID>) {
-        let mut nts = nodes
-            .iter()
-            .map(|n| NodeTime { id: *n, ticks: 0 })
-            .collect();
-        self.0.append(&mut nts);
-    }
-
-    fn contains(&self, node: &NodeID) -> bool {
-        self.get_nodes().0.contains(node)
-    }
-
-    // Removes the oldest n nodes. If less than n nodes are stored, only remove
-    // these nodes.
-    // It returns the removed nodes.
-    fn remove_oldest_n(&mut self, mut n: usize) -> NodeIDs {
-        self.0.sort_by(|a, b| b.ticks.cmp(&a.ticks));
-        n = min(n, self.0.len());
-        NodeIDs {
-            0: self.0.splice(..n, vec![]).map(|n| n.id).collect(),
-        }
-    }
-
-    // Returns nodes that are as old or older than age.
-    fn oldest_ticks(&mut self, ticks: u32) -> NodeIDs {
-        self.0.sort_by(|a, b| b.ticks.cmp(&a.ticks));
-        let nodes: Vec<NodeID> = self
-            .0
-            .iter()
-            .take_while(|n| n.ticks >= ticks)
-            .map(|n| n.id)
-            .collect();
-        NodeIDs { 0: nodes }
-    }
-
-    // Removes nodes that are as old or older than age and returns the removed nodes.
-    fn remove_oldest_ticks(&mut self, ticks: u32) -> NodeIDs {
-        let nodes = self.oldest_ticks(ticks);
-        self.0.splice(..nodes.0.len(), vec![]);
-        nodes
-    }
-
-    // Increases the tick of all nodes by 1
-    fn tick(&mut self) {
-        for node in self.0.iter_mut() {
-            node.ticks += 1;
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Message {
-    /// SetupConnections returns a list of nodes to connect to,
-    /// and a list of nodes to disconnect from.
-    SetupConnections(NodeIDs, NodeIDs),
-
-    SomethingElse(),
-}
+/// Message is a list of nodes to connect to,
+/// and a list of nodes to disconnect from.
+pub type Message = (NodeIDs, NodeIDs);
 
 pub struct Config {
     /// How many maximum connections the system tries to make
@@ -125,7 +46,7 @@ impl Module {
             cfg: cfg.unwrap_or(Config::default()),
             nodes_connected: Nodes::new(),
             nodes_connecting: Nodes::new(),
-            all_nodes: NodeIDs::new(0),
+            all_nodes: NodeIDs::empty(),
         }
     }
 
@@ -148,15 +69,19 @@ impl Module {
 
         // Check if there is space for new nodes. If there is, select a random
         // list of nodes to be added to the connected nodes.
-        let churn = self.nodes_connected.oldest_ticks(self.cfg.churn_connected).0.len();
+        let churn = self
+            .nodes_connected
+            .oldest_ticks(self.cfg.churn_connected)
+            .0
+            .len();
         let missing = self.cfg.max_connections as i32
             - (self.nodes_connected.0.len() + self.nodes_connecting.0.len() - churn) as i32;
         if missing > 0 {
             let connect = self.connect_nodes(missing);
             self.nodes_connecting.add_new(connect.0.clone());
-            Message::SetupConnections(connect, disconnect)
+            (connect, disconnect)
         } else {
-            Message::SetupConnections(NodeIDs::new(0), disconnect)
+            (NodeIDs::empty(), disconnect)
         }
     }
 
@@ -184,12 +109,12 @@ impl Module {
             self.nodes_connected.add_new(vec![node.clone()]);
         }
 
-        let mut disconnect = NodeIDs::new(0);
+        let mut disconnect = NodeIDs::empty();
         let too_many = self.nodes_connected.0.len() as i64 - self.cfg.max_connections as i64;
         if too_many > 0 {
             disconnect = self.nodes_connected.remove_oldest_n(too_many as usize);
         }
-        Message::SetupConnections(NodeIDs::new(0), disconnect)
+        (NodeIDs::empty(), disconnect)
     }
 
     /// Returns a clone of the connected NodeIDs.
@@ -207,12 +132,9 @@ impl Module {
             .nodes_connecting
             .remove_oldest_ticks(self.cfg.connecting_timeout);
 
-        if let Message::SetupConnections(connect, mut disc) = self.update_nodes() {
-            disconnect.0.append(&mut disc.0);
-            Message::SetupConnections(connect, disconnect)
-        } else {
-            Message::SetupConnections(NodeIDs::new(0), disconnect)
-        }
+        let (connect, mut disc) = self.update_nodes();
+        disconnect.0.append(&mut disc.0);
+        (connect, disconnect)
     }
 }
 
@@ -235,21 +157,21 @@ mod tests {
 
         assert_eq!(
             m.new_nodes(&nodes.slice(0, 1)),
-            Message::SetupConnections(nodes.slice(0, 1), NodeIDs::new(0))
+            (nodes.slice(0, 1), NodeIDs::empty())
         );
         assert_eq!(
             m.new_nodes(&nodes.slice(0, 2)),
-            Message::SetupConnections(nodes.slice(1, 1), NodeIDs::new(0))
+            (nodes.slice(1, 1), NodeIDs::empty())
         );
         assert_eq!(
             m.new_nodes(&nodes.slice(0, 3)),
-            Message::SetupConnections(NodeIDs::new(0), NodeIDs::new(0))
+            (NodeIDs::empty(), NodeIDs::empty())
         );
         assert_eq!(
             m.new_nodes(&nodes.slice(1, 2)),
-            Message::SetupConnections(nodes.slice(2, 1), nodes.slice(0, 1))
+            (nodes.slice(2, 1), nodes.slice(0, 1))
         );
-        assert_eq!(m.connected(), NodeIDs::new(0));
+        assert_eq!(m.connected(), NodeIDs::empty());
 
         Ok(())
     }
@@ -277,25 +199,22 @@ mod tests {
     }
 
     fn assert_msg_len(msg: &Message, len_conn: usize, len_disconn: usize) -> (NodeIDs, NodeIDs) {
-        if let Message::SetupConnections(conn, disc) = msg {
-            assert_eq!(
-                len_conn,
-                conn.0.len(),
-                "Wrong number of connections: {} instead of {}",
-                conn.0.len(),
-                len_conn
-            );
-            assert_eq!(
-                len_disconn,
-                disc.0.len(),
-                "Wrong number of disconnections: {} instead of {}",
-                disc.0.len(),
-                len_disconn
-            );
-            return (conn.clone(), disc.clone());
-        } else {
-            panic!("Sould've gotten a SetupConnections");
-        }
+        let (conn, disc) = msg;
+        assert_eq!(
+            len_conn,
+            conn.0.len(),
+            "Wrong number of connections: {} instead of {}",
+            conn.0.len(),
+            len_conn
+        );
+        assert_eq!(
+            len_disconn,
+            disc.0.len(),
+            "Wrong number of disconnections: {} instead of {}",
+            disc.0.len(),
+            len_disconn
+        );
+        (conn.clone(), disc.clone())
     }
 
     // Make sure that .tick() creates a churn in the nodes.
