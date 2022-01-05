@@ -1,6 +1,6 @@
 use core::cmp::min;
-use crate::modules::random_connections::NodeIDs;
-use crate::modules::random_connections::NodeID;
+use crate::nodeids::NodeIDs;
+use crate::nodeids::NodeID;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct NodeTime {

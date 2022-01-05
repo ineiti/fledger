@@ -1,4 +1,4 @@
-use crate::types::U256;
+use common::types::U256;
 
 pub type NodeID = U256;
 

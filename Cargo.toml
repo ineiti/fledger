@@ -6,5 +6,7 @@ members = [
     "wasm-webrtc",
     "common",
     "vendor/names",
-    "web"
+    "web",
+    "modules/raw",
+    "modules/message"
 ]
