@@ -7,6 +7,7 @@ use nodes::*;
 
 /// RandomConnections listens for new available nodes and then chooses
 /// to randomly connect to a set number of nodes.
+#[derive(Debug)]
 pub struct Module {
     cfg: Config,
     nodes_connected: Nodes,
@@ -18,6 +19,7 @@ pub struct Module {
 /// and a list of nodes to disconnect from.
 pub type Message = (NodeIDs, NodeIDs);
 
+#[derive(Debug)]
 pub struct Config {
     /// How many maximum connections the system tries to make
     pub max_connections: u32,

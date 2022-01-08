@@ -15,6 +15,11 @@
 
 # Dates
 
+2022-01-08:
+- set up first communications within the modules
+- created Connections structure to interface with the network layer
+- not really sure if it's all worth it...
+
 2022-01-05:
 - moved modules to their own crate with 'raw' and 'message' modules
 - started working on the 'gossip' module

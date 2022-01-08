@@ -1,6 +1,6 @@
 pub mod nodeids;
 pub mod random_connections;
-pub mod gossip;
+pub mod gossip_chat;
 
 #[cfg(test)]
 mod tests {

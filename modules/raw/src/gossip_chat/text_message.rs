@@ -1,26 +1,13 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use thiserror::Error;
 
 use common::types::U256;
 
-#[derive(Error, Debug)]
-pub enum TMError {
-    #[error("Received an unknown message")]
-    UnknownMessage,
-    #[error("While sending through output queue")]
-    OutputQueue,
-    #[error(transparent)]
-    Serde(#[from] serde_json::Error),
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TextMessage {
-    pub node_info: String,
     pub src: U256,
     pub created: f64,
-    pub liked: u64,
     pub msg: String,
 }
 
@@ -29,7 +16,6 @@ impl TextMessage {
         let mut id = Sha256::new();
         id.update(&self.src);
         id.update(&self.created.to_le_bytes());
-        id.update(&self.liked.to_le_bytes());
         id.update(&self.msg);
         id.finalize().into()
     }
@@ -48,7 +34,7 @@ impl TextMessagesStorage {
         }
     }
 
-    pub fn load(&mut self, data: &str) -> Result<(), TMError> {
+    pub fn load(&mut self, data: &str) -> Result<(), serde_json::Error> {
         if data.len() > 0 {
             let msg_vec: Vec<TextMessage> = serde_json::from_str(data)?;
             self.storage.clear();
@@ -61,7 +47,7 @@ impl TextMessagesStorage {
         Ok(())
     }
 
-    pub fn save(&self) -> Result<String, TMError> {
+    pub fn save(&self) -> Result<String, serde_json::Error> {
         let msg_vec: Vec<TextMessage> = self.storage.iter().map(|(_k, v)| v).cloned().collect();
         Ok(serde_json::to_string(&msg_vec)?.into())
     }

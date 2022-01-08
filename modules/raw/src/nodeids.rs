@@ -69,6 +69,18 @@ impl NodeIDs {
     }
 }
 
+impl From<Vec<U256>> for NodeIDs {
+    fn from(nodes: Vec<U256>) -> Self {
+        Self { 0: nodes }
+    }
+}
+
+impl From<&Vec<U256>> for NodeIDs {
+    fn from(nodes: &Vec<U256>) -> Self {
+        Self { 0: nodes.iter().cloned().collect() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

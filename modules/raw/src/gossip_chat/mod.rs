@@ -1,5 +1,6 @@
-mod text_message;
 use common::types::U256;
+
+pub mod text_message;
 use text_message::*;
 
 const MESSAGE_MAXIMUM: usize = 20;
