@@ -52,17 +52,36 @@ impl TextMessagesStorage {
         Ok(serde_json::to_string(&msg_vec)?.into())
     }
 
-    pub fn add_message(&mut self, msg: TextMessage) {
+    pub fn add_message(&mut self, msg: TextMessage) -> bool {
+        if self.storage.contains_key(&msg.id())
+            || (self.storage.len() >= self.maximum && self.created_before(msg.created))
+        {
+            return false;
+        }
         self.storage.insert(msg.id(), msg);
         self.limit_messages();
+        true
+    }
+
+    /// Stores all new messages and returns the new messages.
+    pub fn add_messages(&mut self, msgs: Vec<TextMessage>) -> Vec<TextMessage>{
+        msgs.iter().filter(|&tm| self.add_message(tm.clone())).cloned().collect()
     }
 
     pub fn get_messages(&self) -> Vec<TextMessage> {
         self.storage.iter().map(|(_k, v)| v.clone()).collect()
     }
 
+    pub fn get_message_ids(&self) -> Vec<U256> {
+        self.storage.iter().map(|(k, _v)| k.clone()).collect()
+    }
+
     pub fn get_message(&self, id: &U256) -> Option<TextMessage> {
         self.storage.get(id).and_then(|tm| Some(tm.clone()))
+    }
+
+    pub fn contains(&self, id: &U256) -> bool {
+        self.storage.contains_key(id)
     }
 
     fn limit_messages(&mut self) {
@@ -78,5 +97,16 @@ impl TextMessagesStorage {
                 self.storage.remove(&msg.id());
             }
         }
+    }
+
+    fn created_before(&self, created: f64) -> bool {
+        if let Some(tm) = self
+            .storage
+            .values()
+            .min_by(|x, y| x.created.partial_cmp(&y.created).unwrap())
+        {
+            return tm.created >= created;
+        }
+        return false;
     }
 }

@@ -11,6 +11,10 @@
 
 ### Things to do
 
+- use the DataStorage to store and retrieve the configuration and data
+- hook up the Network structure to the common-crate
+- write tests
+- use 2 * log(n) connections in the random-connections handler
 - Create a nicer display of the chat, perhaps with markdown display of messages
 
 # Dates

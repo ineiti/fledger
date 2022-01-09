@@ -23,14 +23,34 @@ impl Module {
         }
     }
 
-    pub fn add_message(&mut self, msg: TextMessage) {
-        self.storage.add_message(msg);
+    /// Returns all ids that are not in our storage
+    pub fn filter_known_messages(&self, msgids: Vec<U256>) -> Vec<U256>{
+        msgids.iter().filter(|id| self.storage.contains(&id)).cloned().collect()
     }
 
+    /// Adds a message if it's not known yet or not too old.
+    /// The return value is if the message has been added.
+    pub fn add_message(&mut self, msg: TextMessage) -> bool {
+        self.storage.add_message(msg)
+    }
+
+    /// Takes a vector of TextMessages and stores the new messages. It returns all
+    /// messages that are new.
+    pub fn add_messages(&mut self, msgs: Vec<TextMessage>) -> Vec<TextMessage>{
+        self.storage.add_messages(msgs)
+    }
+
+    /// Gets a copy of all messages stored in the module.
     pub fn get_messages(&self) -> Vec<TextMessage>{
         self.storage.get_messages()
     }
 
+    /// Gets all message-ids that are stored in the module.
+    pub fn get_message_ids(&self) -> Vec<U256>{
+        self.storage.get_message_ids()
+    }
+
+    /// Gets a single message of the module.
     pub fn get_message(&self, id: &U256) -> Option<TextMessage>{
         self.storage.get_message(id)
     }

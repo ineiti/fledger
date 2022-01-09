@@ -1,15 +1,17 @@
+use common::types::U256;
 use serde::{Deserialize, Serialize};
 
 use raw::random_connections;
 
-use crate::connections::ConnectionsMessage;
 use crate::module::DataStorage;
-use crate::module::Intern;
 use crate::module::Message;
 use crate::module::Module;
+use crate::network::NetworkMessage;
 
 #[derive(Debug)]
-pub enum RandomConnectionsMessage {}
+pub enum RandomConnectionsMessage {
+    ConnectedNodes(Vec<U256>),
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RandomConnectionsNodeMessage {}
 
@@ -26,26 +28,24 @@ impl Module for RandomConnections {
     }
 
     fn process_message(&mut self, msg: &Message) -> std::vec::Vec<Message> {
-        if let Message::Intern(i) = msg {
-            self.process_gossip_msg(i)
-        } else {
-            vec![]
-        }
+        self.process_gossip_msg(msg)
     }
 
     fn tick(&mut self) -> std::vec::Vec<Message> {
-        todo!()
+        vec![Message::RandomConnections(
+            RandomConnectionsMessage::ConnectedNodes(self.module.connected().0),
+        )]
     }
 }
 
 impl RandomConnections {
-    fn process_gossip_msg(&mut self, msg: &Intern) -> Vec<Message> {
-        if let Intern::Connections(conn) = msg {
+    fn process_gossip_msg(&mut self, msg: &Message) -> Vec<Message> {
+        if let Message::Network(conn) = msg {
             return match conn {
-                ConnectionsMessage::AvailableNodes(nodes) => {
+                NetworkMessage::AvailableNodes(nodes) => {
                     RandomConnections::dis_connect_msg(self.module.new_nodes(&nodes.into()))
                 }
-                ConnectionsMessage::NewConnection(node) => {
+                NetworkMessage::NewConnection(node) => {
                     RandomConnections::dis_connect_msg(self.module.new_connection(node.into()))
                 }
                 _ => {
@@ -60,10 +60,8 @@ impl RandomConnections {
         msg.0
              .0
             .iter()
-            .map(|id| Message::Intern(Intern::Connections(ConnectionsMessage::Connect(*id))))
-            .chain(vec![Message::Intern(Intern::Connections(
-                ConnectionsMessage::Disconnect(msg.1 .0),
-            ))])
+            .map(|id| Message::Network(NetworkMessage::Connect(*id)))
+            .chain(vec![Message::Network(NetworkMessage::Disconnect(msg.1 .0))])
             .collect()
     }
 }

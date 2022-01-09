@@ -1,9 +1,4 @@
-use common::types::U256;
-use serde::{Serialize, Deserialize};
-
-use crate::connections::ConnectionsMessage;
-use crate::random_connections::RandomConnectionsNodeMessage;
-use crate::gossip_chat::GossipChatNodeMessage;
+use crate::network::NetworkMessage;
 use crate::random_connections::RandomConnectionsMessage;
 use crate::gossip_chat::GossipChatMessage;
 
@@ -11,32 +6,9 @@ use crate::gossip_chat::GossipChatMessage;
 /// Intern messages are sent only between nodes.
 /// Node2Node messages have a destination and will be sent to the given node.
 pub enum Message {
-    Intern(Intern),
-    Node2Node(Node2Node),
-}
-
-pub enum Intern {
     GossipChat(GossipChatMessage),
     RandomConnections(RandomConnectionsMessage),
-    Connections(ConnectionsMessage),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Node2Node {
-    pub id: Address,
-    pub msg: Node2NodeMsg,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Address {
-    From(U256),
-    To(U256),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Node2NodeMsg {
-    GossipChat(GossipChatNodeMessage),
-    RandomConnections(RandomConnectionsNodeMessage),
+    Network(NetworkMessage),
 }
 
 /// This is the common module trait that every module needs to implement.
