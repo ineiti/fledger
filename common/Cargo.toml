@@ -7,6 +7,9 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+types = {path = "../modules/types"}
+message = {path = "../modules/message"}
+raw = {path = "../modules/raw"}
 async-trait = "0.1.51"
 rand = "0.7"
 serde = { version = "1.0.127", features = ["derive"] }

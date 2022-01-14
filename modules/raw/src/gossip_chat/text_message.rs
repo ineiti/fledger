@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-
-use common::types::U256;
+use types::nodeids::U256;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TextMessage {
@@ -64,8 +63,11 @@ impl TextMessagesStorage {
     }
 
     /// Stores all new messages and returns the new messages.
-    pub fn add_messages(&mut self, msgs: Vec<TextMessage>) -> Vec<TextMessage>{
-        msgs.iter().filter(|&tm| self.add_message(tm.clone())).cloned().collect()
+    pub fn add_messages(&mut self, msgs: Vec<TextMessage>) -> Vec<TextMessage> {
+        msgs.iter()
+            .filter(|&tm| self.add_message(tm.clone()))
+            .cloned()
+            .collect()
     }
 
     pub fn get_messages(&self) -> Vec<TextMessage> {

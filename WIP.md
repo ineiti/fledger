@@ -11,13 +11,18 @@
 
 ### Things to do
 
-- use the DataStorage to store and retrieve the configuration and data
 - hook up the Network structure to the common-crate
+  - fetch chat messages from modules
+  - load messages from before
 - write tests
-- use 2 * log(n) connections in the random-connections handler
 - Create a nicer display of the chat, perhaps with markdown display of messages
 
 # Dates
+
+2022-01-09:
+- finished implementing the message implementations of the raw modules
+- use StorageData
+- use 2 * log(n) connections in the random-connections handler
 
 2022-01-08:
 - set up first communications within the modules

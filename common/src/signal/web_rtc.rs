@@ -5,7 +5,8 @@ use std::fmt;
 use thiserror::Error;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
 
-use crate::{node::config::NodeInfo, types::U256};
+use crate::{node::config::NodeInfo};
+use types::nodeids::U256;
 
 #[derive(Debug, Error)]
 pub enum SetupError {

@@ -5,8 +5,8 @@ use crate::{
         BrokerNetwork,
     },
     signal::web_rtc::{PeerInfo, WSSignalMessage},
-    types::U256,
 };
+use types::nodeids::U256;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};

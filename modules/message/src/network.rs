@@ -4,11 +4,10 @@ use serde::{Deserialize, Serialize};
 use tracing;
 
 use crate::gossip_chat::GossipChat;
-use crate::module::DataStorageBase;
 use crate::module::Message;
 use crate::module::Module;
 use crate::random_connections::RandomConnections;
-use common::types::U256;
+use types::{nodeids::U256, data_storage::{DataStorageBase}};
 
 #[derive(Debug)]
 /// This module is used to parse incoming node2node messages.
@@ -29,6 +28,7 @@ pub enum MessageFromNetwork {
 }
 
 /// Messages going out to the network
+#[derive(Debug, Clone)]
 pub enum MessageToNetwork {
     Connect(U256),
     Disconnect(Vec<U256>),
@@ -43,6 +43,8 @@ pub enum NetworkMessage {
     AvailableNodes(Vec<U256>),
     Node2Node(Node2Node),
 }
+
+pub const STORAGE_GOSSIP_CHAT: &str = "gossip_chat";
 
 impl Network {
     pub fn new(dsb: Box<dyn DataStorageBase>) -> Self {

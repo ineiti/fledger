@@ -8,9 +8,8 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 use wasm_bindgen::prelude::*;
-use wasm_webrtc::{
-    helpers::LocalStorage, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
-};
+use wasm_webrtc::helpers::LocalStorageBase;
+use wasm_webrtc::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
 use web_sys::window;
 
 use common::node::{
@@ -19,6 +18,8 @@ use common::node::{
     version::VERSION_STRING,
     Node,
 };
+
+use types::data_storage::DataStorageBase;
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -105,7 +106,7 @@ impl FledgerWeb {
 
     async fn node_start(node_mutex: Arc<Mutex<Option<Node>>>) -> Result<()> {
         let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
-        let my_storage = Box::new(LocalStorage {});
+        let my_storage = Box::new(LocalStorageBase {});
         let ws =
             WebSocketWasm::new(URL).map_err(|e| anyhow!("couldn't create websocket: {:?}", e))?;
         let client = if let Some(window) = web_sys::window() {
@@ -127,7 +128,7 @@ impl FledgerWeb {
     }
 
     fn set_config(data: &str) {
-        if let Err(err) = Node::set_config(Box::new(LocalStorage {}), &data) {
+        if let Err(err) = Node::set_config(LocalStorageBase {}.get("fledger"), &data) {
             info!("Got error while saving config: {}", err);
         }
     }

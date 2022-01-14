@@ -9,9 +9,9 @@ use common::{
         BrokerNetwork,
     },
     signal::web_rtc::{WSSignalMessage, WebRTCSpawner},
-    types::U256,
 };
 use wasm_webrtc::web_rtc_setup::WebRTCConnectionSetupWasm;
+use types::nodeids::U256;
 
 #[wasm_bindgen_test]
 async fn test_connection_state() {

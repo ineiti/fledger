@@ -1,9 +1,8 @@
-use common::types::U256;
 use serde::{Deserialize, Serialize};
+use types::{nodeids::U256, data_storage::DataStorage};
 
 use raw::random_connections;
 
-use crate::module::DataStorage;
 use crate::module::Message;
 use crate::module::Module;
 use crate::network::NetworkMessage;

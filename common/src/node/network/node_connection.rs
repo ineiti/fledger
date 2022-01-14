@@ -1,4 +1,5 @@
-use crate::{signal::web_rtc::PeerInfo, types::U256};
+use crate::{signal::web_rtc::PeerInfo};
+use types::nodeids::U256;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 

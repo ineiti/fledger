@@ -1,4 +1,4 @@
-use crate::types::U256;
+use types::nodeids::U256;
 use ed25519_dalek::{Keypair, PublicKey};
 use rand::rngs::OsRng;
 use serde_derive::{Deserialize, Serialize};

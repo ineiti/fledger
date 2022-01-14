@@ -8,8 +8,8 @@ use common::{
         web_rtc::{WSSignalMessage, WebSocketMessage},
         websocket::WebSocketConnectionSend,
     },
-    types::U256,
 };
+use types::nodeids::U256;
 
 pub struct NodeEntry {
     pub conn: Box<dyn WebSocketConnectionSend>,

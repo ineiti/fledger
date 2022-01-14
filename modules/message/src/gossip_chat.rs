@@ -1,13 +1,14 @@
 use serde::{Deserialize, Serialize};
 
-use crate::module::DataStorage;
 use crate::module::Message;
 use crate::module::Module;
 use crate::network::{Address, NetworkMessage, Node2NodeMsg};
 use crate::random_connections::RandomConnectionsMessage;
-use common::types::U256;
+use types::{nodeids::U256, data_storage::DataStorage};
 use raw::gossip_chat;
 use raw::gossip_chat::text_message::TextMessage;
+
+const STORAGE_KEY: &str = "messages";
 
 #[derive(Debug)]
 pub enum GossipChatMessage {
@@ -28,9 +29,9 @@ pub struct GossipChat {
 }
 
 impl Module for GossipChat {
-    fn new(_: Box<dyn DataStorage>) -> Self {
+    fn new(ds: Box<dyn DataStorage>) -> Self {
         Self {
-            module: gossip_chat::Module::new(),
+            module: gossip_chat::Module::new(&ds.get(STORAGE_KEY).unwrap()),
             nodes: vec![],
         }
     }

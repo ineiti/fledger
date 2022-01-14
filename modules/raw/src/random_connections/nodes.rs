@@ -1,6 +1,6 @@
+use types::nodeids::NodeIDs;
+use types::nodeids::NodeID;
 use core::cmp::min;
-use crate::nodeids::NodeIDs;
-use crate::nodeids::NodeID;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct NodeTime {

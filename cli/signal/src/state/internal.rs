@@ -18,8 +18,8 @@ use common::{
         web_rtc::{NodeStat, WSSignalMessage, WebSocketMessage},
         websocket::WSMessage,
     },
-    types::U256,
 };
+use types::nodeids::U256;
 
 use dipstick::*;
 

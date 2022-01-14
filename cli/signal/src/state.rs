@@ -5,10 +5,8 @@ use std::{
     time::Duration,
 };
 
-use common::{
-    signal::websocket::{WSMessage, WebSocketConnectionSend, WebSocketServer},
-    types::U256,
-};
+use common::signal::websocket::{WSMessage, WebSocketConnectionSend, WebSocketServer};
+use types::nodeids::U256;
 
 mod internal;
 mod node_entry;

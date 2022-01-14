@@ -1,7 +1,6 @@
 use crate::{
     broker::{BInput, BrokerMessage, Subsystem, SubsystemListener},
     node::{network::BrokerNetwork, timer::BrokerTimer, BrokerError, NodeData},
-    types::StorageError,
 };
 use log::{info, trace};
 use serde::{Deserialize, Serialize};
@@ -16,7 +15,11 @@ use thiserror::Error;
 use super::messages::{Message, MessageV1};
 use crate::{
     node::config::{NodeConfig, NodeInfo},
-    types::{now, U256},
+    types::now,
+};
+use types::{
+    data_storage::{DataStorage, StorageError},
+    nodeids::U256,
 };
 
 const MESSAGE_MAXIMUM: usize = 20;
@@ -80,6 +83,7 @@ pub struct AddMessage {
 
 pub struct TextMessages {
     node_data: Arc<Mutex<NodeData>>,
+    storage: Box<dyn DataStorage>,
     broker_tx: Sender<BInput>,
     nodes: Vec<NodeInfo>,
     // maps a message-id to a list of nodes that might hold that message.
@@ -146,16 +150,17 @@ impl TextMessages {
         node_data: Arc<Mutex<NodeData>>,
         broker_tx: Sender<BInput>,
     ) -> Result<Self, TMError> {
-        let (cfg, nodes_msgs) = {
+        let (cfg, nodes_msgs, storage) = {
             let mut node_data = node_data.lock().unwrap();
-            let data = node_data.storage.load(TEXT_MESSAGE_KEY)?;
+            let storage = node_data.storage.get("text_messages");
+            let data = storage.get(TEXT_MESSAGE_KEY)?;
             node_data.messages.load(&data)?;
             let mut nodes_msgs = HashMap::new();
             let cfg = node_data.node_config.clone();
             for (_, tm) in node_data.messages.storage.iter() {
                 nodes_msgs.insert(tm.id(), vec![cfg.our_node.get_id()]);
             }
-            (cfg, nodes_msgs)
+            (cfg, nodes_msgs, storage)
         };
         Ok(Self {
             node_data,
@@ -163,6 +168,7 @@ impl TextMessages {
             nodes_msgs,
             nodes: vec![],
             cfg,
+            storage,
         })
     }
 
@@ -327,7 +333,7 @@ impl TextMessages {
         }
 
         let data = node_data.messages.save()?;
-        Ok(node_data.storage.save(TEXT_MESSAGE_KEY, &data)?)
+        Ok(self.storage.set(TEXT_MESSAGE_KEY, &data)?)
     }
 }
 
@@ -392,7 +398,7 @@ impl TextMessage {
 mod tests {
     use crate::{
         broker::{BInput, BrokerMessage},
-        node::{logic::text_messages::TextMessagesStorage, node_data::TempDS, NodeData, TMError},
+        node::{logic::text_messages::TextMessagesStorage, node_data::TempDSB, NodeData, TMError},
     };
     use anyhow::Result;
     use flexi_logger::LevelFilter;
@@ -403,10 +409,8 @@ mod tests {
     };
 
     use super::{Message, TextMessage, TextMessages};
-    use crate::{
-        node::{config::NodeConfig, logic::messages::MessageV1},
-        types::U256,
-    };
+    use crate::node::{config::NodeConfig, logic::messages::MessageV1};
+    use types::nodeids::U256;
 
     struct TMTest {
         tm: TextMessages,
@@ -419,7 +423,7 @@ mod tests {
         pub fn new(leader: bool) -> Result<Self, TMError> {
             let mut cfg = NodeConfig::new();
             cfg.our_node.node_capacities.leader = leader;
-            let nd = NodeData::new(cfg.clone(), TempDS::new());
+            let nd = NodeData::new(cfg.clone(), TempDSB::new());
             let (tx, rx) = channel::<BInput>();
             Ok(TMTest {
                 tm: TextMessages::new_self(Arc::clone(&nd), tx)?,

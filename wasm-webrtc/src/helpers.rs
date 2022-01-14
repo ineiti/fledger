@@ -1,29 +1,44 @@
 use wasm_bindgen::prelude::*;
 use web_sys::window;
 
-use common::types::{DataStorage, StorageError};
+use types::data_storage::{DataStorage, DataStorageBase, StorageError};
 
-pub struct LocalStorage {}
+pub struct LocalStorageBase {}
+
+impl DataStorageBase for LocalStorageBase {
+    fn get(&self, base: &str) -> Box<dyn DataStorage> {
+        Box::new(LocalStorage{base: base.to_string()})
+    }
+    fn clone(&self) -> Box<dyn DataStorageBase> {
+        Box::new(LocalStorageBase{})
+    }
+}
+
+pub struct LocalStorage {
+    base: String,
+}
 
 impl DataStorage for LocalStorage {
-    fn load(&self, key: &str) -> Result<String, StorageError> {
+    fn get(&self, key: &str) -> Result<String, StorageError> {
+        let key_entry = format!("{}_{}", self.base, key);
         Ok(window()
             .unwrap()
             .local_storage()
             .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))?
             .unwrap()
-            .get(key)
+            .get(&key_entry)
             .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))?
             .unwrap_or("".to_string()))
     }
 
-    fn save(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
+    fn set(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
+        let key_entry = format!("{}_{}", self.base, key);
         window()
             .unwrap()
             .local_storage()
             .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))?
             .unwrap()
-            .set(key, value)
+            .set(&key_entry, value)
             .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))
     }
 }

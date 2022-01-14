@@ -23,8 +23,9 @@ use crate::{
         version::VERSION_STRING,
     },
     signal::web_rtc::{ConnType, NodeStat, WebRTCConnectionState},
-    types::{now, U256},
+    types::{now},
 };
+use types::nodeids::U256;
 
 #[derive(Debug, Error)]
 pub enum SNError {

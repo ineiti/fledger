@@ -1,16 +1,15 @@
-use common::{node::NodeError, signal::websocket::WSError, types::StorageError};
+use common::{node::NodeError, signal::websocket::WSError};
 use js_sys::Date;
 use log::{error, info, trace};
 use thiserror::Error;
+use types::data_storage::DataStorageBase;
+use types::data_storage::{DataStorage, StorageError};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_webrtc::{
     helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
 };
 
-use common::{
-    node::{logic::stats::StatNode, version::VERSION_STRING, Node},
-    types::DataStorage,
-};
+use common::node::{logic::stats::StatNode, version::VERSION_STRING, Node};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -30,18 +29,31 @@ extern "C" {
     pub fn fsexists(name: &str) -> bool;
 }
 
-const STORAGE_NAME: &str = "fledger";
+struct DummyDSB {}
 
-struct DummyDS {}
+impl DataStorageBase for DummyDSB {
+    fn get(&self, base: &str) -> Box<dyn DataStorage> {
+        Box::new(DummyDS {
+            base: base.to_string(),
+        })
+    }
+    fn clone(&self) -> Box<dyn DataStorageBase> {
+        Box::new(Self {})
+    }
+}
+
+struct DummyDS {
+    base: String,
+}
 
 impl DummyDS {
     fn name(&self, key: &str) -> String {
-        format!("{}_{}.toml", STORAGE_NAME, key)
+        format!("{}_{}.toml", self.base, key)
     }
 }
 
 impl DataStorage for DummyDS {
-    fn load(&self, key: &str) -> Result<String, StorageError> {
+    fn get(&self, key: &str) -> Result<String, StorageError> {
         let name = &self.name(key);
         Ok(if fsexists(name) {
             fsread(name)
@@ -51,7 +63,7 @@ impl DataStorage for DummyDS {
         })
     }
 
-    fn save(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
+    fn set(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
         fswrite(&self.name(key), value);
         Ok(())
     }
@@ -67,7 +79,7 @@ enum StartError {
 
 async fn start(url: &str) -> Result<Node, StartError> {
     let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
-    let my_storage = Box::new(DummyDS {});
+    let my_storage = Box::new(DummyDSB {});
     let ws = WebSocketWasm::new(url)?;
     Ok(Node::new(my_storage, "node", Box::new(ws), rtc_spawner)?)
 }

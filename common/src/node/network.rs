@@ -23,9 +23,9 @@ use crate::{
         },
         websocket::{WSError, WSMessage, WebSocketConnection},
     },
-    types::U256,
 };
 use node_connection::{NCError, NodeConnection};
+use types::nodeids::U256;
 
 pub mod connection_state;
 pub mod node_connection;

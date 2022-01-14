@@ -24,11 +24,15 @@ use crate::{
     broker::{Broker, BrokerError},
     node::{logic::stats::Stats, node_data::NodeData},
     signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection},
-    types::{DataStorage, StorageError, U256},
+};
+use types::{
+    data_storage::{DataStorage, DataStorageBase, StorageError},
+    nodeids::U256,
 };
 
 pub mod config;
 pub mod logic;
+pub mod modules;
 pub mod network;
 pub mod node_data;
 pub mod timer;
@@ -64,12 +68,13 @@ impl Node {
     /// new messages from the signalling server and from other nodes.
     /// The actual logic is handled in Logic.
     pub fn new(
-        mut storage: Box<dyn DataStorage>,
+        storage: Box<dyn DataStorageBase>,
         client: &str,
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
     ) -> Result<Node, NodeError> {
-        let config_str = match storage.load(CONFIG_NAME) {
+        let mut storage_node = storage.get("fledger");
+        let config_str = match storage_node.get(CONFIG_NAME) {
             Ok(s) => s,
             Err(_) => {
                 info!("Couldn't load configuration - start with empty");
@@ -78,7 +83,7 @@ impl Node {
         };
         let mut config = NodeConfig::try_from(config_str)?;
         config.our_node.client = client.to_string();
-        storage.save(CONFIG_NAME, &config.to_string()?)?;
+        storage_node.set(CONFIG_NAME, &config.to_string()?)?;
         info!(
             "Starting node: {} = {}",
             config.our_node.info,
@@ -159,7 +164,7 @@ impl Node {
 
     /// Updates the config of the node
     pub fn set_config(mut storage: Box<dyn DataStorage>, config: &str) -> Result<(), NodeError> {
-        storage.save(CONFIG_NAME, config)?;
+        storage.set(CONFIG_NAME, config)?;
         Ok(())
     }
 }

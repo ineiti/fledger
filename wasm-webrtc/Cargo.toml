@@ -8,6 +8,7 @@ edition = "2018"
 node = []
 
 [dependencies]
+types = {path = "../modules/types"}
 common = {path = "../common"}
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
 js-sys = "0.3.51"

@@ -1,9 +1,8 @@
-use super::nodeids::NodeID;
-use super::nodeids::NodeIDs;
-use rand::seq::SliceRandom;
-
 mod nodes;
+use types::nodeids::NodeID;
+use types::nodeids::NodeIDs;
 use nodes::*;
+use rand::seq::SliceRandom;
 
 /// RandomConnections listens for new available nodes and then chooses
 /// to randomly connect to a set number of nodes.
@@ -35,7 +34,7 @@ pub struct Config {
 impl Config {
     pub fn default() -> Self {
         Config {
-            max_connections: 2,
+            max_connections: 20,
             churn_connected: 60,
             connecting_timeout: 1,
         }
@@ -76,8 +75,8 @@ impl Module {
             .oldest_ticks(self.cfg.churn_connected)
             .0
             .len();
-        let missing = self.cfg.max_connections as i32
-            - (self.nodes_connected.0.len() + self.nodes_connecting.0.len() - churn) as i32;
+        let missing = self.nodes_needed()
+            - (self.nodes_connected.0.len() + self.nodes_connecting.0.len() - churn) as i64;
         if missing > 0 {
             let connect = self.connect_nodes(missing);
             self.nodes_connecting.add_new(connect.0.clone());
@@ -87,12 +86,12 @@ impl Module {
         }
     }
 
-    fn connect_nodes(&self, mut nbr: i32) -> NodeIDs {
+    fn connect_nodes(&self, mut nbr: i64) -> NodeIDs {
         let mut new_nodes = self.all_nodes.clone();
         new_nodes.remove_existing(&self.nodes_connected.get_nodes());
         new_nodes.remove_existing(&self.nodes_connecting.get_nodes());
-        if nbr > new_nodes.0.len() as i32 {
-            nbr = new_nodes.0.len() as i32;
+        if nbr > new_nodes.0.len() as i64 {
+            nbr = new_nodes.0.len() as i64;
         }
         NodeIDs {
             0: new_nodes
@@ -112,7 +111,7 @@ impl Module {
         }
 
         let mut disconnect = NodeIDs::empty();
-        let too_many = self.nodes_connected.0.len() as i64 - self.cfg.max_connections as i64;
+        let too_many = self.nodes_connected.0.len() as i64 - self.nodes_needed();
         if too_many > 0 {
             disconnect = self.nodes_connected.remove_oldest_n(too_many as usize);
         }
@@ -137,6 +136,17 @@ impl Module {
         let (connect, mut disc) = self.update_nodes();
         disconnect.0.append(&mut disc.0);
         (connect, disconnect)
+    }
+
+    /// Returns the number of nodes needed to have a high probability of a
+    /// fully connected network. 
+    fn nodes_needed(&self) -> i64 {
+        let nodes = self.all_nodes.0.len();
+        if nodes <= 1 {
+            0
+        } else {
+            ((nodes as f64).ln() * 2.).ceil().min(self.cfg.max_connections as f64) as i64
+        }
     }
 }
 

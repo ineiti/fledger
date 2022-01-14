@@ -1,4 +1,5 @@
-use crate::{node::logic::text_messages::TextMessageV1, types::U256};
+use crate::{node::logic::text_messages::TextMessageV1};
+use types::nodeids::U256;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -17,6 +18,8 @@ pub enum MessageV1 {
     VersionGet(),
     // TextMessages
     TextMessage(TextMessageV1),
+    // Module messages
+    ModuleMessage(String),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -37,6 +40,7 @@ impl fmt::Display for MessageV1 {
             MessageV1::Ping() => write!(f, "Ping"),
             MessageV1::VersionGet() => write!(f, "VersionGet"),
             MessageV1::TextMessage(_) => write!(f, "TextMessage"),
+            MessageV1::ModuleMessage(_) => write!(f, "ModuleMessage"),
         }
     }
 }
