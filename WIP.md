@@ -11,13 +11,15 @@
 
 ### Things to do
 
-- hook up the Network structure to the common-crate
-  - fetch chat messages from modules
-  - load messages from before
 - write tests
 - Create a nicer display of the chat, perhaps with markdown display of messages
 
 # Dates
+
+2022-01-18:
+- hook up the Network structure to the common-crate
+  - fetch chat messages from modules
+  - load messages from before
 
 2022-01-09:
 - finished implementing the message implementations of the raw modules

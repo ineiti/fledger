@@ -42,7 +42,6 @@ impl RandomConnections {
         if let Ok(mut nd) = self.node_data.try_lock() {
             return match msg {
                 BrokerMessage::Network(bmn) => match bmn {
-                    // TODO: need "Connect" and "Disconnect" here
                     BrokerNetwork::UpdateList(nodes) => vec![MessageIn::NodeList(
                         nodes
                             .iter()
@@ -50,6 +49,10 @@ impl RandomConnections {
                             .collect::<Vec<U256>>()
                             .into(),
                     )],
+                    BrokerNetwork::Connected(id) => vec![MessageIn::NodeConnected(id.clone())],
+                    BrokerNetwork::Disconnected(id) => {
+                        vec![MessageIn::NodeDisconnected(id.clone())]
+                    }
                     _ => vec![],
                 },
                 _ => vec![],
@@ -64,12 +67,12 @@ impl RandomConnections {
 
     fn process_msg_out(&self, msg: &MessageOut) -> Vec<BrokerMessage> {
         match msg {
-            MessageOut::ConnectNode(id) => vec![BrokerMessage::NodeMessage(NodeMessage {
-                id: id.clone(),
-                msg: Message::V1(MessageV1::Ping()),
-            })],
-            // TODO: Do something with Disconnect
-            MessageOut::DisconnectNode(_) => vec![],
+            MessageOut::ConnectNode(id) => {
+                vec![BrokerMessage::Network(BrokerNetwork::Connect(id.clone()))]
+            }
+            MessageOut::DisconnectNode(id) => {
+                vec![BrokerMessage::Network(BrokerNetwork::Disconnect(id.clone()))]
+            }
             MessageOut::ListUpdate(_) => vec![BrokerMessage::Modules(ModulesMessage::Random(
                 RandomMessage::MessageOut(msg.clone()),
             ))],
@@ -95,7 +98,7 @@ impl RandomConnections {
                 RandomMessage::MessageOut(_) => {
                     log::warn!("This module should never get a MessageOut");
                     vec![]
-                },
+                }
             },
             _ => self.process_msg_bm(msg),
         }

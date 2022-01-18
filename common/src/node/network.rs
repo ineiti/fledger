@@ -215,22 +215,22 @@ impl Inner {
     async fn process_broker(&mut self) -> Result<(), NetworkError> {
         let bms: Vec<BrokerMessage> = self.broker_rx.try_iter().collect();
         for bm in bms {
-            match bm {
-                BrokerMessage::Network(BrokerNetwork::WebRTC(id, msg)) => {
-                    self.send(&id, msg.clone()).await?
+            if let BrokerMessage::Network(bn) = bm {
+                match bn {
+                    BrokerNetwork::WebRTC(id, msg) => self.send(&id, msg.clone()).await?,
+                    BrokerNetwork::SendStats(ss) => {
+                        self.ws_send(WSSignalMessage::NodeStats(ss.clone()))?
+                    }
+                    BrokerNetwork::ClearNodes => self.ws_send(WSSignalMessage::ClearNodes)?,
+                    BrokerNetwork::UpdateListRequest => {
+                        self.ws_send(WSSignalMessage::ListIDsRequest)?
+                    }
+                    BrokerNetwork::WebSocket(msg) => self.ws_send(msg)?,
+                    BrokerNetwork::Connect(id) => self.connect(&id).await?,
+                    BrokerNetwork::Disconnect(id) => self.disconnect(&id).await?,
+                    _ => continue,
                 }
-                BrokerMessage::Network(BrokerNetwork::SendStats(ss)) => {
-                    self.ws_send(WSSignalMessage::NodeStats(ss.clone()))?
-                }
-                BrokerMessage::Network(BrokerNetwork::ClearNodes) => {
-                    self.ws_send(WSSignalMessage::ClearNodes)?
-                }
-                BrokerMessage::Network(BrokerNetwork::UpdateListRequest) => {
-                    self.ws_send(WSSignalMessage::ListIDsRequest)?
-                }
-                BrokerMessage::Network(BrokerNetwork::WebSocket(msg)) => self.ws_send(msg)?,
-                _ => continue,
-            };
+            }
         }
         Ok(())
     }
@@ -266,6 +266,20 @@ impl Inner {
     async fn send(&mut self, dst: &U256, msg: String) -> Result<(), NetworkError> {
         // log::debug!("Sending {}", msg);
         self.get_connection(dst).await?.send(msg.clone()).await?;
+        Ok(())
+    }
+
+    /// Connect to the given node.
+    async fn connect(&mut self, dst: &U256) -> Result<(), NetworkError>{
+        self.get_connection(dst).await?;
+        self.broker.emit_bm(BrokerMessage::Network(BrokerNetwork::Connected(dst.clone())))?;
+        Ok(())
+    }
+
+    /// Disconnects from a given node.
+    async fn disconnect(&mut self, dst: &U256) -> Result<(), NetworkError> {
+        // TODO: Actually disconnect and listen for nodes that have been disconnected due to timeouts.
+        self.broker.emit_bm(BrokerMessage::Network(BrokerNetwork::Disconnected(dst.clone())))?;
         Ok(())
     }
 

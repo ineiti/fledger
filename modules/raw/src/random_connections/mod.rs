@@ -9,6 +9,7 @@ use types::nodeids::NodeIDs;
 pub enum MessageIn {
     NodeList(NodeIDs),
     NodeConnected(NodeID),
+    NodeDisconnected(NodeID),
     Tick,
 }
 
@@ -68,6 +69,7 @@ impl Module {
         match msg {
             MessageIn::NodeList(nodes) => self.new_nodes(&nodes),
             MessageIn::NodeConnected(node) => self.new_connection(&node),
+            MessageIn::NodeDisconnected(node) => self.new_disconnection(&node),
             MessageIn::Tick => self.tick(),
         }
     }
@@ -98,6 +100,18 @@ impl Module {
             disconnect = self.nodes_connected.remove_oldest_n(too_many as usize);
         }
         Self::make_connect_disconnect(None, Some(disconnect))
+    }
+
+    /// Removes a node that has been disconnected from the list of connected
+    /// nodes and disconnecting nodes.
+    pub fn new_disconnection(&mut self, node: &NodeID) -> Vec<MessageOut> {
+        if self.nodes_connected.contains(node){
+            self.nodes_connected.0.retain(|nt| nt.id != *node);
+        }
+        if self.nodes_connecting.contains(node){
+            self.nodes_connecting.0.retain(|nt| nt.id != *node);
+        }
+        self.update_nodes()
     }
 
     /// Checks if some of the nodes need to be replaced by other nodes.
