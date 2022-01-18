@@ -300,6 +300,10 @@ pub enum BrokerNetwork {
     ClearNodes,
     UpdateListRequest,
     ConnectionState(NetworkConnectionState),
+    Connect(U256),
+    Connected(U256),
+    Disconnect(U256),
+    Disconnected(U256),
 }
 
 #[derive(Debug, Clone, PartialEq)]

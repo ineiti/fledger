@@ -1,6 +1,6 @@
 [package]
 authors = ["Linus Gasser <linus@gasser.blue>"]
-edition = "2018"
+edition = "2021"
 name = "common"
 version = "0.1.0"
 
@@ -8,7 +8,6 @@ version = "0.1.0"
 
 [dependencies]
 types = {path = "../modules/types"}
-message = {path = "../modules/message"}
 raw = {path = "../modules/raw"}
 async-trait = "0.1.51"
 rand = "0.7"
@@ -28,6 +27,7 @@ sha2 = "0.9.5"
 
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 timer = "0.2"
+itertools = "0.10.3"
 
 [dependencies.web-sys]
 features = [

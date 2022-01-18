@@ -95,7 +95,7 @@ impl From<[u8; 32]> for U256 {
 
 pub type NodeID = U256;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct NodeIDs(pub Vec<NodeID>);
 
 impl NodeIDs {

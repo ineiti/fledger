@@ -8,6 +8,5 @@ members = [
     "vendor/names",
     "web",
     "modules/raw",
-    "modules/message",
     "modules/types"
 ]

@@ -2,7 +2,7 @@
 name = "flnode"
 version = "0.1.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
-edition = "2018"
+edition = "2021"
 description = "gtk for WebRTC Fledger communication"
 repository = "https://github.com/ineiti/fledger-1-webrtc"
 license = "AGPLv3"

@@ -226,9 +226,9 @@ dependencies = [
  "flexi_logger 0.19.4",
  "futures",
  "getrandom 0.2.3",
+ "itertools",
  "js-sys",
  "log",
- "message",
  "names",
  "rand 0.7.3",
  "raw",
@@ -393,6 +393,12 @@ dependencies = [
  "sha2 0.9.8",
  "zeroize",
 ]
+
+[[package]]
+name = "either"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "fledger-web"
@@ -698,6 +704,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -768,22 +783,6 @@ name = "memchr"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
-
-[[package]]
-name = "message"
-version = "0.1.0"
-dependencies = [
- "rand 0.7.3",
- "raw",
- "serde",
- "serde_derive",
- "serde_json",
- "sha2 0.9.8",
- "thiserror",
- "toml",
- "tracing",
- "types",
-]
 
 [[package]]
 name = "minreq"

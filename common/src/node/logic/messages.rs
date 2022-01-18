@@ -1,7 +1,7 @@
-use crate::{node::logic::text_messages::TextMessageV1};
 use types::nodeids::U256;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use crate::node::modules::gossip_chat;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 /// This is the command-set for version 1 of the protocol.
@@ -14,12 +14,8 @@ pub enum MessageV1 {
     Error(String),
     // Pings an OracleServer
     Ping(),
-    // Gets the Version of the OracleServers
-    VersionGet(),
-    // TextMessages
-    TextMessage(TextMessageV1),
-    // Module messages
-    ModuleMessage(String),
+    // GossipChat messages
+    GossipChat(gossip_chat::MessageNode),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -38,9 +34,7 @@ impl fmt::Display for MessageV1 {
             MessageV1::Ok() => write!(f, "Ok"),
             MessageV1::Error(_) => write!(f, "Error"),
             MessageV1::Ping() => write!(f, "Ping"),
-            MessageV1::VersionGet() => write!(f, "VersionGet"),
-            MessageV1::TextMessage(_) => write!(f, "TextMessage"),
-            MessageV1::ModuleMessage(_) => write!(f, "ModuleMessage"),
+            MessageV1::GossipChat(_) => write!(f, "GossipChat"),
         }
     }
 }

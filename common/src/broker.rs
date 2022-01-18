@@ -1,5 +1,7 @@
+use crate::node::modules::random_connections::RandomMessage;
+use crate::node::modules::gossip_chat::GossipMessage;
 use crate::node::{
-    logic::{messages::NodeMessage, text_messages::AddMessage},
+    logic::{messages::NodeMessage},
     network::BrokerNetwork,
     timer::BrokerTimer,
 };
@@ -29,11 +31,17 @@ pub trait SubsystemInit: SubsystemListener {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum ModulesMessage {
+    Gossip(GossipMessage),
+    Random(RandomMessage)
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum BrokerMessage {
     Network(BrokerNetwork),
-    TextMessage(AddMessage),
     Timer(BrokerTimer),
     NodeMessage(NodeMessage),
+    Modules(ModulesMessage),
     #[cfg(test)]
     TestMessages(tests::TestMessages),
 }
@@ -45,9 +53,9 @@ impl std::fmt::Display for BrokerMessage {
             "BrokerMessage({})",
             match self {
                 BrokerMessage::Network(_) => "Network",
-                BrokerMessage::TextMessage(_) => "TextMessage",
                 BrokerMessage::Timer(_) => "Timer",
                 BrokerMessage::NodeMessage(_) => "NodeMessage",
+                BrokerMessage::Modules(_) => "Modules",
                 #[cfg(test)]
                 BrokerMessage::TestMessages(_) => "TestMessages",
             }

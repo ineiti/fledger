@@ -1,10 +1,10 @@
+use crate::broker::ModulesMessage;
+use crate::node::modules::gossip_chat::{self, GossipChat, GossipMessage};
+use crate::node::modules::random_connections::RandomConnections;
+use crate::types::now;
 use crate::{
     broker::BrokerMessage,
-    node::{
-        logic::text_messages::{AddMessage, TMError, TextMessages},
-        network::BrokerNetwork,
-        timer::Timer,
-    },
+    node::{network::BrokerNetwork, timer::Timer},
 };
 use std::{
     collections::HashMap,
@@ -17,7 +17,7 @@ use log::{error, info};
 
 use self::{
     config::{ConfigError, NodeConfig, NodeInfo},
-    logic::{stats::StatNode, text_messages::TextMessage},
+    logic::stats::StatNode,
     network::{Network, NetworkError},
 };
 use crate::{
@@ -25,6 +25,7 @@ use crate::{
     node::{logic::stats::Stats, node_data::NodeData},
     signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection},
 };
+use raw::gossip_chat::text_message::TextMessage;
 use types::{
     data_storage::{DataStorage, DataStorageBase, StorageError},
     nodeids::U256,
@@ -50,8 +51,6 @@ pub enum NodeError {
     Network(#[from] NetworkError),
     #[error(transparent)]
     Broker(#[from] BrokerError),
-    #[error(transparent)]
-    TextMessage(#[from] TMError),
 }
 
 /// The node structure holds it all together. It is the main structure of the project.
@@ -94,7 +93,8 @@ impl Node {
         let broker = {
             Network::new(Arc::clone(&node_data), ws, web_rtc);
             Stats::new(Arc::clone(&node_data));
-            TextMessages::new(Arc::clone(&node_data))?;
+            RandomConnections::new(Arc::clone(&node_data));
+            GossipChat::new(Arc::clone(&node_data));
             node_data.lock().unwrap().broker.clone()
         };
         Timer::new(broker.clone());
@@ -144,18 +144,15 @@ impl Node {
 
     pub fn add_message(&self, msg: String) -> Result<(), NodeError> {
         self.broker
-            .enqueue_bm(BrokerMessage::TextMessage(AddMessage { msg }));
+            .enqueue_bm(BrokerMessage::Modules(ModulesMessage::Gossip(
+                GossipMessage::MessageIn(gossip_chat::MessageIn::AddMessage(now(), msg)),
+            )));
         Ok(())
     }
 
     pub fn get_messages(&self) -> Result<Vec<TextMessage>, NodeError> {
         if let Ok(nd) = self.node_data.try_lock() {
-            return Ok(nd
-                .messages
-                .storage
-                .iter()
-                .map(|(_k, v)| v.clone())
-                .collect());
+            return Ok(nd.gossip_chat.get_messages());
         }
         Err(NodeError::Lock)
     }

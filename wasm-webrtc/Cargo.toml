@@ -2,7 +2,7 @@
 name = "wasm-webrtc"
 version = "0.1.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
-edition = "2018"
+edition = "2021"
 
 [features]
 node = []
