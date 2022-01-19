@@ -1,9 +1,9 @@
+use rand::random;
 use serde::{Deserialize, Serialize};
 use sha2::digest::{consts::U32, generic_array::GenericArray};
-use std::fmt;
-use rand::random;
-use thiserror::Error;
 use std::num::ParseIntError;
+use std::{fmt, str::FromStr};
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -31,7 +31,7 @@ impl fmt::Display for U256 {
 
 impl AsRef<[u8]> for U256 {
     fn as_ref(&self) -> &[u8] {
-        return &self.0;
+        &self.0
     }
 }
 
@@ -52,13 +52,21 @@ impl U256 {
         U256 { 0: random() }
     }
 
+    pub fn to_bytes(self) -> [u8; 32] {
+        self.0
+    }
+}
+
+impl FromStr for U256 {
+    type Err = ParseError;
+
     /// Convert a hexadecimal string to a U256.
     /// If less than 64 characters are given, the U256 is filled from
     /// the left with the remaining u8 initialized to 0.
     /// So
     ///   `U256.from_str("1234") == U256.from_str("123400")`
     /// something
-    pub fn from_str(s: &str) -> Result<U256, ParseError> {
+    fn from_str(s: &str) -> Result<U256, ParseError> {
         if s.len() > 64 {
             return Err(ParseError::HexTooLong);
         }
@@ -69,10 +77,6 @@ impl U256 {
         let mut u = U256 { 0: [0u8; 32] };
         v.iter().enumerate().for_each(|(i, b)| u.0[i] = *b);
         Ok(u)
-    }
-
-    pub fn to_bytes(self) -> [u8; 32] {
-        self.0
     }
 }
 
@@ -145,7 +149,7 @@ impl NodeIDs {
                 }
             }
         }
-        return false;
+        false
     }
 
     fn remove(&mut self, nodes: &NodeIDs, exists: bool) -> NodeIDs {
@@ -170,7 +174,9 @@ impl From<Vec<U256>> for NodeIDs {
 
 impl From<&Vec<U256>> for NodeIDs {
     fn from(nodes: &Vec<U256>) -> Self {
-        Self { 0: nodes.iter().cloned().collect() }
+        Self {
+            0: nodes.to_vec(),
+        }
     }
 }
 

@@ -27,7 +27,7 @@ pub struct GossipChat {
 const STORAGE_GOSSIP_CHAT: &str = "gossip_chat";
 
 impl GossipChat {
-    pub fn new(node_data: Arc<Mutex<NodeData>>) {
+    pub fn start(node_data: Arc<Mutex<NodeData>>) {
         {
             let mut nd = node_data.lock().unwrap();
 
@@ -36,7 +36,7 @@ impl GossipChat {
                 .get(STORAGE_GOSSIP_CHAT)
                 .get(STORAGE_GOSSIP_CHAT)
                 .unwrap();
-            if gossip_msgs_str != "" {
+            if !gossip_msgs_str.is_empty() {
                 if let Err(e) = nd.gossip_chat.set(&gossip_msgs_str) {
                     log::warn!("Couldn't load gossip messages: {}", e);
                 }
@@ -62,9 +62,7 @@ impl GossipChat {
             }
             nd.broker.clone()
         }
-        .add_subsystem(Subsystem::Handler(Box::new(Self {
-            node_data: node_data,
-        })))
+        .add_subsystem(Subsystem::Handler(Box::new(Self { node_data })))
         .unwrap();
     }
 
@@ -72,17 +70,15 @@ impl GossipChat {
     fn process_msg_bm(&self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
         if let Ok(mut nd) = self.node_data.try_lock() {
             match msg {
-                BrokerMessage::Network(bmn) => match bmn {
-                    // need "Connect" and "Disconnect" here
-                    BrokerNetwork::UpdateList(nodes) => Some(MessageIn::NodeList(
+                BrokerMessage::Network(BrokerNetwork::UpdateList(nodes)) => {
+                    Some(MessageIn::NodeList(
                         nodes
                             .iter()
                             .map(|ni| ni.get_id())
                             .collect::<Vec<U256>>()
                             .into(),
-                    )),
-                    _ => None,
-                },
+                    ))
+                }
                 BrokerMessage::NodeMessage(nm) => match &nm.msg {
                     Message::V1(MessageV1::GossipChat(gc)) => {
                         Some(MessageIn::Node(nm.id, gc.clone()))
@@ -92,14 +88,12 @@ impl GossipChat {
                 _ => None,
             }
             .and_then(|msg| nd.gossip_chat.process_message(msg).ok())
-            .and_then(|msgs| {
-                Some(
-                    msgs.iter()
-                        .flat_map(|msg| self.process_msg_out(msg))
-                        .collect(),
-                )
+            .map(|msgs| {
+                msgs.iter()
+                    .flat_map(|msg| self.process_msg_out(msg))
+                    .collect()
             })
-            .unwrap_or(vec![])
+            .unwrap_or_default()
         } else {
             vec![]
         }
@@ -124,7 +118,7 @@ impl GossipChat {
     fn process_msg_out(&self, msg: &MessageOut) -> Vec<BrokerMessage> {
         match msg {
             MessageOut::Node(id, nm) => vec![BrokerMessage::NodeMessage(NodeMessage {
-                id: id.clone(),
+                id: *id,
                 msg: Message::V1(MessageV1::GossipChat(nm.clone())),
             })],
             _ => vec![],
@@ -138,7 +132,7 @@ impl GossipChat {
                 GossipMessage::MessageOut(_) => {
                     log::warn!("This should never receive a MessageOut");
                     vec![]
-                },
+                }
             },
             _ => self.process_msg_bm(msg),
         }
@@ -149,7 +143,7 @@ impl SubsystemListener for GossipChat {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BInput> {
         msgs.iter()
             .flat_map(|msg| self.process_msg(msg))
-            .map(|msg| BInput::BM(msg))
+            .map(BInput::BM)
             .collect()
     }
 }

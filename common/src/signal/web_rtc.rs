@@ -158,18 +158,18 @@ impl std::fmt::Display for PeerInfo {
 impl PeerInfo {
     pub fn new(init: &U256, follow: &U256) -> PeerInfo {
         PeerInfo {
-            id_init: init.clone(),
-            id_follow: follow.clone(),
+            id_init: *init,
+            id_follow: *follow,
             message: PeerMessage::Init,
         }
     }
 
     pub fn get_remote(&self, local: &U256) -> Option<U256> {
-        if self.id_init == local.clone() {
-            return Some(self.id_follow.clone());
+        if self.id_init == *local {
+            return Some(self.id_follow);
         }
-        if self.id_follow == local.clone() {
-            return Some(self.id_init.clone());
+        if self.id_follow == *local {
+            return Some(self.id_init);
         }
         return None;
     }

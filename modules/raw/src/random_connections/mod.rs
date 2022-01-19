@@ -244,10 +244,11 @@ mod tests {
             match msg {
                 MessageOut::ConnectNode(node) => should_conn.push(node),
                 MessageOut::DisconnectNode(node) => should_disc.push(node),
+                _ => {},
             }
         }
-        assert_eq!(should_conn, conn.clone());
-        assert_eq!(should_disc, disc.clone());
+        assert_eq!(NodeIDs::from(should_conn), conn.clone());
+        assert_eq!(NodeIDs::from(should_disc), disc.clone());
     }
 
     // Test connection of new nodes
@@ -282,6 +283,7 @@ mod tests {
             match msg {
                 MessageOut::ConnectNode(node) => conn.push(node),
                 MessageOut::DisconnectNode(node) => disc.push(node),
+                _ => {},
             }
         }
         assert_eq!(

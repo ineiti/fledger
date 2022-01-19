@@ -121,6 +121,12 @@ pub struct NodeConfig {
     pub keypair: Keypair,
 }
 
+impl Default for NodeConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NodeConfig {
     /// Returns a new NodeConfig
     pub fn new() -> Self {

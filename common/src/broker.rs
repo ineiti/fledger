@@ -1,10 +1,6 @@
-use crate::node::modules::random_connections::RandomMessage;
 use crate::node::modules::gossip_chat::GossipMessage;
-use crate::node::{
-    logic::{messages::NodeMessage},
-    network::BrokerNetwork,
-    timer::BrokerTimer,
-};
+use crate::node::modules::random_connections::RandomMessage;
+use crate::node::{logic::messages::NodeMessage, network::BrokerNetwork, timer::BrokerTimer};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
@@ -33,7 +29,7 @@ pub trait SubsystemInit: SubsystemListener {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ModulesMessage {
     Gossip(GossipMessage),
-    Random(RandomMessage)
+    Random(RandomMessage),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,24 +78,31 @@ pub struct Broker {
 
 unsafe impl Send for Broker {}
 
-impl Broker {
+impl Default for Broker {
     /// Create a new broker.
-    pub fn new() -> Self {
-        let intern = Intern::new();
-        let broker = Self {
-            intern_tx: intern.clone_tx(),
-            intern: Arc::new(Mutex::new(intern)),
-        };
-        broker
+    fn default() -> Self {
+        Self::new()
     }
+}
 
+impl Clone for Broker {
     /// Clone the broker. The new broker will communicate with the same "Intern" structure
     /// and share all messages. However, each broker clone will have its own tap messages
     /// and is able to filter according to different messages.
-    pub fn clone(&self) -> Self {
+    fn clone(&self) -> Self {
         Self {
             intern: Arc::clone(&self.intern),
             intern_tx: self.intern_tx.clone(),
+        }
+    }
+}
+
+impl Broker {
+    pub fn new() -> Self {
+        let intern = Intern::new();
+        Self {
+            intern_tx: intern.clone_tx(),
+            intern: Arc::new(Mutex::new(intern)),
         }
     }
 
@@ -201,7 +204,7 @@ impl Intern {
                 .drain(..)
                 .collect();
             msgs.append(&mut ss.get_messages());
-            msg_count = msg_count + msgs.len();
+            msg_count += msgs.len();
             new_msgs.push(msgs);
         }
 
@@ -211,8 +214,8 @@ impl Intern {
         for (index, ss) in self.subsystems.iter_mut().enumerate() {
             let mut msg_queue = vec![];
             for (index_nm, nms) in new_msgs.iter().enumerate() {
-                if index_nm == index || nms.len() == 0 {
-                    msg_count = msg_count + nms.len();
+                if index_nm == index || nms.is_empty() {
+                    msg_count += nms.len();
                     continue;
                 }
                 msg_queue.append(&mut ss.put_messages(nms));

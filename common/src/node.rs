@@ -93,8 +93,8 @@ impl Node {
         let broker = {
             Network::new(Arc::clone(&node_data), ws, web_rtc);
             Stats::new(Arc::clone(&node_data));
-            RandomConnections::new(Arc::clone(&node_data));
-            GossipChat::new(Arc::clone(&node_data));
+            RandomConnections::start(Arc::clone(&node_data));
+            GossipChat::start(Arc::clone(&node_data));
             node_data.lock().unwrap().broker.clone()
         };
         Timer::new(broker.clone());

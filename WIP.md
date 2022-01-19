@@ -16,6 +16,9 @@
 
 # Dates
 
+2022-01-19:
+- started test-framework with network dummy and first communications
+
 2022-01-18:
 - hook up the Network structure to the common-crate
   - fetch chat messages from modules

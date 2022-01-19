@@ -4,9 +4,8 @@ use std::sync::Mutex;
 use types::nodeids::U256;
 
 use crate::broker::{BInput, Subsystem, SubsystemListener};
-use crate::node::logic::messages::{Message, MessageV1};
+use crate::node::network::BrokerNetwork;
 use crate::node::NodeData;
-use crate::node::{logic::messages::NodeMessage, network::BrokerNetwork};
 use crate::node::{BrokerMessage, ModulesMessage};
 
 pub use raw::random_connections::{MessageIn, MessageOut};
@@ -27,14 +26,12 @@ pub struct RandomConnections {
 }
 
 impl RandomConnections {
-    pub fn new(node_data: Arc<Mutex<NodeData>>) {
+    pub fn start(node_data: Arc<Mutex<NodeData>>) {
         {
             let nd = node_data.lock().unwrap();
             nd.broker.clone()
         }
-        .add_subsystem(Subsystem::Handler(Box::new(Self {
-            node_data: node_data,
-        })))
+        .add_subsystem(Subsystem::Handler(Box::new(Self { node_data })))
         .unwrap();
     }
 
@@ -49,9 +46,9 @@ impl RandomConnections {
                             .collect::<Vec<U256>>()
                             .into(),
                     )],
-                    BrokerNetwork::Connected(id) => vec![MessageIn::NodeConnected(id.clone())],
+                    BrokerNetwork::Connected(id) => vec![MessageIn::NodeConnected(*id)],
                     BrokerNetwork::Disconnected(id) => {
-                        vec![MessageIn::NodeDisconnected(id.clone())]
+                        vec![MessageIn::NodeDisconnected(*id)]
                     }
                     _ => vec![],
                 },
@@ -61,6 +58,8 @@ impl RandomConnections {
             .flat_map(|msg| nd.random_connections.process_message(msg.clone()))
             .flat_map(|msg| self.process_msg_out(&msg))
             .collect();
+        } else {
+            log::error!("pmb Couldn't lock");
         }
         vec![]
     }
@@ -68,10 +67,10 @@ impl RandomConnections {
     fn process_msg_out(&self, msg: &MessageOut) -> Vec<BrokerMessage> {
         match msg {
             MessageOut::ConnectNode(id) => {
-                vec![BrokerMessage::Network(BrokerNetwork::Connect(id.clone()))]
+                vec![BrokerMessage::Network(BrokerNetwork::Connect(*id))]
             }
             MessageOut::DisconnectNode(id) => {
-                vec![BrokerMessage::Network(BrokerNetwork::Disconnect(id.clone()))]
+                vec![BrokerMessage::Network(BrokerNetwork::Disconnect(*id))]
             }
             MessageOut::ListUpdate(_) => vec![BrokerMessage::Modules(ModulesMessage::Random(
                 RandomMessage::MessageOut(msg.clone()),
@@ -109,7 +108,7 @@ impl SubsystemListener for RandomConnections {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BInput> {
         msgs.iter()
             .flat_map(|msg| self.process_msg(msg))
-            .map(|msg| BInput::BM(msg))
+            .map(BInput::BM)
             .collect()
     }
 }
