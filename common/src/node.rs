@@ -91,13 +91,13 @@ impl Node {
 
         let node_data = NodeData::new(config, storage);
         let broker = {
-            Network::new(Arc::clone(&node_data), ws, web_rtc);
-            Stats::new(Arc::clone(&node_data));
+            Network::start(Arc::clone(&node_data), ws, web_rtc);
+            Stats::start(Arc::clone(&node_data));
             RandomConnections::start(Arc::clone(&node_data));
             GossipChat::start(Arc::clone(&node_data));
             node_data.lock().unwrap().broker.clone()
         };
-        Timer::new(broker.clone());
+        Timer::start(broker.clone());
 
         Ok(Node { node_data, broker })
     }

@@ -34,7 +34,7 @@ impl TextMessagesStorage {
     }
 
     pub fn load(&mut self, data: &str) -> Result<(), serde_json::Error> {
-        if data.len() > 0 {
+        if !data.is_empty() {
             let msg_vec: Vec<TextMessage> = serde_json::from_str(data)?;
             self.storage.clear();
             for msg in msg_vec {
@@ -48,7 +48,7 @@ impl TextMessagesStorage {
 
     pub fn save(&self) -> Result<String, serde_json::Error> {
         let msg_vec: Vec<TextMessage> = self.storage.iter().map(|(_k, v)| v).cloned().collect();
-        Ok(serde_json::to_string(&msg_vec)?.into())
+        serde_json::to_string(&msg_vec)
     }
 
     pub fn add_message(&mut self, msg: TextMessage) -> bool {
@@ -75,11 +75,11 @@ impl TextMessagesStorage {
     }
 
     pub fn get_message_ids(&self) -> Vec<U256> {
-        self.storage.iter().map(|(k, _v)| k.clone()).collect()
+        self.storage.iter().map(|(k, _v)| *k).collect()
     }
 
     pub fn get_message(&self, id: &U256) -> Option<TextMessage> {
-        self.storage.get(id).and_then(|tm| Some(tm.clone()))
+        self.storage.get(id).cloned()
     }
 
     pub fn contains(&self, id: &U256) -> bool {
@@ -109,6 +109,6 @@ impl TextMessagesStorage {
         {
             return tm.created >= created;
         }
-        return false;
+        false
     }
 }

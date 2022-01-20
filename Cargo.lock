@@ -424,6 +424,7 @@ dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "log",
+ "raw",
  "regex",
  "types",
  "urlencoding",

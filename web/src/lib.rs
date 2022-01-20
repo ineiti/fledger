@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use js_sys::Date;
 use log::{debug, error, info, warn};
+use raw::gossip_chat::text_message::TextMessage;
 use regex::Regex;
 use std::{
     sync::{Arc, Mutex},
@@ -12,12 +13,7 @@ use wasm_webrtc::helpers::LocalStorageBase;
 use wasm_webrtc::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
 use web_sys::window;
 
-use common::node::{
-    config::NodeInfo,
-    logic::{stats::StatNode, text_messages::TextMessage},
-    version::VERSION_STRING,
-    Node,
-};
+use common::node::{config::NodeInfo, logic::stats::StatNode, version::VERSION_STRING, Node};
 
 use types::data_storage::DataStorageBase;
 
@@ -63,7 +59,7 @@ impl FledgerWeb {
         let mut fs = None;
         if let Ok(mut no) = self.node.try_lock() {
             if let Some(n) = no.as_mut() {
-                if self.msgs.len() > 0 {
+                if !self.msgs.is_empty() {
                     let msg = self.msgs.remove(0);
                     debug!("Sending message {}", msg);
                     if let Err(e) = n.add_message(msg) {
@@ -91,6 +87,12 @@ impl FledgerWeb {
     }
 }
 
+impl Default for FledgerWeb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FledgerWeb {
     async fn update_node(noc: Arc<Mutex<Option<Node>>>) -> Result<()> {
         if let Ok(mut no) = noc.try_lock() {
@@ -105,7 +107,7 @@ impl FledgerWeb {
     }
 
     async fn node_start(node_mutex: Arc<Mutex<Option<Node>>>) -> Result<()> {
-        let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
+        let rtc_spawner = Box::new(WebRTCConnectionSetupWasm::new_box);
         let my_storage = Box::new(LocalStorageBase {});
         let ws =
             WebSocketWasm::new(URL).map_err(|e| anyhow!("couldn't create websocket: {:?}", e))?;
@@ -128,15 +130,15 @@ impl FledgerWeb {
     }
 
     fn set_config(data: &str) {
-        if let Err(err) = Node::set_config(LocalStorageBase {}.get("fledger"), &data) {
+        if let Err(err) = Node::set_config(LocalStorageBase {}.get("fledger"), data) {
             info!("Got error while saving config: {}", err);
         }
     }
 
     fn set_localstorage() {
         if let Ok(loc) = window().unwrap().location().href() {
-            info!("Location is: {}", loc.clone());
-            if loc.contains("#") {
+            info!("Location is: {}", loc);
+            if loc.contains('#') {
                 let reg = Regex::new(r".*?#").unwrap();
                 let data_enc = reg.replace(&loc, "");
                 if data_enc != "" {
@@ -214,7 +216,7 @@ impl FledgerState {
                 if self.info.get_id() != ni.get_id() {
                     stats_vec.push(
                         vec![
-                            format!("{}", ni.info),
+                            ni.info.to_string(),
                             format!("rx:{} tx:{}", stat.ping_rx, stat.ping_tx),
                             format!("{}s", ((now - stat.last_contact) / 1000.).floor()),
                             format!("in:{:?} out:{:?}", stat.incoming, stat.outgoing),
@@ -256,7 +258,7 @@ impl FledgerMessages {
             // Formats the combined date and time with the specified format string.
             let date = datetime.format("%A, the %d of %B at %H:%M:%S").to_string();
             msgs.push(FledgerMessage {
-                from: msg.node_info.clone(),
+                from: msg.src.to_string(),
                 text: msg.msg.clone(),
                 date,
             })
@@ -268,7 +270,7 @@ impl FledgerMessages {
 #[wasm_bindgen]
 impl FledgerMessages {
     pub fn get_messages(&self) -> String {
-        if self.msgs.len() == 0 {
+        if self.msgs.is_empty() {
             return String::from("No messages");
         }
         format!(

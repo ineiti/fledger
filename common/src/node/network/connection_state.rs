@@ -61,8 +61,8 @@ impl CSDir {
             CSDir::Outgoing => (id_local, id_remote),
         };
         PeerInfo {
-            id_init: id_init.clone(),
-            id_follow: id_follow.clone(),
+            id_init: *id_init,
+            id_follow: *id_follow,
             message,
         }
     }
@@ -323,7 +323,7 @@ impl ConnectionState {
                     .expect("Getting connection")
                     .web_rtc_setup(msg);
                 // This is not really necessary, but speeds up the time for the connection
-                if let Err(_) = broker.process() {
+                if broker.process().is_err() {
                     warn!("Couldn't lock process");
                 }
             }))
@@ -388,7 +388,7 @@ impl Connection {
             WebRTCSetupCBMessage::Connection(conn) => {
                 info!("Connected {:?}", self.direction);
                 let mut broker = self.broker.clone();
-                let id = self.id_remote.clone();
+                let id = self.id_remote;
                 conn.set_cb_message(Box::new(move |msg| {
                     if let Ok(msg) = serde_json::from_str(&msg) {
                         if let Err(e) =
@@ -420,7 +420,7 @@ impl Connection {
 
     fn get_ncs(&self, stat: Option<ConnectionStateMap>) -> NetworkConnectionState {
         NetworkConnectionState {
-            id: self.id_remote.clone(),
+            id: self.id_remote,
             dir: self.direction.get_conn_state(),
             c: self.state.clone(),
             s: stat.map(|s| ConnStats {
@@ -444,6 +444,6 @@ impl Connection {
                 }
             }
         }
-        return false;
+        false
     }
 }

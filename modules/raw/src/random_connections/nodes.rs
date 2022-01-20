@@ -18,7 +18,7 @@ impl Nodes {
 
     pub fn get_nodes(&self) -> NodeIDs {
         NodeIDs {
-            0: self.0.iter().map(|n| n.id.clone()).collect(),
+            0: self.0.iter().map(|n| n.id).collect(),
         }
     }
 

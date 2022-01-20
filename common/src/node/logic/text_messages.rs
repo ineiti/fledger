@@ -21,7 +21,7 @@ impl TextMessagesStorage {
     }
 
     pub fn load(&mut self, data: &str) -> Result<(), TMError> {
-        if data.len() > 0 {
+        if !data.is_empty() {
             let msg_vec: Vec<TextMessage> = serde_json::from_str(data)?;
             self.storage.clear();
             for msg in msg_vec {
@@ -35,7 +35,7 @@ impl TextMessagesStorage {
 
     pub fn save(&self) -> Result<String, TMError> {
         let msg_vec: Vec<TextMessage> = self.storage.iter().map(|(_k, v)| v).cloned().collect();
-        Ok(serde_json::to_string(&msg_vec)?.into())
+        Ok(serde_json::to_string(&msg_vec)?)
     }
 
     // Limit the number of messages to MESSAGE_MAXIMUM,
@@ -56,6 +56,12 @@ impl TextMessagesStorage {
         } else {
             vec![]
         }
+    }
+}
+
+impl Default for TextMessagesStorage {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -32,6 +32,7 @@ pub enum ModulesMessage {
     Random(RandomMessage),
 }
 
+#[allow(clippy::large_enum_variant)] 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerMessage {
     Network(BrokerNetwork),
@@ -59,6 +60,7 @@ impl std::fmt::Display for BrokerMessage {
     }
 }
 
+#[allow(clippy::large_enum_variant)] 
 #[derive(Debug, Clone)]
 pub enum BInput {
     BM(BrokerMessage),
@@ -76,6 +78,7 @@ pub struct Broker {
     intern_tx: Sender<BInput>,
 }
 
+#[allow(clippy::all)] 
 unsafe impl Send for Broker {}
 
 impl Default for Broker {
@@ -242,10 +245,10 @@ impl Subsystem {
         }
     }
 
-    fn put_messages(&mut self, msgs: &Vec<BInput>) -> Vec<BInput> {
+    fn put_messages(&mut self, msgs: &[BInput]) -> Vec<BInput> {
         match self {
             Self::Tap(s) => {
-                msgs.into_iter().for_each(|msg| {
+                msgs.iter().for_each(|msg| {
                     s.send(msg.clone())
                         .map_err(|e| log::error!("While sending: {}", e))
                         .unwrap_or(())
@@ -257,7 +260,7 @@ impl Subsystem {
             // This might be helpful:
             // https://users.rust-lang.org/t/casting-traitobject-to-super-trait/33524/11
             Self::InitHandler(h) => h.messages(
-                msgs.into_iter()
+                msgs.iter()
                     .filter_map(|msg| match msg {
                         BInput::BM(bm) => Some(bm),
                         _ => None,
@@ -265,7 +268,7 @@ impl Subsystem {
                     .collect(),
             ),
             Self::Handler(h) => h.messages(
-                msgs.into_iter()
+                msgs.iter()
                     .filter_map(|msg| match msg {
                         BInput::BM(bm) => Some(bm),
                         _ => None,
@@ -289,12 +292,12 @@ mod tests {
         MsgB,
     }
 
-    pub struct TPS {
+    pub struct Tps {
         init_msgs: Vec<BInput>,
         reply: Vec<(BrokerMessage, BrokerMessage)>,
     }
 
-    impl SubsystemInit for TPS {
+    impl SubsystemInit for Tps {
         fn init(&mut self, to_broker: Sender<BInput>) {
             for msg in self.init_msgs.iter() {
                 to_broker.send(msg.clone()).unwrap();
@@ -302,7 +305,7 @@ mod tests {
         }
     }
 
-    impl SubsystemListener for TPS {
+    impl SubsystemListener for Tps {
         fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BInput> {
             let mut output = vec![];
             log::debug!("Msgs are: {:?} - Replies are: {:?}", msgs, self.reply);
@@ -328,7 +331,7 @@ mod tests {
         let broker = &mut Broker::new();
         // Add a first subsystem that will reply 'msg_b' when it
         // receives 'msg_a'.
-        broker.add_subsystem(Subsystem::InitHandler(Box::new(TPS {
+        broker.add_subsystem(Subsystem::InitHandler(Box::new(Tps {
             init_msgs: vec![],
             reply: vec![(bm_a.clone(), bm_b.clone())],
         })))?;
@@ -337,23 +340,23 @@ mod tests {
 
         // Shouldn't reply to a msg_b, so only 1 message.
         broker.emit(vec![BInput::BM(bm_b.clone())])?;
-        assert_eq!(tap.try_iter().collect::<Vec<BInput>>().len(), 1);
+        assert_eq!(tap.try_iter().count(), 1);
 
         // Should reply to msg_a, so the tap should have 2 messages - the original
         // and the reply.
         broker.emit(vec![BInput::BM(bm_a.clone())])?;
         broker.process()?;
-        assert_eq!(tap.try_iter().collect::<Vec<BInput>>().len(), 2);
+        assert_eq!(tap.try_iter().count(), 2);
 
         // Add the same subsystem, now it should get 3 messages - the original
         // and two replies.
-        broker.add_subsystem(Subsystem::InitHandler(Box::new(TPS {
+        broker.add_subsystem(Subsystem::InitHandler(Box::new(Tps {
             init_msgs: vec![],
-            reply: vec![(bm_a.clone(), bm_b.clone())],
+            reply: vec![(bm_a.clone(), bm_b)],
         })))?;
-        broker.emit(vec![BInput::BM(bm_a.clone())])?;
+        broker.emit(vec![BInput::BM(bm_a)])?;
         broker.process()?;
-        assert_eq!(tap.try_iter().collect::<Vec<BInput>>().len(), 3);
+        assert_eq!(tap.try_iter().count(), 3);
 
         Ok(())
     }

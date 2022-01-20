@@ -125,7 +125,7 @@ impl Module {
             .0
             .iter()
             .filter(|&&id| id != src)
-            .map(|id| MessageOut::Node(id.clone(), MessageNode::Messages(vec![msg.clone()])))
+            .map(|id| MessageOut::Node(*id, MessageNode::Messages(vec![msg.clone()])))
             .collect()
     }
 
@@ -154,7 +154,7 @@ impl Module {
     /// discarded over time.
     pub fn node_known_msg_ids(&mut self, src: NodeID, ids: Vec<U256>) -> Vec<MessageOut> {
         let unknown_ids = self.filter_known_messages(ids);
-        if unknown_ids.len() > 0 {
+        if !unknown_ids.is_empty() {
             return vec![MessageOut::Node(
                 src,
                 MessageNode::RequestMessages(unknown_ids),
@@ -181,7 +181,7 @@ impl Module {
             .filter(|msg| ids.contains(&msg.id()))
             .cloned()
             .collect();
-        if msgs.len() > 0 {
+        if !msgs.is_empty() {
             vec![MessageOut::Node(src, MessageNode::Messages(msgs))]
         } else {
             vec![]
@@ -200,7 +200,7 @@ impl Module {
     pub fn filter_known_messages(&self, msgids: Vec<U256>) -> Vec<U256> {
         msgids
             .iter()
-            .filter(|id| self.storage.contains(&id))
+            .filter(|id| self.storage.contains(id))
             .cloned()
             .collect()
     }
@@ -228,7 +228,7 @@ impl Module {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
     use core::fmt::Error;
 
     #[test]

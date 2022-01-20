@@ -76,18 +76,15 @@ impl WebSocketDummy {
         let msgs: Vec<Message> = self.msg_queue.borrow_mut().drain(..).collect();
         let msgs_count = msgs.len();
         msgs.iter()
-            .for_each(|msg| match WebSocketMessage::from_str(&msg.str) {
-                Ok(wsm) => match wsm.msg {
-                    WSSignalMessage::PeerSetup(_) => {
-                        if self.callbacks.len() == 2 {
-                            if let Err(e) = self.send_message(1 - msg.id as usize, msg.str.clone())
-                            {
-                                error!("couldn't push message: {}", e);
-                            }
+            .for_each(|msg| match msg.str.parse::<WebSocketMessage>() {
+                Ok(wsm) => {
+                    if matches!(wsm.msg, WSSignalMessage::PeerSetup(_)) && self.callbacks.len() == 2
+                    {
+                        if let Err(e) = self.send_message(1 - msg.id as usize, msg.str.clone()) {
+                            error!("couldn't push message: {}", e);
                         }
                     }
-                    _ => {}
-                },
+                }
                 Err(e) => info!("Error while getting message: {}", e),
             });
         msgs_count
@@ -132,7 +129,7 @@ impl WebSocketConnection for WebSocketConnectionDummy {
         let queue = Rc::clone(&self.msg_queue);
         queue.borrow_mut().push(Message {
             id: self.id,
-            str: msg.clone(),
+            str: msg,
         });
         Ok(())
     }
@@ -146,10 +143,10 @@ pub struct DataStorageDummyBase {}
 
 impl DataStorageBase for DataStorageDummyBase {
     fn get(&self, _: &str) -> Box<dyn DataStorage> {
-        Box::new(DataStorageDummy{})
+        Box::new(DataStorageDummy {})
     }
     fn clone(&self) -> Box<dyn DataStorageBase> {
-        Box::new(DataStorageDummyBase{})
+        Box::new(DataStorageDummyBase {})
     }
 }
 
@@ -183,8 +180,8 @@ async fn set_callback(
     ice: &Arc<Mutex<Vec<String>>>,
     conn: &Arc<Mutex<Option<Box<dyn WebRTCConnection>>>>,
 ) {
-    let icec = Arc::clone(&ice);
-    let connc = Arc::clone(&conn);
+    let icec = Arc::clone(ice);
+    let connc = Arc::clone(conn);
     webrtc
         .set_callback(Box::new(move |msg| {
             info!("dbg: Got message: {:?}", &msg);
@@ -204,7 +201,7 @@ enum CombinedError {
     #[error(transparent)]
     Node(#[from] NodeError),
     #[error(transparent)]
-    WSD(#[from] WSDError),
+    Wsd(#[from] WSDError),
 }
 
 async fn connect_test_base() -> Result<(), CombinedError> {
@@ -212,13 +209,13 @@ async fn connect_test_base() -> Result<(), CombinedError> {
     // First node
     let ice1 = Arc::new(Mutex::new(vec![]));
     let conn1 = Arc::new(Mutex::new(None));
-    let mut webrtc1 = WebRTCConnectionSetupWasm::new(WebRTCConnectionState::Initializer)?;
+    let mut webrtc1 = WebRTCConnectionSetupWasm::new_box(WebRTCConnectionState::Initializer)?;
     set_callback(&mut webrtc1, &ice1, &conn1).await;
 
     // Second node
     let ice2 = Arc::new(Mutex::new(vec![]));
     let conn2 = Arc::new(Mutex::new(None));
-    let mut webrtc2 = WebRTCConnectionSetupWasm::new(WebRTCConnectionState::Follower)?;
+    let mut webrtc2 = WebRTCConnectionSetupWasm::new_box(WebRTCConnectionState::Follower)?;
     set_callback(&mut webrtc2, &ice2, &conn2).await;
 
     // Exchange messages
@@ -283,13 +280,13 @@ async fn connect_test_simple() -> Result<(), CombinedError> {
     let mut ws_conn = WebSocketDummy::new();
 
     // First node
-    let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
+    let rtc_spawner = Box::new(WebRTCConnectionSetupWasm::new_box);
     let my_storage = Box::new(DataStorageDummyBase {});
     let ws = Box::new(ws_conn.get_connection()?);
     let mut node1 = Node::new(my_storage, "test", ws, rtc_spawner)?;
 
     // Second node
-    let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
+    let rtc_spawner = Box::new(WebRTCConnectionSetupWasm::new_box);
     let my_storage = Box::new(DataStorageDummyBase {});
     let ws = Box::new(ws_conn.get_connection()?);
     let mut node2 = Node::new(my_storage, "test", ws, rtc_spawner)?;
@@ -304,7 +301,7 @@ async fn connect_test_simple() -> Result<(), CombinedError> {
         node1.process().await?;
         node2.process().await?;
 
-        i = i + 1;
+        i += 1;
         ws_conn.run_queue();
         // if ws_conn.run_queue()? == 0 {
         //     break;

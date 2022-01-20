@@ -52,6 +52,7 @@ pub enum NetworkError {
     Broker(#[from] BrokerError),
 }
 
+#[derive(Default)]
 pub struct NetworkState {
     pub list: Vec<NodeInfo>,
 }
@@ -68,7 +69,7 @@ pub struct Network {
 }
 
 impl Network {
-    pub fn new(
+    pub fn start(
         node_data: Arc<Mutex<NodeData>>,
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
@@ -137,7 +138,7 @@ impl Inner {
                 if let Err(e) = ws_tx.send(msg) {
                     warn!("Couldn't send msg over ws-channel: {}", e);
                 }
-                if let Err(_) = broker_clone.process() {
+                if broker_clone.process().is_err() {
                     warn!("Couldn't process broker");
                 }
             }));
@@ -158,12 +159,9 @@ impl Inner {
     async fn process_websocket(&mut self) -> Result<usize, NetworkError> {
         let msgs: Vec<WSMessage> = self.ws_rx.try_iter().collect();
         for msg in &msgs {
-            match msg {
-                WSMessage::MessageString(s) => {
-                    self.process_msg(WebSocketMessage::from_str(&s)?.msg)
-                        .await?;
-                }
-                _ => {}
+            if let WSMessage::MessageString(s) = msg {
+                self.process_msg(s.parse::<WebSocketMessage>()?.msg)
+                    .await?;
             }
         }
         Ok(msgs.len())
@@ -246,12 +244,11 @@ impl Inner {
             .filter(|entry| entry.get_id() != self.node_config.our_node.get_id())
             .cloned()
             .collect();
-        let res = self
+        self
             .broker
             .emit_bm(BrokerMessage::Network(BrokerNetwork::UpdateList(list)))
             .map(|_| ())
-            .map_err(|_| NetworkError::OutputQueue);
-        res
+            .map_err(|_| NetworkError::OutputQueue)
     }
 
     fn ws_send(&mut self, msg: WSSignalMessage) -> Result<(), NetworkError> {
@@ -270,16 +267,22 @@ impl Inner {
     }
 
     /// Connect to the given node.
-    async fn connect(&mut self, dst: &U256) -> Result<(), NetworkError>{
+    async fn connect(&mut self, dst: &U256) -> Result<(), NetworkError> {
         self.get_connection(dst).await?;
-        self.broker.emit_bm(BrokerMessage::Network(BrokerNetwork::Connected(dst.clone())))?;
+        self.broker
+            .emit_bm(BrokerMessage::Network(BrokerNetwork::Connected(
+                *dst,
+            )))?;
         Ok(())
     }
 
     /// Disconnects from a given node.
     async fn disconnect(&mut self, dst: &U256) -> Result<(), NetworkError> {
         // TODO: Actually disconnect and listen for nodes that have been disconnected due to timeouts.
-        self.broker.emit_bm(BrokerMessage::Network(BrokerNetwork::Disconnected(dst.clone())))?;
+        self.broker
+            .emit_bm(BrokerMessage::Network(BrokerNetwork::Disconnected(
+                *dst,
+            )))?;
         Ok(())
     }
 
@@ -289,22 +292,23 @@ impl Inner {
     async fn get_connection(&mut self, id: &U256) -> Result<&mut NodeConnection, NetworkError> {
         if !self.connections.contains_key(id) {
             self.connections.insert(
-                id.clone(),
+                *id,
                 NodeConnection::new(
                     Arc::clone(&self.web_rtc),
                     self.broker.clone(),
                     self.node_config.our_node.get_id(),
-                    id.clone(),
+                    *id,
                 )
                 .await?,
             );
         }
         self.connections
-            .get_mut(&id)
+            .get_mut(id)
             .ok_or(NetworkError::ConnectionMissing)
     }
 }
 
+#[allow(clippy::large_enum_variant)] 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerNetwork {
     WebRTC(U256, String),

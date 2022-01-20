@@ -12,6 +12,8 @@
 ### Things to do
 
 - write tests
+  - test if full connectivity is given
+  - test if messages get correctly gossipped
 - Create a nicer display of the chat, perhaps with markdown display of messages
 
 # Dates

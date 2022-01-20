@@ -91,7 +91,7 @@ impl Module {
     pub fn new_connection(&mut self, node: &NodeID) -> Vec<MessageOut> {
         if self.nodes_connecting.contains(node) {
             self.nodes_connecting.0.retain(|nt| nt.id != *node);
-            self.nodes_connected.add_new(vec![node.clone()]);
+            self.nodes_connected.add_new(vec![*node]);
         }
 
         let mut disconnect = NodeIDs::empty();
@@ -162,13 +162,13 @@ impl Module {
         disconnect: Option<NodeIDs>,
     ) -> Vec<MessageOut> {
         connect
-            .unwrap_or(NodeIDs::empty())
+            .unwrap_or_else(NodeIDs::empty)
             .0
             .iter()
             .map(|node| MessageOut::ConnectNode(*node))
             .chain(
                 disconnect
-                    .unwrap_or(NodeIDs::empty())
+                    .unwrap_or_else(NodeIDs::empty)
                     .0
                     .iter()
                     .map(|node| MessageOut::DisconnectNode(*node)),

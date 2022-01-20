@@ -78,7 +78,7 @@ enum StartError {
 }
 
 async fn start(url: &str) -> Result<Node, StartError> {
-    let rtc_spawner = Box::new(|cs| WebRTCConnectionSetupWasm::new(cs));
+    let rtc_spawner = Box::new(WebRTCConnectionSetupWasm::new_box);
     let my_storage = Box::new(DummyDSB {});
     let ws = WebSocketWasm::new(url)?;
     Ok(Node::new(my_storage, "node", Box::new(ws), rtc_spawner)?)
@@ -124,7 +124,7 @@ pub async fn run_app() {
     info!("Started successfully");
     let mut i: i32 = 0;
     loop {
-        i = i + 1;
+        i += 1;
 
         if i % 3 == 2 {
             info!("Waiting");

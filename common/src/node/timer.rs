@@ -38,7 +38,7 @@ where
 }
 
 impl Timer {
-    pub fn new(broker: Broker) {
+    pub fn start(broker: Broker) {
         let mut timer_struct = Timer { seconds: 0, broker };
         schedule_repeating(move || timer_struct.process());
     }
@@ -58,6 +58,6 @@ impl Timer {
             self.emit(BrokerTimer::Minute);
             self.seconds = 60;
         }
-        self.seconds = self.seconds - 1;
+        self.seconds -= 1;
     }
 }

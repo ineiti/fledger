@@ -53,6 +53,12 @@ impl NDStats {
     }
 }
 
+impl Default for NDStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct StatNode {
     pub node_info: Option<NodeInfo>,
@@ -87,7 +93,7 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new(node_data: Arc<Mutex<NodeData>>) {
+    pub fn start(node_data: Arc<Mutex<NodeData>>) {
         let (node_config, mut broker) = {
             let nd = node_data.lock().unwrap();
             (nd.node_config.clone(), nd.broker.clone())
@@ -121,7 +127,7 @@ impl Stats {
             self.ping_all()?;
             self.ping_all_counter = 5;
         }
-        self.ping_all_counter = self.ping_all_counter - 1;
+        self.ping_all_counter -= 1;
         Ok(())
     }
 
@@ -141,7 +147,7 @@ impl Stats {
         let expired: Vec<U256> = nodes
             .iter()
             .filter(|(_k, v)| self.last_stats - v.last_contact > stats_ignore)
-            .map(|(k, _v)| k.clone())
+            .map(|(k, _v)| *k)
             .collect();
         for k in expired {
             nodes.remove(&k);
@@ -157,7 +163,7 @@ impl Stats {
             // Ignore our node and nodes that are inactive
             .filter(|(&k, _v)| k != our_id)
             .map(|(k, v)| NodeStat {
-                id: k.clone(),
+                id: *k,
                 version: VERSION_STRING.to_string(),
                 ping_ms: 0u32,
                 ping_rx: v.ping_rx,
@@ -169,9 +175,9 @@ impl Stats {
     fn upsert(&mut self, ncs: &NetworkConnectionState) -> Result<(), SNError> {
         let mut nodes = self.get_stats_nodes();
         nodes
-            .entry(ncs.id.clone())
+            .entry(ncs.id)
             .or_insert_with(|| StatNode::new(None, now()));
-        nodes.entry(ncs.id.clone()).and_modify(|s| {
+        nodes.entry(ncs.id).and_modify(|s| {
             let cs = ConnState::from_states(ncs.c.clone(), ncs.s.clone());
             if ncs.dir == WebRTCConnectionState::Initializer {
                 s.outgoing = cs;
@@ -184,11 +190,11 @@ impl Stats {
     }
 
     /// Update a NodeInfo
-    fn update_list(&mut self, nul: &Vec<NodeInfo>) -> Result<(), SNError> {
+    fn update_list(&mut self, nul: &[NodeInfo]) -> Result<(), SNError> {
         let mut nodes = self.get_stats_nodes();
         for ni in nul {
             let s = nodes
-                .entry(ni.get_id().clone())
+                .entry(ni.get_id())
                 .or_insert_with(|| StatNode::new(None, now()));
             s.node_info = Some(ni.clone());
         }
@@ -227,9 +233,9 @@ impl Stats {
         let from = nm.id;
         let mut nodes = self.get_stats_nodes();
         nodes
-            .entry(from.clone())
+            .entry(from)
             .or_insert_with(|| StatNode::new(None, now()));
-        nodes.entry(from.clone()).and_modify(|s| {
+        nodes.entry(from).and_modify(|s| {
             s.last_contact = now();
             s.ping_rx += 1;
         });

@@ -71,12 +71,10 @@ impl NodeConnection {
         let conn_result = {
             if self.outgoing.get_connection_open().await? {
                 Some(&mut self.outgoing)
+            } else if self.incoming.get_connection_open().await? {
+                Some(&mut self.incoming)
             } else {
-                if self.incoming.get_connection_open().await? {
-                    Some(&mut self.incoming)
-                } else {
-                    None
-                }
+                None
             }
         };
         match conn_result {

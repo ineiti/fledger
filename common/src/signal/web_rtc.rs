@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{fmt::{self, Display}, str::FromStr};
 use thiserror::Error;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
 
@@ -171,7 +171,7 @@ impl PeerInfo {
         if self.id_follow == *local {
             return Some(self.id_init);
         }
-        return None;
+        None
     }
 }
 
@@ -180,13 +180,16 @@ pub struct WebSocketMessage {
     pub msg: WSSignalMessage,
 }
 
-impl WebSocketMessage {
-    pub fn from_str(s: &str) -> Result<WebSocketMessage, serde_json::Error> {
+impl FromStr for WebSocketMessage {
+    type Err = serde_json::Error;
+    fn from_str(s: &str) -> Result<WebSocketMessage, serde_json::Error> {
         serde_json::from_str(s)
     }
+}
 
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
+impl Display for WebSocketMessage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", serde_json::to_string(self).unwrap())
     }
 }
 
@@ -200,6 +203,7 @@ impl WebSocketMessage {
 /// server will send a 'PeerReply' to the corresponding node, which will continue
 /// the protocol by sending its own PeerRequest.
 /// - Done is a standard message that can be sent back to indicate all is well.
+#[allow(clippy::large_enum_variant)] 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub enum WSSignalMessage {
     Challenge(u64, U256),

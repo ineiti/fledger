@@ -28,7 +28,7 @@ impl DataStorage for LocalStorage {
             .unwrap()
             .get(&key_entry)
             .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))?
-            .unwrap_or("".to_string()))
+            .unwrap_or_else(|| "".to_string()))
     }
 
     fn set(&mut self, key: &str, value: &str) -> Result<(), StorageError> {

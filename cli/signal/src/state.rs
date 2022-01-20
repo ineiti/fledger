@@ -41,7 +41,7 @@ impl ServerState {
     /// Treats new connections from websockets.
     fn cb_connection(int: Arc<Mutex<Internal>>, mut conn: Box<dyn WebSocketConnectionSend + Send>) {
         let challenge = U256::rnd();
-        let ch_cl = challenge.clone();
+        let ch_cl = challenge;
         let int_clone = Arc::clone(&int);
         let (tx, rx) = channel::<WSMessage>();
         conn.set_cb_wsmessage(Box::new(move |cb| {
@@ -62,7 +62,7 @@ impl ServerState {
         if let Ok(mut int_lock) = int.try_lock() {
             int_lock
                 .nodes
-                .insert(challenge.clone(), NodeEntry::new(challenge, conn));
+                .insert(challenge, NodeEntry::new(challenge, conn));
         }
     }
 

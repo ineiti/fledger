@@ -22,7 +22,7 @@ impl WebSocketWasm {
         let ws = WebSocket::new(addr).map_err(|e| WSError::Underlying(format!("{:?}", e)))?;
         let mut wsw = WebSocketWasm {
             cb: Rc::new(RefCell::new(None)),
-            ws: ws.clone(),
+            ws,
             addr: addr.to_string(),
         };
         wsw.attach_callbacks();

@@ -22,5 +22,5 @@ pub fn block_on<F: Future<Output = ()>>(f: F) {
 }
 
 pub fn type_to_string<T>(_: &T) -> String {
-    format!("{}", std::any::type_name::<T>())
+    std::any::type_name::<T>().to_string()
 }

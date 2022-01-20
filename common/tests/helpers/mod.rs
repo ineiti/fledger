@@ -118,8 +118,8 @@ impl Node {
         for msg in self.rcv.try_iter() {
             broker.enqueue_bm(BrokerMessage::Network(msg));
         }
-        if let Err(e) = broker.process() {
-            log::error!("While processing: {}", e);
+        if broker.process().is_err() {
+            log::error!("Couldn't process");
         }
     }
 }
