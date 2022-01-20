@@ -6,10 +6,8 @@ fn connect_nodes() {
     let _ = env_logger::init();
 
     let mut net = Network::new();
-    net.add_nodes(3);
-    net.tick();
-    net.tick();
-    net.tick();
-    net.tick();
-    net.tick();
+    log::info!("Creating nodes");
+    net.add_nodes(1000);
+    log::info!("Processing 5 times");
+    net.process(5);
 }
