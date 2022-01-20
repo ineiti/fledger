@@ -17,7 +17,7 @@ use std::{
 use types::{data_storage::TempDSB, nodeids::U256};
 
 pub struct Network {
-    nodes: HashMap<U256, Node>,
+    pub nodes: HashMap<U256, Node>,
     node_inputs: HashMap<U256, Sender<BrokerNetwork>>,
     node_outputs: HashMap<U256, Receiver<BrokerNetwork>>,
 }
@@ -95,7 +95,7 @@ impl Network {
 }
 
 pub struct Node {
-    node_data: Arc<Mutex<NodeData>>,
+    pub node_data: Arc<Mutex<NodeData>>,
     rcv: Receiver<BrokerNetwork>,
 }
 
