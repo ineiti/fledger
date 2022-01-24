@@ -74,7 +74,9 @@ impl Network {
     /// Then it calls `tick` on all nodes.
     pub fn process(&mut self, nbr: usize) {
         for i in 0..nbr {
-            log::info!("Processing {}/{}", i + 1, nbr);
+            if nbr > 1 {
+                log::info!("Processing {}/{}", i + 1, nbr);
+            }
             self.process_one();
         }
     }

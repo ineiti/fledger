@@ -67,37 +67,24 @@ impl GossipChat {
         .unwrap();
     }
 
-    // Converts a BrokerMessage to an Option<MessageIn>
+    // Searches for a matching NodeMessageIn or a RandomMessage that needs conversion.
     fn process_msg_bm(&self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
-        if let Ok(mut nd) = self.node_data.try_lock() {
-            match msg {
-                BrokerMessage::Network(BrokerNetwork::NodeMessageIn(nm)) => match &nm.msg {
-                    Message::V1(MessageV1::GossipChat(gc)) => {
-                        Some(MessageIn::Node(nm.id, gc.clone()))
-                    }
-                    _ => None,
-                },
-                BrokerMessage::Modules(ModulesMessage::Random(RandomMessage::MessageOut(
-                    msg_rnd,
-                ))) => {
-                    if let raw::random_connections::MessageOut::ListUpdate(ids) = msg_rnd {
-                        Some(MessageIn::NodeList(ids.clone()))
-                    } else {
-                        None
-                    }
-                }
+        match msg {
+            BrokerMessage::Network(BrokerNetwork::NodeMessageIn(nm)) => match &nm.msg {
+                Message::V1(MessageV1::GossipChat(gc)) => Some(MessageIn::Node(nm.id, gc.clone())),
                 _ => None,
+            },
+            BrokerMessage::Modules(ModulesMessage::Random(RandomMessage::MessageOut(msg_rnd))) => {
+                if let raw::random_connections::MessageOut::ListUpdate(ids) = msg_rnd {
+                    Some(MessageIn::NodeList(ids.clone()))
+                } else {
+                    None
+                }
             }
-            .and_then(|msg| nd.gossip_chat.process_message(msg).ok())
-            .map(|msgs| {
-                msgs.iter()
-                    .flat_map(|msg| self.process_msg_out(msg))
-                    .collect()
-            })
-            .unwrap_or_default()
-        } else {
-            vec![]
+            _ => None,
         }
+        .map(|msg| self.process_msg_in(&msg))
+        .unwrap_or_default()
     }
 
     fn process_msg_in(&self, msg: &MessageIn) -> Vec<BrokerMessage> {
@@ -105,47 +92,37 @@ impl GossipChat {
             if let Ok(msgs) = nd.gossip_chat.process_message(msg.clone()) {
                 return msgs
                     .iter()
-                    .map(|msg| {
-                        BrokerMessage::Modules(ModulesMessage::Gossip(GossipMessage::MessageOut(
-                            msg.clone(),
-                        )))
+                    .map(|msg| match msg {
+                        MessageOut::Node(id, nm) => {
+                            BrokerMessage::Network(BrokerNetwork::NodeMessageOut(NodeMessage {
+                                id: *id,
+                                msg: Message::V1(MessageV1::GossipChat(nm.clone())),
+                            }))
+                        }
+                        _ => BrokerMessage::Modules(ModulesMessage::Gossip(
+                            GossipMessage::MessageOut(msg.clone()),
+                        )),
                     })
                     .collect();
             }
         }
         vec![]
     }
-
-    fn process_msg_out(&self, msg: &MessageOut) -> Vec<BrokerMessage> {
-        match msg {
-            MessageOut::Node(id, nm) => vec![BrokerMessage::Network(BrokerNetwork::NodeMessageOut(
-                NodeMessage {
-                    id: *id,
-                    msg: Message::V1(MessageV1::GossipChat(nm.clone())),
-                },
-            ))],
-            _ => vec![],
-        }
-    }
-
-    fn process_msg(&self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
-        match msg {
-            BrokerMessage::Modules(ModulesMessage::Gossip(msg)) => match msg {
-                GossipMessage::MessageIn(msg) => self.process_msg_in(msg),
-                GossipMessage::MessageOut(_) => {
-                    log::warn!("This should never receive a MessageOut");
-                    vec![]
-                }
-            },
-            _ => self.process_msg_bm(msg),
-        }
-    }
 }
 
 impl SubsystemListener for GossipChat {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BInput> {
         msgs.iter()
-            .flat_map(|msg| self.process_msg(msg))
+            .flat_map(|msg| {
+                if let BrokerMessage::Modules(ModulesMessage::Gossip(GossipMessage::MessageIn(
+                    msg_in,
+                ))) = msg
+                {
+                    self.process_msg_in(msg_in)
+                } else {
+                    self.process_msg_bm(msg)
+                }
+            })
             .map(BInput::BM)
             .collect()
     }

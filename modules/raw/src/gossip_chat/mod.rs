@@ -110,7 +110,7 @@ impl Module {
     pub fn add_message(&mut self, msg: TextMessage) -> Vec<MessageOut> {
         self.add_messages(vec![msg])
             .iter()
-            .flat_map(|msg| self.send_message(msg.src, msg))
+            .flat_map(|msg| self.send_message(self.cfg.our_id, msg))
             .collect()
     }
 
@@ -124,7 +124,7 @@ impl Module {
         self.nodes
             .0
             .iter()
-            .filter(|&&id| id != src)
+            .filter(|&&id| id != src && id != msg.src && id != self.cfg.our_id)
             .map(|id| MessageOut::Node(*id, MessageNode::Messages(vec![msg.clone()])))
             .collect()
     }
