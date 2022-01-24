@@ -1,4 +1,4 @@
-use crate::broker::{BInput, Subsystem, SubsystemListener};
+use crate::broker::{Subsystem, SubsystemListener};
 use crate::node::logic::messages::{Message, MessageV1};
 use crate::node::logic::text_messages::TextMessagesStorage;
 use crate::node::NodeData;
@@ -75,11 +75,7 @@ impl GossipChat {
                 _ => None,
             },
             BrokerMessage::Modules(ModulesMessage::Random(RandomMessage::MessageOut(msg_rnd))) => {
-                if let raw::random_connections::MessageOut::ListUpdate(ids) = msg_rnd {
-                    Some(MessageIn::NodeList(ids.clone()))
-                } else {
-                    None
-                }
+                msg_rnd.clone().into()
             }
             _ => None,
         }
@@ -111,7 +107,7 @@ impl GossipChat {
 }
 
 impl SubsystemListener for GossipChat {
-    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BInput> {
+    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         msgs.iter()
             .flat_map(|msg| {
                 if let BrokerMessage::Modules(ModulesMessage::Gossip(GossipMessage::MessageIn(
@@ -123,7 +119,6 @@ impl SubsystemListener for GossipChat {
                     self.process_msg_bm(msg)
                 }
             })
-            .map(BInput::BM)
             .collect()
     }
 }

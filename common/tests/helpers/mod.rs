@@ -1,5 +1,5 @@
 use common::{
-    broker::{BInput, BrokerMessage, Subsystem, SubsystemListener},
+    broker::{BrokerMessage, Subsystem, SubsystemListener},
     node::{
         config::{NodeConfig, NodeInfo},
         logic::messages::NodeMessage,
@@ -186,13 +186,12 @@ impl WebRTC {
 }
 
 impl SubsystemListener for WebRTC {
-    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BInput> {
+    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         msgs.iter()
             .filter_map(|&msg| match msg {
                 BrokerMessage::Network(bn) => self.msg_outgoing_network(bn),
                 _ => None,
             })
-            .map(BInput::BM)
             .collect()
     }
 }

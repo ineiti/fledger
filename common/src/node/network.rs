@@ -11,7 +11,7 @@ use thiserror::Error;
 
 use self::connection_state::CSEnum;
 use crate::{
-    broker::{BInput, Broker, BrokerError, BrokerMessage, SubsystemListener},
+    broker::{Broker, BrokerError, BrokerMessage, SubsystemListener},
     node::{
         config::{NodeConfig, NodeInfo},
         node_data::NodeData,
@@ -88,7 +88,7 @@ impl Network {
 }
 
 impl SubsystemListener for Network {
-    fn messages(&mut self, bms: Vec<&BrokerMessage>) -> Vec<BInput> {
+    fn messages(&mut self, bms: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         let inner_cl = Arc::clone(&self.inner);
         for bm in bms.iter().map(|&b| b.clone()) {
             self.broker_tx.send(bm).expect("Send broker message");

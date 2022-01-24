@@ -1,4 +1,4 @@
-use crate::broker::{BInput, Broker, BrokerMessage};
+use crate::broker::{Broker, BrokerMessage};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerTimer {
@@ -46,7 +46,7 @@ impl Timer {
     fn emit(&mut self, msg: BrokerTimer) {
         if let Err(e) = self
             .broker
-            .emit(vec![BInput::BM(BrokerMessage::Timer(msg.clone()))])
+            .emit(vec![BrokerMessage::Timer(msg.clone())])
         {
             log::warn!("While emitting {:?}, got error: {:?}", msg, e);
         }

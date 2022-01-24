@@ -13,7 +13,7 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    broker::{BInput, BrokerError, BrokerMessage, SubsystemListener},
+    broker::{BrokerError, BrokerMessage, SubsystemListener},
     node::{
         config::{NodeConfig, NodeInfo},
         logic::messages::{Message, MessageV1},
@@ -87,7 +87,7 @@ impl StatNode {
 pub struct Stats {
     node_data: Arc<Mutex<NodeData>>,
     node_config: NodeConfig,
-    broker_tx: Sender<BInput>,
+    broker_tx: Sender<BrokerMessage>,
     last_stats: f64,
     ping_all_counter: u32,
 }
@@ -118,9 +118,9 @@ impl Stats {
             let stats: Vec<NodeStat> = self.collect();
 
             self.broker_tx
-                .send(BInput::BM(BrokerMessage::Network(
+                .send(BrokerMessage::Network(
                     BrokerNetwork::SendStats(stats),
-                )))
+                ))
                 .map_err(|_| SNError::OutputQueue)?;
         }
         if self.ping_all_counter == 0 {
@@ -210,12 +210,12 @@ impl Stats {
             if let Some(ni) = stat.1.node_info.as_ref() {
                 if our_id != ni.get_id() {
                     self.broker_tx
-                        .send(BInput::BM(BrokerMessage::Network(
+                        .send(BrokerMessage::Network(
                             BrokerNetwork::NodeMessageOut(NodeMessage {
                                 id: ni.get_id(),
                                 msg: Message::V1(MessageV1::Ping()),
                             }),
-                        )))
+                        ))
                         .map_err(|_| SNError::OutputQueue)?;
                     stat.1.ping_tx += 1;
                 }
@@ -255,7 +255,7 @@ impl Stats {
 }
 
 impl SubsystemListener for Stats {
-    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BInput> {
+    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         for msg in msgs {
             if let Err(e) = match msg {
                 BrokerMessage::Network(BrokerNetwork::ConnectionState(cs)) => self.upsert(cs),

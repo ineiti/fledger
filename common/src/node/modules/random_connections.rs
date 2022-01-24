@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use types::nodeids::U256;
 
-use crate::broker::{BInput, Subsystem, SubsystemListener};
+use crate::broker::{Subsystem, SubsystemListener};
 use crate::node::network::BrokerNetwork;
 use crate::node::NodeData;
 use crate::node::{BrokerMessage, ModulesMessage};
@@ -41,78 +41,65 @@ impl RandomConnections {
         .unwrap();
     }
 
-    fn process_msg_bm(&self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
-        if let Ok(mut nd) = self.node_data.try_lock() {
-            return match msg {
-                BrokerMessage::Network(bmn) => match bmn {
-                    BrokerNetwork::UpdateList(nodes) => vec![MessageIn::NodeList(
-                        nodes
-                            .iter()
-                            .map(|ni| ni.get_id())
-                            .collect::<Vec<U256>>()
-                            .into(),
-                    )],
-                    BrokerNetwork::Connected(id) => vec![MessageIn::NodeConnected(*id)],
-                    BrokerNetwork::Disconnected(id) => {
-                        vec![MessageIn::NodeDisconnected(*id)]
-                    }
-                    _ => vec![],
-                },
-                _ => vec![],
-            }
-            .iter()
-            .flat_map(|msg| nd.random_connections.process_message(msg.clone()))
-            .flat_map(|msg| self.process_msg_out(&msg))
-            .collect();
-        } else {
-            log::error!("pmb Couldn't lock");
-        }
-        vec![]
-    }
-
-    fn process_msg_out(&self, msg: &MessageOut) -> Vec<BrokerMessage> {
-        match msg {
-            MessageOut::ConnectNode(id) => {
-                vec![BrokerMessage::Network(BrokerNetwork::Connect(*id))]
-            }
-            MessageOut::DisconnectNode(id) => {
-                vec![BrokerMessage::Network(BrokerNetwork::Disconnect(*id))]
-            }
-            MessageOut::ListUpdate(_) => vec![ModulesMessage::Random(RandomMessage::MessageOut(msg.clone())).into()],
-        }
-    }
-
     fn process_msg_in(&self, msg: &MessageIn) -> Vec<BrokerMessage> {
         if let Ok(mut nd) = self.node_data.try_lock() {
             return nd
                 .random_connections
                 .process_message(msg.clone())
                 .iter()
-                .flat_map(|msg| self.process_msg_out(msg))
+                .flat_map(|msg| match msg {
+                    MessageOut::ConnectNode(id) => {
+                        vec![BrokerMessage::Network(BrokerNetwork::Connect(*id))]
+                    }
+                    MessageOut::DisconnectNode(id) => {
+                        vec![BrokerMessage::Network(BrokerNetwork::Disconnect(*id))]
+                    }
+                    MessageOut::ListUpdate(_) => {
+                        vec![ModulesMessage::Random(RandomMessage::MessageOut(msg.clone())).into()]
+                    }
+                })
                 .collect();
         }
         vec![]
     }
 
-    fn process_msg(&self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
+    fn process_msg_bm(&self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
         match msg {
-            BrokerMessage::Modules(ModulesMessage::Random(msg)) => match msg {
-                RandomMessage::MessageIn(msg) => self.process_msg_in(msg),
-                RandomMessage::MessageOut(_) => {
-                    log::warn!("This module should never get a MessageOut");
-                    vec![]
+            BrokerMessage::Network(bmn) => match bmn {
+                BrokerNetwork::UpdateList(nodes) => vec![MessageIn::NodeList(
+                    nodes
+                        .iter()
+                        .map(|ni| ni.get_id())
+                        .collect::<Vec<U256>>()
+                        .into(),
+                )],
+                BrokerNetwork::Connected(id) => vec![MessageIn::NodeConnected(*id)],
+                BrokerNetwork::Disconnected(id) => {
+                    vec![MessageIn::NodeDisconnected(*id)]
                 }
+                _ => vec![],
             },
-            _ => self.process_msg_bm(msg),
+            _ => vec![],
         }
+        .iter()
+        .flat_map(|msg| self.process_msg_in(msg))
+        .collect()
     }
 }
 
 impl SubsystemListener for RandomConnections {
-    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BInput> {
+    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         msgs.iter()
-            .flat_map(|msg| self.process_msg(msg))
-            .map(BInput::BM)
+            .flat_map(|msg| {
+                if let BrokerMessage::Modules(ModulesMessage::Random(RandomMessage::MessageIn(
+                    msg_in,
+                ))) = msg
+                {
+                    self.process_msg_in(msg_in)
+                } else {
+                    self.process_msg_bm(msg)
+                }
+            })
             .collect()
     }
 }
