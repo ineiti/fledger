@@ -2,6 +2,7 @@ use common::{
     broker::{BInput, BrokerMessage, Subsystem, SubsystemListener},
     node::{
         config::{NodeConfig, NodeInfo},
+        logic::messages::NodeMessage,
         modules::{gossip_chat::GossipChat, random_connections::RandomConnections},
         network::BrokerNetwork,
         node_data::NodeData,
@@ -18,8 +19,8 @@ use types::{data_storage::TempDSB, nodeids::U256};
 
 pub struct Network {
     pub nodes: HashMap<U256, Node>,
-    node_inputs: HashMap<U256, Sender<BrokerNetwork>>,
-    node_outputs: HashMap<U256, Receiver<BrokerNetwork>>,
+    node_inputs: HashMap<U256, Sender<BrokerMessage>>,
+    node_outputs: HashMap<U256, Receiver<BrokerMessage>>,
 }
 
 impl Network {
@@ -46,9 +47,12 @@ impl Network {
     pub fn send_update_list(&mut self) {
         let list: Vec<NodeInfo> = self.nodes.values().map(|node| node.node_info()).collect();
         for id in self.nodes.keys() {
-            self.node_inputs
-                .get_mut(id)
-                .and_then(|ch| ch.send(BrokerNetwork::UpdateList(list.clone())).ok());
+            self.node_inputs.get_mut(id).and_then(|ch| {
+                ch.send(BrokerMessage::Network(BrokerNetwork::UpdateList(
+                    list.clone(),
+                )))
+                .ok()
+            });
         }
     }
 
@@ -75,14 +79,28 @@ impl Network {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn send_message(&mut self, id: &U256, bm: BrokerMessage) {
+        if let Some(ch) = self.node_inputs.get(id) {
+            ch.send(bm).unwrap();
+        }
+    }
+
     fn process_one(&mut self) {
         let ids: Vec<U256> = self.nodes.keys().cloned().collect();
         for id in ids.iter() {
             for msg in self.node_outputs.get(id).unwrap().try_iter() {
-                log::debug!("node2node message: {}: {:?}", id, msg);
-                if let BrokerNetwork::WebRTC(dest, _) = msg {
-                    if let Some(ch_in) = self.node_inputs.get(&dest) {
-                        ch_in.send(msg).unwrap();
+                if let BrokerMessage::Network(BrokerNetwork::NodeMessageOut(nm)) = &msg {
+                    if let Some(ch_in) = self.node_inputs.get(&nm.id) {
+                        log::trace!("Send: {} -> {}: {:?}", id.short(), nm.id.short(), msg);
+                        ch_in
+                            .send(BrokerMessage::Network(BrokerNetwork::NodeMessageIn(
+                                NodeMessage {
+                                    id: *id,
+                                    msg: nm.msg.clone(),
+                                },
+                            )))
+                            .unwrap();
                     }
                 }
             }
@@ -96,11 +114,11 @@ impl Network {
 
 pub struct Node {
     pub node_data: Arc<Mutex<NodeData>>,
-    rcv: Receiver<BrokerNetwork>,
+    rcv: Receiver<BrokerMessage>,
 }
 
 impl Node {
-    pub fn new(snd: Sender<BrokerNetwork>, rcv: Receiver<BrokerNetwork>) -> Self {
+    pub fn new(snd: Sender<BrokerMessage>, rcv: Receiver<BrokerMessage>) -> Self {
         let node_data = NodeData::new(NodeConfig::new(), TempDSB::new());
         RandomConnections::start(Arc::clone(&node_data));
         GossipChat::start(Arc::clone(&node_data));
@@ -116,20 +134,30 @@ impl Node {
     pub fn process(&mut self) {
         let mut broker = { self.node_data.lock().unwrap().broker.clone() };
         for msg in self.rcv.try_iter() {
-            broker.enqueue_bm(BrokerMessage::Network(msg));
+            broker.enqueue_bm(msg);
         }
         if broker.process().is_err() {
             log::error!("Couldn't process");
         }
     }
+
+    #[allow(dead_code)]
+    pub fn messages(&mut self) -> usize {
+        self.node_data
+            .lock()
+            .unwrap()
+            .gossip_chat
+            .get_messages()
+            .len()
+    }
 }
 
 pub struct WebRTC {
-    snd: Sender<BrokerNetwork>,
+    snd: Sender<BrokerMessage>,
 }
 
 impl WebRTC {
-    pub fn start(node_data: Arc<Mutex<NodeData>>, snd: Sender<BrokerNetwork>) {
+    pub fn start(node_data: Arc<Mutex<NodeData>>, snd: Sender<BrokerMessage>) {
         node_data
             .lock()
             .unwrap()
@@ -138,14 +166,18 @@ impl WebRTC {
             .unwrap();
     }
 
-    fn msg_outgoing(&mut self, msg: &BrokerNetwork) -> Option<BrokerNetwork> {
+    fn msg_outgoing_network(&mut self, msg: &BrokerNetwork) -> Option<BrokerMessage> {
         match msg {
-            BrokerNetwork::WebRTC(_, _) => {
-                self.snd.send(msg.clone()).unwrap();
+            BrokerNetwork::NodeMessageOut(_) => {
+                self.snd.send(msg.into()).unwrap();
                 None
             }
-            BrokerNetwork::Connect(id) => Some(BrokerNetwork::Connected(*id)),
-            BrokerNetwork::Disconnect(id) => Some(BrokerNetwork::Disconnected(*id)),
+            BrokerNetwork::Connect(id) => {
+                Some(BrokerMessage::Network(BrokerNetwork::Connected(*id)))
+            }
+            BrokerNetwork::Disconnect(id) => {
+                Some(BrokerMessage::Network(BrokerNetwork::Disconnected(*id)))
+            }
             _ => None,
         }
     }
@@ -154,11 +186,11 @@ impl WebRTC {
 impl SubsystemListener for WebRTC {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BInput> {
         msgs.iter()
-            .filter_map(|msg| match msg {
-                BrokerMessage::Network(bn) => self.msg_outgoing(bn),
+            .filter_map(|&msg| match msg {
+                BrokerMessage::Network(bn) => self.msg_outgoing_network(bn),
                 _ => None,
             })
-            .map(|bn| BInput::BM(BrokerMessage::Network(bn)))
+            .map(BInput::BM)
             .collect()
     }
 }

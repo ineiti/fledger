@@ -23,7 +23,7 @@ use crate::{
         version::VERSION_STRING,
     },
     signal::web_rtc::{ConnType, NodeStat, WebRTCConnectionState},
-    types::{now},
+    types::now,
 };
 use types::nodeids::U256;
 
@@ -209,12 +209,13 @@ impl Stats {
         for stat in nodes.iter_mut() {
             if let Some(ni) = stat.1.node_info.as_ref() {
                 if our_id != ni.get_id() {
-                    let msg = Message::V1(MessageV1::Ping()).to_string()?;
                     self.broker_tx
-                        .send(BInput::BM(BrokerMessage::Network(BrokerNetwork::WebRTC(
-                            ni.get_id(),
-                            msg,
-                        ))))
+                        .send(BInput::BM(BrokerMessage::Network(
+                            BrokerNetwork::NodeMessageOut(NodeMessage {
+                                id: ni.get_id(),
+                                msg: Message::V1(MessageV1::Ping()),
+                            }),
+                        )))
                         .map_err(|_| SNError::OutputQueue)?;
                     stat.1.ping_tx += 1;
                 }
@@ -259,7 +260,7 @@ impl SubsystemListener for Stats {
             if let Err(e) = match msg {
                 BrokerMessage::Network(BrokerNetwork::ConnectionState(cs)) => self.upsert(cs),
                 BrokerMessage::Network(BrokerNetwork::UpdateList(ul)) => self.update_list(ul),
-                BrokerMessage::NodeMessage(nm) => self.ping_rcv(nm),
+                BrokerMessage::Network(BrokerNetwork::NodeMessageIn(nm)) => self.ping_rcv(nm),
                 BrokerMessage::Timer(BrokerTimer::Second) => self.send_stats(),
                 _ => Ok(()),
             } {

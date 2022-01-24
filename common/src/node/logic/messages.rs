@@ -1,7 +1,7 @@
-use types::nodeids::U256;
+use crate::node::{modules::gossip_chat, network::BrokerNetwork};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use crate::node::modules::gossip_chat;
+use types::nodeids::U256;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 /// This is the command-set for version 1 of the protocol.
@@ -57,14 +57,24 @@ impl From<String> for Message {
     }
 }
 
-impl Message {
-    pub fn to_string(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string(self)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct NodeMessage {
     pub id: U256,
     pub msg: Message,
+}
+
+impl From<NodeMessage> for BrokerNetwork {
+    fn from(msg: NodeMessage) -> Self {
+        Self::NodeMessageOut(msg)
+    }
+}
+
+impl fmt::Debug for NodeMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&format!(
+            "NodeMessage( id: {}, msg: {:?}",
+            self.id.short(),
+            self.msg
+        ))
+    }
 }

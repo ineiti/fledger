@@ -1122,6 +1122,7 @@ dependencies = [
 name = "raw"
 version = "0.1.0"
 dependencies = [
+ "itertools",
  "log",
  "rand 0.7.3",
  "serde",

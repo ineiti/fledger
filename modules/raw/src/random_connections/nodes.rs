@@ -1,6 +1,6 @@
-use types::nodeids::NodeIDs;
-use types::nodeids::NodeID;
 use core::cmp::min;
+use types::nodeids::NodeID;
+use types::nodeids::NodeIDs;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct NodeTime {
@@ -48,6 +48,16 @@ impl Nodes {
         n = min(n, self.0.len());
         NodeIDs {
             0: self.0.splice(..n, vec![]).map(|n| n.id).collect(),
+        }
+    }
+
+    // Only keeps the newest n nodes. If there are more than n nodes, the
+    // oldest nodes are discarded.
+    pub fn keep_newest_n(&mut self, n: usize) -> NodeIDs {
+        if self.0.len() > n {
+            self.remove_oldest_n(n - self.0.len())
+        } else {
+            NodeIDs::empty()
         }
     }
 

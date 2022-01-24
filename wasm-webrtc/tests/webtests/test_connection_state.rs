@@ -83,7 +83,7 @@ async fn test_connection_state_result() -> Result<(), CSError> {
     init.send("Hello".into()).await?;
     wait_ms(1000).await;
     for msg in tap_follow.try_iter() {
-        if let BInput::BM(BrokerMessage::NodeMessage(m)) = msg {
+        if let BInput::BM(BrokerMessage::Network(BrokerNetwork::NodeMessageIn(m))) = msg {
             log::info!("Follow got {} / {:?}", m.id, m.msg);
         }
     }

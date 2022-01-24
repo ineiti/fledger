@@ -7,9 +7,9 @@ use crate::node::{BrokerMessage, ModulesMessage};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use types::nodeids::U256;
-
 pub use raw::gossip_chat::{MessageIn, MessageNode, MessageOut};
+
+use super::random_connections::RandomMessage;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GossipMessage {
@@ -71,21 +71,21 @@ impl GossipChat {
     fn process_msg_bm(&self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
         if let Ok(mut nd) = self.node_data.try_lock() {
             match msg {
-                BrokerMessage::Network(BrokerNetwork::UpdateList(nodes)) => {
-                    Some(MessageIn::NodeList(
-                        nodes
-                            .iter()
-                            .map(|ni| ni.get_id())
-                            .collect::<Vec<U256>>()
-                            .into(),
-                    ))
-                }
-                BrokerMessage::NodeMessage(nm) => match &nm.msg {
+                BrokerMessage::Network(BrokerNetwork::NodeMessageIn(nm)) => match &nm.msg {
                     Message::V1(MessageV1::GossipChat(gc)) => {
                         Some(MessageIn::Node(nm.id, gc.clone()))
                     }
                     _ => None,
                 },
+                BrokerMessage::Modules(ModulesMessage::Random(RandomMessage::MessageOut(
+                    msg_rnd,
+                ))) => {
+                    if let raw::random_connections::MessageOut::ListUpdate(ids) = msg_rnd {
+                        Some(MessageIn::NodeList(ids.clone()))
+                    } else {
+                        None
+                    }
+                }
                 _ => None,
             }
             .and_then(|msg| nd.gossip_chat.process_message(msg).ok())
@@ -118,10 +118,12 @@ impl GossipChat {
 
     fn process_msg_out(&self, msg: &MessageOut) -> Vec<BrokerMessage> {
         match msg {
-            MessageOut::Node(id, nm) => vec![BrokerMessage::NodeMessage(NodeMessage {
-                id: *id,
-                msg: Message::V1(MessageV1::GossipChat(nm.clone())),
-            })],
+            MessageOut::Node(id, nm) => vec![BrokerMessage::Network(BrokerNetwork::NodeMessageOut(
+                NodeMessage {
+                    id: *id,
+                    msg: Message::V1(MessageV1::GossipChat(nm.clone())),
+                },
+            ))],
             _ => vec![],
         }
     }

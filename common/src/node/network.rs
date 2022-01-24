@@ -1,4 +1,4 @@
-use crate::{broker::Subsystem, node::logic::messages::NodeMessage, types::block_on};
+use crate::{broker::Subsystem, types::block_on};
 use ed25519_dalek::Signer;
 use std::sync::mpsc::{channel, Sender};
 
@@ -26,6 +26,8 @@ use crate::{
 };
 use node_connection::{NCError, NodeConnection};
 use types::nodeids::U256;
+
+use super::logic::messages::NodeMessage;
 
 pub mod connection_state;
 pub mod node_connection;
@@ -160,8 +162,7 @@ impl Inner {
         let msgs: Vec<WSMessage> = self.ws_rx.try_iter().collect();
         for msg in &msgs {
             if let WSMessage::MessageString(s) = msg {
-                self.process_msg(s.parse::<WebSocketMessage>()?.msg)
-                    .await?;
+                self.process_msg(s.parse::<WebSocketMessage>()?.msg).await?;
             }
         }
         Ok(msgs.len())
@@ -215,7 +216,9 @@ impl Inner {
         for bm in bms {
             if let BrokerMessage::Network(bn) = bm {
                 match bn {
-                    BrokerNetwork::WebRTC(id, msg) => self.send(&id, msg.clone()).await?,
+                    BrokerNetwork::NodeMessageOut(nm) => {
+                        self.send(&nm.id, serde_json::to_string(&nm.msg)?).await?
+                    }
                     BrokerNetwork::SendStats(ss) => {
                         self.ws_send(WSSignalMessage::NodeStats(ss.clone()))?
                     }
@@ -244,8 +247,7 @@ impl Inner {
             .filter(|entry| entry.get_id() != self.node_config.our_node.get_id())
             .cloned()
             .collect();
-        self
-            .broker
+        self.broker
             .emit_bm(BrokerMessage::Network(BrokerNetwork::UpdateList(list)))
             .map(|_| ())
             .map_err(|_| NetworkError::OutputQueue)
@@ -270,9 +272,7 @@ impl Inner {
     async fn connect(&mut self, dst: &U256) -> Result<(), NetworkError> {
         self.get_connection(dst).await?;
         self.broker
-            .emit_bm(BrokerMessage::Network(BrokerNetwork::Connected(
-                *dst,
-            )))?;
+            .emit_bm(BrokerMessage::Network(BrokerNetwork::Connected(*dst)))?;
         Ok(())
     }
 
@@ -280,9 +280,7 @@ impl Inner {
     async fn disconnect(&mut self, dst: &U256) -> Result<(), NetworkError> {
         // TODO: Actually disconnect and listen for nodes that have been disconnected due to timeouts.
         self.broker
-            .emit_bm(BrokerMessage::Network(BrokerNetwork::Disconnected(
-                *dst,
-            )))?;
+            .emit_bm(BrokerMessage::Network(BrokerNetwork::Disconnected(*dst)))?;
         Ok(())
     }
 
@@ -308,10 +306,11 @@ impl Inner {
     }
 }
 
-#[allow(clippy::large_enum_variant)] 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerNetwork {
-    WebRTC(U256, String),
+    NodeMessageIn(NodeMessage),
+    NodeMessageOut(NodeMessage),
     WebSocket(WSSignalMessage),
     SendStats(Vec<NodeStat>),
     UpdateList(Vec<NodeInfo>),
@@ -322,6 +321,18 @@ pub enum BrokerNetwork {
     Connected(U256),
     Disconnect(U256),
     Disconnected(U256),
+}
+
+impl From<BrokerNetwork> for BrokerMessage {
+    fn from(msg: BrokerNetwork) -> Self {
+        Self::Network(msg)
+    }
+}
+
+impl From<&BrokerNetwork> for BrokerMessage {
+    fn from(msg: &BrokerNetwork) -> Self {
+        Self::Network(msg.clone())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

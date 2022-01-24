@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use types::nodeids::{NodeID, NodeIDs, U256};
-use serde::{Serialize, Deserialize};
 
 pub mod text_message;
 use text_message::*;
@@ -132,11 +132,14 @@ impl Module {
     /// If an updated list of nodes is available, send a `RequestMsgIDs` to
     /// all new nodes.
     pub fn node_list(&mut self, ids: NodeIDs) -> Vec<MessageOut> {
-        ids.0
+        let reply = ids
+            .0
             .iter()
-            .filter(|id| !self.nodes.0.contains(id))
+            .filter(|&id| !self.nodes.0.contains(id) && id != &self.cfg.our_id)
             .map(|&id| MessageOut::Node(id, MessageNode::RequestMsgIDs))
-            .collect()
+            .collect();
+        self.nodes = ids;
+        reply
     }
 
     /// Set the message store
@@ -158,7 +161,7 @@ impl Module {
             return vec![MessageOut::Node(
                 src,
                 MessageNode::RequestMessages(unknown_ids),
-            )]
+            )];
         }
         vec![]
     }
@@ -200,7 +203,7 @@ impl Module {
     pub fn filter_known_messages(&self, msgids: Vec<U256>) -> Vec<U256> {
         msgids
             .iter()
-            .filter(|id| self.storage.contains(id))
+            .filter(|id| !self.storage.contains(id))
             .cloned()
             .collect()
     }

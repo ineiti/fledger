@@ -1,4 +1,5 @@
 mod nodes;
+use itertools::concat;
 use nodes::*;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -94,21 +95,16 @@ impl Module {
             self.nodes_connected.add_new(vec![*node]);
         }
 
-        let mut disconnect = NodeIDs::empty();
-        let too_many = self.nodes_connected.0.len() as i64 - self.nodes_needed();
-        if too_many > 0 {
-            disconnect = self.nodes_connected.remove_oldest_n(too_many as usize);
-        }
-        Self::make_connect_disconnect(None, Some(disconnect))
+        self.update_nodes()
     }
 
     /// Removes a node that has been disconnected from the list of connected
     /// nodes and disconnecting nodes.
     pub fn new_disconnection(&mut self, node: &NodeID) -> Vec<MessageOut> {
-        if self.nodes_connected.contains(node){
+        if self.nodes_connected.contains(node) {
             self.nodes_connected.0.retain(|nt| nt.id != *node);
         }
-        if self.nodes_connecting.contains(node){
+        if self.nodes_connecting.contains(node) {
             self.nodes_connecting.0.retain(|nt| nt.id != *node);
         }
         self.update_nodes()
@@ -120,13 +116,7 @@ impl Module {
         self.nodes_connected.tick();
         self.nodes_connecting.tick();
 
-        let disconnect = self
-            .nodes_connecting
-            .remove_oldest_ticks(self.cfg.connecting_timeout);
-
-        let mut out = self.update_nodes();
-        out.extend(Self::make_connect_disconnect(None, Some(disconnect)));
-        out
+        self.update_nodes()
     }
 
     fn update_nodes(&mut self) -> Vec<MessageOut> {
@@ -134,10 +124,14 @@ impl Module {
 
         // Search for nodes that are not available anymore
         // and that should be disconnected.
-        let mut disconnect = self.nodes_connecting.remove_missing(nodes);
-        disconnect
-            .0
-            .append(&mut self.nodes_connected.remove_missing(nodes).0);
+        let disconnect = NodeIDs::from(concat([
+            self.nodes_connecting.remove_missing(nodes).0,
+            self.nodes_connecting
+                .remove_oldest_ticks(self.cfg.connecting_timeout)
+                .0,
+            self.nodes_connected.remove_missing(nodes).0,
+            self.nodes_connected.keep_newest_n(self.nodes_needed()).0,
+        ]));
 
         // Check if there is space for new nodes. If there is, select a random
         // list of nodes to be added to the connected nodes.
@@ -146,34 +140,33 @@ impl Module {
             .oldest_ticks(self.cfg.churn_connected)
             .0
             .len();
-        let missing = self.nodes_needed()
+        let missing = self.nodes_needed() as i64
             - (self.nodes_connected.0.len() + self.nodes_connecting.0.len() - churn) as i64;
+
+        let mut connect = vec![];
         if missing > 0 {
-            let connect = self.connect_nodes(missing);
-            self.nodes_connecting.add_new(connect.0.clone());
-            Self::make_connect_disconnect(Some(connect), Some(disconnect))
-        } else {
-            Self::make_connect_disconnect(None, Some(disconnect))
+            connect.append(&mut self.connect_nodes(missing).0);
+            self.nodes_connecting.add_new(connect.clone());
         }
+        self.reply(connect.into(), disconnect)
     }
 
-    fn make_connect_disconnect(
-        connect: Option<NodeIDs>,
-        disconnect: Option<NodeIDs>,
-    ) -> Vec<MessageOut> {
-        connect
-            .unwrap_or_else(NodeIDs::empty)
+    fn reply(&self, connect: NodeIDs, disconnect: NodeIDs) -> Vec<MessageOut> {
+        let mut reply: Vec<MessageOut> = connect
             .0
             .iter()
             .map(|node| MessageOut::ConnectNode(*node))
             .chain(
                 disconnect
-                    .unwrap_or_else(NodeIDs::empty)
                     .0
                     .iter()
                     .map(|node| MessageOut::DisconnectNode(*node)),
             )
-            .collect()
+            .collect();
+        if !self.connected().0.is_empty() {
+            reply.push(MessageOut::ListUpdate(self.nodes_connected.get_nodes()));
+        }
+        reply
     }
 
     fn connect_nodes(&self, mut nbr: i64) -> NodeIDs {
@@ -194,14 +187,14 @@ impl Module {
 
     /// Returns the number of nodes needed to have a high probability of a
     /// fully connected network.
-    fn nodes_needed(&self) -> i64 {
+    fn nodes_needed(&self) -> usize {
         let nodes = self.all_nodes.0.len();
         if nodes <= 1 {
             0
         } else {
             ((nodes as f64).ln() * 2.)
                 .ceil()
-                .min(self.cfg.max_connections as f64) as i64
+                .min(self.cfg.max_connections as f64) as usize
         }
     }
 }
@@ -244,7 +237,7 @@ mod tests {
             match msg {
                 MessageOut::ConnectNode(node) => should_conn.push(node),
                 MessageOut::DisconnectNode(node) => should_disc.push(node),
-                _ => {},
+                _ => {}
             }
         }
         assert_eq!(NodeIDs::from(should_conn), conn.clone());
@@ -283,7 +276,7 @@ mod tests {
             match msg {
                 MessageOut::ConnectNode(node) => conn.push(node),
                 MessageOut::DisconnectNode(node) => disc.push(node),
-                _ => {},
+                _ => {}
             }
         }
         assert_eq!(

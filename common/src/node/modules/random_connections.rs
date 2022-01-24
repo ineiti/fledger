@@ -16,6 +16,12 @@ pub enum RandomMessage {
     MessageOut(MessageOut),
 }
 
+impl From<RandomMessage> for ModulesMessage {
+    fn from(msg: RandomMessage) -> Self {
+        Self::Random(msg)
+    }
+}
+
 /// This is a wrapper to handle BrokerMessages.
 /// It translates from BrokerMessages to MessageIn, and from
 /// MessageOut to BrokerMessages.
@@ -72,9 +78,7 @@ impl RandomConnections {
             MessageOut::DisconnectNode(id) => {
                 vec![BrokerMessage::Network(BrokerNetwork::Disconnect(*id))]
             }
-            MessageOut::ListUpdate(_) => vec![BrokerMessage::Modules(ModulesMessage::Random(
-                RandomMessage::MessageOut(msg.clone()),
-            ))],
+            MessageOut::ListUpdate(_) => vec![ModulesMessage::Random(RandomMessage::MessageOut(msg.clone())).into()],
         }
     }
 

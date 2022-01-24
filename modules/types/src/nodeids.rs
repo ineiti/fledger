@@ -55,6 +55,10 @@ impl U256 {
     pub fn to_bytes(self) -> [u8; 32] {
         self.0
     }
+
+    pub fn short(self) -> String {
+        format!("{:x}{:x}{:x}{:x}", &self.0[0], &self.0[1], &self.0[2], &self.0[3])
+    }
 }
 
 impl FromStr for U256 {

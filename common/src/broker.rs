@@ -1,6 +1,6 @@
 use crate::node::modules::gossip_chat::GossipMessage;
 use crate::node::modules::random_connections::RandomMessage;
-use crate::node::{logic::messages::NodeMessage, network::BrokerNetwork, timer::BrokerTimer};
+use crate::node::{network::BrokerNetwork, timer::BrokerTimer};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
@@ -32,12 +32,17 @@ pub enum ModulesMessage {
     Random(RandomMessage),
 }
 
-#[allow(clippy::large_enum_variant)] 
+impl From<ModulesMessage> for BrokerMessage {
+    fn from(msg: ModulesMessage) -> Self {
+        Self::Modules(msg)
+    }
+}
+
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerMessage {
     Network(BrokerNetwork),
     Timer(BrokerTimer),
-    NodeMessage(NodeMessage),
     Modules(ModulesMessage),
     #[cfg(test)]
     TestMessages(tests::TestMessages),
@@ -51,7 +56,6 @@ impl std::fmt::Display for BrokerMessage {
             match self {
                 BrokerMessage::Network(_) => "Network",
                 BrokerMessage::Timer(_) => "Timer",
-                BrokerMessage::NodeMessage(_) => "NodeMessage",
                 BrokerMessage::Modules(_) => "Modules",
                 #[cfg(test)]
                 BrokerMessage::TestMessages(_) => "TestMessages",
@@ -60,11 +64,17 @@ impl std::fmt::Display for BrokerMessage {
     }
 }
 
-#[allow(clippy::large_enum_variant)] 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum BInput {
     BM(BrokerMessage),
     Subscribe(Vec<String>),
+}
+
+impl From<BrokerMessage> for BInput {
+    fn from(msg: BrokerMessage) -> Self {
+        Self::BM(msg)
+    }
 }
 
 /// The broker connects the different subsystem together and offers
@@ -78,7 +88,7 @@ pub struct Broker {
     intern_tx: Sender<BInput>,
 }
 
-#[allow(clippy::all)] 
+#[allow(clippy::all)]
 unsafe impl Send for Broker {}
 
 impl Default for Broker {
