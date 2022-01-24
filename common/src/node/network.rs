@@ -27,7 +27,7 @@ use crate::{
 use node_connection::{NCError, NodeConnection};
 use types::nodeids::U256;
 
-use super::logic::messages::NodeMessage;
+use super::modules::messages::NodeMessage;
 
 pub mod connection_state;
 pub mod node_connection;
@@ -326,12 +326,6 @@ pub enum BrokerNetwork {
 impl From<BrokerNetwork> for BrokerMessage {
     fn from(msg: BrokerNetwork) -> Self {
         Self::Network(msg)
-    }
-}
-
-impl From<&BrokerNetwork> for BrokerMessage {
-    fn from(msg: &BrokerNetwork) -> Self {
-        Self::Network(msg.clone())
     }
 }
 

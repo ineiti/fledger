@@ -1,4 +1,4 @@
-use crate::broker::ModulesMessage;
+use crate::broker::BrokerModules;
 use crate::node::modules::gossip_chat::{self, GossipChat, GossipMessage};
 use crate::node::modules::random_connections::RandomConnections;
 use crate::types::now;
@@ -17,12 +17,12 @@ use log::{error, info};
 
 use self::{
     config::{ConfigError, NodeConfig, NodeInfo},
-    logic::stats::StatNode,
     network::{Network, NetworkError},
+    stats::StatNode,
 };
 use crate::{
     broker::{Broker, BrokerError},
-    node::{logic::stats::Stats, node_data::NodeData},
+    node::{node_data::NodeData, stats::Stats},
     signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection},
 };
 use raw::gossip_chat::text_message::TextMessage;
@@ -32,10 +32,10 @@ use types::{
 };
 
 pub mod config;
-pub mod logic;
 pub mod modules;
 pub mod network;
 pub mod node_data;
+pub mod stats;
 pub mod timer;
 pub mod version;
 
@@ -144,7 +144,7 @@ impl Node {
 
     pub fn add_message(&self, msg: String) -> Result<(), NodeError> {
         self.broker
-            .enqueue_bm(BrokerMessage::Modules(ModulesMessage::Gossip(
+            .enqueue_bm(BrokerMessage::Modules(BrokerModules::Gossip(
                 GossipMessage::MessageIn(gossip_chat::MessageIn::AddMessage(now(), msg)),
             )));
         Ok(())

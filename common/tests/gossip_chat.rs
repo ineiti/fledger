@@ -1,6 +1,6 @@
 mod helpers;
 use common::{
-    broker::{BrokerMessage, ModulesMessage},
+    broker::{BrokerMessage, BrokerModules},
     node::modules::gossip_chat::GossipMessage,
 };
 use helpers::*;
@@ -57,7 +57,7 @@ fn connect_nodes() {
 fn add_message(net: &mut Network, id: &U256, step: i32) {
     net.send_message(
         id,
-        BrokerMessage::Modules(ModulesMessage::Gossip(GossipMessage::MessageIn(
+        BrokerMessage::Modules(BrokerModules::Gossip(GossipMessage::MessageIn(
             MessageIn::AddMessage(step as f64, "msg".into()),
         ))),
     );

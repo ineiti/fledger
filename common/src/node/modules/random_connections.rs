@@ -6,7 +6,7 @@ use types::nodeids::U256;
 use crate::broker::{Subsystem, SubsystemListener};
 use crate::node::network::BrokerNetwork;
 use crate::node::NodeData;
-use crate::node::{BrokerMessage, ModulesMessage};
+use crate::node::{BrokerMessage, BrokerModules};
 
 pub use raw::random_connections::{MessageIn, MessageOut};
 
@@ -16,7 +16,7 @@ pub enum RandomMessage {
     MessageOut(MessageOut),
 }
 
-impl From<RandomMessage> for ModulesMessage {
+impl From<RandomMessage> for BrokerModules {
     fn from(msg: RandomMessage) -> Self {
         Self::Random(msg)
     }
@@ -55,7 +55,7 @@ impl RandomConnections {
                         vec![BrokerMessage::Network(BrokerNetwork::Disconnect(*id))]
                     }
                     MessageOut::ListUpdate(_) => {
-                        vec![ModulesMessage::Random(RandomMessage::MessageOut(msg.clone())).into()]
+                        vec![BrokerModules::Random(RandomMessage::MessageOut(msg.clone())).into()]
                     }
                 })
                 .collect();
@@ -91,7 +91,7 @@ impl SubsystemListener for RandomConnections {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         msgs.iter()
             .flat_map(|msg| {
-                if let BrokerMessage::Modules(ModulesMessage::Random(RandomMessage::MessageIn(
+                if let BrokerMessage::Modules(BrokerModules::Random(RandomMessage::MessageIn(
                     msg_in,
                 ))) = msg
                 {

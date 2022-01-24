@@ -1,7 +1,7 @@
 use crate::{
     broker::Subsystem,
     node::{
-        logic::messages::NodeMessage,
+        modules::messages::NodeMessage,
         network::{BrokerNetwork, NetworkConnectionState},
     },
 };
@@ -16,7 +16,7 @@ use crate::{
     broker::{BrokerError, BrokerMessage, SubsystemListener},
     node::{
         config::{NodeConfig, NodeInfo},
-        logic::messages::{Message, MessageV1},
+        modules::messages::{Message, MessageV1},
         network::{connection_state::CSEnum, ConnStats},
         node_data::NodeData,
         timer::BrokerTimer,
@@ -118,9 +118,7 @@ impl Stats {
             let stats: Vec<NodeStat> = self.collect();
 
             self.broker_tx
-                .send(BrokerMessage::Network(
-                    BrokerNetwork::SendStats(stats),
-                ))
+                .send(BrokerMessage::Network(BrokerNetwork::SendStats(stats)))
                 .map_err(|_| SNError::OutputQueue)?;
         }
         if self.ping_all_counter == 0 {
@@ -210,12 +208,13 @@ impl Stats {
             if let Some(ni) = stat.1.node_info.as_ref() {
                 if our_id != ni.get_id() {
                     self.broker_tx
-                        .send(BrokerMessage::Network(
-                            BrokerNetwork::NodeMessageOut(NodeMessage {
+                        .send(
+                            NodeMessage {
                                 id: ni.get_id(),
                                 msg: Message::V1(MessageV1::Ping()),
-                            }),
-                        ))
+                            }
+                            .output(),
+                        )
                         .map_err(|_| SNError::OutputQueue)?;
                     stat.1.ping_tx += 1;
                 }

@@ -1,9 +1,9 @@
+use super::text_messages_v1::TextMessagesStorage;
 use crate::broker::{Subsystem, SubsystemListener};
-use crate::node::logic::messages::{Message, MessageV1};
-use crate::node::logic::text_messages::TextMessagesStorage;
+use crate::node::modules::messages::{Message, MessageV1};
 use crate::node::NodeData;
-use crate::node::{logic::messages::NodeMessage, network::BrokerNetwork};
-use crate::node::{BrokerMessage, ModulesMessage};
+use crate::node::{modules::messages::NodeMessage, network::BrokerNetwork};
+use crate::node::{BrokerMessage, BrokerModules};
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -15,6 +15,12 @@ use super::random_connections::RandomMessage;
 pub enum GossipMessage {
     MessageIn(MessageIn),
     MessageOut(MessageOut),
+}
+
+impl From<GossipMessage> for BrokerModules {
+    fn from(msg: GossipMessage) -> Self {
+        Self::Gossip(msg)
+    }
 }
 
 /// This is a wrapper around the raw::gossip_chat module. It parses the
@@ -74,7 +80,7 @@ impl GossipChat {
                 Message::V1(MessageV1::GossipChat(gc)) => Some(MessageIn::Node(nm.id, gc.clone())),
                 _ => None,
             },
-            BrokerMessage::Modules(ModulesMessage::Random(RandomMessage::MessageOut(msg_rnd))) => {
+            BrokerMessage::Modules(BrokerModules::Random(RandomMessage::MessageOut(msg_rnd))) => {
                 msg_rnd.clone().into()
             }
             _ => None,
@@ -90,12 +96,12 @@ impl GossipChat {
                     .iter()
                     .map(|msg| match msg {
                         MessageOut::Node(id, nm) => {
-                            BrokerMessage::Network(BrokerNetwork::NodeMessageOut(NodeMessage {
+                            NodeMessage {
                                 id: *id,
                                 msg: Message::V1(MessageV1::GossipChat(nm.clone())),
-                            }))
+                            }.output()
                         }
-                        _ => BrokerMessage::Modules(ModulesMessage::Gossip(
+                        _ => BrokerMessage::Modules(BrokerModules::Gossip(
                             GossipMessage::MessageOut(msg.clone()),
                         )),
                     })
@@ -110,7 +116,7 @@ impl SubsystemListener for GossipChat {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         msgs.iter()
             .flat_map(|msg| {
-                if let BrokerMessage::Modules(ModulesMessage::Gossip(GossipMessage::MessageIn(
+                if let BrokerMessage::Modules(BrokerModules::Gossip(GossipMessage::MessageIn(
                     msg_in,
                 ))) = msg
                 {

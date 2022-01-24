@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     broker::Broker,
-    node::{config::NodeConfig, logic::stats::NDStats, network::NetworkState},
+    node::{config::NodeConfig, stats::NDStats, network::NetworkState},
 };
 
 use types::data_storage::DataStorageBase;

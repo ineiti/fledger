@@ -13,7 +13,7 @@ use wasm_webrtc::helpers::LocalStorageBase;
 use wasm_webrtc::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
 use web_sys::window;
 
-use common::node::{config::NodeInfo, logic::stats::StatNode, version::VERSION_STRING, Node};
+use common::node::{config::NodeInfo, stats::StatNode, version::VERSION_STRING, Node};
 
 use types::data_storage::DataStorageBase;
 

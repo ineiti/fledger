@@ -2,7 +2,7 @@ use common::{
     broker::{BrokerMessage, Subsystem, SubsystemListener},
     node::{
         config::{NodeConfig, NodeInfo},
-        logic::messages::NodeMessage,
+        modules::messages::NodeMessage,
         modules::{gossip_chat::GossipChat, random_connections::RandomConnections},
         network::BrokerNetwork,
         node_data::NodeData,
@@ -96,12 +96,13 @@ impl Network {
                     if let Some(ch_in) = self.node_inputs.get(&nm.id) {
                         log::trace!("Send: {} -> {}: {:?}", id.short(), nm.id.short(), msg);
                         ch_in
-                            .send(BrokerMessage::Network(BrokerNetwork::NodeMessageIn(
+                            .send(
                                 NodeMessage {
                                     id: *id,
                                     msg: nm.msg.clone(),
-                                },
-                            )))
+                                }
+                                .input(),
+                            )
                             .unwrap();
                     }
                 }
@@ -171,7 +172,7 @@ impl WebRTC {
     fn msg_outgoing_network(&mut self, msg: &BrokerNetwork) -> Option<BrokerMessage> {
         match msg {
             BrokerNetwork::NodeMessageOut(_) => {
-                self.snd.send(msg.into()).unwrap();
+                self.snd.send(msg.clone().into()).unwrap();
                 None
             }
             BrokerNetwork::Connect(id) => {

@@ -225,26 +225,20 @@ pub trait SubsystemInit: SubsystemListener {
     fn init(&mut self, to_broker: Sender<BrokerMessage>);
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ModulesMessage {
-    Gossip(GossipMessage),
-    Random(RandomMessage),
-}
-
-impl From<ModulesMessage> for BrokerMessage {
-    fn from(msg: ModulesMessage) -> Self {
-        Self::Modules(msg)
-    }
-}
-
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerMessage {
     Network(BrokerNetwork),
     Timer(BrokerTimer),
-    Modules(ModulesMessage),
+    Modules(BrokerModules),
     #[cfg(test)]
-    TestMessages(tests::TestMessages),
+    TestMessages(tests::BrokerTest),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BrokerModules {
+    Gossip(GossipMessage),
+    Random(RandomMessage),
 }
 
 impl std::fmt::Display for BrokerMessage {
@@ -263,6 +257,12 @@ impl std::fmt::Display for BrokerMessage {
     }
 }
 
+impl From<BrokerModules> for BrokerMessage {
+    fn from(msg: BrokerModules) -> Self {
+        Self::Modules(msg)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use flexi_logger::LevelFilter;
@@ -270,7 +270,7 @@ mod tests {
     use super::*;
 
     #[derive(Debug, Clone, PartialEq)]
-    pub enum TestMessages {
+    pub enum BrokerTest {
         MsgA,
         MsgB,
     }
@@ -308,8 +308,8 @@ mod tests {
     async fn test_broker_new() -> Result<(), BrokerError> {
         simple_logging::log_to_stderr(LevelFilter::Trace);
 
-        let bm_a = BrokerMessage::TestMessages(TestMessages::MsgA);
-        let bm_b = BrokerMessage::TestMessages(TestMessages::MsgB);
+        let bm_a = BrokerMessage::TestMessages(BrokerTest::MsgA);
+        let bm_b = BrokerMessage::TestMessages(BrokerTest::MsgB);
 
         let broker = &mut Broker::new();
         // Add a first subsystem that will reply 'msg_b' when it

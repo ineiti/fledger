@@ -392,7 +392,7 @@ impl Connection {
                 conn.set_cb_message(Box::new(move |msg| {
                     if let Ok(msg) = serde_json::from_str(&msg) {
                         if let Err(e) =
-                            broker.emit_bm(BrokerNetwork::NodeMessageIn(NodeMessage { id, msg }).into())
+                            broker.emit_bm(NodeMessage { id, msg }.input())
                         {
                             error!("While emitting webrtc: {:?}", e);
                         }

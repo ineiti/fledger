@@ -9,7 +9,7 @@ use wasm_webrtc::{
     helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
 };
 
-use common::node::{logic::stats::StatNode, version::VERSION_STRING, Node};
+use common::node::{stats::StatNode, version::VERSION_STRING, Node};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
