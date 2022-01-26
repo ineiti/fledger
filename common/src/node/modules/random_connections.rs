@@ -29,16 +29,18 @@ impl From<RandomMessage> for BrokerModules {
 /// so that other modules can interact, too.
 pub struct RandomConnections {
     node_data: Arc<Mutex<NodeData>>,
+    our_id: U256,
 }
 
 impl RandomConnections {
     pub fn start(node_data: Arc<Mutex<NodeData>>) {
-        {
+        let (mut broker, our_id) = {
             let nd = node_data.lock().unwrap();
-            nd.broker.clone()
-        }
-        .add_subsystem(Subsystem::Handler(Box::new(Self { node_data })))
-        .unwrap();
+            (nd.broker.clone(), nd.node_config.our_node.get_id())
+        };
+        broker
+            .add_subsystem(Subsystem::Handler(Box::new(Self { node_data, our_id })))
+            .unwrap();
     }
 
     fn process_msg_in(&self, msg: &MessageIn) -> Vec<BrokerMessage> {
@@ -59,6 +61,8 @@ impl RandomConnections {
                     }
                 })
                 .collect();
+        } else {
+            log::error!("Couldn't lock");
         }
         vec![]
     }
@@ -70,6 +74,7 @@ impl RandomConnections {
                     nodes
                         .iter()
                         .map(|ni| ni.get_id())
+                        .filter(|id| *id != self.our_id)
                         .collect::<Vec<U256>>()
                         .into(),
                 )],

@@ -47,6 +47,11 @@ node.
 ## Next steps
 
 The following next steps are in the pipeline:
+- clean up network and make crates:
+  - for signalling-server
+  - for network-layer
+  - for wasm and linux client
+
 - Create a minimum consensus for people to try it out in the browser at
 https://fledg.re
 - Link server nodes with browser nodes

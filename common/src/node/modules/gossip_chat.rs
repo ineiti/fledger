@@ -117,6 +117,8 @@ impl GossipChat {
                     })
                     .collect();
             }
+        } else {
+            log::error!("Couldn't lock");
         }
         vec![]
     }

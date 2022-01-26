@@ -2,6 +2,7 @@ use crate::node::modules::gossip_chat::GossipMessage;
 use crate::node::modules::random_connections::RandomMessage;
 use crate::node::network::NetworkConnectionState;
 use crate::node::{network::BrokerNetwork, timer::BrokerTimer};
+use crate::signal::web_rtc::{WSSignalMessage, PeerInfo};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
@@ -267,7 +268,10 @@ impl From<BrokerModules> for BrokerMessage {
 transitive_from::hierarchy! {
     BrokerMessage {
         BrokerNetwork {
-            NetworkConnectionState
+            NetworkConnectionState,
+            WSSignalMessage {
+                PeerInfo
+            }
         },
         BrokerTimer,
         BrokerModules {

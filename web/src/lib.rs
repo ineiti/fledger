@@ -71,6 +71,8 @@ impl FledgerWeb {
                     Err(e) => error!("Couldn't create state: {:?}", e),
                 }
             }
+        } else {
+            log::error!("Couldn't lock");
         }
         let noc = Arc::clone(&self.node);
         self.counter += 1;
@@ -102,7 +104,9 @@ impl FledgerWeb {
             } else {
                 warn!("Couldn't lock node");
             }
-        };
+        } else {
+            log::error!("Couldn't lock");
+        }
         Ok(())
     }
 
@@ -125,6 +129,8 @@ impl FledgerWeb {
                 Node::new(my_storage, &client, Box::new(ws), rtc_spawner)
                     .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?,
             );
+        } else {
+            log::error!("Couldn't lock");
         }
         Ok(())
     }

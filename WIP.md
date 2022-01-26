@@ -11,12 +11,19 @@
 
 ### Things to do
 
-- write tests
-  - test if full connectivity is given
-  - test if messages get correctly gossipped
+- make sure config gets loaded on browser, too - currently it seems to be ignored
+- debug real-network failure for new messages
+- re-enable display of node names (currently it's only the IDs)
+  - needs perhaps a node-name-cache
 - Create a nicer display of the chat, perhaps with markdown display of messages
 
 # Dates
+
+2022-01-26:
+- debug connection failures
+- write tests
+  - test if full connectivity is given
+  - test if messages get correctly gossipped
 
 2022-01-19:
 - started test-framework with network dummy and first communications

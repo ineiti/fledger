@@ -44,6 +44,8 @@ pub enum NetworkError {
     Lock,
     #[error("Connection not found")]
     ConnectionMissing,
+    #[error("Cannot connect to myself")]
+    ConnectMyself,
     #[error(transparent)]
     WebSocket(#[from] WSError),
     #[error(transparent)]
@@ -96,7 +98,8 @@ impl SubsystemListener for Network {
         block_on(async move {
             // Because block_on puts things in the background for wasm, it's not
             // really blocking, and multiple calls will arrive here at the same
-            // time.
+            // time. Because both method calls read from a channel, it's not a problem
+            // if the `try_lock` fails. It will get the messages the next time around.
             if let Ok(mut inner) = inner_cl.try_lock() {
                 if let Err(e) = inner.process_broker().await {
                     log::error!("While processing broker messages: {:?}", e);
@@ -217,7 +220,6 @@ impl Inner {
             if let BrokerMessage::Network(bn) = bm {
                 match bn {
                     BrokerNetwork::NodeMessageOut(nm) => {
-                        log::debug!("{}: sending {nm:?}", self.node_config.our_node.get_id());
                         self.send(&nm.id, serde_json::to_string(&nm.msg)?).await?
                     }
                     BrokerNetwork::SendStats(ss) => {
@@ -289,6 +291,10 @@ impl Inner {
     /// start a new connection and put the message in a queue to be sent once the connection
     /// is established.
     async fn get_connection(&mut self, id: &U256) -> Result<&mut NodeConnection, NetworkError> {
+        if *id == self.node_config.our_node.get_id(){
+            return Err(NetworkError::ConnectMyself);
+        }
+
         if !self.connections.contains_key(id) {
             self.connections.insert(
                 *id,

@@ -63,6 +63,8 @@ impl ServerState {
             int_lock
                 .nodes
                 .insert(challenge, NodeEntry::new(challenge, conn));
+        } else {
+            error!("Couldn't lock");
         }
     }
 

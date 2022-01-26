@@ -4,13 +4,13 @@ use crate::{
         network::{ConnStats, NetworkConnectionState, NodeMessage},
         BrokerNetwork,
     },
-    signal::web_rtc::{PeerInfo, WSSignalMessage},
+    signal::web_rtc::PeerInfo,
 };
-use types::nodeids::U256;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
+use types::nodeids::U256;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState};
 
 use crate::{
@@ -158,7 +158,10 @@ impl ConnectionState {
                     if self.get_connection_state() == CSEnum::HasDataChannel {
                         reset = reset || state_dc == &RtcDataChannelState::Closed;
                         if reset {
-                            warn!("State_dc is: {state_dc:?} - s.ice_connection is: {:?}", s.ice_connection);
+                            warn!(
+                                "State_dc is: {state_dc:?} - s.ice_connection is: {:?}",
+                                s.ice_connection
+                            );
                         }
                     } else {
                         warn!(
@@ -177,8 +180,7 @@ impl ConnectionState {
                     .await?;
             }
         }
-        self.broker
-            .enqueue_bm(self.get_ncs(stat).into());
+        self.broker.enqueue_bm(self.get_ncs(stat).into());
         Ok(())
     }
 
@@ -260,10 +262,7 @@ impl ConnectionState {
         }
         if self.get_connection_state() != CSEnum::Idle {
             self.update_connection(CSEnum::Idle, None);
-            self.broker
-                .enqueue_bm(BrokerMessage::Network(BrokerNetwork::ConnectionState(
-                    self.get_ncs(None),
-                )));
+            self.broker.enqueue_bm(self.get_ncs(None).into());
         }
         if self.direction == CSDir::Incoming {
             error!("Cannot start incoming connection")
@@ -387,13 +386,9 @@ impl Connection {
                 info!("Connected {:?}", self.direction);
                 let mut broker = self.broker.clone();
                 let id = self.id_remote;
-                let our_id = self.id_local;
                 conn.set_cb_message(Box::new(move |msg| {
                     if let Ok(msg) = serde_json::from_str(&msg) {
-                        log::debug!("{:?} got message from {id:?}: {msg:?}", our_id);
-                        if let Err(e) =
-                            broker.emit_bm(NodeMessage { id, msg }.input())
-                        {
+                        if let Err(e) = broker.emit_bm(NodeMessage { id, msg }.input()) {
                             error!("While emitting webrtc: {:?}", e);
                         }
                     }
@@ -412,10 +407,7 @@ impl Connection {
         let peer_info = self
             .direction
             .get_peer_info(&self.id_local, &self.id_remote, message);
-        self.broker
-            .enqueue_bm(BrokerMessage::Network(BrokerNetwork::WebSocket(
-                WSSignalMessage::PeerSetup(peer_info),
-            )));
+        self.broker.enqueue_bm(peer_info.into());
     }
 
     fn get_ncs(&self, stat: Option<ConnectionStateMap>) -> NetworkConnectionState {
