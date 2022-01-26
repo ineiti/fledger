@@ -158,7 +158,7 @@ impl ConnectionState {
                     if self.get_connection_state() == CSEnum::HasDataChannel {
                         reset = reset || state_dc == &RtcDataChannelState::Closed;
                         if reset {
-                            warn!("State_dc is: {:?}", state_dc);
+                            warn!("State_dc is: {state_dc:?} - s.ice_connection is: {:?}", s.ice_connection);
                         }
                     } else {
                         warn!(
@@ -178,9 +178,7 @@ impl ConnectionState {
             }
         }
         self.broker
-            .enqueue_bm(BrokerMessage::Network(BrokerNetwork::ConnectionState(
-                self.get_ncs(stat),
-            )));
+            .enqueue_bm(self.get_ncs(stat).into());
         Ok(())
     }
 
@@ -389,8 +387,10 @@ impl Connection {
                 info!("Connected {:?}", self.direction);
                 let mut broker = self.broker.clone();
                 let id = self.id_remote;
+                let our_id = self.id_local;
                 conn.set_cb_message(Box::new(move |msg| {
                     if let Ok(msg) = serde_json::from_str(&msg) {
+                        log::debug!("{:?} got message from {id:?}: {msg:?}", our_id);
                         if let Err(e) =
                             broker.emit_bm(NodeMessage { id, msg }.input())
                         {

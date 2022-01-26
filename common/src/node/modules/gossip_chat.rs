@@ -23,6 +23,18 @@ impl From<GossipMessage> for BrokerModules {
     }
 }
 
+impl From<MessageIn> for GossipMessage {
+    fn from(msg: MessageIn) -> Self {
+        Self::MessageIn(msg)
+    }
+}
+
+impl From<MessageOut> for GossipMessage {
+    fn from(msg: MessageOut) -> Self {
+        Self::MessageOut(msg)
+    }
+}
+
 /// This is a wrapper around the raw::gossip_chat module. It parses the
 /// BrokerMessages for messages of other nodes and for a new NodeList sent by the
 /// random_connections module.
@@ -98,12 +110,10 @@ impl GossipChat {
                         MessageOut::Node(id, nm) => {
                             NodeMessage {
                                 id: *id,
-                                msg: Message::V1(MessageV1::GossipChat(nm.clone())),
+                                msg: nm.clone().into(),
                             }.output()
                         }
-                        _ => BrokerMessage::Modules(BrokerModules::Gossip(
-                            GossipMessage::MessageOut(msg.clone()),
-                        )),
+                        _ => msg.clone().into(),
                     })
                     .collect();
             }

@@ -1,5 +1,6 @@
 use crate::node::modules::gossip_chat::GossipMessage;
 use crate::node::modules::random_connections::RandomMessage;
+use crate::node::network::NetworkConnectionState;
 use crate::node::{network::BrokerNetwork, timer::BrokerTimer};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
@@ -260,6 +261,25 @@ impl std::fmt::Display for BrokerMessage {
 impl From<BrokerModules> for BrokerMessage {
     fn from(msg: BrokerModules) -> Self {
         Self::Modules(msg)
+    }
+}
+
+transitive_from::hierarchy! {
+    BrokerMessage {
+        BrokerNetwork {
+            NetworkConnectionState
+        },
+        BrokerTimer,
+        BrokerModules {
+            GossipMessage {
+                raw::gossip_chat::MessageIn,
+                raw::gossip_chat::MessageOut,
+            },
+            RandomMessage {
+                // raw::random_connections::MessageIn,
+                // raw::random_connections::MessageOut,
+            },
+        },
     }
 }
 

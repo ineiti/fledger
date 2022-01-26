@@ -45,12 +45,6 @@ impl NodeMessage {
     }
 }
 
-impl From<NodeMessage> for BrokerNetwork {
-    fn from(msg: NodeMessage) -> Self {
-        Self::NodeMessageOut(msg)
-    }
-}
-
 impl fmt::Debug for NodeMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!(
@@ -58,6 +52,18 @@ impl fmt::Debug for NodeMessage {
             self.id.short(),
             self.msg
         ))
+    }
+}
+
+impl From<MessageV1> for Message {
+    fn from(msg: MessageV1) -> Self {
+        Self::V1(msg)
+    }
+}
+
+impl From<gossip_chat::MessageNode> for MessageV1 {
+    fn from(msg: gossip_chat::MessageNode) -> Self {
+        Self::GossipChat(msg)
     }
 }
 
@@ -87,6 +93,14 @@ impl fmt::Display for MessageV1 {
             MessageV1::Error(_) => write!(f, "Error"),
             MessageV1::Ping() => write!(f, "Ping"),
             MessageV1::GossipChat(_) => write!(f, "GossipChat"),
+        }
+    }
+}
+
+transitive_from::hierarchy! {
+    Message {
+        MessageV1{
+            gossip_chat::MessageNode
         }
     }
 }

@@ -217,6 +217,7 @@ impl Inner {
             if let BrokerMessage::Network(bn) = bm {
                 match bn {
                     BrokerNetwork::NodeMessageOut(nm) => {
+                        log::debug!("{}: sending {nm:?}", self.node_config.our_node.get_id());
                         self.send(&nm.id, serde_json::to_string(&nm.msg)?).await?
                     }
                     BrokerNetwork::SendStats(ss) => {
@@ -335,6 +336,12 @@ pub struct NetworkConnectionState {
     pub dir: WebRTCConnectionState,
     pub c: CSEnum,
     pub s: Option<ConnStats>,
+}
+
+impl From<NetworkConnectionState> for BrokerNetwork {
+    fn from(msg: NetworkConnectionState) -> Self {
+        Self::ConnectionState(msg)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
