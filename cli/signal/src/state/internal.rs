@@ -164,13 +164,6 @@ impl Internal {
                     .and_modify(|ne| ne.info = Some(msg_ann.node_info));
             }
 
-            // Node requests deleting of the list of all nodes
-            // TODO: remove this after debugging is done
-            WSSignalMessage::ClearNodes => {
-                info!("Clearing nodes");
-                self.nodes.clear();
-            }
-
             // Node requests a list of all currently connected nodes,
             // including itself.
             WSSignalMessage::ListIDsRequest => {

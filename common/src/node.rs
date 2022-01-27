@@ -74,7 +74,7 @@ impl Node {
     ) -> Result<Node, NodeError> {
         // New config place
         let mut storage_node = storage.get("fledger");
-        
+
         // First try the old config
         let mut old_storage_node = storage.get("");
         let mut config_str = old_storage_node.get(CONFIG_NAME)?;
@@ -117,14 +117,6 @@ impl Node {
     pub fn info(&self) -> Result<NodeInfo, NodeError> {
         let state = self.node_data.lock().map_err(|_| NodeError::Lock)?;
         Ok(state.node_config.clone().our_node)
-    }
-
-    /// TODO: this is only for development
-    pub fn clear(&mut self) -> Result<(), NodeError> {
-        Ok(self
-            .broker
-            .emit_bm(BrokerMessage::Network(BrokerNetwork::ClearNodes))
-            .map(|_| ())?)
     }
 
     /// Requests a list of all connected nodes

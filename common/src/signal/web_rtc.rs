@@ -219,7 +219,6 @@ pub enum WSSignalMessage {
     Announce(MessageAnnounce),
     ListIDsRequest,
     ListIDsReply(Vec<NodeInfo>),
-    ClearNodes,
     PeerSetup(PeerInfo),
     NodeStats(Vec<NodeStat>),
 }
@@ -251,7 +250,6 @@ impl std::fmt::Display for WSSignalMessage {
             WSSignalMessage::Announce(_) => write!(f, "Announce"),
             WSSignalMessage::ListIDsRequest => write!(f, "ListIDsRequest"),
             WSSignalMessage::ListIDsReply(_) => write!(f, "ListIDsReply"),
-            WSSignalMessage::ClearNodes => write!(f, "ClearNodes"),
             WSSignalMessage::PeerSetup(_) => write!(f, "PeerSetup"),
             WSSignalMessage::NodeStats(_) => write!(f, "NodeStats"),
         }

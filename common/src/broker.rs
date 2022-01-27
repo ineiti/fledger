@@ -208,10 +208,6 @@ impl Subsystem {
                 });
                 vec![]
             }
-            // TODO: find out how to write a common code for this. As the two handlers
-            // are a different trait, I cannot get it to work.
-            // This might be helpful:
-            // https://users.rust-lang.org/t/casting-traitobject-to-super-trait/33524/11
             Self::InitHandler(h) => h.messages(msgs),
             Self::Handler(h) => h.messages(msgs),
             _ => vec![],

@@ -225,7 +225,6 @@ impl Inner {
                     BrokerNetwork::SendStats(ss) => {
                         self.ws_send(WSSignalMessage::NodeStats(ss.clone()))?
                     }
-                    BrokerNetwork::ClearNodes => self.ws_send(WSSignalMessage::ClearNodes)?,
                     BrokerNetwork::UpdateListRequest => {
                         self.ws_send(WSSignalMessage::ListIDsRequest)?
                     }

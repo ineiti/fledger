@@ -59,8 +59,7 @@ impl GossipChat {
                     log::warn!("Couldn't load gossip messages: {}", e);
                 }
             } else {
-                // TODO: re-enable
-                // log::info!("Migrating from old TextMessageStorage to new one.");
+                log::info!("Migrating from old TextMessageStorage to new one.");
                 let mut messages = TextMessagesStorage::new();
                 if let Err(e) =
                     messages.load(&nd.storage.get("something").get("something").unwrap())

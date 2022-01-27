@@ -5,7 +5,6 @@ use std::{
     sync::{mpsc::channel, Arc, Mutex},
 };
 use thiserror::Error;
-use types::data_storage::DataStorageBase;
 
 use common::{
     node::{Node, NodeError},
@@ -18,8 +17,7 @@ use common::{
     },
 };
 use types::{
-    data_storage::{DataStorage, StorageError},
-    nodeids::U256,
+    nodeids::U256, data_storage::TempDSB,
 };
 
 use wasm_bindgen_test::*;
@@ -135,35 +133,7 @@ impl WebSocketConnection for WebSocketConnectionDummy {
     }
 
     fn reconnect(&mut self) -> Result<(), WSError> {
-        todo!()
-    }
-}
-
-// TODO: remove and replace with TempDSS and TempDS
-pub struct DataStorageDummyBase {}
-
-impl DataStorageBase for DataStorageDummyBase {
-    fn get(&self, _: &str) -> Box<dyn DataStorage> {
-        Box::new(DataStorageDummy {})
-    }
-    fn clone(&self) -> Box<dyn DataStorageBase> {
-        Box::new(DataStorageDummyBase {})
-    }
-}
-
-pub struct DataStorageDummy {}
-
-impl DataStorage for DataStorageDummy {
-    fn get(&self, _key: &str) -> Result<String, StorageError> {
-        Ok("".to_string())
-    }
-
-    fn set(&mut self, _key: &str, _value: &str) -> Result<(), StorageError> {
-        Ok(())
-    }
-
-    fn remove(&mut self, _key: &str) -> Result<(), StorageError> {
-        Ok(())
+        Err(WSError::Underlying("not implemented".into()))
     }
 }
 
@@ -286,13 +256,13 @@ async fn connect_test_simple() -> Result<(), CombinedError> {
 
     // First node
     let rtc_spawner = Box::new(WebRTCConnectionSetupWasm::new_box);
-    let my_storage = Box::new(DataStorageDummyBase {});
+    let my_storage = Box::new(TempDSB {});
     let ws = Box::new(ws_conn.get_connection()?);
     let mut node1 = Node::new(my_storage, "test", ws, rtc_spawner)?;
 
     // Second node
     let rtc_spawner = Box::new(WebRTCConnectionSetupWasm::new_box);
-    let my_storage = Box::new(DataStorageDummyBase {});
+    let my_storage = Box::new(TempDSB {});
     let ws = Box::new(ws_conn.get_connection()?);
     let mut node2 = Node::new(my_storage, "test", ws, rtc_spawner)?;
 
