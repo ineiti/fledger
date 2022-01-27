@@ -19,11 +19,8 @@ pub struct U256([u8; 32]);
 
 impl fmt::Display for U256 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (index, byte) in self.0.iter().enumerate() {
-            if index % 8 == 0 && index > 0 {
-                f.write_str("-")?;
-            }
-            f.write_fmt(format_args!("{:02x}", byte))?;
+        for index in 0..8 {
+            f.write_fmt(format_args!("{:02x}", self.0[index]))?;
         }
         Ok(())
     }
@@ -54,10 +51,6 @@ impl U256 {
 
     pub fn to_bytes(self) -> [u8; 32] {
         self.0
-    }
-
-    pub fn short(self) -> String {
-        format!("{:x}{:x}{:x}{:x}", &self.0[0], &self.0[1], &self.0[2], &self.0[3])
     }
 }
 

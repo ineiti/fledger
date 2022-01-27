@@ -68,6 +68,7 @@ impl NodeConnection {
     /// If the connection is in setup phase, the message is queued.
     /// If the connection is idle, an error is returned.
     pub async fn send(&mut self, msg: String) -> Result<(), NCError> {
+        log::trace!("Sending {}", msg);
         let conn_result = {
             if self.outgoing.get_connection_open().await? {
                 Some(&mut self.outgoing)
@@ -90,8 +91,8 @@ impl NodeConnection {
                 Ok(())
             }
             None => {
+                self.msg_queue.push(msg);
                 if self.outgoing.get_connection_state() == CSEnum::Idle {
-                    self.msg_queue.push(msg);
                     self.outgoing.start_connection(None).await?;
                 }
                 Ok(())

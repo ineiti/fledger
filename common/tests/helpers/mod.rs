@@ -94,7 +94,7 @@ impl Network {
             for msg in self.node_outputs.get(id).unwrap().try_iter() {
                 if let BrokerMessage::Network(BrokerNetwork::NodeMessageOut(nm)) = &msg {
                     if let Some(ch_in) = self.node_inputs.get(&nm.id) {
-                        log::trace!("Send: {} -> {}: {:?}", id.short(), nm.id.short(), msg);
+                        log::trace!("Send: {} -> {}: {:?}", id, nm.id, msg);
                         ch_in
                             .send(
                                 NodeMessage {

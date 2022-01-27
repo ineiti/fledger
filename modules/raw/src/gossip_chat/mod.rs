@@ -17,6 +17,7 @@ pub enum MessageNode {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MessageIn {
+    Tick,
     Node(NodeID, MessageNode),
     SetStorage(String),
     GetStorage,
@@ -73,7 +74,9 @@ impl Module {
         &mut self,
         msg: MessageIn,
     ) -> Result<Vec<MessageOut>, serde_json::Error> {
+        log::trace!("{} got message {:?}", self.cfg.our_id, msg);
         Ok(match msg {
+            MessageIn::Tick => self.tick(),
             MessageIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
             MessageIn::AddMessage(created, msg_str) => self.add_message_str(created, &msg_str),
             MessageIn::NodeList(ids) => self.node_list(ids),
@@ -225,7 +228,11 @@ impl Module {
 
     /// Nothing to do for tick for the moment.
     pub fn tick(&self) -> Vec<MessageOut> {
-        vec![]
+        self.nodes
+            .0
+            .iter()
+            .map(|id| MessageOut::Node(*id, MessageNode::RequestMsgIDs))
+            .collect()
     }
 }
 

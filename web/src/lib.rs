@@ -36,7 +36,7 @@ impl FledgerWeb {
         console_error_panic_hook::set_once();
         FledgerWeb::set_localstorage();
 
-        wasm_logger::init(wasm_logger::Config::default());
+        wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
         info!("Starting new FledgerWeb");
 
         let fw = Self {

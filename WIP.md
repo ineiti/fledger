@@ -4,6 +4,7 @@
 
 - Explore a framework for having multiple modules interacting with each other
 - Propose a set of modules that can work together
+- Create usable crates for a signalling server and webrtc clients
 
 ## Current concrete goal
 
@@ -11,13 +12,15 @@
 
 ### Things to do
 
-- make sure config gets loaded on browser, too - currently it seems to be ignored
-- debug real-network failure for new messages
 - re-enable display of node names (currently it's only the IDs)
   - needs perhaps a node-name-cache
 - Create a nicer display of the chat, perhaps with markdown display of messages
 
 # Dates
+
+2022-01-27:
+- make sure config gets loaded on browser, too - currently it seems to be ignored
+- debug real-network failure for new messages
 
 2022-01-26:
 - debug connection failures

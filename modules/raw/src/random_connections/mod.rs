@@ -67,12 +67,15 @@ impl Module {
     /// Processes one message and returns messages that need to be treated by the
     /// system.
     pub fn process_message(&mut self, msg: MessageIn) -> Vec<MessageOut> {
-        match msg {
+        log::trace!("got message {:?}", msg);
+        let out = match msg {
             MessageIn::NodeList(nodes) => self.new_nodes(&nodes),
             MessageIn::NodeConnected(node) => self.new_connection(&node),
             MessageIn::NodeDisconnected(node) => self.new_disconnection(&node),
             MessageIn::Tick => self.tick(),
-        }
+        };
+        log::trace!("Output is: {:?}", out);
+        out
     }
 
     /// Returns a clone of the connected NodeIDs.
@@ -189,12 +192,11 @@ impl Module {
     /// fully connected network.
     fn nodes_needed(&self) -> usize {
         let nodes = self.all_nodes.0.len();
-        if nodes <= 1 {
-            0
-        } else {
-            ((nodes as f64).ln() * 2.)
+        match nodes {
+            0 | 1 => nodes,
+            _ => ((nodes as f64).ln() * 2.)
                 .ceil()
-                .min(self.cfg.max_connections as f64) as usize
+                .min(self.cfg.max_connections as f64) as usize,
         }
     }
 }

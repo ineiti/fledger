@@ -10,7 +10,7 @@ use types::nodeids::U256;
 #[test]
 fn connect_nodes() {
     let _ = env_logger::init();
-    let nbr_nodes = 100;
+    let nbr_nodes = 2;
 
     let mut net = Network::new();
     log::info!("Creating {nbr_nodes} nodes");

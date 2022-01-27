@@ -220,6 +220,7 @@ impl Inner {
             if let BrokerMessage::Network(bn) = bm {
                 match bn {
                     BrokerNetwork::NodeMessageOut(nm) => {
+                        log::trace!("{}->{}: {:?}", self.node_config.our_node.get_id(), nm.id, nm.msg);
                         self.send(&nm.id, serde_json::to_string(&nm.msg)?).await?
                     }
                     BrokerNetwork::SendStats(ss) => {

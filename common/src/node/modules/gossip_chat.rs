@@ -1,6 +1,7 @@
 use super::text_messages_v1::TextMessagesStorage;
 use crate::broker::{Subsystem, SubsystemListener};
 use crate::node::modules::messages::{Message, MessageV1};
+use crate::node::timer::BrokerTimer;
 use crate::node::NodeData;
 use crate::node::{modules::messages::NodeMessage, network::BrokerNetwork};
 use crate::node::{BrokerMessage, BrokerModules};
@@ -94,6 +95,7 @@ impl GossipChat {
             BrokerMessage::Modules(BrokerModules::Random(RandomMessage::MessageOut(msg_rnd))) => {
                 msg_rnd.clone().into()
             }
+            BrokerMessage::Timer(BrokerTimer::Minute) => Some(MessageIn::Tick),
             _ => None,
         }
         .map(|msg| self.process_msg_in(&msg))
@@ -106,12 +108,11 @@ impl GossipChat {
                 return msgs
                     .iter()
                     .map(|msg| match msg {
-                        MessageOut::Node(id, nm) => {
-                            NodeMessage {
-                                id: *id,
-                                msg: nm.clone().into(),
-                            }.output()
+                        MessageOut::Node(id, nm) => NodeMessage {
+                            id: *id,
+                            msg: nm.clone().into(),
                         }
+                        .output(),
                         _ => msg.clone().into(),
                     })
                     .collect();

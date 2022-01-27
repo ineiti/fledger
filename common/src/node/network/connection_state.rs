@@ -386,8 +386,10 @@ impl Connection {
                 info!("Connected {:?}", self.direction);
                 let mut broker = self.broker.clone();
                 let id = self.id_remote;
-                conn.set_cb_message(Box::new(move |msg| {
-                    if let Ok(msg) = serde_json::from_str(&msg) {
+                let our_id = self.id_local;
+                conn.set_cb_message(Box::new(move |msg_str| {
+                    log::trace!("{}->{}: {:?}", our_id, id, msg_str);
+                    if let Ok(msg) = serde_json::from_str(&msg_str) {
                         if let Err(e) = broker.emit_bm(NodeMessage { id, msg }.input()) {
                             error!("While emitting webrtc: {:?}", e);
                         }

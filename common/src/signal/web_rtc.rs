@@ -157,8 +157,8 @@ impl std::fmt::Display for PeerInfo {
         write!(
             f,
             "init: {} - follow: {} - msg: {}",
-            self.id_init.short(),
-            self.id_follow.short(),
+            self.id_init,
+            self.id_follow,
             self.message
         )
     }
