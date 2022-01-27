@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 pub use raw::gossip_chat::{MessageIn, MessageNode, MessageOut};
+use types::data_storage::DataStorage;
 
 use super::random_connections::RandomMessage;
 
@@ -41,20 +42,18 @@ impl From<MessageOut> for GossipMessage {
 /// random_connections module.
 pub struct GossipChat {
     node_data: Arc<Mutex<NodeData>>,
+    data_storage: Box<dyn DataStorage>,
 }
 
 const STORAGE_GOSSIP_CHAT: &str = "gossip_chat";
 
 impl GossipChat {
     pub fn start(node_data: Arc<Mutex<NodeData>>) {
-        {
+        let (mut broker, data_storage) = {
             let mut nd = node_data.lock().unwrap();
 
-            let gossip_msgs_str = nd
-                .storage
-                .get(STORAGE_GOSSIP_CHAT)
-                .get(STORAGE_GOSSIP_CHAT)
-                .unwrap();
+            let data_storage = nd.storage.get("fledger");
+            let gossip_msgs_str = data_storage.get(STORAGE_GOSSIP_CHAT).unwrap();
             if !gossip_msgs_str.is_empty() {
                 if let Err(e) = nd.gossip_chat.set(&gossip_msgs_str) {
                     log::warn!("Couldn't load gossip messages: {}", e);
@@ -62,9 +61,7 @@ impl GossipChat {
             } else {
                 log::info!("Migrating from old TextMessageStorage to new one.");
                 let mut messages = TextMessagesStorage::new();
-                if let Err(e) =
-                    messages.load(&nd.storage.get("something").get("something").unwrap())
-                {
+                if let Err(e) = messages.load(&nd.storage.get("").get("text_message").unwrap()) {
                     log::warn!("Error while loading messages: {}", e);
                 } else {
                     let msgs = messages
@@ -79,10 +76,14 @@ impl GossipChat {
                     nd.gossip_chat.add_messages(msgs);
                 }
             }
-            nd.broker.clone()
-        }
-        .add_subsystem(Subsystem::Handler(Box::new(Self { node_data })))
-        .unwrap();
+            (nd.broker.clone(), data_storage)
+        };
+        broker
+            .add_subsystem(Subsystem::Handler(Box::new(Self {
+                node_data,
+                data_storage,
+            })))
+            .unwrap();
     }
 
     // Searches for a matching NodeMessageIn or a RandomMessage that needs conversion.
@@ -122,11 +123,26 @@ impl GossipChat {
         }
         vec![]
     }
+
+    fn update_storage(&mut self) {
+        if let Ok(mut nd) = self.node_data.try_lock() {
+            if nd.gossip_chat.is_updated() {
+                if let Ok(messages) = nd.gossip_chat.get() {
+                    if let Err(e) = self.data_storage.set(STORAGE_GOSSIP_CHAT, &messages) {
+                        log::error!("Couldn't store gossip-messages: {}", e);
+                    }
+                }
+            }
+        } else {
+            log::error!("Couldn't lock");
+        }
+    }
 }
 
 impl SubsystemListener for GossipChat {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
-        msgs.iter()
+        let output = msgs
+            .iter()
             .flat_map(|msg| {
                 if let BrokerMessage::Modules(BrokerModules::Gossip(GossipMessage::MessageIn(
                     msg_in,
@@ -137,6 +153,8 @@ impl SubsystemListener for GossipChat {
                     self.process_msg_bm(msg)
                 }
             })
-            .collect()
+            .collect();
+        self.update_storage();
+        output
     }
 }

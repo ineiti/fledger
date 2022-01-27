@@ -12,13 +12,14 @@
 
 ### Things to do
 
-- re-enable display of node names (currently it's only the IDs)
-  - needs perhaps a node-name-cache
+- add a node-info storage to the gossip-chat or random-connection
 - Create a nicer display of the chat, perhaps with markdown display of messages
 
 # Dates
 
 2022-01-27:
+- get texts loaded from browser storage
+- re-enable display of node names (currently it's only the IDs)
 - make sure config gets loaded on browser, too - currently it seems to be ignored
 - debug real-network failure for new messages
 

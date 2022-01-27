@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use js_sys::Date;
-use log::{debug, error, info, warn};
 use raw::gossip_chat::text_message::TextMessage;
 use regex::Regex;
 use std::{
@@ -37,7 +36,7 @@ impl FledgerWeb {
         FledgerWeb::set_localstorage();
 
         wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
-        info!("Starting new FledgerWeb");
+        log::info!("Starting new FledgerWeb");
 
         let fw = Self {
             node: Arc::new(Mutex::new(None)),
@@ -48,8 +47,8 @@ impl FledgerWeb {
         let node_cl = fw.node.clone();
         wasm_bindgen_futures::spawn_local(async {
             match FledgerWeb::node_start(node_cl).await {
-                Ok(_) => info!("Initialized node"),
-                Err(e) => error!("Couldn't initialize node: {}", e),
+                Ok(_) => log::info!("Initialized node"),
+                Err(e) => log::error!("Couldn't initialize node: {}", e),
             }
         });
         fw
@@ -61,14 +60,13 @@ impl FledgerWeb {
             if let Some(n) = no.as_mut() {
                 if !self.msgs.is_empty() {
                     let msg = self.msgs.remove(0);
-                    debug!("Sending message {}", msg);
                     if let Err(e) = n.add_message(msg) {
-                        error!("Couldn't add message: {:?}", e);
+                        log::error!("Couldn't add message: {:?}", e);
                     }
                 }
                 match FledgerState::new(n) {
                     Ok(f) => fs = Some(f),
-                    Err(e) => error!("Couldn't create state: {:?}", e),
+                    Err(e) => log::error!("Couldn't create state: {:?}", e),
                 }
             }
         } else {
@@ -78,7 +76,7 @@ impl FledgerWeb {
         self.counter += 1;
         wasm_bindgen_futures::spawn_local(async move {
             if let Err(e) = Self::update_node(noc).await {
-                error!("Couldn't update node: {:?}", e);
+                log::error!("Couldn't update node: {:?}", e);
             };
         });
         fs
@@ -102,7 +100,7 @@ impl FledgerWeb {
                 n.list().map_err(|e| anyhow!(e))?;
                 n.process().await.map_err(|e| anyhow!(e))?;
             } else {
-                warn!("Couldn't lock node");
+                log::warn!("Couldn't lock node");
             }
         } else {
             log::error!("Couldn't lock");
@@ -137,18 +135,16 @@ impl FledgerWeb {
 
     fn set_config(data: &str) {
         if let Err(err) = Node::set_config(LocalStorageBase {}.get("fledger"), data) {
-            info!("Got error while saving config: {}", err);
+            log::warn!("Got error while saving config: {}", err);
         }
     }
 
     fn set_localstorage() {
         if let Ok(loc) = window().unwrap().location().href() {
-            info!("Location is: {}", loc);
             if loc.contains('#') {
                 let reg = Regex::new(r".*?#").unwrap();
                 let data_enc = reg.replace(&loc, "");
                 if data_enc != "" {
-                    info!("Setting data");
                     if let Ok(data) = urlencoding::decode(&data_enc) {
                         FledgerWeb::set_config(&data);
                     }
@@ -201,9 +197,11 @@ impl FledgerState {
             .map(|(_k, v)| v.clone())
             .collect();
         let msgs = node.get_messages().map_err(|e| anyhow!(e))?;
+        let mut list = node.get_list()?;
+        list.push(node.info()?);
         Ok(Self {
             info,
-            msgs: FledgerMessages::new(msgs),
+            msgs: FledgerMessages::new(msgs, list),
             nodes_online: stats.len() as u32,
             msgs_system: 0,
             msgs_local: 0,
@@ -254,7 +252,7 @@ pub struct FledgerMessages {
 }
 
 impl FledgerMessages {
-    fn new(mut tm_msgs: Vec<TextMessage>) -> Self {
+    fn new(mut tm_msgs: Vec<TextMessage>, nodes: Vec<NodeInfo>) -> Self {
         tm_msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
         let mut msgs = vec![];
         for msg in tm_msgs {
@@ -263,8 +261,15 @@ impl FledgerMessages {
             let datetime = DateTime::<Utc>::from(d);
             // Formats the combined date and time with the specified format string.
             let date = datetime.format("%A, the %d of %B at %H:%M:%S").to_string();
+
+            let node: Vec<&NodeInfo> = nodes.iter().filter(|&ni| ni.get_id() == msg.src).collect();
+            let from = if node.len() == 1 {
+                node[0].info.clone()
+            } else {
+                format!("{}", msg.src)
+            };
             msgs.push(FledgerMessage {
-                from: msg.src.to_string(),
+                from,
                 text: msg.msg.clone(),
                 date,
             })

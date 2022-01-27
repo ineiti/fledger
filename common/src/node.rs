@@ -134,7 +134,7 @@ impl Node {
     }
 
     /// Gets the current list of available nodes
-    pub fn get_list(&mut self) -> Result<Vec<NodeInfo>, NodeError> {
+    pub fn get_list(&self) -> Result<Vec<NodeInfo>, NodeError> {
         let nd = self.node_data.lock().map_err(|_| NodeError::Lock)?;
         Ok(nd.network_state.list.clone())
     }

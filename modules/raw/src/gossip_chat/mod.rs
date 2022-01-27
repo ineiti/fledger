@@ -147,12 +147,17 @@ impl Module {
 
     /// Set the message store
     pub fn set(&mut self, data: &str) -> Result<(), serde_json::Error> {
-        self.storage.load(data)
+        self.storage.set(data)
     }
 
     /// Get the message store as a string
-    pub fn get(&self) -> Result<String, serde_json::Error> {
-        self.storage.save()
+    pub fn get(&mut self) -> Result<String, serde_json::Error> {
+        self.storage.get()
+    }
+
+    /// Return true if the textMessages have been updated since the last get
+    pub fn is_updated(&mut self) -> bool {
+        self.storage.is_updated()
     }
 
     /// Reply with a list of messages this node doesn't know yet.

@@ -23,6 +23,7 @@ impl TextMessage {
 pub struct TextMessagesStorage {
     storage: HashMap<U256, TextMessage>,
     maximum: usize,
+    updated: bool,
 }
 
 impl TextMessagesStorage {
@@ -30,10 +31,11 @@ impl TextMessagesStorage {
         Self {
             storage: HashMap::new(),
             maximum,
+            updated: false,
         }
     }
 
-    pub fn load(&mut self, data: &str) -> Result<(), serde_json::Error> {
+    pub fn set(&mut self, data: &str) -> Result<(), serde_json::Error> {
         if !data.is_empty() {
             let msg_vec: Vec<TextMessage> = serde_json::from_str(data)?;
             self.storage.clear();
@@ -43,11 +45,13 @@ impl TextMessagesStorage {
         } else {
             self.storage = HashMap::new();
         }
+        self.updated = true;
         Ok(())
     }
 
-    pub fn save(&self) -> Result<String, serde_json::Error> {
+    pub fn get(&mut self) -> Result<String, serde_json::Error> {
         let msg_vec: Vec<TextMessage> = self.storage.iter().map(|(_k, v)| v).cloned().collect();
+        self.updated = false;
         serde_json::to_string(&msg_vec)
     }
 
@@ -59,6 +63,7 @@ impl TextMessagesStorage {
         }
         self.storage.insert(msg.id(), msg);
         self.limit_messages();
+        self.updated = true;
         true
     }
 
@@ -84,6 +89,10 @@ impl TextMessagesStorage {
 
     pub fn contains(&self, id: &U256) -> bool {
         self.storage.contains_key(id)
+    }
+
+    pub fn is_updated(&self) -> bool {
+        self.updated
     }
 
     fn limit_messages(&mut self) {
