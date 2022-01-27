@@ -139,6 +139,7 @@ impl WebSocketConnection for WebSocketConnectionDummy {
     }
 }
 
+// TODO: remove and replace with TempDSS and TempDS
 pub struct DataStorageDummyBase {}
 
 impl DataStorageBase for DataStorageDummyBase {
@@ -158,6 +159,10 @@ impl DataStorage for DataStorageDummy {
     }
 
     fn set(&mut self, _key: &str, _value: &str) -> Result<(), StorageError> {
+        Ok(())
+    }
+
+    fn remove(&mut self, _key: &str) -> Result<(), StorageError> {
         Ok(())
     }
 }

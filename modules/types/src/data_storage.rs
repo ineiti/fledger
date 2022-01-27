@@ -22,6 +22,8 @@ pub trait DataStorage {
     fn get(&self, key: &str) -> Result<String, StorageError>;
 
     fn set(&mut self, key: &str, value: &str) -> Result<(), StorageError>;
+
+    fn remove(&mut self, key: &str) -> Result<(), StorageError>;
 }
 
 /// A temporary DataStorageBase that hands out ephemeral, memory-base
@@ -63,6 +65,11 @@ impl DataStorage for TempDS {
 
     fn set(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
         self.kvs.insert(key.to_string(), value.to_string());
+        Ok(())
+    }
+
+    fn remove(&mut self, key: &str) -> Result<(), StorageError> {
+        self.kvs.remove(key);
         Ok(())
     }
 }

@@ -72,8 +72,19 @@ impl Node {
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
     ) -> Result<Node, NodeError> {
+        // New config place
         let mut storage_node = storage.get("fledger");
-        let config_str = match storage_node.get(CONFIG_NAME) {
+        
+        // First try the old config
+        let mut old_storage_node = storage.get("");
+        let mut config_str = old_storage_node.get(CONFIG_NAME)?;
+        if !config_str.is_empty() {
+            info!("Migrating config");
+            storage_node.set(CONFIG_NAME, &config_str)?;
+            old_storage_node.remove(CONFIG_NAME)?;
+        }
+
+        config_str = match storage_node.get(CONFIG_NAME) {
             Ok(s) => s,
             Err(_) => {
                 info!("Couldn't load configuration - start with empty");

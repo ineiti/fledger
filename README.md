@@ -51,6 +51,8 @@ The following next steps are in the pipeline:
   - for signalling-server
   - for network-layer
   - for wasm and linux client
+    - create and publish also an npm package
+    - write test-clients
 
 - Create a minimum consensus for people to try it out in the browser at
 https://fledg.re
