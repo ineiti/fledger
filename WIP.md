@@ -13,6 +13,13 @@
 ### Things to do
 
 - add a node-info storage to the gossip-chat or random-connection
+  + replace TextMessages by a new Message with a category type
+  + rewrite gossip_chat to use the new Message type
+  - add node-info to the Message
+  - use node-info from the Message to display the chat messages
+  - clean up names: raw::gossip_chat::message::Message
+    - gossip_chat -> gossip_events
+    - message::Message* -> event::Event*
 - Create a nicer display of the chat, perhaps with markdown display of messages
 
 # Dates

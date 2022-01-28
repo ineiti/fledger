@@ -1,3 +1,4 @@
+use raw::gossip_chat::message;
 use crate::broker::BrokerModules;
 use crate::node::modules::gossip_chat::{self, GossipChat, GossipMessage};
 use crate::node::modules::random_connections::RandomConnections;
@@ -25,7 +26,6 @@ use crate::{
     node::{node_data::NodeData, stats::Stats},
     signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection},
 };
-use raw::gossip_chat::text_message::TextMessage;
 use types::{
     data_storage::{DataStorage, DataStorageBase, StorageError},
     nodeids::U256,
@@ -145,17 +145,23 @@ impl Node {
         Ok(nd.stats.nodes.clone())
     }
 
-    pub fn add_message(&self, msg: String) -> Result<(), NodeError> {
+    pub fn add_chat_message(&self, msg: String) -> Result<(), NodeError> {
+        let msg_txt = message::Message {
+            category: message::Category::TextMessage,
+            src: self.info()?.get_id(),
+            created: now(),
+            msg,
+        };
         self.broker
             .enqueue_bm(BrokerMessage::Modules(BrokerModules::Gossip(
-                GossipMessage::MessageIn(gossip_chat::MessageIn::AddMessage(now(), msg)),
+                GossipMessage::MessageIn(gossip_chat::MessageIn::AddMessage(msg_txt)),
             )));
         Ok(())
     }
 
-    pub fn get_messages(&self) -> Result<Vec<TextMessage>, NodeError> {
+    pub fn get_chat_messages(&self) -> Result<Vec<message::Message>, NodeError> {
         if let Ok(nd) = self.node_data.try_lock() {
-            return Ok(nd.gossip_chat.get_messages());
+            return Ok(nd.gossip_chat.get_chat_messages(message::Category::TextMessage));
         }
         Err(NodeError::Lock)
     }

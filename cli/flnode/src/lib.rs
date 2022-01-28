@@ -143,7 +143,7 @@ pub async fn run_app() {
             if let Err(e) = list_node(&mut node).await {
                 error!("Couldn't list or ping nodes: {}", e);
             }
-            match node.get_messages() {
+            match node.get_chat_messages() {
                 Ok(msgs) => trace!("Got messages: {:?}", msgs),
                 Err(e) => error!("While getting messages: {:?}", e),
             }

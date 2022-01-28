@@ -67,7 +67,8 @@ impl GossipChat {
                     let msgs = messages
                         .storage
                         .values()
-                        .map(|msg| raw::gossip_chat::text_message::TextMessage {
+                        .map(|msg| raw::gossip_chat::message::Message {
+                            category: raw::gossip_chat::message::Category::TextMessage,
                             src: msg.src,
                             created: msg.created,
                             msg: msg.msg.clone(),
@@ -87,7 +88,7 @@ impl GossipChat {
     }
 
     // Searches for a matching NodeMessageIn or a RandomMessage that needs conversion.
-    fn process_msg_bm(&self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
+    fn process_msg_bm(&mut self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
         match msg {
             BrokerMessage::Network(BrokerNetwork::NodeMessageIn(nm)) => match &nm.msg {
                 Message::V1(MessageV1::GossipChat(gc)) => Some(MessageIn::Node(nm.id, gc.clone())),
@@ -103,7 +104,7 @@ impl GossipChat {
         .unwrap_or_default()
     }
 
-    fn process_msg_in(&self, msg: &MessageIn) -> Vec<BrokerMessage> {
+    fn process_msg_in(&mut self, msg: &MessageIn) -> Vec<BrokerMessage> {
         if let Ok(mut nd) = self.node_data.try_lock() {
             if let Ok(msgs) = nd.gossip_chat.process_message(msg.clone()) {
                 return msgs
@@ -114,6 +115,16 @@ impl GossipChat {
                             msg: nm.clone().into(),
                         }
                         .output(),
+                        MessageOut::Updated => {
+                            if let Ok(messages) = nd.gossip_chat.get() {
+                                if let Err(e) =
+                                    self.data_storage.set(STORAGE_GOSSIP_CHAT, &messages)
+                                {
+                                    log::error!("Couldn't store gossip-messages: {}", e);
+                                }
+                            }
+                            msg.clone().into()
+                        }
                         _ => msg.clone().into(),
                     })
                     .collect();
@@ -122,20 +133,6 @@ impl GossipChat {
             log::error!("Couldn't lock");
         }
         vec![]
-    }
-
-    fn update_storage(&mut self) {
-        if let Ok(mut nd) = self.node_data.try_lock() {
-            if nd.gossip_chat.is_updated() {
-                if let Ok(messages) = nd.gossip_chat.get() {
-                    if let Err(e) = self.data_storage.set(STORAGE_GOSSIP_CHAT, &messages) {
-                        log::error!("Couldn't store gossip-messages: {}", e);
-                    }
-                }
-            }
-        } else {
-            log::error!("Couldn't lock");
-        }
     }
 }
 
@@ -154,7 +151,6 @@ impl SubsystemListener for GossipChat {
                 }
             })
             .collect();
-        self.update_storage();
         output
     }
 }

@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use js_sys::Date;
-use raw::gossip_chat::text_message::TextMessage;
 use regex::Regex;
 use std::{
     sync::{Arc, Mutex},
@@ -60,7 +59,7 @@ impl FledgerWeb {
             if let Some(n) = no.as_mut() {
                 if !self.msgs.is_empty() {
                     let msg = self.msgs.remove(0);
-                    if let Err(e) = n.add_message(msg) {
+                    if let Err(e) = n.add_chat_message(msg) {
                         log::error!("Couldn't add message: {:?}", e);
                     }
                 }
@@ -196,7 +195,7 @@ impl FledgerState {
             .iter()
             .map(|(_k, v)| v.clone())
             .collect();
-        let msgs = node.get_messages().map_err(|e| anyhow!(e))?;
+        let msgs = node.get_chat_messages().map_err(|e| anyhow!(e))?;
         let mut list = node.get_list()?;
         list.push(node.info()?);
         Ok(Self {
@@ -252,7 +251,7 @@ pub struct FledgerMessages {
 }
 
 impl FledgerMessages {
-    fn new(mut tm_msgs: Vec<TextMessage>, nodes: Vec<NodeInfo>) -> Self {
+    fn new(mut tm_msgs: Vec<raw::gossip_chat::message::Message>, nodes: Vec<NodeInfo>) -> Self {
         tm_msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
         let mut msgs = vec![];
         for msg in tm_msgs {

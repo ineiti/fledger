@@ -1,16 +1,16 @@
 use serde::{Deserialize, Serialize};
 use types::nodeids::{NodeID, NodeIDs, U256};
 
-pub mod text_message;
-use text_message::*;
 pub mod conversions;
+pub mod message;
+use message::*;
 
 const MESSAGE_MAXIMUM: usize = 20;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MessageNode {
     KnownMsgIDs(Vec<U256>),
-    Messages(Vec<TextMessage>),
+    Messages(Vec<Message>),
     RequestMsgIDs,
     RequestMessages(Vec<U256>),
 }
@@ -21,7 +21,7 @@ pub enum MessageIn {
     Node(NodeID, MessageNode),
     SetStorage(String),
     GetStorage,
-    AddMessage(f64, String),
+    AddMessage(Message),
     NodeList(NodeIDs),
 }
 
@@ -29,6 +29,7 @@ pub enum MessageIn {
 pub enum MessageOut {
     Node(NodeID, MessageNode),
     Storage(String),
+    Updated,
 }
 
 #[derive(Debug)]
@@ -53,7 +54,7 @@ impl Config {
 /// It keeps 20 messages in memory, each message not being bigger than 1kB.
 #[derive(Debug)]
 pub struct Module {
-    storage: TextMessagesStorage,
+    storage: MessageStorage,
     cfg: Config,
     nodes: NodeIDs,
 }
@@ -62,7 +63,7 @@ impl Module {
     /// Returns a new chat module.
     pub fn new(cfg: Config) -> Self {
         Self {
-            storage: TextMessagesStorage::new(cfg.maximum_messages),
+            storage: MessageStorage::new(),
             cfg,
             nodes: NodeIDs::empty(),
         }
@@ -78,7 +79,7 @@ impl Module {
         Ok(match msg {
             MessageIn::Tick => self.tick(),
             MessageIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
-            MessageIn::AddMessage(created, msg_str) => self.add_message_str(created, &msg_str),
+            MessageIn::AddMessage(msg) => self.add_message(msg),
             MessageIn::NodeList(ids) => self.node_list(ids),
             MessageIn::GetStorage => vec![MessageOut::Storage(self.get()?)],
             MessageIn::SetStorage(data) => {
@@ -99,31 +100,33 @@ impl Module {
         }
     }
 
-    /// Adds a new message with the given string.
-    pub fn add_message_str(&mut self, created: f64, msg: &str) -> Vec<MessageOut> {
-        self.add_message(TextMessage {
-            src: self.cfg.our_id,
-            created,
-            msg: msg.to_string(),
-        })
-    }
-
     /// Adds a message if it's not known yet or not too old.
     /// This will send out the message to all other nodes.
-    pub fn add_message(&mut self, msg: TextMessage) -> Vec<MessageOut> {
-        self.add_messages(vec![msg])
-            .iter()
-            .flat_map(|msg| self.send_message(self.cfg.our_id, msg))
+    pub fn add_message(&mut self, msg: Message) -> Vec<MessageOut> {
+        if self.storage.add_message(msg.clone()) {
+            return itertools::concat([
+                self.send_message(self.cfg.our_id, &msg),
+                vec![MessageOut::Updated],
+            ]);
+        }
+        vec![]
+    }
+
+    /// Takes a vector of Messages and stores the new messages. It returns all
+    /// messages that are new to the system.
+    pub fn add_messages(&mut self, msgs: Vec<Message>) -> Vec<Message> {
+        msgs.into_iter()
+            .flat_map(|msg| {
+                if self.storage.add_message(msg.clone()) {
+                    Some(msg)
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
-    /// Takes a vector of TextMessages and stores the new messages. It returns all
-    /// messages that are new.
-    pub fn add_messages(&mut self, msgs: Vec<TextMessage>) -> Vec<TextMessage> {
-        self.storage.add_messages(msgs)
-    }
-
-    fn send_message(&self, src: NodeID, msg: &TextMessage) -> Vec<MessageOut> {
+    fn send_message(&self, src: NodeID, msg: &Message) -> Vec<MessageOut> {
         self.nodes
             .0
             .iter()
@@ -155,11 +158,6 @@ impl Module {
         self.storage.get()
     }
 
-    /// Return true if the textMessages have been updated since the last get
-    pub fn is_updated(&mut self) -> bool {
-        self.storage.is_updated()
-    }
-
     /// Reply with a list of messages this node doesn't know yet.
     /// We suppose that if there are too old messages in here, they will be
     /// discarded over time.
@@ -175,7 +173,7 @@ impl Module {
     }
 
     /// Store the new messages and send them to the other nodes.
-    pub fn node_messages(&mut self, src: NodeID, msgs: Vec<TextMessage>) -> Vec<MessageOut> {
+    pub fn node_messages(&mut self, src: NodeID, msgs: Vec<Message>) -> Vec<MessageOut> {
         self.add_messages(msgs)
             .iter()
             .flat_map(|msg| self.send_message(src, msg))
@@ -185,13 +183,7 @@ impl Module {
     /// Send the messages to the other node. One or more of the requested
     /// messages might be missing.
     pub fn node_request_messages(&mut self, src: NodeID, ids: Vec<U256>) -> Vec<MessageOut> {
-        let msgs: Vec<TextMessage> = self
-            .storage
-            .get_messages()
-            .iter()
-            .filter(|msg| ids.contains(&msg.id()))
-            .cloned()
-            .collect();
+        let msgs: Vec<Message> = self.storage.get_messages_by_ids(ids);
         if !msgs.is_empty() {
             vec![MessageOut::Node(src, MessageNode::Messages(msgs))]
         } else {
@@ -209,16 +201,16 @@ impl Module {
 
     /// Returns all ids that are not in our storage
     pub fn filter_known_messages(&self, msgids: Vec<U256>) -> Vec<U256> {
+        let our_ids = self.storage.get_message_ids();
         msgids
-            .iter()
-            .filter(|id| !self.storage.contains(id))
-            .cloned()
+            .into_iter()
+            .filter(|id| !our_ids.contains(id))
             .collect()
     }
 
     /// Gets a copy of all messages stored in the module.
-    pub fn get_messages(&self) -> Vec<TextMessage> {
-        self.storage.get_messages()
+    pub fn get_chat_messages(&self, cat: Category) -> Vec<Message> {
+        self.storage.get_messages(cat)
     }
 
     /// Gets all message-ids that are stored in the module.
@@ -227,7 +219,7 @@ impl Module {
     }
 
     /// Gets a single message of the module.
-    pub fn get_message(&self, id: &U256) -> Option<TextMessage> {
+    pub fn get_message(&self, id: &U256) -> Option<Message> {
         self.storage.get_message(id)
     }
 
