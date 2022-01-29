@@ -5,10 +5,12 @@ use crate::node::timer::BrokerTimer;
 use crate::node::NodeData;
 use crate::node::{modules::messages::NodeMessage, network::BrokerNetwork};
 use crate::node::{BrokerMessage, BrokerModules};
+use crate::types::now;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-pub use raw::gossip_chat::{MessageIn, MessageNode, MessageOut};
+use raw::gossip_events::events;
+pub use raw::gossip_events::{MessageIn, MessageNode, MessageOut};
 use types::data_storage::DataStorage;
 
 use super::random_connections::RandomMessage;
@@ -67,16 +69,23 @@ impl GossipChat {
                     let msgs = messages
                         .storage
                         .values()
-                        .map(|msg| raw::gossip_chat::message::Message {
-                            category: raw::gossip_chat::message::Category::TextMessage,
+                        .map(|msg| raw::gossip_events::events::Event {
+                            category: raw::gossip_events::events::Category::TextMessage,
                             src: msg.src,
                             created: msg.created,
                             msg: msg.msg.clone(),
                         })
                         .collect();
-                    nd.gossip_chat.add_messages(msgs);
+                    nd.gossip_chat.add_events(msgs);
                 }
             }
+            let msg = events::Event {
+                category: events::Category::NodeInfo,
+                src: nd.node_config.our_node.get_id(),
+                created: now(),
+                msg: serde_json::to_string(&nd.node_config.our_node).unwrap(),
+            };
+            nd.gossip_chat.add_event(msg);
             (nd.broker.clone(), data_storage)
         };
         broker
@@ -116,12 +125,15 @@ impl GossipChat {
                         }
                         .output(),
                         MessageOut::Updated => {
-                            if let Ok(messages) = nd.gossip_chat.get() {
-                                if let Err(e) =
-                                    self.data_storage.set(STORAGE_GOSSIP_CHAT, &messages)
-                                {
-                                    log::error!("Couldn't store gossip-messages: {}", e);
+                            match nd.gossip_chat.get() {
+                                Ok(messages) => {
+                                    if let Err(e) =
+                                        self.data_storage.set(STORAGE_GOSSIP_CHAT, &messages)
+                                    {
+                                        log::error!("Couldn't store gossip-messages: {}", e);
+                                    }
                                 }
+                                Err(e) => log::error!("Couldn't get messages: {:?}", e),
                             }
                             msg.clone().into()
                         }

@@ -272,8 +272,8 @@ transitive_from::hierarchy! {
         BrokerTimer,
         BrokerModules {
             GossipMessage {
-                raw::gossip_chat::MessageIn,
-                raw::gossip_chat::MessageOut,
+                raw::gossip_events::MessageIn,
+                raw::gossip_events::MessageOut,
             },
             RandomMessage {
                 // raw::random_connections::MessageIn,

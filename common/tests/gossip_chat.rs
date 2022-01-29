@@ -4,7 +4,7 @@ use common::{
     node::modules::gossip_chat::GossipMessage,
 };
 use helpers::*;
-use raw::gossip_chat::{MessageIn, message};
+use raw::gossip_events::{MessageIn, events};
 use types::nodeids::U256;
 
 #[test]
@@ -63,8 +63,8 @@ fn connect_nodes(nbr_nodes: usize) {
 }
 
 fn add_chat_message(net: &mut Network, id: &U256, step: i32) {
-    let msg = message::Message{
-        category: message::Category::TextMessage,
+    let msg = events::Event{
+        category: events::Category::TextMessage,
         src: U256::rnd(),
         created: step as f64,
         msg: "msg".into(),
@@ -72,7 +72,7 @@ fn add_chat_message(net: &mut Network, id: &U256, step: i32) {
     net.send_message(
         id,
         BrokerMessage::Modules(BrokerModules::Gossip(GossipMessage::MessageIn(
-            MessageIn::AddMessage(msg),
+            MessageIn::AddEvent(msg),
         ))),
     );
 }

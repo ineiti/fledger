@@ -12,17 +12,22 @@
 
 ### Things to do
 
-- add a node-info storage to the gossip-chat or random-connection
-  + replace TextMessages by a new Message with a category type
-  + rewrite gossip_chat to use the new Message type
-  - add node-info to the Message
-  - use node-info from the Message to display the chat messages
-  - clean up names: raw::gossip_chat::message::Message
-    - gossip_chat -> gossip_events
-    - message::Message* -> event::Event*
+- for the unique messages: also encode the time in the msgID, so that an
+  updated unique message is also transmitted. Currently the msgID == nodeID,
+  so if the 'created' field is updated, the message is not retransmitted.
 - Create a nicer display of the chat, perhaps with markdown display of messages
 
 # Dates
+
+2022-01-29:
+- clean up names: raw::gossip_chat::message::Message
+  - gossip_chat -> gossip_events
+  - message::Message* -> event::Event*
+- add a node-info storage to the gossip-chat or random-connection
+  + replace TextMessages by a new Message with a category type
+  + rewrite gossip_chat to use the new Message type
+  + add node-info to the Message
+  + use node-info from the Message to display the chat messages
 
 2022-01-27:
 - get texts loaded from browser storage

@@ -30,7 +30,7 @@ pub struct NodeData {
     /// Handles a random number of connections
     pub random_connections: raw::random_connections::Module,
     /// Gossip-messages sent and received
-    pub gossip_chat: raw::gossip_chat::Module,
+    pub gossip_chat: raw::gossip_events::Module,
 }
 
 impl NodeData {
@@ -43,8 +43,8 @@ impl NodeData {
             random_connections: raw::random_connections::Module::new(
                 raw::random_connections::Config::default(),
             ),
-            gossip_chat: raw::gossip_chat::Module::new(
-                raw::gossip_chat::Config::new(node_config.our_node.get_id()),
+            gossip_chat: raw::gossip_events::Module::new(
+                raw::gossip_events::Config::new(node_config.our_node.get_id()),
             ),
             node_config,
         }))

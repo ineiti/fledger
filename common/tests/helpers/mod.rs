@@ -150,7 +150,7 @@ impl Node {
             .lock()
             .unwrap()
             .gossip_chat
-            .get_chat_messages(raw::gossip_chat::message::Category::TextMessage)
+            .get_chat_events(raw::gossip_events::events::Category::TextMessage)
             .len()
     }
 }

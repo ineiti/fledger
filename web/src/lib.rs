@@ -196,11 +196,9 @@ impl FledgerState {
             .map(|(_k, v)| v.clone())
             .collect();
         let msgs = node.get_chat_messages().map_err(|e| anyhow!(e))?;
-        let mut list = node.get_list()?;
-        list.push(node.info()?);
         Ok(Self {
             info,
-            msgs: FledgerMessages::new(msgs, list),
+            msgs: FledgerMessages::new(msgs, node.get_list_nodes()?),
             nodes_online: stats.len() as u32,
             msgs_system: 0,
             msgs_local: 0,
@@ -251,7 +249,7 @@ pub struct FledgerMessages {
 }
 
 impl FledgerMessages {
-    fn new(mut tm_msgs: Vec<raw::gossip_chat::message::Message>, nodes: Vec<NodeInfo>) -> Self {
+    fn new(mut tm_msgs: Vec<raw::gossip_events::events::Event>, nodes: Vec<NodeInfo>) -> Self {
         tm_msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
         let mut msgs = vec![];
         for msg in tm_msgs {

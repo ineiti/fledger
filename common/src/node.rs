@@ -1,4 +1,3 @@
-use raw::gossip_chat::message;
 use crate::broker::BrokerModules;
 use crate::node::modules::gossip_chat::{self, GossipChat, GossipMessage};
 use crate::node::modules::random_connections::RandomConnections;
@@ -7,6 +6,7 @@ use crate::{
     broker::BrokerMessage,
     node::{network::BrokerNetwork, timer::Timer},
 };
+use raw::gossip_events::events;
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -51,6 +51,8 @@ pub enum NodeError {
     Network(#[from] NetworkError),
     #[error(transparent)]
     Broker(#[from] BrokerError),
+    #[error(transparent)]
+    Yaml(#[from] serde_yaml::Error),
 }
 
 /// The node structure holds it all together. It is the main structure of the project.
@@ -134,9 +136,20 @@ impl Node {
     }
 
     /// Gets the current list of available nodes
-    pub fn get_list(&self) -> Result<Vec<NodeInfo>, NodeError> {
+    pub fn get_list_active(&self) -> Result<Vec<NodeInfo>, NodeError> {
         let nd = self.node_data.lock().map_err(|_| NodeError::Lock)?;
         Ok(nd.network_state.list.clone())
+    }
+
+    /// Returns a list of known nodes from the local storage
+    pub fn get_list_nodes(&self) -> Result<Vec<NodeInfo>, NodeError> {
+        let nd = self.node_data.lock().map_err(|_| NodeError::Lock)?;
+        let mut nodeinfos = vec![];
+        for ni in nd.gossip_chat.get_events(events::Category::NodeInfo) {
+            // For some reason I cannot get to work the from_str in a .iter().map()
+            nodeinfos.push(serde_yaml::from_str(&ni.msg)?);
+        }
+        Ok(nodeinfos)
     }
 
     /// Returns a copy of the logic stats
@@ -146,22 +159,24 @@ impl Node {
     }
 
     pub fn add_chat_message(&self, msg: String) -> Result<(), NodeError> {
-        let msg_txt = message::Message {
-            category: message::Category::TextMessage,
+        let msg_txt = events::Event {
+            category: events::Category::TextMessage,
             src: self.info()?.get_id(),
             created: now(),
             msg,
         };
         self.broker
             .enqueue_bm(BrokerMessage::Modules(BrokerModules::Gossip(
-                GossipMessage::MessageIn(gossip_chat::MessageIn::AddMessage(msg_txt)),
+                GossipMessage::MessageIn(gossip_chat::MessageIn::AddEvent(msg_txt)),
             )));
         Ok(())
     }
 
-    pub fn get_chat_messages(&self) -> Result<Vec<message::Message>, NodeError> {
+    pub fn get_chat_messages(&self) -> Result<Vec<events::Event>, NodeError> {
         if let Ok(nd) = self.node_data.try_lock() {
-            return Ok(nd.gossip_chat.get_chat_messages(message::Category::TextMessage));
+            return Ok(nd
+                .gossip_chat
+                .get_chat_events(events::Category::TextMessage));
         }
         Err(NodeError::Lock)
     }
