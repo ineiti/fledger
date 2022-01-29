@@ -106,20 +106,35 @@ pub struct Events {
 impl Events {
     // Makes sure that the 'unique' configuration is respected.
     pub fn insert(&mut self, msg: Event) -> bool {
+        if self.events.get(&msg.get_id()).is_some() {
+            return false;
+        }
         if self.config.unique {
-            self.try_insert(msg.src, msg)
+            self.insert_unique(msg)
         } else {
-            self.try_insert(msg.get_id(), msg)
+            self.insert_simple(msg)
         }
     }
 
-    fn try_insert(&mut self, id: U256, msg: Event) -> bool {
-        if let Some(msg_stored) = self.events.get(&id) {
-            if msg_stored.created >= msg.created {
+    // Check if a message from the same node already exists. If it does,
+    // keep only the most recent of the stored and incoming message.
+    fn insert_unique(&mut self, msg: Event) -> bool {
+        if let Some((id, ev)) = self
+            .events
+            .iter()
+            .find(|(_, v)| v.src == msg.src).map(|(id, ev)| (*id, ev.clone()))
+        {
+            if ev.created > msg.created {
                 return false;
             }
+            self.events.remove(&id);
         }
-        self.events.insert(id, msg);
+        self.insert_simple(msg)
+    }
+
+    // Insert the message in the events and make sure the limits are kept.
+    fn insert_simple(&mut self, msg: Event) -> bool {
+        self.events.insert(msg.get_id(), msg);
         self.limit();
         true
     }
@@ -195,5 +210,51 @@ impl Event {
         id.update(self.created.to_le_bytes());
         id.update(&self.msg);
         id.finalize().into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_double_unique(){
+        let mut evs = Events{
+            config: CategoryConfig{ unique: true, max_events: 10 },
+            events: HashMap::new(),
+        };
+
+        let e1 = Event{ category: Category::NodeInfo, src: U256::rnd(), created: 1., msg: "foo".into() };
+        let e2 = Event{ category: Category::NodeInfo, src: e1.src, created: 2., msg: "bar".into() };
+
+        assert_eq!(0, evs.events.len());
+        assert!(evs.insert(e1.clone()));
+        assert_eq!(1, evs.events.len());
+        assert!(!evs.insert(e1));
+        assert_eq!(1, evs.events.len());
+        assert!(evs.insert(e2.clone()));
+        assert_eq!(1, evs.events.len());
+        assert!(evs.events.get(&e2.get_id()).is_some());
+    }
+
+    #[test]
+    fn test_double_normal(){
+        let mut evs = Events{
+            config: CategoryConfig{ unique: false, max_events: 10 },
+            events: HashMap::new(),
+        };
+
+        let e1 = Event{ category: Category::NodeInfo, src: U256::rnd(), created: 1., msg: "foo".into() };
+        let e2 = Event{ category: Category::NodeInfo, src: e1.src, created: 2., msg: "bar".into() };
+
+        assert_eq!(0, evs.events.len());
+        assert!(evs.insert(e1.clone()));
+        assert_eq!(1, evs.events.len());
+        assert!(!evs.insert(e1.clone()));
+        assert_eq!(1, evs.events.len());
+        assert!(evs.insert(e2.clone()));
+        assert_eq!(2, evs.events.len());
+        assert!(evs.events.get(&e1.get_id()).is_some());
+        assert!(evs.events.get(&e2.get_id()).is_some());
     }
 }

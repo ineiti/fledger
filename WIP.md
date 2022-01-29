@@ -12,14 +12,14 @@
 
 ### Things to do
 
-- for the unique messages: also encode the time in the msgID, so that an
-  updated unique message is also transmitted. Currently the msgID == nodeID,
-  so if the 'created' field is updated, the message is not retransmitted.
 - Create a nicer display of the chat, perhaps with markdown display of messages
 
 # Dates
 
 2022-01-29:
+- for the unique messages: also encode the time in the msgID, so that an
+  updated unique message is also transmitted. Currently the msgID == nodeID,
+  so if the 'created' field is updated, the message is not retransmitted.
 - clean up names: raw::gossip_chat::message::Message
   - gossip_chat -> gossip_events
   - message::Message* -> event::Event*
