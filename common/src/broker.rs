@@ -1,4 +1,4 @@
-use crate::node::modules::gossip_chat::GossipMessage;
+use crate::node::modules::gossip_events::GossipMessage;
 use crate::node::modules::random_connections::RandomMessage;
 use crate::node::network::NetworkConnectionState;
 use crate::node::{network::BrokerNetwork, timer::BrokerTimer};

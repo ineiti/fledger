@@ -2,8 +2,6 @@
 
 ## Current high-level goal
 
-- Explore a framework for having multiple modules interacting with each other
-- Propose a set of modules that can work together
 - Create usable crates for a signalling server and webrtc clients
 
 ## Current concrete goal
@@ -17,6 +15,8 @@
 # Dates
 
 2022-01-29:
+- high-level: Explore a framework for having multiple modules interacting with each other
+- high-level: Propose a set of modules that can work together (random-connections, gossip-events)
 - for the unique messages: also encode the time in the msgID, so that an
   updated unique message is also transmitted. Currently the msgID == nodeID,
   so if the 'created' field is updated, the message is not retransmitted.

@@ -1,7 +1,7 @@
 mod helpers;
 use common::{
     broker::{BrokerMessage, BrokerModules},
-    node::modules::gossip_chat::GossipMessage,
+    node::modules::gossip_events::GossipMessage,
 };
 use helpers::*;
 use raw::gossip_events::{MessageIn, events};

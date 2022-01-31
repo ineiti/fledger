@@ -3,7 +3,7 @@ use common::{
     node::{
         config::{NodeConfig, NodeInfo},
         modules::messages::NodeMessage,
-        modules::{gossip_chat::GossipChat, random_connections::RandomConnections},
+        modules::{gossip_events::GossipChat, random_connections::RandomConnections},
         network::BrokerNetwork,
         node_data::NodeData,
     },
@@ -149,7 +149,7 @@ impl Node {
         self.node_data
             .lock()
             .unwrap()
-            .gossip_chat
+            .gossip_events
             .get_chat_events(raw::gossip_events::events::Category::TextMessage)
             .len()
     }

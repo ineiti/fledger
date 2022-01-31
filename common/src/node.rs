@@ -1,5 +1,5 @@
 use crate::broker::BrokerModules;
-use crate::node::modules::gossip_chat::{self, GossipChat, GossipMessage};
+use crate::node::modules::gossip_events::{self, GossipChat, GossipMessage};
 use crate::node::modules::random_connections::RandomConnections;
 use crate::types::now;
 use crate::{
@@ -145,7 +145,7 @@ impl Node {
     pub fn get_list_nodes(&self) -> Result<Vec<NodeInfo>, NodeError> {
         let nd = self.node_data.lock().map_err(|_| NodeError::Lock)?;
         let mut nodeinfos = vec![];
-        for ni in nd.gossip_chat.get_events(events::Category::NodeInfo) {
+        for ni in nd.gossip_events.get_events(events::Category::NodeInfo) {
             // For some reason I cannot get to work the from_str in a .iter().map()
             nodeinfos.push(serde_yaml::from_str(&ni.msg)?);
         }
@@ -167,7 +167,7 @@ impl Node {
         };
         self.broker
             .enqueue_bm(BrokerMessage::Modules(BrokerModules::Gossip(
-                GossipMessage::MessageIn(gossip_chat::MessageIn::AddEvent(msg_txt)),
+                GossipMessage::MessageIn(gossip_events::MessageIn::AddEvent(msg_txt)),
             )));
         Ok(())
     }
@@ -175,7 +175,7 @@ impl Node {
     pub fn get_chat_messages(&self) -> Result<Vec<events::Event>, NodeError> {
         if let Ok(nd) = self.node_data.try_lock() {
             return Ok(nd
-                .gossip_chat
+                .gossip_events
                 .get_chat_events(events::Category::TextMessage));
         }
         Err(NodeError::Lock)

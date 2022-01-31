@@ -51,7 +51,11 @@ struct DummyDS {
 
 impl DummyDS {
     fn name(&self, key: &str) -> String {
-        format!("{}_{}.toml", self.base, key)
+        if self.base.is_empty() {
+            format!("fledger_{}.toml", key)
+        } else {
+            format!("{}_{}.toml", self.base, key)
+        }
     }
 }
 

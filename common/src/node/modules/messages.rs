@@ -1,6 +1,6 @@
 use crate::{
     broker::BrokerMessage,
-    node::{modules::gossip_chat, network::BrokerNetwork},
+    node::{modules::gossip_events, network::BrokerNetwork},
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -33,7 +33,7 @@ pub enum MessageV1 {
     // Pings another node
     Ping(),
     // GossipChat messages
-    GossipChat(gossip_chat::MessageNode),
+    GossipChat(gossip_events::MessageNode),
 }
 
 impl NodeMessage {
@@ -61,8 +61,8 @@ impl From<MessageV1> for Message {
     }
 }
 
-impl From<gossip_chat::MessageNode> for MessageV1 {
-    fn from(msg: gossip_chat::MessageNode) -> Self {
+impl From<gossip_events::MessageNode> for MessageV1 {
+    fn from(msg: gossip_events::MessageNode) -> Self {
         Self::GossipChat(msg)
     }
 }
@@ -100,7 +100,7 @@ impl fmt::Display for MessageV1 {
 transitive_from::hierarchy! {
     Message {
         MessageV1{
-            gossip_chat::MessageNode
+            gossip_events::MessageNode
         }
     }
 }
