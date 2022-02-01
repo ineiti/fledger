@@ -44,10 +44,7 @@ impl Timer {
     }
 
     fn emit(&mut self, msg: BrokerTimer) {
-        if let Err(e) = self
-            .broker
-            .emit(vec![BrokerMessage::Timer(msg.clone())])
-        {
+        if let Err(e) = self.broker.emit(vec![BrokerMessage::Timer(msg.clone())]) {
             log::warn!("While emitting {:?}, got error: {:?}", msg, e);
         }
     }

@@ -15,8 +15,8 @@ crate-type = ["cdylib"]
 local = []
 
 [dependencies]
-types = {path="../../modules/types"}
-raw = {path="../../modules/raw"}
+types = {path="../../fltypes"}
+raw = {path="../../modules"}
 common = {path = "../../common"}
 wasm-webrtc = {path = "../../wasm-webrtc", features=["node"]}
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }

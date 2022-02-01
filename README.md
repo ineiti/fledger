@@ -53,7 +53,7 @@ The following next steps are in the pipeline:
   - for wasm and linux client
     - create and publish also an npm package
     - write test-clients
-
+- Create a nicer display of the chat, perhaps with markdown display of messages
 - Create a minimum consensus for people to try it out in the browser at
 https://fledg.re
 - Link server nodes with browser nodes

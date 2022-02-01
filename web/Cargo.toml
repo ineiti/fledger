@@ -11,8 +11,8 @@ crate-type = ["cdylib", "rlib"]
 local = []
 
 [dependencies]
-raw = {path="../modules/raw"}
-types = {path="../modules/types"}
+raw = {path="../modules"}
+types = {path="../fltypes"}
 chrono = "0.4"
 anyhow = "1.0.42"
 js-sys = "0.3.51"

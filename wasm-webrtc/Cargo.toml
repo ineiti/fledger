@@ -8,7 +8,7 @@ edition = "2021"
 node = []
 
 [dependencies]
-types = {path = "../modules/types"}
+types = {path = "../fltypes"}
 common = {path = "../common"}
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
 js-sys = "0.3.51"

@@ -7,6 +7,6 @@ members = [
     "common",
     "vendor/names",
     "web",
-    "modules/raw",
-    "modules/types"
+    "modules",
+    "fltypes"
 ]

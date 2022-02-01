@@ -6,15 +6,17 @@
 
 ## Current concrete goal
 
-- Extend the chat using gossip-messaging instead of the centralized "oracle" nodes
+- Cleanup network.rs, signal.rs, types.rs, to be able to move them easier.
 
 ### Things to do
 
-- Create a nicer display of the chat, perhaps with markdown display of messages
-
 # Dates
 
+2022-02-01:
+- starting to cleanup network, broker, and types, before the move of the different parts
+
 2022-01-29:
+- Extend the chat using gossip-messaging instead of the centralized "oracle" nodes
 - high-level: Explore a framework for having multiple modules interacting with each other
 - high-level: Propose a set of modules that can work together (random-connections, gossip-events)
 - for the unique messages: also encode the time in the msgID, so that an

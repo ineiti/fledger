@@ -49,8 +49,7 @@ impl fmt::Debug for NodeMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!(
             "NodeMessage( id: {}, msg: {:?}",
-            self.id,
-            self.msg
+            self.id, self.msg
         ))
     }
 }

@@ -1,12 +1,4 @@
-use crate::broker::BrokerModules;
-use crate::node::modules::gossip_events::{self, GossipChat, GossipMessage};
-use crate::node::modules::random_connections::RandomConnections;
-use crate::types::now;
-use crate::{
-    broker::BrokerMessage,
-    node::{network::BrokerNetwork, timer::Timer},
-};
-use raw::gossip_events::events;
+use log::{error, info};
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -14,21 +6,26 @@ use std::{
 };
 use thiserror::Error;
 
-use log::{error, info};
-
-use self::{
-    config::{ConfigError, NodeConfig, NodeInfo},
-    network::{Network, NetworkError},
-    stats::StatNode,
-};
-use crate::{
-    broker::{Broker, BrokerError},
-    node::{node_data::NodeData, stats::Stats},
-    signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection},
-};
+use raw::gossip_events::events;
 use types::{
     data_storage::{DataStorage, DataStorageBase, StorageError},
     nodeids::U256,
+    utils::now,
+};
+
+use crate::{
+    broker::{Broker, BrokerError, BrokerMessage, BrokerModules},
+    node::modules::{
+        gossip_events::{self, GossipChat, GossipMessage},
+        random_connections::RandomConnections,
+    },
+    node::{
+        config::{ConfigError, NodeConfig, NodeInfo},
+        network::{Network, NetworkError},
+        stats::StatNode,
+    },
+    node::{network::BrokerNetwork, node_data::NodeData, stats::Stats, timer::Timer},
+    signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection},
 };
 
 pub mod config;
@@ -102,14 +99,14 @@ impl Node {
             config.our_node.get_id()
         );
 
-        let node_data = NodeData::new(config, storage);
+        let node_data = NodeData::new(config.clone(), storage);
         let broker = {
-            Network::start(Arc::clone(&node_data), ws, web_rtc);
             Stats::start(Arc::clone(&node_data));
             RandomConnections::start(Arc::clone(&node_data));
             GossipChat::start(Arc::clone(&node_data));
             node_data.lock().unwrap().broker.clone()
         };
+        Network::start(broker.clone(), config, ws, web_rtc);
         Timer::start(broker.clone());
 
         Ok(Node { node_data, broker })
@@ -138,7 +135,13 @@ impl Node {
     /// Gets the current list of available nodes
     pub fn get_list_active(&self) -> Result<Vec<NodeInfo>, NodeError> {
         let nd = self.node_data.lock().map_err(|_| NodeError::Lock)?;
-        Ok(nd.network_state.list.clone())
+        Ok(nd
+            .stats
+            .nodes
+            .values()
+            .filter_map(|sd| sd.node_info.as_ref())
+            .cloned()
+            .collect())
     }
 
     /// Returns a list of known nodes from the local storage

@@ -4,16 +4,16 @@ use common::{
     node::modules::gossip_events::GossipMessage,
 };
 use helpers::*;
-use raw::gossip_events::{MessageIn, events};
+use raw::gossip_events::{events, MessageIn};
 use types::nodeids::U256;
 
 #[test]
-fn connect_nodes_2(){
+fn connect_nodes_2() {
     connect_nodes(2);
 }
 
 #[test]
-fn connect_nodes_200(){
+fn connect_nodes_200() {
     connect_nodes(200);
 }
 
@@ -44,12 +44,18 @@ fn connect_nodes(nbr_nodes: usize) {
                 add_chat_message(&mut net, id, step);
             }
             20 => {
-                log::info!("Checking messages {} == {nbr} and adding 2nd message", nbr_nodes);
+                log::info!(
+                    "Checking messages {} == {nbr} and adding 2nd message",
+                    nbr_nodes
+                );
                 assert_eq!(nbr_nodes, nbr);
                 add_chat_message(&mut net, id, step);
             }
             30 => {
-                log::info!("Checking messages {} == {nbr} and adding {nbr_nodes} nodes", 2 * nbr_nodes);
+                log::info!(
+                    "Checking messages {} == {nbr} and adding {nbr_nodes} nodes",
+                    2 * nbr_nodes
+                );
                 assert_eq!(2 * nbr_nodes, nbr);
                 net.add_nodes(nbr_nodes);
             }
@@ -63,7 +69,7 @@ fn connect_nodes(nbr_nodes: usize) {
 }
 
 fn add_chat_message(net: &mut Network, id: &U256, step: i32) {
-    let msg = events::Event{
+    let msg = events::Event {
         category: events::Category::TextMessage,
         src: U256::rnd(),
         created: step as f64,

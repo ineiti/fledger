@@ -23,9 +23,8 @@ use crate::{
         version::VERSION_STRING,
     },
     signal::web_rtc::{ConnType, NodeStat, WebRTCConnectionState},
-    types::now,
 };
-use types::nodeids::U256;
+use types::{nodeids::U256, utils::now};
 
 #[derive(Debug, Error)]
 pub enum SNError {
@@ -39,12 +38,14 @@ pub enum SNError {
 
 pub struct NDStats {
     pub nodes: HashMap<U256, StatNode>,
+    pub list: Vec<NodeInfo>,
 }
 
 impl NDStats {
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),
+            list: vec![],
         }
     }
 

@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     broker::Broker,
-    node::{config::NodeConfig, stats::NDStats, network::NetworkState},
+    node::{config::NodeConfig, stats::NDStats},
 };
 
 use types::data_storage::DataStorageBase;
@@ -23,8 +23,6 @@ pub struct NodeData {
     pub broker: Broker,
 
     // Subsystem data
-    /// State of the network
-    pub network_state: NetworkState,
     /// Statistics of the connection
     pub stats: NDStats,
     /// Handles a random number of connections
@@ -38,14 +36,13 @@ impl NodeData {
         Arc::new(Mutex::new(Self {
             storage,
             broker: Broker::new(),
-            network_state: NetworkState::new(),
             stats: NDStats::new(),
             random_connections: raw::random_connections::Module::new(
                 raw::random_connections::Config::default(),
             ),
-            gossip_events: raw::gossip_events::Module::new(
-                raw::gossip_events::Config::new(node_config.our_node.get_id()),
-            ),
+            gossip_events: raw::gossip_events::Module::new(raw::gossip_events::Config::new(
+                node_config.our_node.get_id(),
+            )),
             node_config,
         }))
     }

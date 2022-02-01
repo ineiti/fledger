@@ -1,19 +1,20 @@
-use super::text_messages_v1::TextMessagesStorage;
-use crate::broker::{Subsystem, SubsystemListener};
-use crate::node::modules::messages::{Message, MessageV1};
-use crate::node::timer::BrokerTimer;
-use crate::node::NodeData;
-use crate::node::{modules::messages::NodeMessage, network::BrokerNetwork};
-use crate::node::{BrokerMessage, BrokerModules};
-use crate::types::now;
 use std::sync::Arc;
 use std::sync::Mutex;
 
 use raw::gossip_events::events;
 pub use raw::gossip_events::{MessageIn, MessageNode, MessageOut};
-use types::data_storage::DataStorage;
+use types::{data_storage::DataStorage, utils::now};
 
 use super::random_connections::RandomMessage;
+use super::text_messages_v1::TextMessagesStorage;
+use crate::{
+    broker::{Subsystem, SubsystemListener},
+    node::modules::messages::{Message, MessageV1},
+    node::timer::BrokerTimer,
+    node::NodeData,
+    node::{modules::messages::NodeMessage, network::BrokerNetwork},
+    node::{BrokerMessage, BrokerModules},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GossipMessage {

@@ -2,7 +2,7 @@ use crate::node::modules::gossip_events::GossipMessage;
 use crate::node::modules::random_connections::RandomMessage;
 use crate::node::network::NetworkConnectionState;
 use crate::node::{network::BrokerNetwork, timer::BrokerTimer};
-use crate::signal::web_rtc::{WSSignalMessage, PeerInfo};
+use crate::signal::web_rtc::{PeerInfo, WSSignalMessage};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
@@ -132,12 +132,7 @@ impl Intern {
 
     /// Adds a SubsystemInit
     pub fn add_subsystem(&mut self, ss: Subsystem) {
-        if let Subsystem::InitHandler(mut init) = ss {
-            init.init(self.main_tx.clone());
-            self.subsystems.push(Subsystem::InitHandler(init));
-        } else {
-            self.subsystems.push(ss);
-        }
+        self.subsystems.push(ss);
         self.msg_queue.push(vec![]);
     }
 
@@ -186,7 +181,6 @@ impl Intern {
 pub enum Subsystem {
     Sender(Receiver<BrokerMessage>),
     Tap(Sender<BrokerMessage>),
-    InitHandler(Box<dyn SubsystemInit>),
     Handler(Box<dyn SubsystemListener>),
 }
 
@@ -208,7 +202,6 @@ impl Subsystem {
                 });
                 vec![]
             }
-            Self::InitHandler(h) => h.messages(msgs),
             Self::Handler(h) => h.messages(msgs),
             _ => vec![],
         }
@@ -217,10 +210,6 @@ impl Subsystem {
 
 pub trait SubsystemListener {
     fn messages(&mut self, from_broker: Vec<&BrokerMessage>) -> Vec<BrokerMessage>;
-}
-
-pub trait SubsystemInit: SubsystemListener {
-    fn init(&mut self, to_broker: Sender<BrokerMessage>);
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -296,16 +285,7 @@ mod tests {
     }
 
     pub struct Tps {
-        init_msgs: Vec<BrokerMessage>,
         reply: Vec<(BrokerMessage, BrokerMessage)>,
-    }
-
-    impl SubsystemInit for Tps {
-        fn init(&mut self, to_broker: Sender<BrokerMessage>) {
-            for msg in self.init_msgs.iter() {
-                to_broker.send(msg.clone()).unwrap();
-            }
-        }
     }
 
     impl SubsystemListener for Tps {
@@ -334,8 +314,7 @@ mod tests {
         let broker = &mut Broker::new();
         // Add a first subsystem that will reply 'msg_b' when it
         // receives 'msg_a'.
-        broker.add_subsystem(Subsystem::InitHandler(Box::new(Tps {
-            init_msgs: vec![],
+        broker.add_subsystem(Subsystem::Handler(Box::new(Tps {
             reply: vec![(bm_a.clone(), bm_b.clone())],
         })))?;
         let (tap_tx, tap) = channel::<BrokerMessage>();
@@ -353,8 +332,7 @@ mod tests {
 
         // Add the same subsystem, now it should get 3 messages - the original
         // and two replies.
-        broker.add_subsystem(Subsystem::InitHandler(Box::new(Tps {
-            init_msgs: vec![],
+        broker.add_subsystem(Subsystem::Handler(Box::new(Tps {
             reply: vec![(bm_a.clone(), bm_b)],
         })))?;
         broker.emit(vec![bm_a])?;

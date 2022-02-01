@@ -1,20 +1,18 @@
-use crate::{broker::Subsystem, types::block_on};
 use ed25519_dalek::Signer;
-use std::sync::mpsc::{channel, Sender};
-
 use log::{info, warn};
 use std::{
     collections::HashMap,
+    sync::mpsc::{channel, Sender},
     sync::{mpsc::Receiver, Arc, Mutex},
 };
 use thiserror::Error;
+use types::{nodeids::U256, utils::block_on};
 
-use self::connection_state::CSEnum;
 use crate::{
-    broker::{Broker, BrokerError, BrokerMessage, SubsystemListener},
+    broker::{Broker, BrokerError, BrokerMessage, Subsystem, SubsystemListener},
     node::{
         config::{NodeConfig, NodeInfo},
-        node_data::NodeData,
+        modules::messages::NodeMessage,
     },
     signal::{
         web_rtc::{
@@ -24,13 +22,11 @@ use crate::{
         websocket::{WSError, WSMessage, WebSocketConnection},
     },
 };
-use node_connection::{NCError, NodeConnection};
-use types::nodeids::U256;
-
-use super::modules::messages::NodeMessage;
 
 pub mod connection_state;
 pub mod node_connection;
+use connection_state::CSEnum;
+use node_connection::{NCError, NodeConnection};
 
 #[derive(Error, Debug)]
 pub enum NetworkError {
@@ -56,17 +52,6 @@ pub enum NetworkError {
     Broker(#[from] BrokerError),
 }
 
-#[derive(Default)]
-pub struct NetworkState {
-    pub list: Vec<NodeInfo>,
-}
-
-impl NetworkState {
-    pub fn new() -> Self {
-        Self { list: vec![] }
-    }
-}
-
 pub struct Network {
     inner: Arc<Mutex<Inner>>,
     broker_tx: Sender<BrokerMessage>,
@@ -74,15 +59,22 @@ pub struct Network {
 
 impl Network {
     pub fn start(
-        node_data: Arc<Mutex<NodeData>>,
+        broker: Broker,
+        node_config: NodeConfig,
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
     ) {
-        let mut broker = node_data.lock().expect("Get NodeData").broker.clone();
         let (broker_tx, broker_rx) = channel::<BrokerMessage>();
         broker
+            .clone()
             .add_subsystem(Subsystem::Handler(Box::new(Self {
-                inner: Arc::new(Mutex::new(Inner::new(broker_rx, node_data, ws, web_rtc))),
+                inner: Arc::new(Mutex::new(Inner::new(
+                    broker,
+                    node_config,
+                    broker_rx,
+                    ws,
+                    web_rtc,
+                ))),
                 broker_tx,
             })))
             .expect("Couldn't add subsystem");
@@ -119,7 +111,6 @@ struct Inner {
     ws_rx: Receiver<WSMessage>,
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
     connections: HashMap<U256, NodeConnection>,
-    node_data: Arc<Mutex<NodeData>>,
     node_config: NodeConfig,
     broker: Broker,
     broker_rx: Receiver<BrokerMessage>,
@@ -130,25 +121,22 @@ struct Inner {
 /// It supports setting up automatic connections to other nodes.
 impl Inner {
     pub fn new(
+        broker: Broker,
+        node_config: NodeConfig,
         broker_rx: Receiver<BrokerMessage>,
-        node_data: Arc<Mutex<NodeData>>,
         mut ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
     ) -> Self {
         let (ws_tx, ws_rx) = channel::<WSMessage>();
-        let (node_config, broker) = {
-            let nsl = node_data.lock().unwrap();
-            let mut broker_clone = nsl.broker.clone();
-            ws.set_cb_wsmessage(Box::new(move |msg| {
-                if let Err(e) = ws_tx.send(msg) {
-                    warn!("Couldn't send msg over ws-channel: {}", e);
-                }
-                if broker_clone.process().is_err() {
-                    warn!("Couldn't process broker");
-                }
-            }));
-            (nsl.node_config.clone(), nsl.broker.clone())
-        };
+        let mut broker_clone = broker.clone();
+        ws.set_cb_wsmessage(Box::new(move |msg| {
+            if let Err(e) = ws_tx.send(msg) {
+                warn!("Couldn't send msg over ws-channel: {}", e);
+            }
+            if broker_clone.process().is_err() {
+                warn!("Couldn't process broker");
+            }
+        }));
         Self {
             ws,
             ws_rx,
@@ -156,7 +144,6 @@ impl Inner {
             web_rtc: Arc::new(Mutex::new(web_rtc)),
             connections: HashMap::new(),
             node_config,
-            node_data,
             broker,
         }
     }
@@ -193,7 +180,9 @@ impl Inner {
                 self.ws_send(WSSignalMessage::ListIDsRequest)?;
             }
             WSSignalMessage::ListIDsReply(list) => {
-                self.update_list(list)?;
+                let _ = self
+                    .broker
+                    .emit_bm(BrokerMessage::Network(BrokerNetwork::UpdateList(list)))?;
             }
             WSSignalMessage::PeerSetup(pi) => {
                 let remote_node = match pi.get_remote(&self.node_config.our_node.get_id()) {
@@ -220,7 +209,12 @@ impl Inner {
             if let BrokerMessage::Network(bn) = bm {
                 match bn {
                     BrokerNetwork::NodeMessageOut(nm) => {
-                        log::trace!("{}->{}: {:?}", self.node_config.our_node.get_id(), nm.id, nm.msg);
+                        log::trace!(
+                            "{}->{}: {:?}",
+                            self.node_config.our_node.get_id(),
+                            nm.id,
+                            nm.msg
+                        );
                         self.send(&nm.id, serde_json::to_string(&nm.msg)?).await?
                     }
                     BrokerNetwork::SendStats(ss) => {
@@ -237,23 +231,6 @@ impl Inner {
             }
         }
         Ok(())
-    }
-
-    /// Stores a node list sent from the signalling server.
-    fn update_list(&mut self, list: Vec<NodeInfo>) -> Result<(), NetworkError> {
-        self.node_data
-            .try_lock()
-            .expect("locking")
-            .network_state
-            .list = list
-            .iter()
-            .filter(|entry| entry.get_id() != self.node_config.our_node.get_id())
-            .cloned()
-            .collect();
-        self.broker
-            .emit_bm(BrokerMessage::Network(BrokerNetwork::UpdateList(list)))
-            .map(|_| ())
-            .map_err(|_| NetworkError::OutputQueue)
     }
 
     fn ws_send(&mut self, msg: WSSignalMessage) -> Result<(), NetworkError> {
@@ -291,7 +268,7 @@ impl Inner {
     /// start a new connection and put the message in a queue to be sent once the connection
     /// is established.
     async fn get_connection(&mut self, id: &U256) -> Result<&mut NodeConnection, NetworkError> {
-        if *id == self.node_config.our_node.get_id(){
+        if *id == self.node_config.our_node.get_id() {
             return Err(NetworkError::ConnectMyself);
         }
 

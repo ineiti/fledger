@@ -1,4 +1,3 @@
-use types::nodeids::U256;
 use ed25519_dalek::{Keypair, PublicKey};
 use rand::rngs::OsRng;
 use serde_derive::{Deserialize, Serialize};
@@ -7,6 +6,7 @@ use std::{
     fmt::{Debug, Error, Formatter},
 };
 use thiserror::Error;
+use types::nodeids::U256;
 
 #[derive(Error, Debug)]
 pub enum ConfigError {

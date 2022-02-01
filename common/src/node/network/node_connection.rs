@@ -1,7 +1,7 @@
-use crate::{signal::web_rtc::PeerInfo};
-use types::nodeids::U256;
+use crate::signal::web_rtc::PeerInfo;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
+use types::nodeids::U256;
 
 use crate::{
     broker::Broker,
