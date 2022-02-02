@@ -3,22 +3,20 @@ use wasm_bindgen_test::*;
 use wasm_webrtc::helpers::wait_ms;
 use wasm_webrtc::web_rtc_setup::WebRTCConnectionSetupWasm;
 
+use flnet::{
+    network::{
+        connection_state::CSError,
+        node_connection::{NCError, NodeConnection},
+        BrokerNetwork,
+    },
+    signal::web_rtc::{WSSignalMessage, WebRTCSpawner},
+};
 use flutils::{
     broker::{Broker, Subsystem},
     nodeids::U256,
 };
 
-use common::{
-    node::{
-        modules::messages::BrokerMessage,
-        network::{
-            connection_state::CSError,
-            node_connection::{NCError, NodeConnection},
-            BrokerNetwork,
-        },
-    },
-    signal::web_rtc::{WSSignalMessage, WebRTCSpawner},
-};
+use common::node::modules::messages::BrokerMessage;
 
 #[wasm_bindgen_test]
 async fn test_node_connection() {

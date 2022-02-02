@@ -1,15 +1,15 @@
-use flutils::{
-    broker::{Subsystem, SubsystemListener},
-    nodeids::U256,
-};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crate::node::network::BrokerNetwork;
-use crate::node::NodeData;
-
 pub use flmodules::random_connections::{MessageIn, MessageOut};
+use flnet::network::BrokerNetwork;
+use flutils::{
+    broker::{Subsystem, SubsystemListener},
+    nodeids::U256,
+};
+
+use crate::node::NodeData;
 
 use super::messages::BrokerMessage;
 use super::messages::BrokerModules;

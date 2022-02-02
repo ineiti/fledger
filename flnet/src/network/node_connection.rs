@@ -3,10 +3,7 @@ use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 use crate::{
-    node::{
-        modules::messages::BrokerMessage,
-        network::connection_state::{CSEnum, CSError, ConnectionState},
-    },
+    network::{connection_state::{CSEnum, CSError, ConnectionState}, BrokerNetwork},
     signal::web_rtc::{PeerInfo, WebRTCSpawner},
 };
 
@@ -38,7 +35,7 @@ pub struct NodeConnection {
 impl NodeConnection {
     pub async fn new(
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
-        broker: Broker<BrokerMessage>,
+        broker: Broker<BrokerNetwork>,
         id_local: U256,
         id_remote: U256,
     ) -> Result<NodeConnection, NCError> {

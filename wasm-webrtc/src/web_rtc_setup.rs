@@ -1,16 +1,14 @@
 use async_trait::async_trait;
-use common::signal::web_rtc::SetupError;
+use js_sys::Reflect;
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-
-use js_sys::Reflect;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::RtcConfiguration;
 
-use common::signal::web_rtc::{
-    ConnectionStateMap, WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCB,
+use flnet::signal::web_rtc::{
+    ConnectionStateMap, SetupError, WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCB,
     WebRTCSetupCBMessage,
 };
 

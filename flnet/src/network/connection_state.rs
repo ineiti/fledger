@@ -1,9 +1,5 @@
 use crate::{
-    node::{
-        modules::messages::BrokerMessage,
-        network::{ConnStats, NetworkConnectionState, NodeMessage},
-        BrokerNetwork,
-    },
+    network::{ConnStats, NetworkConnectionState, NodeMessage, BrokerNetwork},
     signal::web_rtc::PeerInfo,
 };
 use flutils::{broker::Broker, nodeids::U256};
@@ -77,7 +73,7 @@ pub struct ConnectionState {
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
     conn_setup: Option<Box<dyn WebRTCConnectionSetup>>,
     direction: CSDir,
-    broker: Broker<BrokerMessage>,
+    broker: Broker<BrokerNetwork>,
     connection: Arc<Mutex<Connection>>,
 }
 
@@ -86,7 +82,7 @@ impl ConnectionState {
     pub async fn new(
         incoming: bool,
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
-        broker: Broker<BrokerMessage>,
+        broker: Broker<BrokerNetwork>,
         id_local: U256,
         id_remote: U256,
     ) -> Result<ConnectionState, CSError> {
@@ -323,9 +319,9 @@ impl ConnectionState {
             }))
             .await;
         self.broker
-            .enqueue_msg(BrokerMessage::Network(BrokerNetwork::ConnectionState(
+            .enqueue_msg(BrokerNetwork::ConnectionState(
                 self.get_ncs(None),
-            )));
+            ));
         self.conn_setup = Some(rtc_conn);
         self.update_connection(CSEnum::Setup, None);
         Ok(())
@@ -354,7 +350,7 @@ impl ConnectionState {
 }
 
 struct Connection {
-    broker: Broker<BrokerMessage>,
+    broker: Broker<BrokerNetwork>,
     direction: CSDir,
     id_local: U256,
     id_remote: U256,
@@ -364,7 +360,7 @@ struct Connection {
 
 impl Connection {
     fn new(
-        broker: Broker<BrokerMessage>,
+        broker: Broker<BrokerNetwork>,
         direction: CSDir,
         id_local: U256,
         id_remote: U256,
@@ -400,9 +396,9 @@ impl Connection {
                 self.state = CSEnum::HasDataChannel;
                 self.connected = Some(conn);
                 self.broker
-                    .enqueue_msg(BrokerMessage::Network(BrokerNetwork::ConnectionState(
+                    .enqueue_msg(BrokerNetwork::ConnectionState(
                         self.get_ncs(None),
-                    )));
+                    ));
             }
         }
     }

@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use flutils::{broker::Broker, data_storage::DataStorageBase};
+use flnet::config::NodeConfig;
 
-use crate::node::{config::NodeConfig, modules::messages::BrokerMessage, stats::NDStats};
+use crate::node::{modules::messages::BrokerMessage, stats::NDStats};
 
 /// The NodeState is the shared global state of every node.
 /// It must only be stored as Arc<Mutex<NodeState>>.

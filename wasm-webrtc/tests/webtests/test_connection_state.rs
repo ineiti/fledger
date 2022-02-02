@@ -1,23 +1,20 @@
 use std::sync::{mpsc::channel, Arc, Mutex};
 use wasm_bindgen_test::*;
-use wasm_webrtc::helpers::wait_ms;
 
+use flnet::{
+    network::{
+        connection_state::{CSError, ConnectionState},
+        BrokerNetwork,
+    },
+    signal::web_rtc::{WSSignalMessage, WebRTCSpawner},
+};
 use flutils::{
     broker::{Broker, Subsystem},
     nodeids::U256,
 };
-use wasm_webrtc::web_rtc_setup::WebRTCConnectionSetupWasm;
+use wasm_webrtc::{helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm};
 
-use common::{
-    node::{
-        modules::messages::BrokerMessage,
-        network::{
-            connection_state::{CSError, ConnectionState},
-            BrokerNetwork,
-        },
-    },
-    signal::web_rtc::{WSSignalMessage, WebRTCSpawner},
-};
+use common::node::modules::messages::BrokerMessage;
 
 #[wasm_bindgen_test]
 async fn test_connection_state() {

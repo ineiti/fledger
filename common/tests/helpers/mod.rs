@@ -11,15 +11,17 @@ use flutils::{
     data_storage::TempDSB,
     nodeids::U256,
 };
+use flnet::{
+    config::{NodeConfig, NodeInfo},
+    network::BrokerNetwork,
+};
 
 use common::node::{
-    config::{NodeConfig, NodeInfo},
     modules::{
         gossip_events::GossipChat,
         messages::{BrokerMessage, NodeMessage},
         random_connections::RandomConnections,
     },
-    network::BrokerNetwork,
     node_data::NodeData,
 };
 

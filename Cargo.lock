@@ -226,6 +226,7 @@ dependencies = [
  "env_logger",
  "flexi_logger 0.19.4",
  "flmodules",
+ "flnet",
  "flutils",
  "futures",
  "getrandom 0.2.3",
@@ -509,6 +510,28 @@ dependencies = [
 [[package]]
 name = "flnet"
 version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ed25519-dalek",
+ "flmodules",
+ "flutils",
+ "futures",
+ "getrandom 0.2.3",
+ "itertools",
+ "log",
+ "names",
+ "rand 0.7.3",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.9.8",
+ "thiserror",
+ "timer",
+ "toml",
+ "transitive_from",
+ "web-sys",
+]
 
 [[package]]
 name = "flnode"
@@ -1899,6 +1922,7 @@ dependencies = [
  "async-trait",
  "common",
  "console_error_panic_hook",
+ "flnet",
  "flutils",
  "getrandom 0.2.3",
  "js-sys",

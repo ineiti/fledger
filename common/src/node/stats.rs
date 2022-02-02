@@ -5,22 +5,22 @@ use std::{
 };
 use thiserror::Error;
 
+use flnet::{
+    config::{NodeConfig, NodeInfo},
+    network::{connection_state::CSEnum, BrokerNetwork, ConnStats, NetworkConnectionState},
+    signal::web_rtc::{ConnType, NodeStat, WebRTCConnectionState},
+};
 use flutils::{
     broker::{Broker, BrokerError, Subsystem, SubsystemListener},
     nodeids::U256,
     utils::now,
 };
 
-use crate::{
-    node::{
-        config::{NodeConfig, NodeInfo},
-        modules::messages::{BrokerMessage, Message, MessageV1, NodeMessage},
-        network::{connection_state::CSEnum, BrokerNetwork, ConnStats, NetworkConnectionState},
-        node_data::NodeData,
-        timer::BrokerTimer,
-        version::VERSION_STRING,
-    },
-    signal::web_rtc::{ConnType, NodeStat, WebRTCConnectionState},
+use crate::node::{
+    modules::messages::{BrokerMessage, Message, MessageV1, NodeMessage},
+    node_data::NodeData,
+    timer::BrokerTimer,
+    version::VERSION_STRING,
 };
 
 #[derive(Debug, Error)]
@@ -255,7 +255,7 @@ impl SubsystemListener<BrokerMessage> for Stats {
             if let Err(e) = match msg {
                 BrokerMessage::Network(BrokerNetwork::ConnectionState(cs)) => self.upsert(cs),
                 BrokerMessage::Network(BrokerNetwork::UpdateList(ul)) => self.update_list(ul),
-                BrokerMessage::Network(BrokerNetwork::NodeMessageIn(nm)) => self.ping_rcv(nm),
+                BrokerMessage::NodeMessageIn(nm) => self.ping_rcv(nm),
                 BrokerMessage::Timer(BrokerTimer::Second) => self.send_stats(),
                 _ => Ok(()),
             } {

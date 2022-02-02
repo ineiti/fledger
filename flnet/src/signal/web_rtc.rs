@@ -7,9 +7,10 @@ use std::{
 };
 use thiserror::Error;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
+
 use flutils::nodeids::U256;
 
-use crate::node::{config::NodeInfo, network::BrokerNetwork};
+use crate::{config::NodeInfo, network::BrokerNetwork};
 
 #[derive(Debug, Error)]
 pub enum SetupError {

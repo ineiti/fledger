@@ -1,20 +1,20 @@
-use flutils::nodeids::U256;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::{
-    node::{
-        modules::{gossip_events, gossip_events::GossipMessage, random_connections::RandomMessage},
-        network::{BrokerNetwork, NetworkConnectionState},
-        timer::BrokerTimer,
-    },
-    signal::web_rtc::{PeerInfo, WSSignalMessage},
+use flnet::network::{self, BrokerNetwork};
+use flutils::nodeids::U256;
+
+use crate::node::{
+    modules::{gossip_events, gossip_events::GossipMessage, random_connections::RandomMessage},
+    timer::BrokerTimer,
 };
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerMessage {
     Network(BrokerNetwork),
+    NodeMessageIn(NodeMessage),
+    NodeMessageOut(NodeMessage),
     Timer(BrokerTimer),
     Modules(BrokerModules),
 }
@@ -32,6 +32,8 @@ impl std::fmt::Display for BrokerMessage {
             "BrokerMessage({})",
             match self {
                 BrokerMessage::Network(_) => "Network",
+                BrokerMessage::NodeMessageIn(_) => "NodeMessageIn",
+                BrokerMessage::NodeMessageOut(_) => "NodeMessageOut",
                 BrokerMessage::Timer(_) => "Timer",
                 BrokerMessage::Modules(_) => "Modules",
             }
@@ -45,25 +47,41 @@ impl From<BrokerModules> for BrokerMessage {
     }
 }
 
-transitive_from::hierarchy! {
-    BrokerMessage {
-        BrokerNetwork {
-            NetworkConnectionState,
-            WSSignalMessage {
-                PeerInfo
+impl TryFrom<BrokerNetwork> for BrokerMessage {
+    type Error = ();
+    fn try_from(msg: BrokerNetwork) -> Result<Self, ()> {
+        match msg {
+            BrokerNetwork::NodeMessageIn(msg) => {
+                if let Ok(nm) = serde_json::from_str(&msg.msg) {
+                    Ok(NodeMessage {
+                        id: msg.id,
+                        msg: nm,
+                    }
+                    .input())
+                } else {
+                    Err(())
+                }
             }
-        },
-        BrokerTimer,
-        BrokerModules {
-            GossipMessage {
-                flmodules::gossip_events::MessageIn,
-                flmodules::gossip_events::MessageOut,
-            },
-            RandomMessage {
-                // flmodules::random_connections::MessageIn,
-                // flmodules::random_connections::MessageOut,
-            },
-        },
+            BrokerNetwork::NodeMessageOut(_) => Err(()),
+            _ => Ok(Self::Network(msg)),
+        }
+    }
+}
+
+impl TryInto<BrokerNetwork> for BrokerMessage {
+    type Error = ();
+    fn try_into(self) -> Result<BrokerNetwork, ()>{
+        match self {
+            BrokerMessage::NodeMessageOut(nm) => {
+                if let Ok(msg) = serde_json::to_string(&nm.msg){
+                    Ok(network::NodeMessage{id: nm.id, msg}.output())
+                } else {
+                    Err(())
+                }
+            }
+            BrokerMessage::Network(net) => Ok(net),
+            _ => Err(())
+        }
     }
 }
 
@@ -99,10 +117,10 @@ pub enum MessageV1 {
 
 impl NodeMessage {
     pub fn input(&self) -> BrokerMessage {
-        BrokerNetwork::NodeMessageIn(self.clone()).into()
+        BrokerMessage::NodeMessageIn(self.clone())
     }
     pub fn output(&self) -> BrokerMessage {
-        BrokerNetwork::NodeMessageOut(self.clone()).into()
+        BrokerMessage::NodeMessageOut(self.clone())
     }
 }
 
@@ -112,6 +130,18 @@ impl fmt::Debug for NodeMessage {
             "NodeMessage( id: {}, msg: {:?}",
             self.id, self.msg
         ))
+    }
+}
+
+impl TryFrom<&network::NodeMessage> for NodeMessage {
+    type Error = String;
+    fn try_from(msg_net: &network::NodeMessage) -> Result<Self, Self::Error> {
+        serde_json::from_str(&msg_net.msg)
+            .map(|msg| Self {
+                id: msg_net.id,
+                msg,
+            })
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -158,6 +188,16 @@ impl fmt::Display for MessageV1 {
 }
 
 transitive_from::hierarchy! {
+    BrokerMessage {
+        BrokerNetwork,
+        BrokerModules {
+            GossipMessage {
+                gossip_events::MessageIn,
+                gossip_events::MessageOut,
+            },
+            RandomMessage,
+        }
+    },
     Message {
         MessageV1{
             gossip_events::MessageNode

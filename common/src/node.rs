@@ -13,26 +13,26 @@ use flutils::{
     nodeids::U256,
     utils::now,
 };
+use flnet::{
+    config::{ConfigError, NodeConfig, NodeInfo},
+    network::{BrokerNetwork, Network, NetworkError},
+    signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection},
+};
 
 use crate::{
     node::{
-        config::{ConfigError, NodeConfig, NodeInfo},
         modules::{
             gossip_events::{self, GossipChat, GossipMessage},
             messages::{BrokerMessage, BrokerModules},
             random_connections::RandomConnections,
         },
-        network::{BrokerNetwork, Network, NetworkError},
         node_data::NodeData,
         stats::{StatNode, Stats},
         timer::Timer,
     },
-    signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection},
 };
 
-pub mod config;
 pub mod modules;
-pub mod network;
 pub mod node_data;
 pub mod stats;
 pub mod timer;
@@ -108,7 +108,7 @@ impl Node {
             GossipChat::start(Arc::clone(&node_data));
             node_data.lock().unwrap().broker.clone()
         };
-        Network::start(broker.clone(), config, ws, web_rtc);
+        let broker_net = Network::start(config, ws, web_rtc);
         Timer::start(broker.clone());
 
         Ok(Node { node_data, broker })

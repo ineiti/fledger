@@ -10,15 +10,14 @@ use flutils::{
     utils::now,
 };
 
-use super::messages::BrokerMessage;
-use super::messages::BrokerModules;
-use super::random_connections::RandomMessage;
-use super::text_messages_v1::TextMessagesStorage;
-use crate::{
-    node::modules::messages::{Message, MessageV1},
-    node::timer::BrokerTimer,
-    node::NodeData,
-    node::{modules::messages::NodeMessage, network::BrokerNetwork},
+use crate::node::{
+    modules::{
+        messages::{BrokerMessage, BrokerModules, Message, MessageV1, NodeMessage},
+        random_connections::RandomMessage,
+        text_messages_v1::TextMessagesStorage,
+    },
+    timer::BrokerTimer,
+    NodeData,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -106,7 +105,7 @@ impl GossipChat {
     // Searches for a matching NodeMessageIn or a RandomMessage that needs conversion.
     fn process_msg_bm(&mut self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
         match msg {
-            BrokerMessage::Network(BrokerNetwork::NodeMessageIn(nm)) => match &nm.msg {
+            BrokerMessage::NodeMessageIn(nm) => match &nm.msg {
                 Message::V1(MessageV1::GossipChat(gc)) => Some(MessageIn::Node(nm.id, gc.clone())),
                 _ => None,
             },

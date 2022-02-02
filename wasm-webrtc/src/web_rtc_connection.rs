@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{MessageEvent, RtcDataChannel, RtcPeerConnection, RtcSignalingState};
 
-use common::signal::web_rtc::{
+use flnet::signal::web_rtc::{
     ConnType, ConnectionError, ConnectionStateMap, SignalingState, WebRTCConnection,
     WebRTCMessageCB,
 };

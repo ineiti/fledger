@@ -7,9 +7,10 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-transitive_from = "0.1.3"
+flnet = {path="../flnet"}
 flutils = {path = "../flutils"}
 flmodules = {path = "../flmodules"}
+transitive_from = "0.1.3"
 async-trait = "0.1.51"
 rand = "0.7"
 serde = { version = "1.0.127", features = ["derive"] }

@@ -5,24 +5,18 @@ use std::{
     sync::{mpsc::channel, Arc, Mutex},
 };
 use thiserror::Error;
-
-use common::{
-    node::{Node, NodeError},
-    signal::{
-        web_rtc::{
-            ConnectionError, SetupError, WSSignalMessage, WebRTCConnection, WebRTCConnectionSetup,
-            WebRTCConnectionState, WebRTCSetupCBMessage, WebSocketMessage,
-        },
-        websocket::{MessageCallback, WSError, WSMessage, WebSocketConnection},
-    },
-};
-use flutils::{
-    nodeids::U256, data_storage::TempDSB,
-};
-
 use wasm_bindgen_test::*;
 
+use flnet::signal::{
+    web_rtc::{
+        ConnectionError, SetupError, WSSignalMessage, WebRTCConnection, WebRTCConnectionSetup,
+        WebRTCConnectionState, WebRTCSetupCBMessage, WebSocketMessage,
+    },
+    websocket::{MessageCallback, WSError, WSMessage, WebSocketConnection},
+};
+use flutils::{data_storage::TempDSB, nodeids::U256};
 use wasm_webrtc::{helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm};
+use common::node::{Node, NodeError};
 
 #[derive(Debug, Error)]
 pub enum WSDError {

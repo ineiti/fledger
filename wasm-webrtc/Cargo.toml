@@ -8,6 +8,7 @@ edition = "2021"
 node = []
 
 [dependencies]
+flnet = {path="../flnet"}
 flutils = {path = "../flutils"}
 common = {path = "../common"}
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
