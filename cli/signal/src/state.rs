@@ -6,7 +6,7 @@ use std::{
 };
 
 use common::signal::websocket::{WSMessage, WebSocketConnectionSend, WebSocketServer};
-use types::nodeids::U256;
+use flutils::nodeids::U256;
 
 mod internal;
 mod node_entry;

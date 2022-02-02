@@ -19,7 +19,7 @@ use common::{
         websocket::WSMessage,
     },
 };
-use types::nodeids::U256;
+use flutils::nodeids::U256;
 
 use dipstick::*;
 

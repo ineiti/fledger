@@ -1,12 +1,11 @@
-use crate::{signal::web_rtc::PeerInfo, broker::BrokerMessage};
+use flutils::nodeids::U256;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use types::nodeids::U256;
 
 use crate::{
     broker::Broker,
-    node::network::connection_state::{CSEnum, CSError, ConnectionState},
-    signal::web_rtc::WebRTCSpawner,
+    node::{network::connection_state::{CSEnum, CSError, ConnectionState}, modules::messages::BrokerMessage},
+    signal::web_rtc::{PeerInfo, WebRTCSpawner},
 };
 
 #[derive(Error, Debug)]

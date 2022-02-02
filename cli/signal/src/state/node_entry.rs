@@ -9,7 +9,7 @@ use common::{
         websocket::WebSocketConnectionSend,
     },
 };
-use types::nodeids::U256;
+use flutils::nodeids::U256;
 
 pub struct NodeEntry {
     pub conn: Box<dyn WebSocketConnectionSend>,

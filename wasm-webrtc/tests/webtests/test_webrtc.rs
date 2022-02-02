@@ -16,7 +16,7 @@ use common::{
         websocket::{MessageCallback, WSError, WSMessage, WebSocketConnection},
     },
 };
-use types::{
+use flutils::{
     nodeids::U256, data_storage::TempDSB,
 };
 

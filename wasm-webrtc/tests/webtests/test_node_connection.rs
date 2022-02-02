@@ -1,15 +1,22 @@
-use common::node::network::node_connection::{NCError, NodeConnection};
 use std::sync::{mpsc::channel, Arc, Mutex};
 use wasm_bindgen_test::*;
 use wasm_webrtc::helpers::wait_ms;
+use wasm_webrtc::web_rtc_setup::WebRTCConnectionSetupWasm;
+
+use flutils::nodeids::U256;
 
 use common::{
-    broker::{Broker, BrokerMessage, Subsystem},
-    node::network::{connection_state::CSError, BrokerNetwork},
+    broker::{Broker, Subsystem},
+    node::{
+        modules::messages::BrokerMessage,
+        network::{
+            connection_state::CSError,
+            node_connection::{NCError, NodeConnection},
+            BrokerNetwork,
+        },
+    },
     signal::web_rtc::{WSSignalMessage, WebRTCSpawner},
 };
-use types::nodeids::U256;
-use wasm_webrtc::web_rtc_setup::WebRTCConnectionSetupWasm;
 
 #[wasm_bindgen_test]
 async fn test_node_connection() {
@@ -57,9 +64,9 @@ async fn test_node_connection_result() -> Result<(), NCError> {
         let msgs: Vec<BrokerMessage> = tap_init.try_iter().collect();
         log::info!("Processing messages from init");
         for msg in msgs {
-            if let BrokerMessage::Network(BrokerNetwork::WebSocket(
-                WSSignalMessage::PeerSetup(pi),
-            )) = msg
+            if let BrokerMessage::Network(BrokerNetwork::WebSocket(WSSignalMessage::PeerSetup(
+                pi,
+            ))) = msg
             {
                 log::debug!("Time {}: init sent message: {}", i, pi.message);
                 follow.process_ws(pi).await?
@@ -69,9 +76,9 @@ async fn test_node_connection_result() -> Result<(), NCError> {
         let msgs: Vec<BrokerMessage> = tap_follow.try_iter().collect();
         log::info!("Processing messages from follow");
         for msg in msgs {
-            if let BrokerMessage::Network(BrokerNetwork::WebSocket(
-                WSSignalMessage::PeerSetup(pi),
-            )) = msg
+            if let BrokerMessage::Network(BrokerNetwork::WebSocket(WSSignalMessage::PeerSetup(
+                pi,
+            ))) = msg
             {
                 log::debug!("Time {}: follow sent message: {}", i, pi.message);
                 init.process_ws(pi).await?

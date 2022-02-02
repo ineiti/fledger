@@ -1,11 +1,8 @@
+use flutils::nodeids::U256;
+use flmodules::gossip_events::{events, MessageIn};
+
 mod helpers;
-use common::{
-    broker::{BrokerMessage, BrokerModules},
-    node::modules::gossip_events::GossipMessage,
-};
 use helpers::*;
-use raw::gossip_events::{events, MessageIn};
-use types::nodeids::U256;
 
 #[test]
 fn connect_nodes_2() {
@@ -75,10 +72,5 @@ fn add_chat_message(net: &mut Network, id: &U256, step: i32) {
         created: step as f64,
         msg: "msg".into(),
     };
-    net.send_message(
-        id,
-        BrokerMessage::Modules(BrokerModules::Gossip(GossipMessage::MessageIn(
-            MessageIn::AddEvent(msg),
-        ))),
-    );
+    net.send_message(id, MessageIn::AddEvent(msg).into());
 }

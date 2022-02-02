@@ -1,13 +1,3 @@
-use common::{
-    broker::{BrokerMessage, Subsystem, SubsystemListener},
-    node::{
-        config::{NodeConfig, NodeInfo},
-        modules::messages::NodeMessage,
-        modules::{gossip_events::GossipChat, random_connections::RandomConnections},
-        network::BrokerNetwork,
-        node_data::NodeData,
-    },
-};
 use std::{
     collections::HashMap,
     sync::{
@@ -15,7 +5,22 @@ use std::{
         Arc, Mutex,
     },
 };
-use types::{data_storage::TempDSB, nodeids::U256};
+
+use flutils::{data_storage::TempDSB, nodeids::U256};
+
+use common::{
+    broker::{Subsystem, SubsystemListener},
+    node::{
+        config::{NodeConfig, NodeInfo},
+        modules::{
+            gossip_events::GossipChat,
+            messages::{BrokerMessage, NodeMessage},
+            random_connections::RandomConnections,
+        },
+        network::BrokerNetwork,
+        node_data::NodeData,
+    },
+};
 
 pub struct Network {
     pub nodes: HashMap<U256, Node>,
@@ -150,7 +155,7 @@ impl Node {
             .lock()
             .unwrap()
             .gossip_events
-            .get_chat_events(raw::gossip_events::events::Category::TextMessage)
+            .get_chat_events(flmodules::gossip_events::events::Category::TextMessage)
             .len()
     }
 }

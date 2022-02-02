@@ -6,10 +6,10 @@ use std::{
     sync::{mpsc::Receiver, Arc, Mutex},
 };
 use thiserror::Error;
-use types::{nodeids::U256, utils::block_on};
+use flutils::{nodeids::U256, utils::block_on};
 
 use crate::{
-    broker::{Broker, BrokerError, BrokerMessage, Subsystem, SubsystemListener},
+    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
     node::{
         config::{NodeConfig, NodeInfo},
         modules::messages::NodeMessage,
@@ -27,6 +27,8 @@ pub mod connection_state;
 pub mod node_connection;
 use connection_state::CSEnum;
 use node_connection::{NCError, NodeConnection};
+
+use super::modules::messages::BrokerMessage;
 
 #[derive(Error, Debug)]
 pub enum NetworkError {

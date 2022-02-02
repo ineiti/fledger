@@ -1,10 +1,71 @@
-use crate::{
-    broker::BrokerMessage,
-    node::{modules::gossip_events, network::BrokerNetwork},
-};
+use flutils::nodeids::U256;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use types::nodeids::U256;
+
+use crate::{
+    node::{
+        modules::{gossip_events, gossip_events::GossipMessage, random_connections::RandomMessage},
+        network::{BrokerNetwork, NetworkConnectionState},
+        timer::BrokerTimer,
+    },
+    signal::web_rtc::{PeerInfo, WSSignalMessage},
+};
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum BrokerMessage {
+    Network(BrokerNetwork),
+    Timer(BrokerTimer),
+    Modules(BrokerModules),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BrokerModules {
+    Gossip(GossipMessage),
+    Random(RandomMessage),
+}
+
+impl std::fmt::Display for BrokerMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "BrokerMessage({})",
+            match self {
+                BrokerMessage::Network(_) => "Network",
+                BrokerMessage::Timer(_) => "Timer",
+                BrokerMessage::Modules(_) => "Modules",
+            }
+        )
+    }
+}
+
+impl From<BrokerModules> for BrokerMessage {
+    fn from(msg: BrokerModules) -> Self {
+        Self::Modules(msg)
+    }
+}
+
+transitive_from::hierarchy! {
+    BrokerMessage {
+        BrokerNetwork {
+            NetworkConnectionState,
+            WSSignalMessage {
+                PeerInfo
+            }
+        },
+        BrokerTimer,
+        BrokerModules {
+            GossipMessage {
+                flmodules::gossip_events::MessageIn,
+                flmodules::gossip_events::MessageOut,
+            },
+            RandomMessage {
+                // flmodules::random_connections::MessageIn,
+                // flmodules::random_connections::MessageOut,
+            },
+        },
+    }
+}
 
 #[derive(Clone, PartialEq)]
 pub struct NodeMessage {

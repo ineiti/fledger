@@ -1,8 +1,3 @@
-use crate::node::modules::gossip_events::GossipMessage;
-use crate::node::modules::random_connections::RandomMessage;
-use crate::node::network::NetworkConnectionState;
-use crate::node::{network::BrokerNetwork, timer::BrokerTimer};
-use crate::signal::web_rtc::{PeerInfo, WSSignalMessage};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
@@ -34,7 +29,7 @@ pub struct Broker<T: Clone> {
 #[allow(clippy::all)]
 unsafe impl<T: Clone> Send for Broker<T> {}
 
-impl<T: Clone> Default for Broker<T> {
+impl<T: 'static + Clone> Default for Broker<T> {
     /// Create a new broker.
     fn default() -> Self {
         Self::new()
@@ -52,7 +47,7 @@ impl<T: Clone> Clone for Broker<T> {
     }
 }
 
-impl<T: Clone> Broker<T> {
+impl<T: 'static + Clone> Broker<T> {
     pub fn new() -> Self {
         let intern = Intern::new();
         Self {
@@ -95,6 +90,47 @@ impl<T: Clone> Broker<T> {
     /// Try to emit and process a message
     pub fn emit_msg(&mut self, msg: T) -> Result<usize, BrokerError> {
         self.emit_msgs(vec![msg])
+    }
+
+    /// Connects to another broker. The message type of the other broker
+    /// needs to implement the TryFrom and TryInto for this broker's message
+    /// type.
+    /// Any error in the TryInto and TryFrom are interpreted as a message
+    /// that cannot be translated and are ignored.
+    pub fn broker_join<R: 'static + Clone + TryFrom<T> + TryInto<T>>(
+        &self,
+        broker_r: &Broker<R>,
+    ) {
+        let listener_r = Listener {
+            broker: self.clone(),
+        };
+        let listener_s = Listener {
+            broker: broker_r.clone(),
+        };
+        broker_r
+            .clone()
+            .add_subsystem(Subsystem::Handler(Box::new(listener_r)))
+            .unwrap();
+        self
+            .clone()
+            .add_subsystem(Subsystem::Handler(Box::new(listener_s)))
+            .unwrap();
+    }    
+}
+
+pub struct Listener<S: Clone> {
+    broker: Broker<S>,
+}
+
+impl<R: Clone + TryInto<S>, S: 'static + Clone> SubsystemListener<R> for Listener<S> {
+    fn messages(&mut self, msgs: Vec<&R>) -> Vec<R> {
+        self.broker.enqueue_msgs(
+            msgs.iter()
+                .filter_map(|&msg| msg.clone().try_into().ok())
+                .collect(),
+        );
+        let _ = self.broker.process();
+        vec![]
     }
 }
 
@@ -201,66 +237,6 @@ pub trait SubsystemListener<T> {
     fn messages(&mut self, from_broker: Vec<&T>) -> Vec<T>;
 }
 
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum BrokerMessage {
-    Network(BrokerNetwork),
-    Timer(BrokerTimer),
-    Modules(BrokerModules),
-    #[cfg(test)]
-    TestMessages(tests::BrokerTest),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum BrokerModules {
-    Gossip(GossipMessage),
-    Random(RandomMessage),
-}
-
-impl std::fmt::Display for BrokerMessage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "BrokerMessage({})",
-            match self {
-                BrokerMessage::Network(_) => "Network",
-                BrokerMessage::Timer(_) => "Timer",
-                BrokerMessage::Modules(_) => "Modules",
-                #[cfg(test)]
-                BrokerMessage::TestMessages(_) => "TestMessages",
-            }
-        )
-    }
-}
-
-impl From<BrokerModules> for BrokerMessage {
-    fn from(msg: BrokerModules) -> Self {
-        Self::Modules(msg)
-    }
-}
-
-transitive_from::hierarchy! {
-    BrokerMessage {
-        BrokerNetwork {
-            NetworkConnectionState,
-            WSSignalMessage {
-                PeerInfo
-            }
-        },
-        BrokerTimer,
-        BrokerModules {
-            GossipMessage {
-                raw::gossip_events::MessageIn,
-                raw::gossip_events::MessageOut,
-            },
-            RandomMessage {
-                // raw::random_connections::MessageIn,
-                // raw::random_connections::MessageOut,
-            },
-        },
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use flexi_logger::LevelFilter;
@@ -274,11 +250,11 @@ mod tests {
     }
 
     pub struct Tps {
-        reply: Vec<(BrokerMessage, BrokerMessage)>,
+        reply: Vec<(BrokerTest, BrokerTest)>,
     }
 
-    impl SubsystemListener<BrokerMessage> for Tps {
-        fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
+    impl SubsystemListener<BrokerTest> for Tps {
+        fn messages(&mut self, msgs: Vec<&BrokerTest>) -> Vec<BrokerTest> {
             let mut output = vec![];
             log::debug!("Msgs are: {:?} - Replies are: {:?}", msgs, self.reply);
 
@@ -297,8 +273,8 @@ mod tests {
     async fn test_broker_new() -> Result<(), BrokerError> {
         simple_logging::log_to_stderr(LevelFilter::Trace);
 
-        let bm_a = BrokerMessage::TestMessages(BrokerTest::MsgA);
-        let bm_b = BrokerMessage::TestMessages(BrokerTest::MsgB);
+        let bm_a = BrokerTest::MsgA;
+        let bm_b = BrokerTest::MsgB;
 
         let broker = &mut Broker::new();
         // Add a first subsystem that will reply 'msg_b' when it
@@ -306,7 +282,7 @@ mod tests {
         broker.add_subsystem(Subsystem::Handler(Box::new(Tps {
             reply: vec![(bm_a.clone(), bm_b.clone())],
         })))?;
-        let (tap_tx, tap) = channel::<BrokerMessage>();
+        let (tap_tx, tap) = channel::<BrokerTest>();
         broker.add_subsystem(Subsystem::Tap(tap_tx))?;
 
         // Shouldn't reply to a msg_b, so only 1 message.
@@ -327,6 +303,88 @@ mod tests {
         broker.emit_msgs(vec![bm_a])?;
         broker.process()?;
         assert_eq!(tap.try_iter().count(), 3);
+
+        Ok(())
+    }
+
+    #[derive(Clone, PartialEq, Debug)]
+    enum MessageA {
+        One,
+        Two,
+        Four,
+    }
+
+    impl TryFrom<MessageB> for MessageA {
+        type Error = String;
+        fn try_from(msg: MessageB) -> Result<Self, String> {
+            match msg {
+                MessageB::Un => Ok(Self::One),
+                _ => Err("unknown".to_string()),
+            }
+        }
+    }
+
+    impl TryInto<MessageB> for MessageA {
+        type Error = String;
+        fn try_into(self) -> Result<MessageB, String> {
+            match self {
+                MessageA::Two => Ok(MessageB::Deux),
+                _ => Err("unknown".to_string()),
+            }
+        }
+    }
+
+    #[derive(Clone, PartialEq, Debug)]
+    enum MessageB {
+        Un,
+        Deux,
+        Trois,
+    }
+
+    #[derive(Error, Debug)]
+    enum ConvertError {
+        #[error("Wrong conversion")]
+        Conversion(String),
+        #[error(transparent)]
+        Broker(#[from] BrokerError),
+    }
+
+    #[test]
+    fn convert() -> Result<(), ConvertError> {
+        let mut broker_a: Broker<MessageA> = Broker::new();
+        let (tap_a_tx, tap_a_rx) = channel::<MessageA>();
+        broker_a.add_subsystem(Subsystem::Tap(tap_a_tx))?;
+        let mut broker_b: Broker<MessageB> = Broker::new();
+        let (tap_b_tx, tap_b_rx) = channel::<MessageB>();
+        broker_b.add_subsystem(Subsystem::Tap(tap_b_tx))?;
+
+        broker_b.broker_join(&broker_a);
+
+        broker_a.emit_msg(MessageA::Two)?;
+        tap_a_rx.recv().unwrap();
+        broker_b.process()?;
+        if let Ok(msg) = tap_b_rx.try_recv() {
+            assert_eq!(MessageB::Deux, msg);
+        } else {
+            return Err(ConvertError::Conversion("A to B".to_string()));
+        }
+        broker_b.emit_msg(MessageB::Un)?;
+        tap_b_rx.recv().unwrap();
+        broker_a.process()?;
+        if let Ok(msg) = tap_a_rx.try_recv() {
+            assert_eq!(MessageA::One, msg);
+        } else {
+            return Err(ConvertError::Conversion("B to A".to_string()));
+        }
+
+        broker_a.emit_msg(MessageA::Four)?;
+        tap_a_rx.recv().unwrap();
+        broker_b.process()?;
+        assert!(tap_b_rx.try_recv().is_err());
+        broker_b.emit_msg(MessageB::Trois)?;
+        tap_b_rx.recv().unwrap();
+        broker_a.process()?;
+        assert!(tap_a_rx.try_recv().is_err());
 
         Ok(())
     }

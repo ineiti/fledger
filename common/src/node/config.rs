@@ -6,7 +6,7 @@ use std::{
     fmt::{Debug, Error, Formatter},
 };
 use thiserror::Error;
-use types::nodeids::U256;
+use flutils::nodeids::U256;
 
 #[derive(Error, Debug)]
 pub enum ConfigError {

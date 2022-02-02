@@ -1,11 +1,11 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{
-    broker::{Broker, BrokerMessage},
-    node::{config::NodeConfig, stats::NDStats},
-};
+use flutils::data_storage::DataStorageBase;
 
-use types::data_storage::DataStorageBase;
+use crate::{
+    broker::Broker,
+    node::{config::NodeConfig, modules::messages::BrokerMessage, stats::NDStats},
+};
 
 /// The NodeState is the shared global state of every node.
 /// It must only be stored as Arc<Mutex<NodeState>>.
@@ -26,9 +26,9 @@ pub struct NodeData {
     /// Statistics of the connection
     pub stats: NDStats,
     /// Handles a random number of connections
-    pub random_connections: raw::random_connections::Module,
+    pub random_connections: flmodules::random_connections::Module,
     /// Gossip-events sent and received
-    pub gossip_events: raw::gossip_events::Module,
+    pub gossip_events: flmodules::gossip_events::Module,
 }
 
 impl NodeData {
@@ -37,10 +37,10 @@ impl NodeData {
             storage,
             broker: Broker::new(),
             stats: NDStats::new(),
-            random_connections: raw::random_connections::Module::new(
-                raw::random_connections::Config::default(),
+            random_connections: flmodules::random_connections::Module::new(
+                flmodules::random_connections::Config::default(),
             ),
-            gossip_events: raw::gossip_events::Module::new(raw::gossip_events::Config::new(
+            gossip_events: flmodules::gossip_events::Module::new(flmodules::gossip_events::Config::new(
                 node_config.our_node.get_id(),
             )),
             node_config,

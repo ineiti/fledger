@@ -1,10 +1,12 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use raw::gossip_events::events;
-pub use raw::gossip_events::{MessageIn, MessageNode, MessageOut};
-use types::{data_storage::DataStorage, utils::now};
+use flmodules::gossip_events::events;
+pub use flmodules::gossip_events::{MessageIn, MessageNode, MessageOut};
+use flutils::{data_storage::DataStorage, utils::now};
 
+use super::messages::BrokerMessage;
+use super::messages::BrokerModules;
 use super::random_connections::RandomMessage;
 use super::text_messages_v1::TextMessagesStorage;
 use crate::{
@@ -13,7 +15,6 @@ use crate::{
     node::timer::BrokerTimer,
     node::NodeData,
     node::{modules::messages::NodeMessage, network::BrokerNetwork},
-    node::{BrokerMessage, BrokerModules},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -40,7 +41,7 @@ impl From<MessageOut> for GossipMessage {
     }
 }
 
-/// This is a wrapper around the raw::gossip_events module. It parses the
+/// This is a wrapper around the flmodules::gossip_events module. It parses the
 /// BrokerMessages for messages of other nodes and for a new NodeList sent by the
 /// random_connections module.
 pub struct GossipChat {
@@ -70,8 +71,8 @@ impl GossipChat {
                     let msgs = messages
                         .storage
                         .values()
-                        .map(|msg| raw::gossip_events::events::Event {
-                            category: raw::gossip_events::events::Category::TextMessage,
+                        .map(|msg| flmodules::gossip_events::events::Event {
+                            category: flmodules::gossip_events::events::Category::TextMessage,
                             src: msg.src,
                             created: msg.created,
                             msg: msg.msg.clone(),

@@ -1,14 +1,16 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::Mutex;
-use types::nodeids::U256;
+use flutils::nodeids::U256;
 
 use crate::broker::{Subsystem, SubsystemListener};
 use crate::node::network::BrokerNetwork;
 use crate::node::NodeData;
-use crate::node::{BrokerMessage, BrokerModules};
 
-pub use raw::random_connections::{MessageIn, MessageOut};
+pub use flmodules::random_connections::{MessageIn, MessageOut};
+
+use super::messages::BrokerMessage;
+use super::messages::BrokerModules;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RandomMessage {

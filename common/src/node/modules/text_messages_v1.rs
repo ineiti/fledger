@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 
-use types::nodeids::U256;
+use flutils::nodeids::U256;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TextMessagesStorage {

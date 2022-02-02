@@ -1,8 +1,7 @@
 use crate::{
-    broker::BrokerMessage,
     node::{
         network::{ConnStats, NetworkConnectionState, NodeMessage},
-        BrokerNetwork,
+        BrokerNetwork, modules::messages::BrokerMessage,
     },
     signal::web_rtc::PeerInfo,
 };
@@ -10,7 +9,7 @@ use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use types::nodeids::U256;
+use flutils::nodeids::U256;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState};
 
 use crate::{

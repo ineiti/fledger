@@ -2,16 +2,20 @@ use std::sync::{mpsc::channel, Arc, Mutex};
 use wasm_bindgen_test::*;
 use wasm_webrtc::helpers::wait_ms;
 
+use flutils::nodeids::U256;
+use wasm_webrtc::web_rtc_setup::WebRTCConnectionSetupWasm;
+
 use common::{
-    broker::{Broker, BrokerMessage, Subsystem},
-    node::network::{
-        connection_state::{CSError, ConnectionState},
-        BrokerNetwork,
+    broker::{Broker, Subsystem},
+    node::{
+        modules::messages::BrokerMessage,
+        network::{
+            connection_state::{CSError, ConnectionState},
+            BrokerNetwork,
+        },
     },
     signal::web_rtc::{WSSignalMessage, WebRTCSpawner},
 };
-use types::nodeids::U256;
-use wasm_webrtc::web_rtc_setup::WebRTCConnectionSetupWasm;
 
 #[wasm_bindgen_test]
 async fn test_connection_state() {
@@ -61,18 +65,18 @@ async fn test_connection_state_result() -> Result<(), CSError> {
         broker_init.process().map_err(|_| CSError::InputQueue)?;
         broker_follow.process().map_err(|_| CSError::InputQueue)?;
         for msg in tap_init.try_iter() {
-            if let BrokerMessage::Network(BrokerNetwork::WebSocket(
-                WSSignalMessage::PeerSetup(pi),
-            )) = msg
+            if let BrokerMessage::Network(BrokerNetwork::WebSocket(WSSignalMessage::PeerSetup(
+                pi,
+            ))) = msg
             {
                 log::debug!("Time {}: init sent message: {}", i, pi.message);
                 follow.process_peer_message(pi.message).await?
             }
         }
         for msg in tap_follow.try_iter() {
-            if let BrokerMessage::Network(BrokerNetwork::WebSocket(
-                WSSignalMessage::PeerSetup(pi),
-            )) = msg
+            if let BrokerMessage::Network(BrokerNetwork::WebSocket(WSSignalMessage::PeerSetup(
+                pi,
+            ))) = msg
             {
                 log::debug!("Time {}: follow sent message: {}", i, pi.message);
                 init.process_peer_message(pi.message).await?

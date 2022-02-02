@@ -2,8 +2,8 @@ use common::{node::NodeError, signal::websocket::WSError};
 use js_sys::Date;
 use log::{error, info, trace};
 use thiserror::Error;
-use types::data_storage::DataStorageBase;
-use types::data_storage::{DataStorage, StorageError};
+use flutils::data_storage::DataStorageBase;
+use flutils::data_storage::{DataStorage, StorageError};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_webrtc::{
     helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,

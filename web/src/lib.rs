@@ -13,7 +13,7 @@ use web_sys::window;
 
 use common::node::{config::NodeInfo, stats::StatNode, version::VERSION_STRING, Node};
 
-use types::data_storage::DataStorageBase;
+use flutils::data_storage::DataStorageBase;
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -249,7 +249,7 @@ pub struct FledgerMessages {
 }
 
 impl FledgerMessages {
-    fn new(mut tm_msgs: Vec<raw::gossip_events::events::Event>, nodes: Vec<NodeInfo>) -> Self {
+    fn new(mut tm_msgs: Vec<flmodules::gossip_events::events::Event>, nodes: Vec<NodeInfo>) -> Self {
         tm_msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
         let mut msgs = vec![];
         for msg in tm_msgs {

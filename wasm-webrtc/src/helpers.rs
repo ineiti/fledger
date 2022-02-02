@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 use web_sys::window;
 
-use types::data_storage::{DataStorage, DataStorageBase, StorageError};
+use flutils::data_storage::{DataStorage, DataStorageBase, StorageError};
 
 pub struct LocalStorageBase {}
 
