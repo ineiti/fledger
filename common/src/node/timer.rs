@@ -1,4 +1,6 @@
-use crate::{broker::Broker, node::modules::messages::BrokerMessage};
+use flutils::broker::Broker;
+
+use crate::node::modules::messages::BrokerMessage;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerTimer {

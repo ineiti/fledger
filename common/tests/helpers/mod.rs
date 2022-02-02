@@ -6,20 +6,21 @@ use std::{
     },
 };
 
-use flutils::{data_storage::TempDSB, nodeids::U256};
-
-use common::{
+use flutils::{
     broker::{Subsystem, SubsystemListener},
-    node::{
-        config::{NodeConfig, NodeInfo},
-        modules::{
-            gossip_events::GossipChat,
-            messages::{BrokerMessage, NodeMessage},
-            random_connections::RandomConnections,
-        },
-        network::BrokerNetwork,
-        node_data::NodeData,
+    data_storage::TempDSB,
+    nodeids::U256,
+};
+
+use common::node::{
+    config::{NodeConfig, NodeInfo},
+    modules::{
+        gossip_events::GossipChat,
+        messages::{BrokerMessage, NodeMessage},
+        random_connections::RandomConnections,
     },
+    network::BrokerNetwork,
+    node_data::NodeData,
 };
 
 pub struct Network {

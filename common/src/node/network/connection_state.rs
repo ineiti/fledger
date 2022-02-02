@@ -1,23 +1,21 @@
 use crate::{
     node::{
+        modules::messages::BrokerMessage,
         network::{ConnStats, NetworkConnectionState, NodeMessage},
-        BrokerNetwork, modules::messages::BrokerMessage,
+        BrokerNetwork,
     },
     signal::web_rtc::PeerInfo,
 };
+use flutils::{broker::Broker, nodeids::U256};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use flutils::nodeids::U256;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState};
 
-use crate::{
-    broker::Broker,
-    signal::web_rtc::{
-        ConnType, ConnectionError, ConnectionStateMap, PeerMessage, SetupError, WebRTCConnection,
-        WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCBMessage, WebRTCSpawner,
-    },
+use crate::signal::web_rtc::{
+    ConnType, ConnectionError, ConnectionStateMap, PeerMessage, SetupError, WebRTCConnection,
+    WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCBMessage, WebRTCSpawner,
 };
 
 #[derive(Error, Debug)]
@@ -365,7 +363,12 @@ struct Connection {
 }
 
 impl Connection {
-    fn new(broker: Broker<BrokerMessage>, direction: CSDir, id_local: U256, id_remote: U256) -> Self {
+    fn new(
+        broker: Broker<BrokerMessage>,
+        direction: CSDir,
+        id_local: U256,
+        id_remote: U256,
+    ) -> Self {
         Self {
             broker,
             direction,

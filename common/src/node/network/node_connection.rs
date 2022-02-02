@@ -1,10 +1,12 @@
-use flutils::nodeids::U256;
+use flutils::{broker::Broker, nodeids::U256};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 use crate::{
-    broker::Broker,
-    node::{network::connection_state::{CSEnum, CSError, ConnectionState}, modules::messages::BrokerMessage},
+    node::{
+        modules::messages::BrokerMessage,
+        network::connection_state::{CSEnum, CSError, ConnectionState},
+    },
     signal::web_rtc::{PeerInfo, WebRTCSpawner},
 };
 

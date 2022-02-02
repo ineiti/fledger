@@ -1,11 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use flutils::data_storage::DataStorageBase;
+use flutils::{broker::Broker, data_storage::DataStorageBase};
 
-use crate::{
-    broker::Broker,
-    node::{config::NodeConfig, modules::messages::BrokerMessage, stats::NDStats},
-};
+use crate::node::{config::NodeConfig, modules::messages::BrokerMessage, stats::NDStats};
 
 /// The NodeState is the shared global state of every node.
 /// It must only be stored as Arc<Mutex<NodeState>>.
@@ -40,9 +37,9 @@ impl NodeData {
             random_connections: flmodules::random_connections::Module::new(
                 flmodules::random_connections::Config::default(),
             ),
-            gossip_events: flmodules::gossip_events::Module::new(flmodules::gossip_events::Config::new(
-                node_config.our_node.get_id(),
-            )),
+            gossip_events: flmodules::gossip_events::Module::new(
+                flmodules::gossip_events::Config::new(node_config.our_node.get_id()),
+            ),
             node_config,
         }))
     }

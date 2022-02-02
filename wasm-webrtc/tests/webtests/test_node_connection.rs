@@ -3,10 +3,12 @@ use wasm_bindgen_test::*;
 use wasm_webrtc::helpers::wait_ms;
 use wasm_webrtc::web_rtc_setup::WebRTCConnectionSetupWasm;
 
-use flutils::nodeids::U256;
+use flutils::{
+    broker::{Broker, Subsystem},
+    nodeids::U256,
+};
 
 use common::{
-    broker::{Broker, Subsystem},
     node::{
         modules::messages::BrokerMessage,
         network::{

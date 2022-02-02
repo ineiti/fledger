@@ -6,15 +6,15 @@ use std::{
 };
 use thiserror::Error;
 
+use flmodules::gossip_events::events;
 use flutils::{
+    broker::{Broker, BrokerError},
     data_storage::{DataStorage, DataStorageBase, StorageError},
     nodeids::U256,
     utils::now,
 };
-use flmodules::gossip_events::events;
 
 use crate::{
-    broker::{Broker, BrokerError},
     node::{
         config::{ConfigError, NodeConfig, NodeInfo},
         modules::{

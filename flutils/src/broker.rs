@@ -239,8 +239,6 @@ pub trait SubsystemListener<T> {
 
 #[cfg(test)]
 mod tests {
-    use flexi_logger::LevelFilter;
-
     use super::*;
 
     #[derive(Debug, Clone, PartialEq)]
@@ -271,7 +269,7 @@ mod tests {
     /// Test the broker with two subsystems.
     #[tokio::test]
     async fn test_broker_new() -> Result<(), BrokerError> {
-        simple_logging::log_to_stderr(LevelFilter::Trace);
+        flexi_logger::Logger::try_with_str("debug").unwrap();
 
         let bm_a = BrokerTest::MsgA;
         let bm_b = BrokerTest::MsgB;

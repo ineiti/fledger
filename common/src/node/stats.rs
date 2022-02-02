@@ -5,11 +5,13 @@ use std::{
 };
 use thiserror::Error;
 
-use flutils::{nodeids::U256, utils::now};
+use flutils::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
+    nodeids::U256,
+    utils::now,
+};
 
 use crate::{
-    broker::{Broker, Subsystem},
-    broker::{BrokerError, SubsystemListener},
     node::{
         config::{NodeConfig, NodeInfo},
         modules::messages::{BrokerMessage, Message, MessageV1, NodeMessage},

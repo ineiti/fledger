@@ -1,9 +1,11 @@
+use flutils::{
+    broker::{Subsystem, SubsystemListener},
+    nodeids::U256,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::Mutex;
-use flutils::nodeids::U256;
 
-use crate::broker::{Subsystem, SubsystemListener};
 use crate::node::network::BrokerNetwork;
 use crate::node::NodeData;
 

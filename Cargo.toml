@@ -8,5 +8,6 @@ members = [
     "vendor/names",
     "web",
     "flmodules",
-    "flutils"
+    "flutils",
+    "flnet"
 ]

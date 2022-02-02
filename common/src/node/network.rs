@@ -1,4 +1,9 @@
 use ed25519_dalek::Signer;
+use flutils::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
+    nodeids::U256,
+    utils::block_on,
+};
 use log::{info, warn};
 use std::{
     collections::HashMap,
@@ -6,10 +11,8 @@ use std::{
     sync::{mpsc::Receiver, Arc, Mutex},
 };
 use thiserror::Error;
-use flutils::{nodeids::U256, utils::block_on};
 
 use crate::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
     node::{
         config::{NodeConfig, NodeInfo},
         modules::messages::NodeMessage,

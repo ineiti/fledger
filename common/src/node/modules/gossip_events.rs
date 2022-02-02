@@ -1,16 +1,20 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use flmodules::gossip_events::events;
-pub use flmodules::gossip_events::{MessageIn, MessageNode, MessageOut};
-use flutils::{data_storage::DataStorage, utils::now};
+pub use flmodules::gossip_events::{
+    events, {MessageIn, MessageNode, MessageOut},
+};
+use flutils::{
+    broker::{Subsystem, SubsystemListener},
+    data_storage::DataStorage,
+    utils::now,
+};
 
 use super::messages::BrokerMessage;
 use super::messages::BrokerModules;
 use super::random_connections::RandomMessage;
 use super::text_messages_v1::TextMessagesStorage;
 use crate::{
-    broker::{Subsystem, SubsystemListener},
     node::modules::messages::{Message, MessageV1},
     node::timer::BrokerTimer,
     node::NodeData,
