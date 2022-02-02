@@ -92,7 +92,7 @@ impl RandomConnections {
     }
 }
 
-impl SubsystemListener for RandomConnections {
+impl SubsystemListener<BrokerMessage> for RandomConnections {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         msgs.iter()
             .flat_map(|msg| {

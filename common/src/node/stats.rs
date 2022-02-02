@@ -1,5 +1,5 @@
 use crate::{
-    broker::Subsystem,
+    broker::{Broker, Subsystem},
     node::{
         modules::messages::NodeMessage,
         network::{BrokerNetwork, NetworkConnectionState},
@@ -8,7 +8,7 @@ use crate::{
 use core::f64;
 use std::{
     collections::HashMap,
-    sync::{mpsc::Sender, Arc, Mutex},
+    sync::{Arc, Mutex},
 };
 use thiserror::Error;
 
@@ -88,22 +88,23 @@ impl StatNode {
 pub struct Stats {
     node_data: Arc<Mutex<NodeData>>,
     node_config: NodeConfig,
-    broker_tx: Sender<BrokerMessage>,
+    broker: Broker<BrokerMessage>,
     last_stats: f64,
     ping_all_counter: u32,
 }
 
 impl Stats {
     pub fn start(node_data: Arc<Mutex<NodeData>>) {
-        let (node_config, mut broker) = {
+        let (node_config, broker) = {
             let nd = node_data.lock().unwrap();
             (nd.node_config.clone(), nd.broker.clone())
         };
         broker
+            .clone()
             .add_subsystem(Subsystem::Handler(Box::new(Stats {
                 node_data,
                 node_config,
-                broker_tx: broker.clone_tx(),
+                broker,
                 last_stats: 0.,
                 ping_all_counter: 0,
             })))
@@ -118,9 +119,8 @@ impl Stats {
 
             let stats: Vec<NodeStat> = self.collect();
 
-            self.broker_tx
-                .send(BrokerMessage::Network(BrokerNetwork::SendStats(stats)))
-                .map_err(|_| SNError::OutputQueue)?;
+            self.broker
+                .enqueue_msg(BrokerMessage::Network(BrokerNetwork::SendStats(stats)));
         }
         if self.ping_all_counter == 0 {
             self.ping_all()?;
@@ -208,15 +208,13 @@ impl Stats {
         for stat in nodes.iter_mut() {
             if let Some(ni) = stat.1.node_info.as_ref() {
                 if our_id != ni.get_id() {
-                    self.broker_tx
-                        .send(
-                            NodeMessage {
-                                id: ni.get_id(),
-                                msg: Message::V1(MessageV1::Ping()),
-                            }
-                            .output(),
-                        )
-                        .map_err(|_| SNError::OutputQueue)?;
+                    self.broker.enqueue_msg(
+                        NodeMessage {
+                            id: ni.get_id(),
+                            msg: Message::V1(MessageV1::Ping()),
+                        }
+                        .output(),
+                    );
                     stat.1.ping_tx += 1;
                 }
             }
@@ -254,7 +252,7 @@ impl Stats {
     }
 }
 
-impl SubsystemListener for Stats {
+impl SubsystemListener<BrokerMessage> for Stats {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         for msg in msgs {
             if let Err(e) = match msg {

@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    broker::Broker,
+    broker::{Broker, BrokerMessage},
     node::{config::NodeConfig, stats::NDStats},
 };
 
@@ -20,7 +20,7 @@ pub struct NodeData {
     /// Storage to be used
     pub storage: Box<dyn DataStorageBase>,
     /// Broker that can be cloned
-    pub broker: Broker,
+    pub broker: Broker<BrokerMessage>,
 
     // Subsystem data
     /// Statistics of the connection

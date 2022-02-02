@@ -156,7 +156,7 @@ impl GossipChat {
     }
 }
 
-impl SubsystemListener for GossipChat {
+impl SubsystemListener<BrokerMessage> for GossipChat {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         let output = msgs
             .iter()

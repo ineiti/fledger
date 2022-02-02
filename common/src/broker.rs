@@ -26,25 +26,24 @@ pub enum BrokerError {
 /// Every subsystem can emit any number of messages.
 /// Incoming messages are queued in a channel and are treated when
 /// the `process` method is called.
-pub struct Broker {
-    intern: Arc<Mutex<Intern>>,
-    intern_tx: Sender<BrokerMessage>,
+pub struct Broker<T: Clone> {
+    intern: Arc<Mutex<Intern<T>>>,
+    intern_tx: Sender<T>,
 }
 
 #[allow(clippy::all)]
-unsafe impl Send for Broker {}
+unsafe impl<T: Clone> Send for Broker<T> {}
 
-impl Default for Broker {
+impl<T: Clone> Default for Broker<T> {
     /// Create a new broker.
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Clone for Broker {
+impl<T: Clone> Clone for Broker<T> {
     /// Clone the broker. The new broker will communicate with the same "Intern" structure
-    /// and share all messages. However, each broker clone will have its own tap messages
-    /// and is able to filter according to different messages.
+    /// and share all messages. However, each broker clone will have its own tap messages.
     fn clone(&self) -> Self {
         Self {
             intern: Arc::clone(&self.intern),
@@ -53,7 +52,7 @@ impl Clone for Broker {
     }
 }
 
-impl Broker {
+impl<T: Clone> Broker<T> {
     pub fn new() -> Self {
         let intern = Intern::new();
         Self {
@@ -62,13 +61,8 @@ impl Broker {
         }
     }
 
-    /// Returns a Sender for messages into the broker.
-    pub fn clone_tx(&self) -> Sender<BrokerMessage> {
-        self.intern_tx.clone()
-    }
-
     /// Adds a new subsystem to send and/or receive messages.
-    pub fn add_subsystem(&mut self, ss: Subsystem) -> Result<(), BrokerError> {
+    pub fn add_subsystem(&mut self, ss: Subsystem<T>) -> Result<(), BrokerError> {
         let mut intern = self.intern.try_lock().map_err(|_| BrokerError::Locked)?;
         intern.add_subsystem(ss);
         Ok(())
@@ -81,43 +75,38 @@ impl Broker {
     }
 
     /// Enqueue messages to be sent to all subsystems on the next call to process.
-    pub fn enqueue(&self, msgs: Vec<BrokerMessage>) {
+    pub fn enqueue_msgs(&self, msgs: Vec<T>) {
         for msg in msgs.into_iter() {
             self.intern_tx.send(msg).expect("try_send");
         }
     }
 
-    /// Enqueue a single BrokerMessageStruct
-    pub fn enqueue_bm(&self, msg: BrokerMessage) {
-        self.enqueue(vec![msg]);
+    /// Enqueue a single message
+    pub fn enqueue_msg(&self, msg: T) {
+        self.enqueue_msgs(vec![msg]);
     }
 
     /// Try to emit and processes messages.
-    pub fn emit(&mut self, msgs: Vec<BrokerMessage>) -> Result<usize, BrokerError> {
-        self.enqueue(msgs);
+    pub fn emit_msgs(&mut self, msgs: Vec<T>) -> Result<usize, BrokerError> {
+        self.enqueue_msgs(msgs);
         self.process()
     }
 
-    /// Try to emit and process a BrokerMessage
-    pub fn emit_bm(&mut self, msg: BrokerMessage) -> Result<usize, BrokerError> {
-        self.emit(vec![msg])
-    }
-
-    /// Returns a clone of the input_tx queue.
-    pub fn get_input_tx(&self) -> Sender<BrokerMessage> {
-        self.intern_tx.clone()
+    /// Try to emit and process a message
+    pub fn emit_msg(&mut self, msg: T) -> Result<usize, BrokerError> {
+        self.emit_msgs(vec![msg])
     }
 }
 
-struct Intern {
-    main_tx: Sender<BrokerMessage>,
-    subsystems: Vec<Subsystem>,
-    msg_queue: Vec<Vec<BrokerMessage>>,
+struct Intern<T> {
+    main_tx: Sender<T>,
+    subsystems: Vec<Subsystem<T>>,
+    msg_queue: Vec<Vec<T>>,
 }
 
-impl Intern {
+impl<T: Clone> Intern<T> {
     pub fn new() -> Self {
-        let (main_tx, main_rx) = channel::<BrokerMessage>();
+        let (main_tx, main_rx) = channel::<T>();
         Self {
             main_tx,
             subsystems: vec![Subsystem::Sender(main_rx)],
@@ -126,12 +115,12 @@ impl Intern {
     }
 
     // Returns a clone of the transmission-queue.
-    pub fn clone_tx(&self) -> Sender<BrokerMessage> {
+    pub fn clone_tx(&self) -> Sender<T> {
         self.main_tx.clone()
     }
 
     /// Adds a SubsystemInit
-    pub fn add_subsystem(&mut self, ss: Subsystem) {
+    pub fn add_subsystem(&mut self, ss: Subsystem<T>) {
         self.subsystems.push(ss);
         self.msg_queue.push(vec![]);
     }
@@ -144,11 +133,11 @@ impl Intern {
     /// time, that you won't get what you expect.
     pub fn process(&mut self) -> Result<usize, BrokerError> {
         let mut msg_count: usize = 0;
-        let mut new_msgs: Vec<Vec<BrokerMessage>> = vec![];
+        let mut new_msgs: Vec<Vec<T>> = vec![];
 
         // First get all new messages and concat with messages from last round.
         for (index, ss) in self.subsystems.iter().enumerate() {
-            let mut msgs: Vec<BrokerMessage> = self
+            let mut msgs: Vec<T> = self
                 .msg_queue
                 .get_mut(index)
                 .expect("Get msg_queue")
@@ -178,21 +167,21 @@ impl Intern {
     }
 }
 
-pub enum Subsystem {
-    Sender(Receiver<BrokerMessage>),
-    Tap(Sender<BrokerMessage>),
-    Handler(Box<dyn SubsystemListener>),
+pub enum Subsystem<T> {
+    Sender(Receiver<T>),
+    Tap(Sender<T>),
+    Handler(Box<dyn SubsystemListener<T>>),
 }
 
-impl Subsystem {
-    fn get_messages(&self) -> Vec<BrokerMessage> {
+impl<T: Clone> Subsystem<T> {
+    fn get_messages(&self) -> Vec<T> {
         match self {
             Self::Sender(s) => s.try_iter().collect(),
             _ => vec![],
         }
     }
 
-    fn put_messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
+    fn put_messages(&mut self, msgs: Vec<&T>) -> Vec<T> {
         match self {
             Self::Tap(s) => {
                 msgs.iter().for_each(|&msg| {
@@ -208,8 +197,8 @@ impl Subsystem {
     }
 }
 
-pub trait SubsystemListener {
-    fn messages(&mut self, from_broker: Vec<&BrokerMessage>) -> Vec<BrokerMessage>;
+pub trait SubsystemListener<T> {
+    fn messages(&mut self, from_broker: Vec<&T>) -> Vec<T>;
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -288,7 +277,7 @@ mod tests {
         reply: Vec<(BrokerMessage, BrokerMessage)>,
     }
 
-    impl SubsystemListener for Tps {
+    impl SubsystemListener<BrokerMessage> for Tps {
         fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
             let mut output = vec![];
             log::debug!("Msgs are: {:?} - Replies are: {:?}", msgs, self.reply);
@@ -321,12 +310,12 @@ mod tests {
         broker.add_subsystem(Subsystem::Tap(tap_tx))?;
 
         // Shouldn't reply to a msg_b, so only 1 message.
-        broker.emit(vec![bm_b.clone()])?;
+        broker.emit_msgs(vec![bm_b.clone()])?;
         assert_eq!(tap.try_iter().count(), 1);
 
         // Should reply to msg_a, so the tap should have 2 messages - the original
         // and the reply.
-        broker.emit(vec![bm_a.clone()])?;
+        broker.emit_msgs(vec![bm_a.clone()])?;
         broker.process()?;
         assert_eq!(tap.try_iter().count(), 2);
 
@@ -335,7 +324,7 @@ mod tests {
         broker.add_subsystem(Subsystem::Handler(Box::new(Tps {
             reply: vec![(bm_a.clone(), bm_b)],
         })))?;
-        broker.emit(vec![bm_a])?;
+        broker.emit_msgs(vec![bm_a])?;
         broker.process()?;
         assert_eq!(tap.try_iter().count(), 3);
 

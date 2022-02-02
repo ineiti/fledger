@@ -59,7 +59,7 @@ pub struct Network {
 
 impl Network {
     pub fn start(
-        broker: Broker,
+        broker: Broker<BrokerMessage>,
         node_config: NodeConfig,
         ws: Box<dyn WebSocketConnection>,
         web_rtc: WebRTCSpawner,
@@ -81,7 +81,7 @@ impl Network {
     }
 }
 
-impl SubsystemListener for Network {
+impl SubsystemListener<BrokerMessage> for Network {
     fn messages(&mut self, bms: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         let inner_cl = Arc::clone(&self.inner);
         for bm in bms.iter().map(|&b| b.clone()) {
@@ -112,7 +112,7 @@ struct Inner {
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
     connections: HashMap<U256, NodeConnection>,
     node_config: NodeConfig,
-    broker: Broker,
+    broker: Broker<BrokerMessage>,
     broker_rx: Receiver<BrokerMessage>,
 }
 
@@ -121,7 +121,7 @@ struct Inner {
 /// It supports setting up automatic connections to other nodes.
 impl Inner {
     pub fn new(
-        broker: Broker,
+        broker: Broker<BrokerMessage>,
         node_config: NodeConfig,
         broker_rx: Receiver<BrokerMessage>,
         mut ws: Box<dyn WebSocketConnection>,
@@ -182,7 +182,7 @@ impl Inner {
             WSSignalMessage::ListIDsReply(list) => {
                 let _ = self
                     .broker
-                    .emit_bm(BrokerMessage::Network(BrokerNetwork::UpdateList(list)))?;
+                    .emit_msg(BrokerMessage::Network(BrokerNetwork::UpdateList(list)))?;
             }
             WSSignalMessage::PeerSetup(pi) => {
                 let remote_node = match pi.get_remote(&self.node_config.our_node.get_id()) {
@@ -252,7 +252,7 @@ impl Inner {
     async fn connect(&mut self, dst: &U256) -> Result<(), NetworkError> {
         self.get_connection(dst).await?;
         self.broker
-            .emit_bm(BrokerMessage::Network(BrokerNetwork::Connected(*dst)))?;
+            .emit_msg(BrokerMessage::Network(BrokerNetwork::Connected(*dst)))?;
         Ok(())
     }
 
@@ -260,7 +260,7 @@ impl Inner {
     async fn disconnect(&mut self, dst: &U256) -> Result<(), NetworkError> {
         // TODO: Actually disconnect and listen for nodes that have been disconnected due to timeouts.
         self.broker
-            .emit_bm(BrokerMessage::Network(BrokerNetwork::Disconnected(*dst)))?;
+            .emit_msg(BrokerMessage::Network(BrokerNetwork::Disconnected(*dst)))?;
         Ok(())
     }
 

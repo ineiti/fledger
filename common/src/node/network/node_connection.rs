@@ -1,4 +1,4 @@
-use crate::signal::web_rtc::PeerInfo;
+use crate::{signal::web_rtc::PeerInfo, broker::BrokerMessage};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use types::nodeids::U256;
@@ -37,7 +37,7 @@ pub struct NodeConnection {
 impl NodeConnection {
     pub async fn new(
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
-        broker: Broker,
+        broker: Broker<BrokerMessage>,
         id_local: U256,
         id_remote: U256,
     ) -> Result<NodeConnection, NCError> {

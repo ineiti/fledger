@@ -55,7 +55,7 @@ pub enum NodeError {
 /// The node structure holds it all together. It is the main structure of the project.
 pub struct Node {
     node_data: Arc<Mutex<NodeData>>,
-    broker: Broker,
+    broker: Broker<BrokerMessage>,
 }
 
 pub const CONFIG_NAME: &str = "nodeConfig";
@@ -122,7 +122,7 @@ impl Node {
     pub fn list(&mut self) -> Result<(), NodeError> {
         Ok(self
             .broker
-            .emit_bm(BrokerMessage::Network(BrokerNetwork::UpdateListRequest))
+            .emit_msg(BrokerMessage::Network(BrokerNetwork::UpdateListRequest))
             .map(|_| ())?)
     }
 
@@ -169,7 +169,7 @@ impl Node {
             msg,
         };
         self.broker
-            .enqueue_bm(BrokerMessage::Modules(BrokerModules::Gossip(
+            .enqueue_msg(BrokerMessage::Modules(BrokerModules::Gossip(
                 GossipMessage::MessageIn(gossip_events::MessageIn::AddEvent(msg_txt)),
             )));
         Ok(())

@@ -137,7 +137,7 @@ impl Node {
     pub fn process(&mut self) {
         let mut broker = { self.node_data.lock().unwrap().broker.clone() };
         for msg in self.rcv.try_iter() {
-            broker.enqueue_bm(msg);
+            broker.enqueue_msg(msg);
         }
         if broker.process().is_err() {
             log::error!("Couldn't process");
@@ -186,7 +186,7 @@ impl WebRTC {
     }
 }
 
-impl SubsystemListener for WebRTC {
+impl SubsystemListener<BrokerMessage> for WebRTC {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         msgs.iter()
             .filter_map(|&msg| match msg {
