@@ -1,33 +1,42 @@
 use crate::broker::{Broker, Subsystem, SubsystemListener};
 
-pub fn broker_join<R: 'static + Clone + TryFrom<S>, S: 'static + Clone + TryFrom<R>>(
-    broker1: &Broker<R>,
-    broker2: &Broker<S>,
+pub fn broker_join<R: 'static + Clone + TryFrom<S> + TryInto<S>, S: 'static + Clone>(
+    broker_r: &Broker<R>,
+    broker_s: &Broker<S>,
 ) {
-    let listener1 = Listener::new(broker2.clone());
-    let listener2 = Listener::new(broker1.clone());
-    broker1
+    let listener_r = ListenerR{broker: broker_s.clone()};
+    let listener_s = ListenerS{broker: broker_r.clone()};
+    broker_r
         .clone()
-        .add_subsystem(Subsystem::Handler(Box::new(listener1)))
+        .add_subsystem(Subsystem::Handler(Box::new(listener_r)))
         .unwrap();
-    broker2
+    broker_s
         .clone()
-        .add_subsystem(Subsystem::Handler(Box::new(listener2)))
+        .add_subsystem(Subsystem::Handler(Box::new(listener_s)))
         .unwrap();
 }
 
-pub struct Listener<S: Clone> {
+pub struct ListenerR<S: Clone> {
     broker: Broker<S>,
 }
 
-impl<S: Clone> Listener<S> {
-    pub fn new(broker: Broker<S>) -> Self {
-        Self { broker }
+impl<R: Clone + TryInto<S>, S: Clone> SubsystemListener<R> for ListenerR<S> {
+    fn messages(&mut self, msgs: Vec<&R>) -> Vec<R> {
+        for msg in msgs {
+            if let Ok(msg_s) = msg.clone().try_into() {
+                self.broker.enqueue_msg(msg_s);
+            }
+        }
+        vec![]
     }
 }
 
-impl<R: Clone, S: Clone + TryFrom<R>> SubsystemListener<R> for Listener<S> {
-    fn messages(&mut self, msgs: Vec<&R>) -> Vec<R> {
+pub struct ListenerS<R: Clone> {
+    broker: Broker<R>,
+}
+
+impl<R: Clone + TryFrom<S>, S: Clone> SubsystemListener<S> for ListenerS<R> {
+    fn messages(&mut self, msgs: Vec<&S>) -> Vec<S> {
         for msg in msgs {
             if let Ok(msg_s) = msg.clone().try_into() {
                 self.broker.enqueue_msg(msg_s);
@@ -40,6 +49,8 @@ impl<R: Clone, S: Clone + TryFrom<R>> SubsystemListener<R> for Listener<S> {
 #[cfg(test)]
 mod tests {
     use std::sync::mpsc::channel;
+
+    use thiserror::Error;
 
     use crate::broker::BrokerError;
 
@@ -62,6 +73,16 @@ mod tests {
         }
     }
 
+    impl TryInto<MessageB> for MessageA {
+        type Error = String;
+        fn try_into(self) -> Result<MessageB, String> {
+            match self {
+                MessageA::Two => Ok(MessageB::Deux),
+                _ => Err("unknown".to_string()),
+            }
+        }
+    }
+
     #[derive(Clone, PartialEq, Debug)]
     enum MessageB {
         Un,
@@ -69,18 +90,16 @@ mod tests {
         Trois,
     }
 
-    impl TryFrom<MessageA> for MessageB {
-        type Error = String;
-        fn try_from(msg: MessageA) -> Result<Self, String> {
-            match msg {
-                MessageA::Two => Ok(Self::Deux),
-                _ => Err("unknown".to_string()),
-            }
-        }
+    #[derive(Error, Debug)]
+    enum ConvertError {
+        #[error("Wrong conversion")]
+        Conversion(String),
+        #[error(transparent)]
+        Broker(#[from] BrokerError),    
     }
 
     #[test]
-    fn convert() -> Result<(), BrokerError>{
+    fn convert() -> Result<(), ConvertError>{
         let mut broker_a: Broker<MessageA> = Broker::new();
         let (tap_a_tx, tap_a_rx) = channel::<MessageA>();
         broker_a.add_subsystem(Subsystem::Tap(tap_a_tx))?;
@@ -96,7 +115,7 @@ mod tests {
         if let Ok(msg) = tap_b_rx.try_recv(){
             assert_eq!(MessageB::Deux, msg);
         } else {
-            return Err(BrokerError::BMDecode);
+            return Err(ConvertError::Conversion("A to B".to_string()));
         }
         broker_b.emit_msg(MessageB::Un)?;
         tap_b_rx.recv().unwrap();
@@ -104,7 +123,7 @@ mod tests {
         if let Ok(msg) = tap_a_rx.try_recv(){
             assert_eq!(MessageA::One, msg);
         } else {
-            return Err(BrokerError::BMDecode);
+            return Err(ConvertError::Conversion("B to A".to_string()));
         }
 
         broker_a.emit_msg(MessageA::Four)?;
