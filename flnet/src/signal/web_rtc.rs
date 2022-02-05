@@ -1,16 +1,13 @@
 use async_trait::async_trait;
 use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{self, Display},
-    str::FromStr,
-};
+use std::fmt::{self};
 use thiserror::Error;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
 
 use flutils::nodeids::U256;
 
-use crate::{config::NodeInfo, network::BrokerNetwork};
+use crate::{config::NodeInfo, network::BrokerNetworkCall};
 
 #[derive(Debug, Error)]
 pub enum SetupError {
@@ -181,24 +178,14 @@ impl PeerInfo {
         }
         None
     }
-}
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct WebSocketMessage {
-    pub msg: WSSignalMessage,
-}
-
-impl FromStr for WebSocketMessage {
-    type Err = serde_json::Error;
-    fn from_str(s: &str) -> Result<WebSocketMessage, serde_json::Error> {
-        serde_json::from_str(s)
+    pub fn send(self) -> BrokerNetworkCall {
+        BrokerNetworkCall::SendWSPeer(self)
     }
-}
 
-impl Display for WebSocketMessage {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", serde_json::to_string(self).unwrap())
-    }
+    // pub fn receive(self) -> BrokerNetworkReply {
+    //     BrokerNetworkReply::PeerSetup(self)
+    // }
 }
 
 /// Message is a list of messages to be sent between the node and the signal server.
@@ -213,25 +200,20 @@ impl Display for WebSocketMessage {
 /// - Done is a standard message that can be sent back to indicate all is well.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-pub enum WSSignalMessage {
+pub enum WSSignalMessageToNode {
     Challenge(u64, U256),
-    Announce(MessageAnnounce),
-    ListIDsRequest,
     ListIDsReply(Vec<NodeInfo>),
     PeerSetup(PeerInfo),
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub enum WSSignalMessageFromNode {
+    Announce(MessageAnnounce),
+    ListIDsRequest,
+    ClearNodes,
+    PeerSetup(PeerInfo),
     NodeStats(Vec<NodeStat>),
-}
-
-impl From<PeerInfo> for WSSignalMessage {
-    fn from(pi: PeerInfo) -> Self {
-        Self::PeerSetup(pi)
-    }
-}
-
-impl From<WSSignalMessage> for BrokerNetwork {
-    fn from(msg: WSSignalMessage) -> Self {
-        Self::WebSocket(msg)
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -242,15 +224,24 @@ pub struct NodeStat {
     pub ping_rx: u32,
 }
 
-impl std::fmt::Display for WSSignalMessage {
+impl std::fmt::Display for WSSignalMessageToNode {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            WSSignalMessage::Challenge(_, _) => write!(f, "Challenge"),
-            WSSignalMessage::Announce(_) => write!(f, "Announce"),
-            WSSignalMessage::ListIDsRequest => write!(f, "ListIDsRequest"),
-            WSSignalMessage::ListIDsReply(_) => write!(f, "ListIDsReply"),
-            WSSignalMessage::PeerSetup(_) => write!(f, "PeerSetup"),
-            WSSignalMessage::NodeStats(_) => write!(f, "NodeStats"),
+            WSSignalMessageToNode::Challenge(_, _) => write!(f, "Challenge"),
+            WSSignalMessageToNode::ListIDsReply(_) => write!(f, "ListIDsReply"),
+            WSSignalMessageToNode::PeerSetup(_) => write!(f, "PeerSetup"),
+        }
+    }
+}
+
+impl std::fmt::Display for WSSignalMessageFromNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            WSSignalMessageFromNode::Announce(_) => write!(f, "Announce"),
+            WSSignalMessageFromNode::ListIDsRequest => write!(f, "ListIDsRequest"),
+            WSSignalMessageFromNode::PeerSetup(_) => write!(f, "PeerSetup"),
+            WSSignalMessageFromNode::NodeStats(_) => write!(f, "NodeStats"),
+            WSSignalMessageFromNode::ClearNodes => write!(f, "ClearNodes"),
         }
     }
 }

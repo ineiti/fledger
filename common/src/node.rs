@@ -15,7 +15,7 @@ use flutils::{
 };
 use flnet::{
     config::{ConfigError, NodeConfig, NodeInfo},
-    network::{BrokerNetwork, Network, NetworkError},
+    network::{Network, NetworkError, BrokerNetworkCall},
     signal::{web_rtc::WebRTCSpawner, websocket::WebSocketConnection},
 };
 
@@ -109,6 +109,7 @@ impl Node {
             node_data.lock().unwrap().broker.clone()
         };
         let broker_net = Network::start(config, ws, web_rtc);
+        broker_net.link(&broker);
         Timer::start(broker.clone());
 
         Ok(Node { node_data, broker })
@@ -124,7 +125,7 @@ impl Node {
     pub fn list(&mut self) -> Result<(), NodeError> {
         Ok(self
             .broker
-            .emit_msg(BrokerMessage::Network(BrokerNetwork::UpdateListRequest))
+            .emit_msg(BrokerNetworkCall::SendWSUpdateListRequest.into())
             .map(|_| ())?)
     }
 

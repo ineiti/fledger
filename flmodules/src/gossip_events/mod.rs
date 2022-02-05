@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use flutils::nodeids::{NodeID, NodeIDs, U256};
+use serde::{Deserialize, Serialize};
 
 pub mod conversions;
 pub mod events;
@@ -7,9 +7,9 @@ use events::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MessageNode {
-    KnownMsgIDs(Vec<U256>),
+    KnownEventIDs(Vec<U256>),
     Events(Vec<Event>),
-    RequestMsgIDs,
+    RequestEventIDs,
     RequestEvents(Vec<U256>),
 }
 
@@ -37,9 +37,7 @@ pub struct Config {
 
 impl Config {
     pub fn new(our_id: NodeID) -> Self {
-        Self {
-            our_id,
-        }
+        Self { our_id }
     }
 }
 
@@ -52,6 +50,7 @@ pub struct Module {
     storage: EventsStorage,
     cfg: Config,
     nodes: NodeIDs,
+    outstanding: Vec<U256>,
 }
 
 impl Module {
@@ -61,6 +60,7 @@ impl Module {
             storage: EventsStorage::new(),
             cfg,
             nodes: NodeIDs::empty(),
+            outstanding: vec![],
         }
     }
 
@@ -74,7 +74,7 @@ impl Module {
         Ok(match msg {
             MessageIn::Tick => self.tick(),
             MessageIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
-            MessageIn::AddEvent(msg) => self.add_event(msg),
+            MessageIn::AddEvent(ev) => self.add_event(ev),
             MessageIn::NodeList(ids) => self.node_list(ids),
             MessageIn::GetStorage => vec![MessageOut::Storage(self.get()?)],
             MessageIn::SetStorage(data) => {
@@ -88,19 +88,19 @@ impl Module {
     /// MessageOut.
     pub fn process_node_message(&mut self, src: NodeID, msg: MessageNode) -> Vec<MessageOut> {
         match msg {
-            MessageNode::KnownMsgIDs(ids) => self.node_known_msg_ids(src, ids),
-            MessageNode::Events(msgs) => self.node_events(src, msgs),
+            MessageNode::KnownEventIDs(ids) => self.node_known_event_ids(src, ids),
+            MessageNode::Events(events) => self.node_events(src, events),
             MessageNode::RequestEvents(ids) => self.node_request_events(src, ids),
-            MessageNode::RequestMsgIDs => self.node_request_event_list(src),
+            MessageNode::RequestEventIDs => self.node_request_event_list(src),
         }
     }
 
     /// Adds an event if it's not known yet or not too old.
     /// This will send out the event to all other nodes.
-    pub fn add_event(&mut self, msg: Event) -> Vec<MessageOut> {
-        if self.storage.add_event(msg.clone()) {
+    pub fn add_event(&mut self, event: Event) -> Vec<MessageOut> {
+        if self.storage.add_event(event.clone()) {
             return itertools::concat([
-                self.send_event(self.cfg.our_id, &msg),
+                self.send_events(self.cfg.our_id, &[event]),
                 vec![MessageOut::Updated],
             ]);
         }
@@ -109,29 +109,47 @@ impl Module {
 
     /// Takes a vector of events and stores the new events. It returns all
     /// events that are new to the system.
-    pub fn add_events(&mut self, msgs: Vec<Event>) -> Vec<Event> {
-        msgs.into_iter()
-            .filter(|msg| self.storage.add_event(msg.clone()))
+    pub fn add_events(&mut self, events: Vec<Event>) -> Vec<Event> {
+        events
+            .into_iter()
+            .inspect(|e| self.outstanding.retain(|os| os != &e.get_id()))
+            .filter(|e| self.storage.add_event(e.clone()))
             .collect()
     }
 
-    fn send_event(&self, src: NodeID, msg: &Event) -> Vec<MessageOut> {
+    fn send_events(&self, src: NodeID, events: &[Event]) -> Vec<MessageOut> {
         self.nodes
             .0
             .iter()
-            .filter(|&&id| id != src && id != msg.src && id != self.cfg.our_id)
-            .map(|id| MessageOut::Node(*id, MessageNode::Events(vec![msg.clone()])))
+            .filter(|&&node_id| node_id != src && node_id != self.cfg.our_id)
+            .map(|node_id| {
+                MessageOut::Node(
+                    *node_id,
+                    MessageNode::KnownEventIDs(
+                        events
+                            .iter()
+                            .filter_map(|e| {
+                                if node_id != &e.src {
+                                    Some(e.get_id())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect(),
+                    ),
+                )
+            })
             .collect()
     }
 
-    /// If an updated list of nodes is available, send a `RequestMsgIDs` to
+    /// If an updated list of nodes is available, send a `RequestEventIDs` to
     /// all new nodes.
     pub fn node_list(&mut self, ids: NodeIDs) -> Vec<MessageOut> {
         let reply = ids
             .0
             .iter()
             .filter(|&id| !self.nodes.0.contains(id) && id != &self.cfg.our_id)
-            .map(|&id| MessageOut::Node(id, MessageNode::RequestMsgIDs))
+            .map(|&id| MessageOut::Node(id, MessageNode::RequestEventIDs))
             .collect();
         self.nodes = ids;
         reply
@@ -150,9 +168,10 @@ impl Module {
     /// Reply with a list of events this node doesn't know yet.
     /// We suppose that if there are too old events in here, they will be
     /// discarded over time.
-    pub fn node_known_msg_ids(&mut self, src: NodeID, ids: Vec<U256>) -> Vec<MessageOut> {
+    pub fn node_known_event_ids(&mut self, src: NodeID, ids: Vec<U256>) -> Vec<MessageOut> {
         let unknown_ids = self.filter_known_events(ids);
         if !unknown_ids.is_empty() {
+            self.outstanding.extend(unknown_ids.clone());
             return vec![MessageOut::Node(
                 src,
                 MessageNode::RequestEvents(unknown_ids),
@@ -162,16 +181,13 @@ impl Module {
     }
 
     /// Store the new eventss and send them to the other nodes.
-    pub fn node_events(&mut self, src: NodeID, msgs: Vec<Event>) -> Vec<MessageOut> {
+    pub fn node_events(&mut self, src: NodeID, events: Vec<Event>) -> Vec<MessageOut> {
         // Attention: self.send_event can return an empty vec in case there are no
         // other nodes available yet. So it's not enough to check the 'output' variable
         // to know if the MessageOut::Updated needs to be sent or not.
-        let msgs_out = self.add_events(msgs);
-        let mut output: Vec<MessageOut> = msgs_out
-            .iter()
-            .flat_map(|msg| self.send_event(src, msg))
-            .collect();
-        if !msgs_out.is_empty() {
+        let events_out = self.add_events(events);
+        let mut output: Vec<MessageOut> = self.send_events(src, &events_out);
+        if !events_out.is_empty() {
             output.push(MessageOut::Updated);
         }
         output
@@ -180,9 +196,9 @@ impl Module {
     /// Send the events to the other node. One or more of the requested
     /// events might be missing.
     pub fn node_request_events(&mut self, src: NodeID, ids: Vec<U256>) -> Vec<MessageOut> {
-        let msgs: Vec<Event> = self.storage.get_events_by_ids(ids);
-        if !msgs.is_empty() {
-            vec![MessageOut::Node(src, MessageNode::Events(msgs))]
+        let events: Vec<Event> = self.storage.get_events_by_ids(ids);
+        if !events.is_empty() {
+            vec![MessageOut::Node(src, MessageNode::Events(events))]
         } else {
             vec![]
         }
@@ -192,16 +208,16 @@ impl Module {
     pub fn node_request_event_list(&mut self, src: NodeID) -> Vec<MessageOut> {
         vec![MessageOut::Node(
             src,
-            MessageNode::KnownMsgIDs(self.storage.get_event_ids()),
+            MessageNode::KnownEventIDs(self.storage.get_event_ids()),
         )]
     }
 
     /// Returns all ids that are not in our storage
-    pub fn filter_known_events(&self, msgids: Vec<U256>) -> Vec<U256> {
+    pub fn filter_known_events(&self, eventids: Vec<U256>) -> Vec<U256> {
         let our_ids = self.storage.get_event_ids();
-        msgids
+        eventids
             .into_iter()
-            .filter(|id| !our_ids.contains(id))
+            .filter(|id| !our_ids.contains(id) && !self.outstanding.contains(id))
             .collect()
     }
 
@@ -225,12 +241,13 @@ impl Module {
         self.storage.get_events(cat)
     }
 
-    /// Nothing to do for tick for the moment.
-    pub fn tick(&self) -> Vec<MessageOut> {
+    /// Every tick clear the outstanding vector and request new event IDs.
+    pub fn tick(&mut self) -> Vec<MessageOut> {
+        self.outstanding.clear();
         self.nodes
             .0
             .iter()
-            .map(|id| MessageOut::Node(*id, MessageNode::RequestMsgIDs))
+            .map(|id| MessageOut::Node(*id, MessageNode::RequestEventIDs))
             .collect()
     }
 }

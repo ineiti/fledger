@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use flnet::network::{self, BrokerNetwork};
+use flnet::network::{self, BrokerNetwork, BrokerNetworkCall, BrokerNetworkReply};
 use flutils::nodeids::U256;
 
 use crate::node::{
@@ -12,7 +12,8 @@ use crate::node::{
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerMessage {
-    Network(BrokerNetwork),
+    NetworkCall(BrokerNetworkCall),
+    NetworkReply(BrokerNetworkReply),
     NodeMessageIn(NodeMessage),
     NodeMessageOut(NodeMessage),
     Timer(BrokerTimer),
@@ -31,7 +32,8 @@ impl std::fmt::Display for BrokerMessage {
             f,
             "BrokerMessage({})",
             match self {
-                BrokerMessage::Network(_) => "Network",
+                BrokerMessage::NetworkCall(_) => "NetworkCall",
+                BrokerMessage::NetworkReply(_) => "NetworkReply",
                 BrokerMessage::NodeMessageIn(_) => "NodeMessageIn",
                 BrokerMessage::NodeMessageOut(_) => "NodeMessageOut",
                 BrokerMessage::Timer(_) => "Timer",
@@ -47,40 +49,56 @@ impl From<BrokerModules> for BrokerMessage {
     }
 }
 
+impl From<BrokerNetworkReply> for BrokerMessage {
+    fn from(msg: BrokerNetworkReply) -> Self {
+        Self::NetworkReply(msg)
+    }
+}
+
+impl From<BrokerNetworkCall> for BrokerMessage {
+    fn from(msg: BrokerNetworkCall) -> Self {
+        Self::NetworkCall(msg)
+    }
+}
+
 impl TryFrom<BrokerNetwork> for BrokerMessage {
     type Error = ();
-    fn try_from(msg: BrokerNetwork) -> Result<Self, ()> {
-        match msg {
-            BrokerNetwork::NodeMessageIn(msg) => {
-                if let Ok(nm) = serde_json::from_str(&msg.msg) {
-                    Ok(NodeMessage {
-                        id: msg.id,
-                        msg: nm,
+    fn try_from(bn: BrokerNetwork) -> Result<Self, ()> {
+        match bn {
+            BrokerNetwork::Reply(reply) => match reply {
+                BrokerNetworkReply::RcvNodeMessage(msg) => {
+                    if let Ok(nm) = serde_json::from_str(&msg.msg) {
+                        Ok(NodeMessage {
+                            id: msg.id,
+                            msg: nm,
+                        }
+                        .input())
+                    } else {
+                        Err(())
                     }
-                    .input())
-                } else {
-                    Err(())
                 }
-            }
-            BrokerNetwork::NodeMessageOut(_) => Err(()),
-            _ => Ok(Self::Network(msg)),
+                _ => Ok(Self::NetworkReply(reply)),
+            },
+            BrokerNetwork::Call(call) => Ok(Self::NetworkCall(call)),
         }
     }
 }
 
 impl TryInto<BrokerNetwork> for BrokerMessage {
     type Error = ();
-    fn try_into(self) -> Result<BrokerNetwork, ()>{
+    fn try_into(self) -> Result<BrokerNetwork, ()> {
         match self {
             BrokerMessage::NodeMessageOut(nm) => {
-                if let Ok(msg) = serde_json::to_string(&nm.msg){
-                    Ok(network::NodeMessage{id: nm.id, msg}.output())
+                if let Ok(msg) = serde_json::to_string(&nm.msg) {
+                    Ok(network::NodeMessage { id: nm.id, msg }.output())
                 } else {
                     Err(())
                 }
             }
-            BrokerMessage::Network(net) => Ok(net),
-            _ => Err(())
+            BrokerMessage::NetworkCall(net) => {
+                Ok(BrokerNetwork::Call(net))
+            }
+            _ => Err(()),
         }
     }
 }
@@ -189,7 +207,8 @@ impl fmt::Display for MessageV1 {
 
 transitive_from::hierarchy! {
     BrokerMessage {
-        BrokerNetwork,
+        BrokerNetworkCall,
+        BrokerNetworkReply,
         BrokerModules {
             GossipMessage {
                 gossip_events::MessageIn,

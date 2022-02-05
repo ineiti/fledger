@@ -14,6 +14,8 @@ use crate::signal::web_rtc::{
     WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCBMessage, WebRTCSpawner,
 };
 
+use super::BrokerNetworkReply;
+
 #[derive(Error, Debug)]
 pub enum CSError {
     #[error("While using input queue")]
@@ -319,9 +321,9 @@ impl ConnectionState {
             }))
             .await;
         self.broker
-            .enqueue_msg(BrokerNetwork::ConnectionState(
+            .enqueue_msg(BrokerNetworkReply::ConnectionState(
                 self.get_ncs(None),
-            ));
+            ).into());
         self.conn_setup = Some(rtc_conn);
         self.update_connection(CSEnum::Setup, None);
         Ok(())
@@ -396,9 +398,9 @@ impl Connection {
                 self.state = CSEnum::HasDataChannel;
                 self.connected = Some(conn);
                 self.broker
-                    .enqueue_msg(BrokerNetwork::ConnectionState(
+                    .enqueue_msg(BrokerNetworkReply::ConnectionState(
                         self.get_ncs(None),
-                    ));
+                    ).into());
             }
         }
     }
@@ -407,7 +409,7 @@ impl Connection {
         let peer_info = self
             .direction
             .get_peer_info(&self.id_local, &self.id_remote, message);
-        self.broker.enqueue_msg(peer_info.into());
+        self.broker.enqueue_msg(peer_info.send().into());
     }
 
     fn get_ncs(&self, stat: Option<ConnectionStateMap>) -> NetworkConnectionState {

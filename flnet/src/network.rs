@@ -17,8 +17,8 @@ use crate::{
     config::{NodeConfig, NodeInfo},
     signal::{
         web_rtc::{
-            ConnType, MessageAnnounce, NodeStat, PeerInfo, SignalingState, WSSignalMessage,
-            WebRTCConnectionState, WebRTCSpawner, WebSocketMessage,
+            ConnType, MessageAnnounce, NodeStat, PeerInfo, SignalingState, WSSignalMessageFromNode,
+            WSSignalMessageToNode, WebRTCConnectionState, WebRTCSpawner,
         },
         websocket::{WSError, WSMessage, WebSocketConnection},
     },
@@ -154,7 +154,7 @@ impl Inner {
         let msgs: Vec<WSMessage> = self.ws_rx.try_iter().collect();
         for msg in &msgs {
             if let WSMessage::MessageString(s) = msg {
-                self.process_msg(s.parse::<WebSocketMessage>()?.msg).await?;
+                self.process_msg(serde_json::from_str(s)?).await?;
             }
         }
         Ok(msgs.len())
@@ -163,9 +163,9 @@ impl Inner {
     /// Processes incoming messages from the signalling server.
     /// This can be either messages requested by this node, or connection
     /// setup requests from another node.
-    async fn process_msg(&mut self, msg: WSSignalMessage) -> Result<(), NetworkError> {
+    async fn process_msg(&mut self, msg: WSSignalMessageToNode) -> Result<(), NetworkError> {
         match msg {
-            WSSignalMessage::Challenge(version, challenge) => {
+            WSSignalMessageToNode::Challenge(version, challenge) => {
                 info!("Processing Challenge message version: {}", version);
                 let ma = MessageAnnounce {
                     version,
@@ -173,18 +173,15 @@ impl Inner {
                     node_info: self.node_config.our_node.clone(),
                     signature: self.node_config.keypair.sign(&challenge.to_bytes()),
                 };
-                self.ws.send(
-                    WebSocketMessage {
-                        msg: WSSignalMessage::Announce(ma),
-                    }
-                    .to_string(),
-                )?;
-                self.ws_send(WSSignalMessage::ListIDsRequest)?;
+                self.ws_send(&WSSignalMessageFromNode::Announce(ma))?;
+                self.ws_send(&WSSignalMessageFromNode::ListIDsRequest)?;
             }
-            WSSignalMessage::ListIDsReply(list) => {
-                let _ = self.broker.emit_msg(BrokerNetwork::UpdateList(list))?;
+            WSSignalMessageToNode::ListIDsReply(list) => {
+                let _ = self
+                    .broker
+                    .emit_msg(BrokerNetworkReply::RcvWSUpdateList(list).into())?;
             }
-            WSSignalMessage::PeerSetup(pi) => {
+            WSSignalMessageToNode::PeerSetup(pi) => {
                 let remote_node = match pi.get_remote(&self.node_config.our_node.get_id()) {
                     Some(id) => id,
                     None => {
@@ -196,9 +193,6 @@ impl Inner {
                     .process_ws(pi)
                     .await?;
             }
-            ws => {
-                info!("Got unusable message: {:?}", ws);
-            }
         }
         Ok(())
     }
@@ -206,33 +200,39 @@ impl Inner {
     async fn process_broker(&mut self) -> Result<(), NetworkError> {
         let bms: Vec<BrokerNetwork> = self.broker_rx.try_iter().collect();
         for bm in bms {
-            match bm {
-                BrokerNetwork::NodeMessageOut(nm) => {
-                    log::trace!(
-                        "{}->{}: {:?}",
-                        self.node_config.our_node.get_id(),
-                        nm.id,
-                        nm.msg
-                    );
-                    self.send(&nm.id, serde_json::to_string(&nm.msg)?).await?
+            if let BrokerNetwork::Call(rcv) = bm {
+                match rcv {
+                    BrokerNetworkCall::SendNodeMessage(nm) => {
+                        log::trace!(
+                            "{}->{}: {:?}",
+                            self.node_config.our_node.get_id(),
+                            nm.id,
+                            nm.msg
+                        );
+                        self.send(&nm.id, serde_json::to_string(&nm.msg)?).await?
+                    }
+                    BrokerNetworkCall::SendWSStats(ss) => {
+                        self.ws_send(&WSSignalMessageFromNode::NodeStats(ss.clone()))?
+                    }
+                    BrokerNetworkCall::SendWSUpdateListRequest => {
+                        self.ws_send(&WSSignalMessageFromNode::ListIDsRequest)?
+                    }
+                    BrokerNetworkCall::SendWSClearNodes => {
+                        self.ws_send(&WSSignalMessageFromNode::ClearNodes)?
+                    }
+                    BrokerNetworkCall::SendWSPeer(pi) => {
+                        self.ws_send(&WSSignalMessageFromNode::PeerSetup(pi))?
+                    }
+                    BrokerNetworkCall::Connect(id) => self.connect(&id).await?,
+                    BrokerNetworkCall::Disconnect(id) => self.disconnect(&id).await?,
                 }
-                BrokerNetwork::SendStats(ss) => {
-                    self.ws_send(WSSignalMessage::NodeStats(ss.clone()))?
-                }
-                BrokerNetwork::UpdateListRequest => {
-                    self.ws_send(WSSignalMessage::ListIDsRequest)?
-                }
-                BrokerNetwork::WebSocket(msg) => self.ws_send(msg)?,
-                BrokerNetwork::Connect(id) => self.connect(&id).await?,
-                BrokerNetwork::Disconnect(id) => self.disconnect(&id).await?,
-                _ => continue,
             }
         }
         Ok(())
     }
 
-    fn ws_send(&mut self, msg: WSSignalMessage) -> Result<(), NetworkError> {
-        self.ws.send(WebSocketMessage { msg }.to_string())?;
+    fn ws_send(&mut self, msg: &WSSignalMessageFromNode) -> Result<(), NetworkError> {
+        self.ws.send(serde_json::to_string(msg)?)?;
         Ok(())
     }
 
@@ -249,14 +249,16 @@ impl Inner {
     /// Connect to the given node.
     async fn connect(&mut self, dst: &U256) -> Result<(), NetworkError> {
         self.get_connection(dst).await?;
-        self.broker.emit_msg(BrokerNetwork::Connected(*dst))?;
+        self.broker
+            .emit_msg(BrokerNetworkReply::Connected(*dst).into())?;
         Ok(())
     }
 
     /// Disconnects from a given node.
     async fn disconnect(&mut self, dst: &U256) -> Result<(), NetworkError> {
         // TODO: Actually disconnect and listen for nodes that have been disconnected due to timeouts.
-        self.broker.emit_msg(BrokerNetwork::Disconnected(*dst))?;
+        self.broker
+            .emit_msg(BrokerNetworkReply::Disconnected(*dst).into())?;
         Ok(())
     }
 
@@ -289,18 +291,42 @@ impl Inner {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerNetwork {
-    NodeMessageIn(NodeMessage),
-    NodeMessageOut(NodeMessage),
-    WebSocket(WSSignalMessage),
-    SendStats(Vec<NodeStat>),
-    UpdateList(Vec<NodeInfo>),
-    ClearNodes,
-    UpdateListRequest,
-    ConnectionState(NetworkConnectionState),
+    Call(BrokerNetworkCall),
+    Reply(BrokerNetworkReply),
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum BrokerNetworkCall {
+    SendNodeMessage(NodeMessage),
+    SendWSStats(Vec<NodeStat>),
+    SendWSClearNodes,
+    SendWSUpdateListRequest,
+    SendWSPeer(PeerInfo),
     Connect(U256),
-    Connected(U256),
     Disconnect(U256),
+}
+
+impl From<BrokerNetworkCall> for BrokerNetwork {
+    fn from(msg: BrokerNetworkCall) -> Self {
+        Self::Call(msg)
+    }
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum BrokerNetworkReply {
+    RcvNodeMessage(NodeMessage),
+    RcvWSUpdateList(Vec<NodeInfo>),
+    ConnectionState(NetworkConnectionState),
+    Connected(U256),
     Disconnected(U256),
+}
+
+impl From<BrokerNetworkReply> for BrokerNetwork {
+    fn from(msg: BrokerNetworkReply) -> Self {
+        Self::Reply(msg)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -311,10 +337,10 @@ pub struct NodeMessage {
 
 impl NodeMessage {
     pub fn input(&self) -> BrokerNetwork {
-        BrokerNetwork::NodeMessageIn(self.clone())
+        BrokerNetworkCall::SendNodeMessage(self.clone()).into()
     }
     pub fn output(&self) -> BrokerNetwork {
-        BrokerNetwork::NodeMessageOut(self.clone())
+        BrokerNetworkReply::RcvNodeMessage(self.clone()).into()
     }
 }
 
@@ -328,7 +354,7 @@ pub struct NetworkConnectionState {
 
 impl From<NetworkConnectionState> for BrokerNetwork {
     fn from(msg: NetworkConnectionState) -> Self {
-        Self::ConnectionState(msg)
+        BrokerNetworkReply::ConnectionState(msg).into()
     }
 }
 
@@ -342,11 +368,10 @@ pub struct ConnStats {
     pub delay_ms: u32,
 }
 
-transitive_from::hierarchy! {
-    BrokerNetwork {
-        NetworkConnectionState,
-        WSSignalMessage {
-            PeerInfo
-        }
-    },
-}
+// TODO: currently this is useless - see if it's needed again afterwareds
+// transitive_from::hierarchy! {
+//     BrokerNetwork {
+//         BrokerNetworkCall{
+//         },
+//     },
+// }

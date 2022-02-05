@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use common::signal::websocket::{WSMessage, WebSocketConnectionSend, WebSocketServer};
+use flnet::signal::websocket::{WSMessage, WebSocketConnectionSend, WebSocketServer};
 use flutils::nodeids::U256;
 
 mod internal;

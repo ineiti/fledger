@@ -13,6 +13,7 @@ local = []
 [dependencies]
 flmodules = {path="../flmodules"}
 flutils = {path="../flutils"}
+flnet = {path="../flnet"}
 chrono = "0.4"
 anyhow = "1.0.42"
 js-sys = "0.3.51"

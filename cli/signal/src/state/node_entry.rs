@@ -2,12 +2,9 @@ use futures::executor;
 use log::error;
 use std::{fmt, time::Instant};
 
-use common::{
-    node::config::NodeInfo,
-    signal::{
-        web_rtc::{WSSignalMessage, WebSocketMessage},
-        websocket::WebSocketConnectionSend,
-    },
+use flnet::{
+    config::NodeInfo,
+    signal::{web_rtc::WSSignalMessageToNode, websocket::WebSocketConnectionSend},
 };
 use flutils::nodeids::U256;
 
@@ -33,10 +30,7 @@ impl NodeEntry {
             conn,
             last_seen: Instant::now(),
         };
-        let msg = serde_json::to_string(&WebSocketMessage {
-            msg: WSSignalMessage::Challenge(1u64, ne.entry),
-        })
-        .unwrap();
+        let msg = serde_json::to_string(&WSSignalMessageToNode::Challenge(1u64, ne.entry)).unwrap();
         if let Err(e) = executor::block_on(ne.conn.send(msg)) {
             error!("while sending challenge: {}", e);
         }

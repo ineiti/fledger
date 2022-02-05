@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use flnet::{
     config::{NodeConfig, NodeInfo},
-    network::{connection_state::CSEnum, BrokerNetwork, ConnStats, NetworkConnectionState},
+    network::{connection_state::CSEnum, ConnStats, NetworkConnectionState, BrokerNetworkReply, BrokerNetworkCall},
     signal::web_rtc::{ConnType, NodeStat, WebRTCConnectionState},
 };
 use flutils::{
@@ -117,7 +117,7 @@ impl Stats {
             let stats: Vec<NodeStat> = self.collect();
 
             self.broker
-                .enqueue_msg(BrokerMessage::Network(BrokerNetwork::SendStats(stats)));
+                .enqueue_msg(BrokerNetworkCall::SendWSStats(stats).into());
         }
         if self.ping_all_counter == 0 {
             self.ping_all()?;
@@ -253,8 +253,8 @@ impl SubsystemListener<BrokerMessage> for Stats {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         for msg in msgs {
             if let Err(e) = match msg {
-                BrokerMessage::Network(BrokerNetwork::ConnectionState(cs)) => self.upsert(cs),
-                BrokerMessage::Network(BrokerNetwork::UpdateList(ul)) => self.update_list(ul),
+                BrokerMessage::NetworkReply(BrokerNetworkReply::ConnectionState(cs)) => self.upsert(cs),
+                BrokerMessage::NetworkReply(BrokerNetworkReply::RcvWSUpdateList(ul)) => self.update_list(ul),
                 BrokerMessage::NodeMessageIn(nm) => self.ping_rcv(nm),
                 BrokerMessage::Timer(BrokerTimer::Second) => self.send_stats(),
                 _ => Ok(()),

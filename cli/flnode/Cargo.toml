@@ -17,6 +17,7 @@ local = []
 [dependencies]
 flutils = {path="../../flutils"}
 flmodules = {path="../../flmodules"}
+flnet = {path="../../flnet"}
 common = {path = "../../common"}
 wasm-webrtc = {path = "../../wasm-webrtc", features=["node"]}
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }

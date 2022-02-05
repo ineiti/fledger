@@ -3,7 +3,10 @@ use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 use crate::{
-    network::{connection_state::{CSEnum, CSError, ConnectionState}, BrokerNetwork},
+    network::{
+        connection_state::{CSEnum, CSError, ConnectionState},
+        BrokerNetwork,
+    },
     signal::web_rtc::{PeerInfo, WebRTCSpawner},
 };
 

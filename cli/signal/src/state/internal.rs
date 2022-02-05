@@ -12,10 +12,10 @@ use std::{
 };
 use thiserror::Error;
 
-use common::{
-    node::config::NodeInfo,
+use flnet::{
+    config::NodeInfo,
     signal::{
-        web_rtc::{NodeStat, WSSignalMessage, WebSocketMessage},
+        web_rtc::{NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode},
         websocket::WSMessage,
     },
 };
@@ -115,7 +115,7 @@ impl Internal {
     /// Receives a message from the websocket. Src is the challenge-ID, which is
     /// random and only tied to the id ID through self.pub_chal.
     fn receive_msg(&mut self, chal: &U256, msg: String) {
-        let msg_ws = match msg.parse::<WebSocketMessage>() {
+        let msg_ws = match serde_json::from_str::<WSSignalMessageFromNode>(&msg) {
             Ok(mw) => mw,
             Err(e) => {
                 error!("Couldn't parse message as WebSocketMessage: {:?}", e);
@@ -127,9 +127,9 @@ impl Internal {
             node.last_seen = Instant::now();
         }
 
-        match msg_ws.msg {
+        match msg_ws {
             // Node sends his information to the server
-            WSSignalMessage::Announce(msg_ann) => {
+            WSSignalMessageFromNode::Announce(msg_ann) => {
                 if let Err(e) = msg_ann
                     .node_info
                     .pubkey
@@ -157,8 +157,7 @@ impl Internal {
                         error!("While flushing csv: {}", e);
                     }
                 }
-                self.pub_chal
-                    .insert(msg_ann.node_info.get_id(), *chal);
+                self.pub_chal.insert(msg_ann.node_info.get_id(), *chal);
                 self.nodes
                     .entry(*chal)
                     .and_modify(|ne| ne.info = Some(msg_ann.node_info));
@@ -166,7 +165,7 @@ impl Internal {
 
             // Node requests a list of all currently connected nodes,
             // including itself.
-            WSSignalMessage::ListIDsRequest => {
+            WSSignalMessageFromNode::ListIDsRequest => {
                 let ids: Vec<NodeInfo> = self
                     .nodes
                     .iter()
@@ -174,12 +173,12 @@ impl Internal {
                     .map(|ne| ne.1.info.clone().unwrap())
                     .collect();
                 if let Some(src) = self.chal_to_pub(chal) {
-                    self.send_message_errlog(&src, WSSignalMessage::ListIDsReply(ids));
+                    self.send_message_errlog(&src, WSSignalMessageToNode::ListIDsReply(ids));
                 }
             }
 
             // Node sends a PeerRequest with some of the data set to 'Some'.
-            WSSignalMessage::PeerSetup(pr) => {
+            WSSignalMessageFromNode::PeerSetup(pr) => {
                 info!("Got a PeerSetup {}", pr);
                 if let Some(src) = self.chal_to_pub(chal) {
                     let dst = if src == pr.id_init {
@@ -190,13 +189,13 @@ impl Internal {
                         error!("Node sent a PeerSetup without including itself");
                         return;
                     };
-                    self.send_message_errlog(dst, WSSignalMessage::PeerSetup(pr.clone()));
+                    self.send_message_errlog(dst, WSSignalMessageToNode::PeerSetup(pr.clone()));
                 } else {
                     error!("Got a PeerSetup for an unknown node");
                 }
             }
 
-            WSSignalMessage::NodeStats(ns) => {
+            WSSignalMessageFromNode::NodeStats(ns) => {
                 if let Some(f) = self.file_stats.as_mut() {
                     info!("Writing stats");
                     for n in ns.iter() {
@@ -246,7 +245,7 @@ impl Internal {
         }
     }
 
-    fn send_message_errlog(&mut self, id: &U256, msg: WSSignalMessage) {
+    fn send_message_errlog(&mut self, id: &U256, msg: WSSignalMessageToNode) {
         debug!("Sending to {}: {:?}", id, msg);
         if let Err(e) = self.send_message(id, msg.clone()) {
             error!("Error {} while sending {:?}", e, msg);
@@ -255,8 +254,8 @@ impl Internal {
 
     /// Tries to send a message to the indicated node.
     /// If the node is not reachable, an error will be returned.
-    pub fn send_message(&mut self, id: &U256, msg: WSSignalMessage) -> Result<(), ISError> {
-        let msg_str = serde_json::to_string(&WebSocketMessage { msg }).unwrap();
+    pub fn send_message(&mut self, id: &U256, msg: WSSignalMessageToNode) -> Result<(), ISError> {
+        let msg_str = serde_json::to_string(&msg).unwrap();
         if let Some(chal) = self.pub_to_chal(id) {
             match self.nodes.entry(chal) {
                 Entry::Occupied(mut e) => {

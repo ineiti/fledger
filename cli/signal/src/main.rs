@@ -15,7 +15,7 @@ use std::{
 };
 use tungstenite::{accept, protocol::Role, Message, WebSocket};
 
-use common::signal::websocket::{
+use flnet::signal::websocket::{
     MessageCallbackSend, NewConnectionCallback, WSError, WSMessage, WebSocketConnectionSend,
     WebSocketServer,
 };

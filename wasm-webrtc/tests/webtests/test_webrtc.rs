@@ -7,16 +7,16 @@ use std::{
 use thiserror::Error;
 use wasm_bindgen_test::*;
 
+use common::node::{Node, NodeError};
 use flnet::signal::{
     web_rtc::{
-        ConnectionError, SetupError, WSSignalMessage, WebRTCConnection, WebRTCConnectionSetup,
-        WebRTCConnectionState, WebRTCSetupCBMessage, WebSocketMessage,
+        ConnectionError, SetupError, WSSignalMessageFromNode, WebRTCConnection,
+        WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCBMessage,
     },
     websocket::{MessageCallback, WSError, WSMessage, WebSocketConnection},
 };
-use flutils::{data_storage::TempDSB, nodeids::U256};
+use flutils::data_storage::TempDSB;
 use wasm_webrtc::{helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm};
-use common::node::{Node, NodeError};
 
 #[derive(Debug, Error)]
 pub enum WSDError {
@@ -24,6 +24,8 @@ pub enum WSDError {
     TwoNodesOnly,
     #[error("No callback defined yet")]
     MissingCallback,
+    #[error(transparent)]
+    Serde(#[from] serde_json::Error),
 }
 
 #[derive(Debug)]
@@ -54,13 +56,6 @@ impl WebSocketDummy {
         }
         let wscd = WebSocketConnectionDummy::new(Rc::clone(&self.msg_queue), id);
         self.callbacks.push(Rc::clone(&wscd.cb));
-        let wsm_str = WebSocketMessage {
-            msg: WSSignalMessage::Challenge(1u64, U256::rnd()),
-        }
-        .to_string();
-        self.msg_queue
-            .borrow_mut()
-            .push(Message { id, str: wsm_str });
         Ok(wscd)
     }
 
@@ -68,17 +63,22 @@ impl WebSocketDummy {
         let msgs: Vec<Message> = self.msg_queue.borrow_mut().drain(..).collect();
         let msgs_count = msgs.len();
         msgs.iter()
-            .for_each(|msg| match msg.str.parse::<WebSocketMessage>() {
-                Ok(wsm) => {
-                    if matches!(wsm.msg, WSSignalMessage::PeerSetup(_)) && self.callbacks.len() == 2
-                    {
-                        if let Err(e) = self.send_message(1 - msg.id as usize, msg.str.clone()) {
-                            error!("couldn't push message: {}", e);
+            // TODO: check that this is actually FromNode and not ToNode or perhaps should even be both...
+            .for_each(
+                |msg| match serde_json::from_str::<WSSignalMessageFromNode>(&msg.str) {
+                    Ok(wsm) => {
+                        if matches!(wsm, WSSignalMessageFromNode::PeerSetup(_))
+                            && self.callbacks.len() == 2
+                        {
+                            if let Err(e) = self.send_message(1 - msg.id as usize, msg.str.clone())
+                            {
+                                error!("couldn't push message: {}", e);
+                            }
                         }
                     }
-                }
-                Err(e) => info!("Error while getting message: {}", e),
-            });
+                    Err(e) => info!("Error while getting message: {}", e),
+                },
+            );
         msgs_count
     }
 

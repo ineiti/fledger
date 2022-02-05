@@ -97,7 +97,7 @@ impl<T: 'static + Clone> Broker<T> {
     /// type.
     /// Any error in the TryInto and TryFrom are interpreted as a message
     /// that cannot be translated and are ignored.
-    pub fn broker_join<R: 'static + Clone + TryFrom<T> + TryInto<T>>(
+    pub fn link<R: 'static + Clone + TryFrom<T> + TryInto<T>>(
         &self,
         broker_r: &Broker<R>,
     ) {
@@ -356,7 +356,7 @@ mod tests {
         let (tap_b_tx, tap_b_rx) = channel::<MessageB>();
         broker_b.add_subsystem(Subsystem::Tap(tap_b_tx))?;
 
-        broker_b.broker_join(&broker_a);
+        broker_b.link(&broker_a);
 
         broker_a.emit_msg(MessageA::Two)?;
         tap_a_rx.recv().unwrap();

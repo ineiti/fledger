@@ -10,8 +10,8 @@ fn connect_nodes_2() {
 }
 
 #[test]
-fn connect_nodes_200() {
-    connect_nodes(200);
+fn connect_nodes_20() {
+    connect_nodes(20);
 }
 
 fn connect_nodes(nbr_nodes: usize) {
@@ -22,7 +22,7 @@ fn connect_nodes(nbr_nodes: usize) {
     net.add_nodes(nbr_nodes);
     let id = &net.nodes.keys().next().unwrap().clone();
 
-    for step in 1..50 {
+    for step in 1..=70 {
         log::debug!("Process #{step}");
         net.process(1);
 
@@ -40,7 +40,7 @@ fn connect_nodes(nbr_nodes: usize) {
                 log::info!("Adding 1st message");
                 add_chat_message(&mut net, id, step);
             }
-            20 => {
+            30 => {
                 log::info!(
                     "Checking messages {} == {nbr} and adding 2nd message",
                     nbr_nodes
@@ -48,7 +48,7 @@ fn connect_nodes(nbr_nodes: usize) {
                 assert_eq!(nbr_nodes, nbr);
                 add_chat_message(&mut net, id, step);
             }
-            30 => {
+            50 => {
                 log::info!(
                     "Checking messages {} == {nbr} and adding {nbr_nodes} nodes",
                     2 * nbr_nodes
@@ -56,7 +56,7 @@ fn connect_nodes(nbr_nodes: usize) {
                 assert_eq!(2 * nbr_nodes, nbr);
                 net.add_nodes(nbr_nodes);
             }
-            45 => {
+            70 => {
                 log::info!("Checking messages {} == {nbr}", 4 * nbr_nodes);
                 assert_eq!(4 * nbr_nodes, nbr);
             }

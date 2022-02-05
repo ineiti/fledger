@@ -15,3 +15,9 @@ chrono = "0.4.19"
 log = "0.4.14"
 flexi_logger = "0.22.2"
 tokio = "1.16.1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3.51"
+wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4.24"
+wasm-timer = "0.2"

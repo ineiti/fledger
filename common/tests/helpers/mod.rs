@@ -6,14 +6,14 @@ use std::{
     },
 };
 
+use flnet::{
+    config::{NodeConfig, NodeInfo},
+    network::{BrokerNetworkCall, BrokerNetworkReply},
+};
 use flutils::{
     broker::{Subsystem, SubsystemListener},
     data_storage::TempDSB,
     nodeids::U256,
-};
-use flnet::{
-    config::{NodeConfig, NodeInfo},
-    network::BrokerNetwork,
 };
 
 use common::node::{
@@ -56,9 +56,9 @@ impl Network {
         let list: Vec<NodeInfo> = self.nodes.values().map(|node| node.node_info()).collect();
         for id in self.nodes.keys() {
             self.node_inputs.get_mut(id).and_then(|ch| {
-                ch.send(BrokerMessage::Network(BrokerNetwork::UpdateList(
-                    list.clone(),
-                )))
+                ch.send(BrokerMessage::NetworkReply(
+                    BrokerNetworkReply::RcvWSUpdateList(list.clone()),
+                ))
                 .ok()
             });
         }
@@ -100,7 +100,7 @@ impl Network {
         let ids: Vec<U256> = self.nodes.keys().cloned().collect();
         for id in ids.iter() {
             for msg in self.node_outputs.get(id).unwrap().try_iter() {
-                if let BrokerMessage::Network(BrokerNetwork::NodeMessageOut(nm)) = &msg {
+                if let BrokerMessage::NodeMessageOut(nm) = &msg {
                     if let Some(ch_in) = self.node_inputs.get(&nm.id) {
                         log::trace!("Send: {} -> {}: {:?}", id, nm.id, msg);
                         ch_in
@@ -177,18 +177,10 @@ impl WebRTC {
             .unwrap();
     }
 
-    fn msg_outgoing_network(&mut self, msg: &BrokerNetwork) -> Option<BrokerMessage> {
+    fn msg_outgoing_network(&mut self, msg: &BrokerNetworkCall) -> Option<BrokerMessage> {
         match msg {
-            BrokerNetwork::NodeMessageOut(_) => {
-                self.snd.send(msg.clone().into()).unwrap();
-                None
-            }
-            BrokerNetwork::Connect(id) => {
-                Some(BrokerMessage::Network(BrokerNetwork::Connected(*id)))
-            }
-            BrokerNetwork::Disconnect(id) => {
-                Some(BrokerMessage::Network(BrokerNetwork::Disconnected(*id)))
-            }
+            BrokerNetworkCall::Connect(id) => Some(BrokerNetworkReply::Connected(*id).into()),
+            BrokerNetworkCall::Disconnect(id) => Some(BrokerNetworkReply::Disconnected(*id).into()),
             _ => None,
         }
     }
@@ -198,7 +190,11 @@ impl SubsystemListener<BrokerMessage> for WebRTC {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         msgs.iter()
             .filter_map(|&msg| match msg {
-                BrokerMessage::Network(bn) => self.msg_outgoing_network(bn),
+                BrokerMessage::NodeMessageOut(_) => {
+                    self.snd.send(msg.clone()).unwrap();
+                    None
+                }
+                BrokerMessage::NetworkCall(bnc) => self.msg_outgoing_network(bnc),
                 _ => None,
             })
             .collect()

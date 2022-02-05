@@ -1,9 +1,10 @@
+use flnet::network::BrokerNetworkCall;
+use flnet::network::BrokerNetworkReply;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::Mutex;
 
 pub use flmodules::random_connections::{MessageIn, MessageOut};
-use flnet::network::BrokerNetwork;
 use flutils::{
     broker::{Subsystem, SubsystemListener},
     nodeids::U256,
@@ -55,10 +56,10 @@ impl RandomConnections {
                 .iter()
                 .flat_map(|msg| match msg {
                     MessageOut::ConnectNode(id) => {
-                        vec![BrokerMessage::Network(BrokerNetwork::Connect(*id))]
+                        vec![BrokerNetworkCall::Connect(*id).into()]
                     }
                     MessageOut::DisconnectNode(id) => {
-                        vec![BrokerMessage::Network(BrokerNetwork::Disconnect(*id))]
+                        vec![BrokerNetworkCall::Disconnect(*id).into()]
                     }
                     MessageOut::ListUpdate(_) => {
                         vec![BrokerModules::Random(RandomMessage::MessageOut(msg.clone())).into()]
@@ -72,9 +73,9 @@ impl RandomConnections {
     }
 
     fn process_msg_bm(&self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
-        match msg {
-            BrokerMessage::Network(bmn) => match bmn {
-                BrokerNetwork::UpdateList(nodes) => vec![MessageIn::NodeList(
+        if let BrokerMessage::NetworkReply(bnr) = msg {
+            match bnr {
+                BrokerNetworkReply::RcvWSUpdateList(nodes) => vec![MessageIn::NodeList(
                     nodes
                         .iter()
                         .map(|ni| ni.get_id())
@@ -82,13 +83,14 @@ impl RandomConnections {
                         .collect::<Vec<U256>>()
                         .into(),
                 )],
-                BrokerNetwork::Connected(id) => vec![MessageIn::NodeConnected(*id)],
-                BrokerNetwork::Disconnected(id) => {
+                BrokerNetworkReply::Connected(id) => vec![MessageIn::NodeConnected(*id)],
+                BrokerNetworkReply::Disconnected(id) => {
                     vec![MessageIn::NodeDisconnected(*id)]
                 }
                 _ => vec![],
-            },
-            _ => vec![],
+            }
+        } else {
+            vec![]
         }
         .iter()
         .flat_map(|msg| self.process_msg_in(msg))
