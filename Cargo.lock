@@ -216,44 +216,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "ed25519-dalek",
- "env_logger",
- "flexi_logger 0.19.4",
- "flmodules",
- "flnet",
- "flutils",
- "futures",
- "getrandom 0.2.3",
- "itertools",
- "js-sys",
- "log",
- "names",
- "rand 0.7.3",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_yaml",
- "sha2 0.9.8",
- "simple-logging",
- "simplelog",
- "thiserror",
- "timer",
- "tokio",
- "toml",
- "transitive_from",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-timer",
- "web-sys",
-]
-
-[[package]]
 name = "console_error_panic_hook"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -418,15 +380,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "fledger"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "console_error_panic_hook",
+ "flmodules",
+ "flnet",
+ "flnode",
+ "flutils",
+ "getrandom 0.2.3",
+ "js-sys",
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-logger",
+ "wasm-webrtc",
+ "web-sys",
+]
+
+[[package]]
 name = "fledger-web"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
- "common",
  "console_error_panic_hook",
  "flmodules",
  "flnet",
+ "flnode",
  "flutils",
  "js-sys",
  "log",
@@ -538,23 +524,37 @@ dependencies = [
 name = "flnode"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
- "common",
- "console_error_panic_hook",
+ "chrono",
+ "ed25519-dalek",
+ "env_logger",
+ "flexi_logger 0.19.4",
  "flmodules",
  "flnet",
  "flutils",
+ "futures",
  "getrandom 0.2.3",
+ "itertools",
  "js-sys",
  "log",
+ "names",
+ "rand 0.7.3",
  "serde",
  "serde_derive",
  "serde_json",
+ "serde_yaml",
+ "sha2 0.9.8",
+ "simple-logging",
+ "simplelog",
  "thiserror",
+ "timer",
+ "tokio",
+ "toml",
+ "transitive_from",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-logger",
- "wasm-webrtc",
+ "wasm-timer",
  "web-sys",
 ]
 
@@ -1370,13 +1370,13 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bimap",
- "common",
  "csv",
  "dipstick",
  "ed25519-dalek",
  "flexi_logger 0.18.1",
  "flmodules",
  "flnet",
+ "flnode",
  "flutils",
  "futures",
  "log",
@@ -1927,9 +1927,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "common",
  "console_error_panic_hook",
  "flnet",
+ "flnode",
  "flutils",
  "getrandom 0.2.3",
  "js-sys",

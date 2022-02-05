@@ -2,12 +2,12 @@
 
 members = [
     "cli/signal",
-    "cli/flnode",
+    "cli/fledger",
     "wasm-webrtc",
-    "common",
     "vendor/names",
     "web",
     "flmodules",
     "flutils",
-    "flnet"
+    "flnet",
+    "flnode"
 ]

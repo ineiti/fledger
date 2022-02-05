@@ -16,7 +16,7 @@ use flutils::{
     nodeids::U256,
 };
 
-use common::node::{
+use flnode::node::{
     modules::{
         gossip_events::GossipEvent,
         messages::{BrokerMessage, NodeMessage},

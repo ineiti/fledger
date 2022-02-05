@@ -1,7 +1,7 @@
 [package]
 authors = ["Linus Gasser <linus@gasser.blue>"]
 edition = "2021"
-name = "common"
+name = "flnode"
 version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

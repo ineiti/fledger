@@ -1,4 +1,4 @@
-use common::node::NodeError;
+use flnode::node::NodeError;
 use flnet::signal::websocket::WSError;
 use flutils::data_storage::DataStorageBase;
 use flutils::data_storage::{DataStorage, StorageError};
@@ -10,7 +10,7 @@ use wasm_webrtc::{
     helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
 };
 
-use common::node::{stats::StatNode, version::VERSION_STRING, Node};
+use flnode::node::{stats::StatNode, version::VERSION_STRING, Node};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";

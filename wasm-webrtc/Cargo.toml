@@ -10,7 +10,7 @@ node = []
 [dependencies]
 flnet = {path="../flnet"}
 flutils = {path = "../flutils"}
-common = {path = "../common"}
+flnode = {path = "../flnode"}
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
 js-sys = "0.3.51"
 wasm-bindgen-futures = "0.4.24"

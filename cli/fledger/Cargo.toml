@@ -1,5 +1,5 @@
 [package]
-name = "flnode"
+name = "fledger"
 version = "0.1.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 edition = "2021"
@@ -18,7 +18,7 @@ local = []
 flutils = {path="../../flutils"}
 flmodules = {path="../../flmodules"}
 flnet = {path="../../flnet"}
-common = {path = "../../common"}
+flnode = {path = "../../flnode"}
 wasm-webrtc = {path = "../../wasm-webrtc", features=["node"]}
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
 js-sys = "0.3.51"

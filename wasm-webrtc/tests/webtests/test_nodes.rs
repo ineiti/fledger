@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use common::node::{node_data::TempDS, Node};
+use flnode::node::{node_data::TempDS, Node};
 use wasm_bindgen_test::*;
 use wasm_webrtc::{
     helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,

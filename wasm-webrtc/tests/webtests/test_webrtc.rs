@@ -7,7 +7,7 @@ use std::{
 use thiserror::Error;
 use wasm_bindgen_test::*;
 
-use common::node::{Node, NodeError};
+use flnode::node::{Node, NodeError};
 use flnet::signal::{
     web_rtc::{
         ConnectionError, SetupError, WSSignalMessageFromNode, WebRTCConnection,

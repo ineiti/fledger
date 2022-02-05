@@ -6,11 +6,16 @@
 
 ## Current concrete goal
 
-- Cleanup network.rs, signal.rs, types.rs, to be able to move them easier.
+- Remove wasm from node
+- Separate wasm and libc implementations in flnet
 
 ### Things to do
 
 # Dates
+
+2022-02-05:
+- Cleanup network.rs, signal.rs, types.rs, to be able to move them easier.
+- move things around
 
 2022-02-01:
 - starting to cleanup network, broker, and types, before the move of the different parts
