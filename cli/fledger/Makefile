@@ -1,4 +1,4 @@
-src := $(shell find src ../../common ../../wasm-webrtc ../../vendor -name "*.rs")
+src := $(shell find src ../../flnode ../../wasm-webrtc ../../vendor -name "*.rs")
 wasm := static/wasm_bg.wasm
 TARGET := --release
 build = wasm-pack build ${TARGET} --target nodejs --out-name wasm \

@@ -4,10 +4,13 @@ members = [
     "cli/signal",
     "cli/fledger",
     "wasm-webrtc",
-    "vendor/names",
     "web",
     "flmodules",
     "flutils",
     "flnet",
     "flnode"
 ]
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"
