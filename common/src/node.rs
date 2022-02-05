@@ -22,7 +22,7 @@ use flnet::{
 use crate::{
     node::{
         modules::{
-            gossip_events::{self, GossipChat, GossipMessage},
+            gossip_events::{self, GossipEvent, GossipMessage},
             messages::{BrokerMessage, BrokerModules},
             random_connections::RandomConnections,
         },
@@ -105,7 +105,7 @@ impl Node {
         let broker = {
             Stats::start(Arc::clone(&node_data));
             RandomConnections::start(Arc::clone(&node_data));
-            GossipChat::start(Arc::clone(&node_data));
+            GossipEvent::start(Arc::clone(&node_data));
             node_data.lock().unwrap().broker.clone()
         };
         let broker_net = Network::start(config, ws, web_rtc);

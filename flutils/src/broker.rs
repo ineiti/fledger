@@ -348,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn convert() -> Result<(), ConvertError> {
+    fn link() -> Result<(), ConvertError> {
         let mut broker_a: Broker<MessageA> = Broker::new();
         let (tap_a_tx, tap_a_rx) = channel::<MessageA>();
         broker_a.add_subsystem(Subsystem::Tap(tap_a_tx))?;
@@ -366,6 +366,7 @@ mod tests {
         } else {
             return Err(ConvertError::Conversion("A to B".to_string()));
         }
+
         broker_b.emit_msg(MessageB::Un)?;
         tap_b_rx.recv().unwrap();
         broker_a.process()?;

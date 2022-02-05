@@ -1,5 +1,5 @@
 use crate::{
-    network::{ConnStats, NetworkConnectionState, NodeMessage, BrokerNetwork},
+    network::{ConnStats, NetworkConnectionState, NetworkMessage, BrokerNetwork},
     signal::web_rtc::PeerInfo,
 };
 use flutils::{broker::Broker, nodeids::U256};
@@ -390,7 +390,7 @@ impl Connection {
                 conn.set_cb_message(Box::new(move |msg_str| {
                     log::trace!("{}->{}: {:?}", our_id, id, msg_str);
                     if let Ok(msg) = serde_json::from_str(&msg_str) {
-                        if let Err(e) = broker.emit_msg(NodeMessage { id, msg }.input()) {
+                        if let Err(e) = broker.emit_msg(NetworkMessage { id, msg }.from_net()) {
                             error!("While emitting webrtc: {:?}", e);
                         }
                     }

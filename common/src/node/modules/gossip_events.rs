@@ -47,14 +47,14 @@ impl From<MessageOut> for GossipMessage {
 /// This is a wrapper around the flmodules::gossip_events module. It parses the
 /// BrokerMessages for messages of other nodes and for a new NodeList sent by the
 /// random_connections module.
-pub struct GossipChat {
+pub struct GossipEvent {
     node_data: Arc<Mutex<NodeData>>,
     data_storage: Box<dyn DataStorage>,
 }
 
 const STORAGE_GOSSIP_EVENTS: &str = "gossip_events";
 
-impl GossipChat {
+impl GossipEvent {
     pub fn start(node_data: Arc<Mutex<NodeData>>) {
         let (mut broker, mut data_storage) = {
             let mut nd = node_data.lock().unwrap();
@@ -106,7 +106,7 @@ impl GossipChat {
     fn process_msg_bm(&mut self, msg: &BrokerMessage) -> Vec<BrokerMessage> {
         match msg {
             BrokerMessage::NodeMessageIn(nm) => match &nm.msg {
-                Message::V1(MessageV1::GossipChat(gc)) => Some(MessageIn::Node(nm.id, gc.clone())),
+                Message::V1(MessageV1::GossipEvent(gc)) => Some(MessageIn::Node(nm.id, gc.clone())),
                 _ => None,
             },
             BrokerMessage::Modules(BrokerModules::Random(RandomMessage::MessageOut(msg_rnd))) => {
@@ -134,7 +134,7 @@ impl GossipChat {
                         id: *id,
                         msg: nm.clone().into(),
                     }
-                    .output(),
+                    .to_net(),
                     MessageOut::Updated => {
                         Self::save(&mut self.data_storage, Arc::clone(&self.node_data));
                         msg.clone().into()
@@ -160,7 +160,7 @@ impl GossipChat {
     }
 }
 
-impl SubsystemListener<BrokerMessage> for GossipChat {
+impl SubsystemListener<BrokerMessage> for GossipEvent {
     fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         let output = msgs
             .iter()

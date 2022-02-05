@@ -18,7 +18,7 @@ use flutils::{
 
 use common::node::{
     modules::{
-        gossip_events::GossipChat,
+        gossip_events::GossipEvent,
         messages::{BrokerMessage, NodeMessage},
         random_connections::RandomConnections,
     },
@@ -109,7 +109,7 @@ impl Network {
                                     id: *id,
                                     msg: nm.msg.clone(),
                                 }
-                                .input(),
+                                .from_net(),
                             )
                             .unwrap();
                     }
@@ -132,7 +132,7 @@ impl Node {
     pub fn new(snd: Sender<BrokerMessage>, rcv: Receiver<BrokerMessage>) -> Self {
         let node_data = NodeData::new(NodeConfig::new(), TempDSB::new());
         RandomConnections::start(Arc::clone(&node_data));
-        GossipChat::start(Arc::clone(&node_data));
+        GossipEvent::start(Arc::clone(&node_data));
         WebRTC::start(Arc::clone(&node_data), snd);
 
         Self { node_data, rcv }

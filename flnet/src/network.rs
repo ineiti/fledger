@@ -298,7 +298,7 @@ pub enum BrokerNetwork {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerNetworkCall {
-    SendNodeMessage(NodeMessage),
+    SendNodeMessage(NetworkMessage),
     SendWSStats(Vec<NodeStat>),
     SendWSClearNodes,
     SendWSUpdateListRequest,
@@ -316,7 +316,7 @@ impl From<BrokerNetworkCall> for BrokerNetwork {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerNetworkReply {
-    RcvNodeMessage(NodeMessage),
+    RcvNodeMessage(NetworkMessage),
     RcvWSUpdateList(Vec<NodeInfo>),
     ConnectionState(NetworkConnectionState),
     Connected(U256),
@@ -330,17 +330,17 @@ impl From<BrokerNetworkReply> for BrokerNetwork {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct NodeMessage {
+pub struct NetworkMessage {
     pub id: U256,
     pub msg: String,
 }
 
-impl NodeMessage {
-    pub fn input(&self) -> BrokerNetwork {
-        BrokerNetworkCall::SendNodeMessage(self.clone()).into()
-    }
-    pub fn output(&self) -> BrokerNetwork {
+impl NetworkMessage {
+    pub fn from_net(&self) -> BrokerNetwork {
         BrokerNetworkReply::RcvNodeMessage(self.clone()).into()
+    }
+    pub fn to_net(&self) -> BrokerNetwork {
+        BrokerNetworkCall::SendNodeMessage(self.clone()).into()
     }
 }
 
@@ -367,11 +367,3 @@ pub struct ConnStats {
     pub tx_bytes: u64,
     pub delay_ms: u32,
 }
-
-// TODO: currently this is useless - see if it's needed again afterwareds
-// transitive_from::hierarchy! {
-//     BrokerNetwork {
-//         BrokerNetworkCall{
-//         },
-//     },
-// }

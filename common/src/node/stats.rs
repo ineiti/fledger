@@ -210,7 +210,7 @@ impl Stats {
                             id: ni.get_id(),
                             msg: Message::V1(MessageV1::Ping()),
                         }
-                        .output(),
+                        .to_net(),
                     );
                     stat.1.ping_tx += 1;
                 }
