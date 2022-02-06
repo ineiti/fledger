@@ -1,8 +1,11 @@
 [package]
 name = "signal"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 edition = "2021"
+description = "CLI for signal server in fledger"
+repository = "https://github.com/ineiti/fledger"
+license = "AGPLv3"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

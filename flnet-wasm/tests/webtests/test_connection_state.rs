@@ -4,15 +4,16 @@ use wasm_bindgen_test::*;
 use flnet::{
     network::{
         connection_state::{CSError, ConnectionState},
-        BrokerNetworkReply, BrokerNetworkCall, BrokerNetwork,
+        BrokerNetwork, BrokerNetworkCall, BrokerNetworkReply,
     },
-    signal::web_rtc::{WebRTCSpawner},
+    signal::web_rtc::WebRTCSpawner,
 };
+use flnet_wasm::web_rtc_setup::WebRTCConnectionSetupWasm;
 use flutils::{
     broker::{Broker, Subsystem},
     nodeids::U256,
+    time::wait_ms,
 };
-use wasm_webrtc::{helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm};
 
 use super::TestError;
 
@@ -32,8 +33,7 @@ async fn test_connection_state_result() -> Result<(), TestError> {
     let id_follow = U256::rnd();
     let mut broker_init = Broker::new();
     let (tap_tx, tap_init) = channel::<BrokerNetwork>();
-    broker_init
-        .add_subsystem(Subsystem::Tap(tap_tx))?;
+    broker_init.add_subsystem(Subsystem::Tap(tap_tx))?;
     let web_rtc_init = Arc::new(Mutex::new(
         Box::new(WebRTCConnectionSetupWasm::new_box) as WebRTCSpawner
     ));
@@ -42,8 +42,7 @@ async fn test_connection_state_result() -> Result<(), TestError> {
 
     let mut broker_follow = Broker::new();
     let (tap_tx, tap_follow) = channel::<BrokerNetwork>();
-    broker_follow
-        .add_subsystem(Subsystem::Tap(tap_tx))?;
+    broker_follow.add_subsystem(Subsystem::Tap(tap_tx))?;
     let web_rtc_follow = Arc::new(Mutex::new(
         Box::new(WebRTCConnectionSetupWasm::new_box) as WebRTCSpawner
     ));
@@ -63,19 +62,13 @@ async fn test_connection_state_result() -> Result<(), TestError> {
         broker_follow.process().map_err(|_| CSError::InputQueue)?;
         // TODO: rewrite tests
         for msg in tap_init.try_iter() {
-            if let BrokerNetwork::Call(BrokerNetworkCall::SendWSPeer(
-                pi,
-            )) = msg
-            {
+            if let BrokerNetwork::Call(BrokerNetworkCall::SendWSPeer(pi)) = msg {
                 log::debug!("Time {}: init sent message: {}", i, pi.message);
                 follow.process_peer_message(pi.message).await?
             }
         }
         for msg in tap_follow.try_iter() {
-            if let BrokerNetwork::Call(BrokerNetworkCall::SendWSPeer(
-                pi,
-            )) = msg
-            {
+            if let BrokerNetwork::Call(BrokerNetworkCall::SendWSPeer(pi)) = msg {
                 log::debug!("Time {}: follow sent message: {}", i, pi.message);
                 init.process_peer_message(pi.message).await?
             }

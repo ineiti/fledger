@@ -20,9 +20,9 @@ But of course there are many more things you can do:
 - General storage / backup service
 
 On the technical side, Fledger will have:
-- BFT consensus using ByzCoinX
-- Proof-of-work using transactions instead of hashing
-- Sharding inspired by OmniLedger
+- Gossip-based sharing of information
+- Proof-of-participation to distribute _Mana_ to participants (instead of miners)
+- Different consensus layers, depending on the need: implicit trust, ledger based
 
 So the goal is to be able to serve both short-term online users like browsers,
 but also long-term users who have a server where they can run a fledger node.
@@ -34,11 +34,27 @@ What it will never do:
 
 ## State of Fledger
 
-Currently the following components are available:
-- [Signal server](./cli/signal) - for the webRTC rendez-vous
+### Libraries
+
+Another goal of fledger is to provide a set of libraries that can be used outside
+of the fledger application.
+The current libraries will probably be:
+- [Fledger Network](./flnet/) - webrtc based communication with a websocket signalling.
+Two implementations exist:
+  - [Wasm](./flnet-wasm/) - implements the webrtc and websocket calls for wasm to be
+  used in the brokser and in node
+  - [Libc](./flnet-libc/) - TODO: implements the webrtc and websocket calls for libc
+- [Decentralized modules](./flmodules/) - modules that are usable for decentralized projects
+- [Signal server](./cli/signal/) - to be used to set up connections between nodes
+
+If there is interest, an npm package for the `flnet` will be available for easy data-webrtc.
+
+### Binaries
+
+Currently the following components are available that are used to create the fledger-binaries:
+- [Fledger-Node](./flnode/) - the glue code for the fledger application
 - [Web node](./web) - for running the node in a browser
-- [CLI node](./cli/node) - for running a node in a CLI
-- [Node](./common) - the actual code for the Fledger nodes
+- [Fledger binary](./cli/fledger) - for running a node in a CLI
 
 As a first step, the WebRTC communication has been set up.
 This works now for Chrome, Firefox, and Safari, as well as in the CLI using
@@ -50,7 +66,7 @@ The following next steps are in the pipeline:
 - clean up network and make crates:
   - for signalling-server
   - for network-layer
-  - for wasm and linux client
+  - for wasm and libc client
     - create and publish also an npm package
     - write test-clients
 - Create a nicer display of the chat, perhaps with markdown display of messages
@@ -94,6 +110,9 @@ make serve_local
 # Changelog
 
 ```
+- 0.5.0 - 2022-??-??
+  - Rewrote big parts of the library and application to make it more modular
+  - Offer crates for using parts of fledger directly
 - 0.4.1 - 2021-09-16
   - Using thiserror::Error instead of String
 - 0.4.0 - 2021-07-27

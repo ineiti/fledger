@@ -3,6 +3,9 @@ name = "fledger-web"
 version = "0.1.0"
 authors = ["Linus Gasser <ineiti@gasser.blue>"]
 edition = "2021"
+description = "Web interface for fledger"
+repository = "https://github.com/ineiti/fledger"
+license = "AGPLv3"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -15,7 +18,7 @@ flmodules = {path="../flmodules"}
 flutils = {path="../flutils"}
 flnet = {path="../flnet"}
 flnode = {path = "../flnode"}
-wasm-webrtc = {path = "../wasm-webrtc"}
+flnet-wasm = {path = "../flnet-wasm"}
 
 chrono = "0.4"
 anyhow = "1.0.42"

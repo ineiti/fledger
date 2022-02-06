@@ -1,6 +1,19 @@
 use std::collections::HashMap;
 use thiserror::Error;
 
+#[cfg(all(target_arch = "wasm32", feature = "node"))]
+mod node;
+#[cfg(all(target_arch = "wasm32", feature = "node"))]
+pub use node::*;
+#[cfg(all(target_arch = "wasm32", not(feature = "node")))]
+mod wasm;
+#[cfg(all(target_arch = "wasm32", not(feature = "node")))]
+pub use wasm::*;
+#[cfg(not(target_arch = "wasm32"))]
+mod libc;
+#[cfg(not(target_arch = "wasm32"))]
+pub use libc::*;
+
 #[derive(Error, Debug)]
 pub enum StorageError {
     #[error("From the underlying storage: {0}")]

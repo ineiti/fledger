@@ -7,7 +7,6 @@ use std::{
 use thiserror::Error;
 use wasm_bindgen_test::*;
 
-use flnode::node::{Node, NodeError};
 use flnet::signal::{
     web_rtc::{
         ConnectionError, SetupError, WSSignalMessageFromNode, WebRTCConnection,
@@ -15,8 +14,9 @@ use flnet::signal::{
     },
     websocket::{MessageCallback, WSError, WSMessage, WebSocketConnection},
 };
-use flutils::data_storage::TempDSB;
-use wasm_webrtc::{helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm};
+use flnet_wasm::web_rtc_setup::WebRTCConnectionSetupWasm;
+use flnode::node::{Node, NodeError};
+use flutils::{data_storage::TempDSB, time::wait_ms};
 
 #[derive(Debug, Error)]
 pub enum WSDError {

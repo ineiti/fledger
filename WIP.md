@@ -6,7 +6,6 @@
 
 ## Current concrete goal
 
-- Remove wasm from node
 - Separate wasm and libc implementations in flnet
 
 ### Things to do
@@ -14,6 +13,7 @@
 # Dates
 
 2022-02-05:
+- Remove wasm from node
 - Cleanup network.rs, signal.rs, types.rs, to be able to move them easier.
 - move things around
 

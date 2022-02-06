@@ -1,4 +1,4 @@
-use flutils::{broker::Broker, schedule::schedule_repeating};
+use flutils::{broker::Broker, time::schedule_repeating};
 
 use crate::node::modules::messages::BrokerMessage;
 

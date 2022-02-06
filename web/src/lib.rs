@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
-use flnet::config::NodeInfo;
 use js_sys::Date;
 use regex::Regex;
 use std::{
@@ -8,13 +7,12 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 use wasm_bindgen::prelude::*;
-use wasm_webrtc::helpers::LocalStorageBase;
-use wasm_webrtc::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
 use web_sys::window;
 
+use flnet::config::NodeInfo;
+use flnet_wasm::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
 use flnode::node::{stats::StatNode, version::VERSION_STRING, Node};
-
-use flutils::data_storage::DataStorageBase;
+use flutils::data_storage::{DataStorageBase, DataStorageBaseImpl};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -33,7 +31,7 @@ pub struct FledgerWeb {
 impl FledgerWeb {
     pub fn new() -> Self {
         console_error_panic_hook::set_once();
-        FledgerWeb::set_localstorage();
+        FledgerWeb::set_data_storage();
 
         wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
         log::info!("Starting new FledgerWeb");
@@ -110,7 +108,7 @@ impl FledgerWeb {
 
     async fn node_start(node_mutex: Arc<Mutex<Option<Node>>>) -> Result<()> {
         let rtc_spawner = Box::new(WebRTCConnectionSetupWasm::new_box);
-        let my_storage = Box::new(LocalStorageBase {});
+        let my_storage = Box::new(DataStorageBaseImpl {});
         let ws =
             WebSocketWasm::new(URL).map_err(|e| anyhow!("couldn't create websocket: {:?}", e))?;
         let client = if let Some(window) = web_sys::window() {
@@ -134,12 +132,12 @@ impl FledgerWeb {
     }
 
     fn set_config(data: &str) {
-        if let Err(err) = Node::set_config(LocalStorageBase {}.get("fledger"), data) {
+        if let Err(err) = Node::set_config(DataStorageBaseImpl {}.get("fledger"), data) {
             log::warn!("Got error while saving config: {}", err);
         }
     }
 
-    fn set_localstorage() {
+    fn set_data_storage() {
         if let Ok(loc) = window().unwrap().location().href() {
             if loc.contains('#') {
                 let reg = Regex::new(r".*?#").unwrap();
@@ -250,7 +248,10 @@ pub struct FledgerMessages {
 }
 
 impl FledgerMessages {
-    fn new(mut tm_msgs: Vec<flmodules::gossip_events::events::Event>, nodes: Vec<NodeInfo>) -> Self {
+    fn new(
+        mut tm_msgs: Vec<flmodules::gossip_events::events::Event>,
+        nodes: Vec<NodeInfo>,
+    ) -> Self {
         tm_msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
         let mut msgs = vec![];
         for msg in tm_msgs {

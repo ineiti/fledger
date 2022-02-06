@@ -1,7 +1,5 @@
 use std::sync::{mpsc::channel, Arc, Mutex};
 use wasm_bindgen_test::*;
-use wasm_webrtc::helpers::wait_ms;
-use wasm_webrtc::web_rtc_setup::WebRTCConnectionSetupWasm;
 
 use flnet::{
     network::{
@@ -9,9 +7,11 @@ use flnet::{
     },
     signal::web_rtc::WebRTCSpawner,
 };
+use flnet_wasm::web_rtc_setup::WebRTCConnectionSetupWasm;
 use flutils::{
     broker::{Broker, Subsystem},
     nodeids::U256,
+    time::wait_ms,
 };
 
 use super::TestError;

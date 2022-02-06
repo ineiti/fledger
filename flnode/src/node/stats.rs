@@ -13,7 +13,7 @@ use flnet::{
 use flutils::{
     broker::{Broker, BrokerError, Subsystem, SubsystemListener},
     nodeids::U256,
-    utils::now,
+    time::now,
 };
 
 use crate::node::{

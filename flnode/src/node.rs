@@ -11,7 +11,7 @@ use flutils::{
     broker::{Broker, BrokerError},
     data_storage::{DataStorage, DataStorageBase, StorageError},
     nodeids::U256,
-    utils::now,
+    time::now,
 };
 use flnet::{
     config::{ConfigError, NodeConfig, NodeInfo},

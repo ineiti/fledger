@@ -7,7 +7,7 @@ pub use flmodules::gossip_events::{
 use flutils::{
     broker::{Subsystem, SubsystemListener},
     data_storage::DataStorage,
-    utils::now,
+    time::now,
 };
 
 use crate::node::{

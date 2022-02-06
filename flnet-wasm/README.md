@@ -1,6 +1,6 @@
 # WASM implementation for the Fledger Node
 
-While the [Fledger node](../../common) implements the logic, this part implements
+While the [Fledger node](../flnode) implements the logic, this part implements
 the actual communication traits:
 
 - Websocket

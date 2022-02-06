@@ -1,13 +1,12 @@
 use crate::{
     network::{ConnStats, NetworkConnectionState, NetworkMessage, BrokerNetwork},
-    signal::web_rtc::PeerInfo,
+    signal::web_rtc::{PeerInfo, DataChannelState, IceConnectionState},
 };
 use flutils::{broker::Broker, nodeids::U256};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use web_sys::{RtcDataChannelState, RtcIceConnectionState};
 
 use crate::signal::web_rtc::{
     ConnType, ConnectionError, ConnectionStateMap, PeerMessage, SetupError, WebRTCConnection,
@@ -140,10 +139,10 @@ impl ConnectionState {
         };
         if let Some(s) = stat {
             let mut reset = match s.ice_connection {
-                RtcIceConnectionState::Failed => true,
-                RtcIceConnectionState::Disconnected => true,
-                RtcIceConnectionState::Closed => true,
-                RtcIceConnectionState::Connected => s.type_remote == ConnType::Unknown,
+                IceConnectionState::Failed => true,
+                IceConnectionState::Disconnected => true,
+                IceConnectionState::Closed => true,
+                IceConnectionState::Connected => s.type_remote == ConnType::Unknown,
                 _ => false,
             };
             if self.direction == CSDir::Outgoing {
@@ -151,7 +150,7 @@ impl ConnectionState {
                 // be reset by the remote peer.
                 if let Some(state_dc) = s.data_connection.as_ref() {
                     if self.get_connection_state() == CSEnum::HasDataChannel {
-                        reset = reset || state_dc == &RtcDataChannelState::Closed;
+                        reset = reset || state_dc == &DataChannelState::Closed;
                         if reset {
                             warn!(
                                 "State_dc is: {state_dc:?} - s.ice_connection is: {:?}",
@@ -433,7 +432,7 @@ impl Connection {
             if let Some(conn) = self.connected.as_ref() {
                 if let Ok(state) = conn.get_state().await {
                     if let Some(dc) = state.data_connection {
-                        return dc == RtcDataChannelState::Open;
+                        return dc == DataChannelState::Open;
                     }
                 }
             }

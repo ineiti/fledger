@@ -10,7 +10,7 @@ use thiserror::Error;
 use flutils::{
     broker::{Broker, BrokerError, Subsystem, SubsystemListener},
     nodeids::U256,
-    utils::block_on,
+    time::block_on,
 };
 
 use crate::{

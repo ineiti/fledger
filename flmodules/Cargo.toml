@@ -2,6 +2,9 @@
 name = "flmodules"
 version = "0.1.0"
 edition = "2021"
+description = "Modules used in fledger"
+repository = "https://github.com/ineiti/fledger"
+license = "AGPLv3"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

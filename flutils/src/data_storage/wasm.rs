@@ -1,29 +1,28 @@
-use wasm_bindgen::prelude::*;
 use web_sys::window;
 
-use flutils::data_storage::{DataStorage, DataStorageBase, StorageError};
+use crate::data_storage::{DataStorage, DataStorageBase, StorageError};
 
-pub struct LocalStorageBase {}
+pub struct DataStorageBaseImpl {}
 
-impl DataStorageBase for LocalStorageBase {
+impl DataStorageBase for DataStorageBaseImpl {
     fn get(&self, base_str: &str) -> Box<dyn DataStorage> {
         let base = if base_str.is_empty() {
             "".to_string()
         } else {
             base_str.to_string() + "_"
         };
-        Box::new(LocalStorage { base })
+        Box::new(DataStorageImpl { base })
     }
     fn clone(&self) -> Box<dyn DataStorageBase> {
-        Box::new(LocalStorageBase {})
+        Box::new(DataStorageBaseImpl {})
     }
 }
 
-pub struct LocalStorage {
+pub struct DataStorageImpl {
     base: String,
 }
 
-impl DataStorage for LocalStorage {
+impl DataStorage for DataStorageImpl {
     fn get(&self, key: &str) -> Result<String, StorageError> {
         let key_entry = format!("{}{}", self.base, key);
         Ok(window()
@@ -57,20 +56,4 @@ impl DataStorage for LocalStorage {
             .remove_item(&key_entry)
             .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))
     }
-}
-
-#[cfg_attr(
-    feature = "node",
-    wasm_bindgen(
-        inline_js = "module.exports.wait_ms = function(ms){ return new Promise((r) => setTimeout(r, ms));}"
-    )
-)]
-#[cfg_attr(
-    not(feature = "node"),
-    wasm_bindgen(
-        inline_js = "export function wait_ms(ms){ return new Promise((r) => setTimeout(r, ms));}"
-    )
-)]
-extern "C" {
-    pub async fn wait_ms(ms: u32);
 }

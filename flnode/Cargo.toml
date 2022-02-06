@@ -3,6 +3,9 @@ authors = ["Linus Gasser <linus@gasser.blue>"]
 edition = "2021"
 name = "flnode"
 version = "0.1.0"
+description = "Glue code for flnet and flmodules"
+repository = "https://github.com/ineiti/fledger"
+license = "AGPLv3"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

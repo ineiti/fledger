@@ -3,7 +3,8 @@
 members = [
     "cli/signal",
     "cli/fledger",
-    "wasm-webrtc",
+    "flnet-libc",
+    "flnet-wasm",
     "web",
     "flmodules",
     "flutils",

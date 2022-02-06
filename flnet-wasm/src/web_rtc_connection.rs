@@ -1,11 +1,13 @@
 use async_trait::async_trait;
 
 use wasm_bindgen::{prelude::Closure, JsCast};
-use web_sys::{MessageEvent, RtcDataChannel, RtcPeerConnection, RtcSignalingState};
+use web_sys::{
+    MessageEvent, RtcDataChannel, RtcDataChannelState, RtcPeerConnection, RtcSignalingState, RtcIceGatheringState, RtcIceConnectionState,
+};
 
 use flnet::signal::web_rtc::{
-    ConnType, ConnectionError, ConnectionStateMap, SignalingState, WebRTCConnection,
-    WebRTCMessageCB,
+    ConnType, ConnectionError, ConnectionStateMap, DataChannelState, SignalingState,
+    WebRTCConnection, WebRTCMessageCB, IceGatheringState, IceConnectionState,
 };
 
 pub struct WebRTCConnectionWasm {
@@ -43,7 +45,13 @@ impl WebRTCConnection for WebRTCConnectionWasm {
 
     async fn get_state(&self) -> Result<ConnectionStateMap, ConnectionError> {
         let mut csm = get_state(self.conn.clone()).await?;
-        csm.data_connection = Some(self.dc.ready_state());
+        csm.data_connection = Some(match self.dc.ready_state() {
+            RtcDataChannelState::Connecting => DataChannelState::Connecting,
+            RtcDataChannelState::Open => DataChannelState::Open,
+            RtcDataChannelState::Closing => DataChannelState::Closing,
+            RtcDataChannelState::Closed => DataChannelState::Closed,
+            RtcDataChannelState::__Nonexhaustive => DataChannelState::Closed,
+        });
         Ok(csm)
     }
 }
@@ -75,9 +83,27 @@ pub async fn get_state(conn: RtcPeerConnection) -> Result<ConnectionStateMap, Co
         _ => SignalingState::Setup,
     };
 
+    let ice_gathering = match conn.ice_gathering_state(){
+        RtcIceGatheringState::New => IceGatheringState::New,
+        RtcIceGatheringState::Gathering => IceGatheringState::Gathering,
+        RtcIceGatheringState::Complete => IceGatheringState::Complete,
+        RtcIceGatheringState::__Nonexhaustive => IceGatheringState::New,
+    };
+
+    let ice_connection = match conn.ice_connection_state(){
+        RtcIceConnectionState::New => IceConnectionState::New,
+        RtcIceConnectionState::Checking => IceConnectionState::Checking,
+        RtcIceConnectionState::Connected => IceConnectionState::Connected,
+        RtcIceConnectionState::Completed => IceConnectionState::Completed,
+        RtcIceConnectionState::Failed => IceConnectionState::Failed,
+        RtcIceConnectionState::Disconnected => IceConnectionState::Disconnected,
+        RtcIceConnectionState::Closed => IceConnectionState::Closed,
+        RtcIceConnectionState::__Nonexhaustive => IceConnectionState::New,
+    };
+
     Ok(ConnectionStateMap {
-        ice_gathering: conn.ice_gathering_state(),
-        ice_connection: conn.ice_connection_state(),
+        ice_gathering,
+        ice_connection,
         data_connection: None,
         signaling,
         delay_ms: 0,

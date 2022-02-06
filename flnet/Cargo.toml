@@ -2,6 +2,9 @@
 name = "flnet"
 version = "0.1.0"
 edition = "2021"
+description = "Network setup and communication"
+repository = "https://github.com/ineiti/fledger"
+license = "AGPLv3"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,27 +25,3 @@ futures = "0.3.16"
 log = "0.4.14"
 sha2 = "0.10.1"
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
-
-[dependencies.web-sys]
-features = [
-  "Storage",
-  "Request",
-  "RequestInit",
-  "RequestMode",
-  "Response",
-  "MessageEvent",
-  "RtcPeerConnection",
-  "RtcSignalingState",
-  "RtcSdpType",
-  "RtcSessionDescriptionInit",
-  "RtcPeerConnectionIceEvent",
-  "RtcIceCandidate",
-  "RtcIceCandidateInit",
-  "RtcIceConnectionState",
-  "RtcIceGatheringState",
-  "RtcDataChannel",
-  "RtcDataChannelEvent",
-  "RtcDataChannelState",
-  "Navigator",
-]
-version = "0.3.51"

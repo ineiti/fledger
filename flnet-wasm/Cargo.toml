@@ -1,11 +1,11 @@
 [package]
-name = "wasm-webrtc"
+name = "flnet-wasm"
 version = "0.1.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 edition = "2021"
-
-[features]
-node = []
+description = "Network implementation for wasm"
+repository = "https://github.com/ineiti/fledger"
+license = "AGPLv3"
 
 [dependencies]
 flnet = {path="../flnet"}
@@ -62,5 +62,7 @@ features = [
   "MessageEvent",
   "ProgressEvent",
   "WebSocket",
-
+  "Document",
+  "Storage",
+  "Navigator"
 ]

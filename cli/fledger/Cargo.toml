@@ -1,10 +1,10 @@
 [package]
 name = "fledger"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 edition = "2021"
-description = "gtk for WebRTC Fledger communication"
-repository = "https://github.com/ineiti/fledger-1-webrtc"
+description = "CLI for WebRTC Fledger communication"
+repository = "https://github.com/ineiti/fledger"
 license = "AGPLv3"
 
 [lib]
@@ -15,20 +15,20 @@ crate-type = ["cdylib"]
 local = []
 
 [dependencies]
-flutils = {path="../../flutils"}
+flutils = {path="../../flutils", features=["node"]}
 flmodules = {path="../../flmodules"}
 flnet = {path="../../flnet"}
 flnode = {path = "../../flnode"}
-wasm-webrtc = {path = "../../wasm-webrtc", features=["node"]}
+flnet-wasm = {path = "../../flnet-wasm"}
+
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
 js-sys = "0.3.51"
 wasm-bindgen-futures = "0.4.24"
 serde = { version = "1.0.127", features = ["derive"] }
 serde_derive = "1.0.127"
 serde_json = "1.0.66"
-getrandom = { version = "0.2.3", features = ["js"] }
+rand = { version = "0.7.3", features = ["wasm-bindgen"] }
 console_error_panic_hook = "0.1.6"
-
 async-trait = "0.1.51"
 wasm-logger = "0.2.0"
 log = "0.4.14"

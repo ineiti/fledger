@@ -3,7 +3,6 @@ use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self};
 use thiserror::Error;
-use web_sys::{RtcDataChannelState, RtcIceConnectionState, RtcIceGatheringState};
 
 use flutils::nodeids::U256;
 
@@ -101,15 +100,47 @@ pub enum SignalingState {
     Stable,
 }
 
+/// This is copied from the web-sys RtcIceGatheringState - not sure that this is
+/// also available in the libc-implementation.
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum IceGatheringState {
+    New,
+    Gathering,
+    Complete,
+}
+
+/// This is copied from the web-sys RtcIceConnectionState - not sure that this is
+/// also available in the libc-implementation.
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum IceConnectionState {
+    New,
+    Checking,
+    Connected,
+    Completed,
+    Failed,
+    Disconnected,
+    Closed,
+}
+
+/// This is copied from the web-sys RtcDataChannelState - not sure that this is
+/// also available in the libc-implementation.
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum DataChannelState {
+    Connecting,
+    Open,
+    Closing,
+    Closed,
+}
+
 /// Some statistics about the connection
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub struct ConnectionStateMap {
     pub type_local: ConnType,
     pub type_remote: ConnType,
     pub signaling: SignalingState,
-    pub ice_gathering: RtcIceGatheringState,
-    pub ice_connection: RtcIceConnectionState,
-    pub data_connection: Option<RtcDataChannelState>,
+    pub ice_gathering: IceGatheringState,
+    pub ice_connection: IceConnectionState,
+    pub data_connection: Option<DataChannelState>,
     pub rx_bytes: u64,
     pub tx_bytes: u64,
     pub delay_ms: u32,

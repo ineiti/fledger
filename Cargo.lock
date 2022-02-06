@@ -382,17 +382,18 @@ dependencies = [
 
 [[package]]
 name = "fledger"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "console_error_panic_hook",
  "flmodules",
  "flnet",
+ "flnet-wasm",
  "flnode",
  "flutils",
- "getrandom 0.2.3",
  "js-sys",
  "log",
+ "rand 0.7.3",
  "serde",
  "serde_derive",
  "serde_json",
@@ -400,7 +401,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-logger",
- "wasm-webrtc",
  "web-sys",
 ]
 
@@ -413,6 +413,7 @@ dependencies = [
  "console_error_panic_hook",
  "flmodules",
  "flnet",
+ "flnet-wasm",
  "flnode",
  "flutils",
  "js-sys",
@@ -423,7 +424,6 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "wasm-logger",
- "wasm-webrtc",
  "web-sys",
 ]
 
@@ -493,6 +493,35 @@ dependencies = [
  "sha2 0.10.1",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "flnet-libc"
+version = "0.1.0"
+
+[[package]]
+name = "flnet-wasm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "console_error_panic_hook",
+ "flnet",
+ "flnode",
+ "flutils",
+ "getrandom 0.2.3",
+ "js-sys",
+ "log",
+ "parking_lot 0.11.2",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+ "wasm-logger",
+ "wasm-timer",
  "web-sys",
 ]
 
@@ -542,6 +571,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-timer",
+ "web-sys",
 ]
 
 [[package]]
@@ -666,8 +696,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fc3cb4d91f53b50155bdcfd23f6a4c39ae1969c2ae85982b135750cccaf5fce"
 dependencies = [
  "cfg-if 1.0.0",
+ "js-sys",
  "libc",
  "wasi 0.9.0+wasi-snapshot-preview1",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1315,7 +1347,7 @@ dependencies = [
 
 [[package]]
 name = "signal"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "bimap",
@@ -1778,32 +1810,6 @@ dependencies = [
  "pin-utils",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
-name = "wasm-webrtc"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "console_error_panic_hook",
- "flnet",
- "flnode",
- "flutils",
- "getrandom 0.2.3",
- "js-sys",
- "log",
- "parking_lot 0.11.2",
- "serde",
- "serde_derive",
- "serde_json",
- "thiserror",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-test",
- "wasm-logger",
- "wasm-timer",
  "web-sys",
 ]
 

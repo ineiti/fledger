@@ -1,90 +1,18 @@
-use flnode::node::NodeError;
-use flnet::signal::websocket::WSError;
-use flutils::data_storage::DataStorageBase;
-use flutils::data_storage::{DataStorage, StorageError};
 use js_sys::Date;
 use log::{error, info, trace};
 use thiserror::Error;
-use wasm_bindgen::{prelude::*, JsValue};
-use wasm_webrtc::{
-    helpers::wait_ms, web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm,
-};
+use wasm_bindgen::{prelude::*};
 
-use flnode::node::{stats::StatNode, version::VERSION_STRING, Node};
+use flnet::signal::websocket::WSError;
+use flnet_wasm::{web_rtc_setup::WebRTCConnectionSetupWasm, web_socket::WebSocketWasm};
+use flnode::node::{stats::StatNode, version::VERSION_STRING, Node, NodeError};
+use flutils::{data_storage::{DataStorageBaseImpl}, time::wait_ms};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
 
 #[cfg(feature = "local")]
 const URL: &str = "ws://localhost:8765";
-
-#[wasm_bindgen(
-    inline_js = "module.exports.fswrite = function(name, str) { fs.writeFileSync(name, str); }
-    module.exports.fsread = function(name) { return fs.readFileSync(name, {encoding: 'utf-8'}); }
-    module.exports.fsexists = function(name) { return fs.existsSync(name); }
-    module.exports.fsunlink = function(name) { return fs.unlinkSync(name); }"
-)]
-extern "C" {
-    pub fn fswrite(name: &str, str: &str);
-    #[wasm_bindgen(catch)]
-    pub fn fsread(name: &str) -> Result<String, JsValue>;
-    pub fn fsexists(name: &str) -> bool;
-    #[wasm_bindgen(catch)]
-    pub fn fsunlink(name: &str) -> Result<(), JsValue>;
-}
-
-struct DummyDSB {}
-
-impl DataStorageBase for DummyDSB {
-    fn get(&self, base: &str) -> Box<dyn DataStorage> {
-        Box::new(DummyDS {
-            base: base.to_string(),
-        })
-    }
-    fn clone(&self) -> Box<dyn DataStorageBase> {
-        Box::new(Self {})
-    }
-}
-
-struct DummyDS {
-    base: String,
-}
-
-impl DummyDS {
-    fn name(&self, key: &str) -> String {
-        if self.base.is_empty() {
-            format!("fledger_{}.toml", key)
-        } else {
-            format!("{}_{}.toml", self.base, key)
-        }
-    }
-}
-
-impl DataStorage for DummyDS {
-    fn get(&self, key: &str) -> Result<String, StorageError> {
-        let name = &self.name(key);
-        Ok(if fsexists(name) {
-            fsread(name)
-                .map_err(|e| StorageError::Underlying(format!("While reading file: {:?}", e)))?
-        } else {
-            "".into()
-        })
-    }
-
-    fn set(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
-        fswrite(&self.name(key), value);
-        Ok(())
-    }
-
-    fn remove(&mut self, key: &str) -> Result<(), StorageError> {
-        let name = &self.name(key);
-        if fsexists(name) {
-            fsunlink(name)
-                .map_err(|e| StorageError::Underlying(format!("While unlinking file: {:?}", e)))?
-        };
-        Ok(())
-    }
-}
 
 #[derive(Debug, Error)]
 enum StartError {
@@ -96,7 +24,7 @@ enum StartError {
 
 async fn start(url: &str) -> Result<Node, StartError> {
     let rtc_spawner = Box::new(WebRTCConnectionSetupWasm::new_box);
-    let my_storage = Box::new(DummyDSB {});
+    let my_storage = Box::new(DataStorageBaseImpl {});
     let ws = WebSocketWasm::new(url)?;
     Ok(Node::new(my_storage, "node", Box::new(ws), rtc_spawner)?)
 }

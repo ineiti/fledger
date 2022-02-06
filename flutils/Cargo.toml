@@ -2,8 +2,12 @@
 name = "flutils"
 version = "0.1.0"
 edition = "2021"
+description = "Things for fledger that didn't fit anywhere else"
+repository = "https://github.com/ineiti/fledger"
+license = "AGPLv3"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+node = []
 
 [dependencies]
 thiserror = "1.0.30"
@@ -20,6 +24,7 @@ js-sys = "0.3.51"
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4.24"
 wasm-timer = "0.2"
+web-sys = {version = "0.3.51",features = ['Window', 'Storage',]}
 
 [dev-dependencies]
 tokio = {version = "1", features = ["rt", "macros"]}
