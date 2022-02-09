@@ -23,7 +23,7 @@ pub enum SetupError {
 pub type WebRTCSpawner =
     Box<dyn Fn(WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, SetupError>>;
 
-pub type WebRTCSetupCB = Box<dyn FnMut(WebRTCSetupCBMessage)>;
+pub type WebRTCSetupCB = Box<dyn FnMut(WebRTCSetupCBMessage) + Send>;
 
 #[async_trait(?Send)]
 pub trait WebRTCConnectionSetup {
@@ -48,7 +48,7 @@ pub trait WebRTCConnectionSetup {
 
 pub enum WebRTCSetupCBMessage {
     Ice(String),
-    Connection(Box<dyn WebRTCConnection>),
+    Connection(Box<dyn WebRTCConnection + Send>),
 }
 
 impl fmt::Debug for WebRTCSetupCBMessage {
@@ -146,7 +146,7 @@ pub struct ConnectionStateMap {
     pub delay_ms: u32,
 }
 
-pub type WebRTCMessageCB = Box<dyn FnMut(String)>;
+pub type WebRTCMessageCB = Box<dyn FnMut(String) + Send>;
 
 /// What type of node this is
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]

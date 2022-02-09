@@ -15,8 +15,12 @@ pub struct WebRTCConnectionWasm {
     conn: RtcPeerConnection,
 }
 
+// Because in WASM there are no threads anyway, this should not be a problem.
+#[allow(clippy::all)]
+unsafe impl Send for WebRTCConnectionWasm {}
+
 impl WebRTCConnectionWasm {
-    pub fn new_box(dc: RtcDataChannel, conn: RtcPeerConnection) -> Box<dyn WebRTCConnection> {
+    pub fn new_box(dc: RtcDataChannel, conn: RtcPeerConnection) -> Box<dyn WebRTCConnection + Send> {
         Box::new(WebRTCConnectionWasm { dc, conn })
     }
 }

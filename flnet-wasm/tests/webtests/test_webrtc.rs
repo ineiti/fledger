@@ -133,7 +133,7 @@ impl WebSocketConnection for WebSocketConnectionDummy {
 
 fn put_msg(
     ice: &Arc<Mutex<Vec<String>>>,
-    conn: &Arc<Mutex<Option<Box<dyn WebRTCConnection>>>>,
+    conn: &Arc<Mutex<Option<Box<dyn WebRTCConnection + Send>>>>,
     msg: WebRTCSetupCBMessage,
 ) {
     match msg {
@@ -147,7 +147,7 @@ fn put_msg(
 async fn set_callback(
     webrtc: &mut Box<dyn WebRTCConnectionSetup>,
     ice: &Arc<Mutex<Vec<String>>>,
-    conn: &Arc<Mutex<Option<Box<dyn WebRTCConnection>>>>,
+    conn: &Arc<Mutex<Option<Box<dyn WebRTCConnection + Send>>>>,
 ) {
     let icec = Arc::clone(ice);
     let connc = Arc::clone(conn);
