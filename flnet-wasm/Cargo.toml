@@ -12,6 +12,7 @@ flnet = {path="../flnet"}
 flutils = {path = "../flutils"}
 flnode = {path = "../flnode"}
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
+
 js-sys = "0.3.51"
 wasm-bindgen-futures = "0.4.24"
 serde = { version = "1.0.127", features = ["derive"] }
@@ -19,10 +20,8 @@ serde_derive = "1.0.127"
 serde_json = "1.0.66"
 getrandom = { version = "0.2.3", features = ["js"] }
 thiserror = "1.0.26"
-
 async-trait = "0.1.51"
 log = "0.4.14"
-
 anyhow = "1"
 wasm-bindgen-test = "0.3"
 console_error_panic_hook = "0.1.6"

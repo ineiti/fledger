@@ -7,13 +7,12 @@ description = "CLI for signal server in fledger"
 repository = "https://github.com/ineiti/fledger"
 license = "AGPLv3"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 flutils = {path="../../flutils"}
 flmodules = {path="../../flmodules"}
 flnet = {path="../../flnet"}
 flnode = {path = "../../flnode"}
+
 serde = "1.0.127"
 serde_json = "1.0.66"
 serde_derive = "1.0.127"

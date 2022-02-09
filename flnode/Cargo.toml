@@ -7,8 +7,6 @@ description = "Glue code for flnet and flmodules"
 repository = "https://github.com/ineiti/fledger"
 license = "AGPLv3"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 flnet = {path="../flnet"}
 flutils = {path = "../flutils"}
@@ -27,11 +25,9 @@ toml = "0.5.8"
 getrandom = { version = "0.2.3", features = ["js"] }
 names = "0.12.0"
 thiserror = "1.0.26"
-
 futures = "0.3.16"
 log = "0.4.14"
 sha2 = "0.10.1"
-
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 timer = "0.2"
 itertools = "0.10.3"
