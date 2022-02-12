@@ -32,7 +32,7 @@ async fn connection_setup() -> Result<(), SetupError> {
     log::debug!("answer: {:?}", answer);
     init.use_answer(answer).await?;
 
-    let mut _init_conn: Option<Box<dyn WebRTCConnection>> = None;
+    let mut init_conn: Option<Box<dyn WebRTCConnection>> = None;
     for i in 0..10 {
         log::debug!("Loop {i}");
         if let Ok(msg) = init_rx.try_recv() {
@@ -42,7 +42,7 @@ async fn connection_setup() -> Result<(), SetupError> {
                     log::debug!("Got ice message: {ice}");
                     follow.ice_put(ice).await?;
                 }
-                WebRTCSetupCBMessage::Connection(ic) => _init_conn = Some(ic),
+                WebRTCSetupCBMessage::Connection(ic) => init_conn = Some(ic),
             }
         }
         if let Ok(msg) = follow_rx.try_recv() {
@@ -51,15 +51,17 @@ async fn connection_setup() -> Result<(), SetupError> {
                     log::debug!("Got ice message: {ice}");
                     follow.ice_put(ice).await?;
                 }
-                WebRTCSetupCBMessage::Connection(ic) => _init_conn = Some(ic),
+                _ => {}
+                // WebRTCSetupCBMessage::Connection(ic) => init_conn = Some(ic),
             }
         }
         wait_ms(200).await;
     }
-    // if let Some(ic) = init_conn {
-    //     ic.send("Hello".to_string())
-    //         .map_err(|e| SetupError::Underlying(e.to_string()))?;
-    // }
+    if let Some(ic) = init_conn {
+        ic.send("Hello".to_string())
+            .map_err(|e| SetupError::Underlying(e.to_string()))?;
+    }
+    wait_ms(1000).await;
     Ok(())
 }
 

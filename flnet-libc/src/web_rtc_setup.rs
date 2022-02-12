@@ -106,8 +106,9 @@ impl WebRTCConnectionSetupLibc {
                 let cb = Arc::clone(&cb);
                 Box::pin(async move {
                     if let Some(ice) = ice_op {
+                        let ice_str = ice.to_json().await.unwrap().candidate;
                         if let Some(cb) = cb.lock().unwrap().as_mut() {
-                            cb(WebRTCSetupCBMessage::Ice(ice.to_string()))
+                            cb(WebRTCSetupCBMessage::Ice(ice_str));
                         } else {
                             log::error!("No callback set");
                         }
@@ -140,68 +141,6 @@ impl WebRTCConnectionSetupLibc {
         let rtcsession = &format!("{{ \"type\": \"{sdp_type}\", \"sdp\": \"{sdp_conv}\"}}");
         let rtcsess = serde_json::from_str(rtcsession).unwrap();
         rtcsess
-    }
-
-    /// Returns the offer string that needs to be sent to the `Follower` node.
-    pub async fn make_offer_rtc(&mut self) -> Result<RTCSessionDescription, SetupError> {
-        let data_channel = self
-            .connection
-            .create_data_channel("data", None)
-            .await
-            .map_err(to_error)?;
-
-        data_channel
-            .on_open(Box::new(move || {
-                log::debug!("Data channel open");
-
-                Box::pin(async move {})
-            }))
-            .await;
-        let web_libc = WebRTCConnectionLibc::new(data_channel).await;
-        if let Some(cb) = self.callback.lock().unwrap().as_mut() {
-            cb(WebRTCSetupCBMessage::Connection(Box::new(web_libc)));
-        } else {
-            log::error!("No callback set");
-        }
-
-        let offer = self.connection.create_offer(None).await.map_err(to_error)?;
-        self.connection
-            .set_local_description(offer.clone())
-            .await
-            .map_err(to_error)?;
-        Ok(offer)
-    }
-
-    /// Takes the offer string
-    pub async fn make_answer_rtc(
-        &mut self,
-        offer: RTCSessionDescription,
-    ) -> Result<RTCSessionDescription, SetupError> {
-        self.connection
-            .set_remote_description(offer)
-            .await
-            .map_err(to_error)?;
-        let answer = self
-            .connection
-            .create_answer(None)
-            .await
-            .map_err(to_error)?;
-        self.connection
-            .set_local_description(answer.clone())
-            .await
-            .map_err(to_error)?;
-        Ok(answer)
-    }
-
-    pub async fn use_answer_rtc(
-        &mut self,
-        answer: RTCSessionDescription,
-    ) -> Result<(), SetupError> {
-        self.connection
-            .set_remote_description(answer)
-            .await
-            .map_err(to_error)?;
-        Ok(())
     }
 }
 
@@ -278,19 +217,27 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupLibc {
 
     /// Sends the ICE string to the WebRTC.
     async fn ice_put(&mut self, ice: String) -> Result<(), SetupError> {
-        let elements: Vec<&str> = ice.split("::").collect();
-        if elements.len() != 3 {
-            return Err(SetupError::SetupFail("ICE string is not valid".to_string()));
-        }
+        println!("converting ice-candidate {ice}");
         self.connection
             .add_ice_candidate(RTCIceCandidateInit {
-                candidate: elements[0].to_string(),
-                sdp_mid: elements[1].to_string(),
-                sdp_mline_index: 0,
-                username_fragment: elements[2].to_string(),
+                candidate: ice,
+                ..Default::default()
             })
             .await
             .map_err(to_error)?;
+        // let elements: Vec<&str> = ice.split("::").collect();
+        // if elements.len() != 3 {
+        //     return Err(SetupError::SetupFail("ICE string is not valid".to_string()));
+        // }
+        // self.connection
+        //     .add_ice_candidate(RTCIceCandidateInit {
+        //         candidate: elements[0].to_string(),
+        //         sdp_mid: elements[1].to_string(),
+        //         sdp_mline_index: 0,
+        //         username_fragment: elements[2].to_string(),
+        //     })
+        //     .await
+        //     .map_err(to_error)?;
         Ok(())
     }
 
