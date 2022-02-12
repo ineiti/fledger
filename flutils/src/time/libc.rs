@@ -1,3 +1,5 @@
+use std::{thread, time};
+
 use futures::Future;
 
 pub fn now() -> f64 {
@@ -17,4 +19,6 @@ where
     timer.schedule_repeating(chrono::Duration::seconds(1), cb);
 }
 
-pub async fn wait_ms(_: u32){}
+pub async fn wait_ms(ms: u32) {
+    thread::sleep(time::Duration::from_millis(ms.into()));
+}
