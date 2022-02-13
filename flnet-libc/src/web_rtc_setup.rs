@@ -177,14 +177,12 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupLibc {
             .set_local_description(offer.clone())
             .await
             .map_err(to_error)?;
-        log::debug!("Offer sdp is: {}", offer.sdp);
         Ok(offer.sdp)
     }
 
     /// Takes the offer string
     async fn make_answer(&mut self, offer: String) -> Result<String, SetupError> {
         let desc = Self::get_desc(RTCSdpType::Offer, offer);
-        log::debug!("Offer sdp is: {}", desc.sdp);
         self.connection
             .set_remote_description(desc)
             .await
@@ -217,7 +215,6 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupLibc {
 
     /// Sends the ICE string to the WebRTC.
     async fn ice_put(&mut self, ice: String) -> Result<(), SetupError> {
-        println!("converting ice-candidate {ice}");
         self.connection
             .add_ice_candidate(RTCIceCandidateInit {
                 candidate: ice,
@@ -225,19 +222,6 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupLibc {
             })
             .await
             .map_err(to_error)?;
-        // let elements: Vec<&str> = ice.split("::").collect();
-        // if elements.len() != 3 {
-        //     return Err(SetupError::SetupFail("ICE string is not valid".to_string()));
-        // }
-        // self.connection
-        //     .add_ice_candidate(RTCIceCandidateInit {
-        //         candidate: elements[0].to_string(),
-        //         sdp_mid: elements[1].to_string(),
-        //         sdp_mline_index: 0,
-        //         username_fragment: elements[2].to_string(),
-        //     })
-        //     .await
-        //     .map_err(to_error)?;
         Ok(())
     }
 

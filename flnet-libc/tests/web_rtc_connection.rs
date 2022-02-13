@@ -9,75 +9,94 @@ use flutils::time::wait_ms;
 #[tokio::test(flavor = "multi_thread")]
 async fn connection_setup() -> Result<(), SetupError> {
     let _ = env_logger::try_init();
-    let mut init = WebRTCConnectionSetupLibc::new_async_stuff(true).await?;
-    let (init_cb, init_rx) = SetupCB::new_rx();
-    init.set_callback(Box::new(move |msg| init_cb.cb(msg)))
-        .await;
 
-    let mut follow = WebRTCConnectionSetupLibc::new_async_stuff(false).await?;
-    let (follow_cb, follow_rx) = SetupCB::new_rx();
-    follow
-        .set_callback(Box::new(move |msg| follow_cb.cb(msg)))
-        .await;
+    let mut init = Node::new(true).await;
+    let mut follow = Node::new(false).await;
+    log::debug!("Started init and follow node");
 
-    // let offer = init.make_offer_rtc().await?;
-    // log::debug!("offer: {:?}", offer.sdp);
-    // let answer = follow.make_answer_rtc(offer).await?;
-    // log::debug!("answer: {:?}", answer.sdp);
-    // init.use_answer_rtc(answer).await?;
+    let offer = init.setup.make_offer().await?;
+    log::trace!("offer: {:?}", offer);
+    let answer = follow.setup.make_answer(offer).await?;
+    log::trace!("answer: {:?}", answer);
+    init.setup.use_answer(answer).await?;
 
-    let offer = init.make_offer().await?;
-    log::debug!("offer: {:?}", offer);
-    let answer = follow.make_answer(offer).await?;
-    log::debug!("answer: {:?}", answer);
-    init.use_answer(answer).await?;
-
-    let mut init_conn: Option<Box<dyn WebRTCConnection>> = None;
     for i in 0..10 {
         log::debug!("Loop {i}");
-        if let Ok(msg) = init_rx.try_recv() {
-            log::debug!("init: {:?}", msg);
-            match msg {
-                WebRTCSetupCBMessage::Ice(ice) => {
-                    log::debug!("Got ice message: {ice}");
-                    follow.ice_put(ice).await?;
-                }
-                WebRTCSetupCBMessage::Connection(ic) => init_conn = Some(ic),
-            }
-        }
-        if let Ok(msg) = follow_rx.try_recv() {
-            match msg {
-                WebRTCSetupCBMessage::Ice(ice) => {
-                    log::debug!("Got ice message: {ice}");
-                    follow.ice_put(ice).await?;
-                }
-                _ => {}
-                // WebRTCSetupCBMessage::Connection(ic) => init_conn = Some(ic),
-            }
-        }
+        init.poll(&mut follow).await?;
+        follow.poll(&mut init).await?;
         wait_ms(200).await;
     }
-    if let Some(ic) = init_conn {
-        ic.send("Hello".to_string())
-            .map_err(|e| SetupError::Underlying(e.to_string()))?;
-    }
+
+    log::debug!("Connection should be established");
+    init.send("init->follow")?;
+    follow.send("follow->init")?;
     wait_ms(1000).await;
+
+    assert_eq!(init.rcv()?, String::from("follow->init"));
+    assert_eq!(follow.rcv()?, String::from("init->follow"));
     Ok(())
 }
 
-struct SetupCB {
-    tx: mpsc::Sender<WebRTCSetupCBMessage>,
+struct Node {
+    rx: mpsc::Receiver<WebRTCSetupCBMessage>,
+    msg_rx: Option<mpsc::Receiver<String>>,
+    setup: WebRTCConnectionSetupLibc,
+    conn: Option<Box<dyn WebRTCConnection>>,
 }
 
-// pub type WebRTCSetupCB = Box<dyn FnMut(WebRTCSetupCBMessage) + Send>;
-
-impl SetupCB {
-    fn new_rx() -> (Self, mpsc::Receiver<WebRTCSetupCBMessage>) {
+impl Node {
+    async fn new(init: bool) -> Self {
+        let mut setup = WebRTCConnectionSetupLibc::new_async_stuff(init)
+            .await
+            .unwrap();
         let (tx, rx) = mpsc::channel();
-        (Self { tx }, rx)
+        setup
+            .set_callback(Box::new(move |msg| tx.send(msg).unwrap()))
+            .await;
+        Self {
+            rx,
+            msg_rx: None,
+            setup,
+            conn: None,
+        }
     }
 
-    fn cb(&self, msg: WebRTCSetupCBMessage) {
-        self.tx.send(msg).unwrap();
+    async fn poll(&mut self, remote: &mut Node) -> Result<(), SetupError> {
+        if let Ok(msg) = self.rx.try_recv() {
+            log::debug!("poll: {:?}", msg);
+            match msg {
+                WebRTCSetupCBMessage::Ice(ice) => {
+                    log::trace!("Got ice message: {ice}");
+                    remote.setup.ice_put(ice).await?;
+                }
+                WebRTCSetupCBMessage::Connection(ic) => {
+                    let (msg_tx, msg_rx) = mpsc::channel();
+                    ic.set_cb_message(Box::new(move |msg| {
+                        msg_tx.send(msg).unwrap();
+                    }));
+                    self.conn = Some(ic);
+                    self.msg_rx = Some(msg_rx);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn send(&self, msg: &str) -> Result<(), SetupError> {
+        if let Some(ic) = self.conn.as_ref() {
+            return ic.send(msg.to_string())
+                .map_err(|e| SetupError::Underlying(e.to_string()))
+        }
+        Err(SetupError::Underlying("No connection established in init".to_string()))
+    }
+
+    fn rcv(&self) -> Result<String, SetupError> {
+        if let Some(msg_rx) = &self.msg_rx {
+            msg_rx
+                .recv()
+                .map_err(|e| SetupError::Underlying(e.to_string()))
+        } else {
+            Err(SetupError::Underlying("No receiving channel".to_string()))
+        }
     }
 }
