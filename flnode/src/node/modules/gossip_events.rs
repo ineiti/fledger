@@ -4,6 +4,7 @@ use std::sync::Mutex;
 pub use flmodules::gossip_events::{
     events, {MessageIn, MessageNode, MessageOut},
 };
+use flutils::broker::Destination;
 use flutils::{
     broker::{Subsystem, SubsystemListener},
     data_storage::DataStorage,
@@ -161,7 +162,7 @@ impl GossipEvent {
 }
 
 impl SubsystemListener<BrokerMessage> for GossipEvent {
-    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
+    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<(Destination, BrokerMessage)> {
         let output = msgs
             .iter()
             .flat_map(|msg| {
@@ -174,6 +175,7 @@ impl SubsystemListener<BrokerMessage> for GossipEvent {
                     self.process_msg_bm(msg)
                 }
             })
+            .map(|m| (Destination::Others, m))
             .collect();
         output
     }

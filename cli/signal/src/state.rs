@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use flnet::signal::websocket::{WSMessage, WebSocketConnectionSend, WebSocketServer};
+use flnet::signal::websocket::{WSMessage, WebSocketConnection, WebSocketServer};
 use flutils::nodeids::U256;
 
 mod internal;
@@ -39,7 +39,7 @@ impl ServerState {
     }
 
     /// Treats new connections from websockets.
-    fn cb_connection(int: Arc<Mutex<Internal>>, mut conn: Box<dyn WebSocketConnectionSend + Send>) {
+    fn cb_connection(int: Arc<Mutex<Internal>>, mut conn: Box<dyn WebSocketConnection + Send>) {
         let challenge = U256::rnd();
         let ch_cl = challenge;
         let int_clone = Arc::clone(&int);

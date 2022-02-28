@@ -1,5 +1,6 @@
 use flnet::network::BrokerNetworkCall;
 use flnet::network::BrokerNetworkReply;
+use flutils::broker::Destination;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -99,7 +100,7 @@ impl RandomConnections {
 }
 
 impl SubsystemListener<BrokerMessage> for RandomConnections {
-    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
+    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<(Destination, BrokerMessage)> {
         msgs.iter()
             .flat_map(|msg| {
                 if let BrokerMessage::Modules(BrokerModules::Random(RandomMessage::MessageIn(
@@ -111,6 +112,7 @@ impl SubsystemListener<BrokerMessage> for RandomConnections {
                     self.process_msg_bm(msg)
                 }
             })
+            .map(|m| (Destination::Others, m))
             .collect()
     }
 }

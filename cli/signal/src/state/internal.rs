@@ -2,7 +2,6 @@ use ed25519_dalek::Verifier;
 
 use bimap::BiMap;
 use csv::Writer;
-use futures::executor;
 use log::{debug, error, info, warn};
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -259,7 +258,7 @@ impl Internal {
         if let Some(chal) = self.pub_to_chal(id) {
             match self.nodes.entry(chal) {
                 Entry::Occupied(mut e) => {
-                    if let Err(e) = executor::block_on((e.get_mut().conn).send(msg_str)) {
+                    if let Err(e) = (e.get_mut().conn).send(msg_str) {
                         error!("Couldn't send message: {}", e);
                     }
                     Ok(())

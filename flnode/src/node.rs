@@ -174,7 +174,7 @@ impl Node {
         self.broker
             .enqueue_msg(BrokerMessage::Modules(BrokerModules::Gossip(
                 GossipMessage::MessageIn(gossip_events::MessageIn::AddEvent(msg_txt)),
-            )));
+            )))?;
         Ok(())
     }
 

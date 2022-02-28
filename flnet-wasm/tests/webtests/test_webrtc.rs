@@ -102,6 +102,11 @@ struct WebSocketConnectionDummy {
     cb: Rc<RefCell<Option<MessageCallback>>>,
 }
 
+// This is mostly to make Visual Studio Code happy, as this crate is never
+// compiled with anything else than wasm32-unknown-unknown.
+#[cfg(not(target_arch = "wasm32"))]
+unsafe impl Send for WebSocketConnectionDummy {}
+
 impl WebSocketConnectionDummy {
     fn new(msg_queue: Rc<RefCell<Vec<Message>>>, id: u32) -> WebSocketConnectionDummy {
         WebSocketConnectionDummy {

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{ErrorEvent, MessageEvent, WebSocket};
@@ -11,6 +11,11 @@ pub struct WebSocketWasm {
     ws: WebSocket,
     addr: String,
 }
+
+// This is mostly to make Visual Studio Code happy, as this crate is never
+// compiled with anything else than wasm32-unknown-unknown.
+#[cfg(not(target_arch = "wasm32"))]
+unsafe impl Send for WebSocketWasm {}
 
 impl WebSocketWasm {
     pub fn new(addr: &str) -> Result<WebSocketWasm, WSError> {
@@ -72,7 +77,7 @@ impl WebSocketWasm {
 impl WebSocketConnection for WebSocketWasm {
     fn send(&mut self, msg: String) -> Result<(), WSError> {
         if self.ws.ready_state() != WebSocket::OPEN {
-            warn!("Websocket is not open - trying to reconnect");
+            log::warn!("Websocket is not open - trying to reconnect");
             self.reconnect()?;
             Err(WSError::Underlying("Send while not connected".into()))
         } else {
@@ -88,7 +93,7 @@ impl WebSocketConnection for WebSocketWasm {
     }
 
     fn reconnect(&mut self) -> Result<(), WSError> {
-        warn!("Reconnecting websocket");
+        log::warn!("Reconnecting websocket");
         if let Err(e) = self.ws.close() {
             error!("Error while closing: {:?}", e);
         }

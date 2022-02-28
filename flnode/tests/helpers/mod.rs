@@ -11,7 +11,7 @@ use flnet::{
     network::{BrokerNetworkCall, BrokerNetworkReply},
 };
 use flutils::{
-    broker::{Subsystem, SubsystemListener},
+    broker::{Subsystem, SubsystemListener, Destination},
     data_storage::TempDSB,
     nodeids::U256,
 };
@@ -145,7 +145,9 @@ impl Node {
     pub fn process(&mut self) {
         let mut broker = { self.node_data.lock().unwrap().broker.clone() };
         for msg in self.rcv.try_iter() {
-            broker.enqueue_msg(msg);
+            if let Err(e) = broker.enqueue_msg(msg){
+                log::error!("Couldn't send message: {e}");
+            }
         }
         if broker.process().is_err() {
             log::error!("Couldn't process");
@@ -187,7 +189,7 @@ impl WebRTC {
 }
 
 impl SubsystemListener<BrokerMessage> for WebRTC {
-    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
+    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<(Destination, BrokerMessage)> {
         msgs.iter()
             .filter_map(|&msg| match msg {
                 BrokerMessage::NodeMessageOut(_) => {
@@ -197,6 +199,7 @@ impl SubsystemListener<BrokerMessage> for WebRTC {
                 BrokerMessage::NetworkCall(bnc) => self.msg_outgoing_network(bnc),
                 _ => None,
             })
+            .map(|m| (Destination::Others, m))
             .collect()
     }
 }

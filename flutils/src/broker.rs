@@ -15,6 +15,14 @@ pub enum BrokerError {
     Locked,
 }
 
+/// The Destination of the message
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Destination {
+    All,
+    Others,
+    This,
+}
+
 /// The broker connects the different subsystem together and offers
 /// a pub/sub system.
 /// Every subsystem can subscribe to any number of messages.
@@ -23,7 +31,7 @@ pub enum BrokerError {
 /// the `process` method is called.
 pub struct Broker<T: Clone> {
     intern: Arc<Mutex<Intern<T>>>,
-    intern_tx: Sender<T>,
+    intern_tx: Sender<(Destination, T)>,
 }
 
 #[allow(clippy::all)]
@@ -69,38 +77,40 @@ impl<T: 'static + Clone> Broker<T> {
         intern.process()
     }
 
-    /// Enqueue messages to be sent to all subsystems on the next call to process.
-    pub fn enqueue_msgs(&self, msgs: Vec<T>) {
-        for msg in msgs.into_iter() {
-            self.intern_tx.send(msg).expect("try_send");
-        }
+    /// Enqueue a message to a given destination of other listeners.
+    pub fn enqueue_msg_dest(&self, dst: Destination, msg: T) -> Result<(), BrokerError> {
+        self.intern_tx
+            .send((dst, msg))
+            .map_err(|_| BrokerError::SendQueue)?;
+        Ok(())
     }
 
-    /// Enqueue a single message
-    pub fn enqueue_msg(&self, msg: T) {
-        self.enqueue_msgs(vec![msg]);
-    }
-
-    /// Try to emit and processes messages.
-    pub fn emit_msgs(&mut self, msgs: Vec<T>) -> Result<usize, BrokerError> {
-        self.enqueue_msgs(msgs);
+    /// Emit a message to a given destination of other listeners.
+    pub fn emit_msg_dest(&mut self, dst: Destination, msg: T) -> Result<usize, BrokerError> {
+        self.intern_tx
+            .send((dst, msg))
+            .map_err(|_| BrokerError::SendQueue)?;
         self.process()
     }
 
-    /// Try to emit and process a message
+    /// Enqueue a single message to other listeners.
+    pub fn enqueue_msg(&self, msg: T) -> Result<(), BrokerError> {
+        self.enqueue_msg_dest(Destination::Others, msg)
+    }
+
+    /// Try to emit and process a message to other listeners.
     pub fn emit_msg(&mut self, msg: T) -> Result<usize, BrokerError> {
-        self.emit_msgs(vec![msg])
+        self.emit_msg_dest(Destination::Others, msg)
     }
 
     /// Connects to another broker. The message type of the other broker
     /// needs to implement the TryFrom and TryInto for this broker's message
     /// type.
     /// Any error in the TryInto and TryFrom are interpreted as a message
-    /// that cannot be translated and are ignored.
-    pub fn link<R: 'static + Clone + TryFrom<T> + TryInto<T>>(
-        &self,
-        broker_r: &Broker<R>,
-    ) {
+    /// that cannot be translated and that is ignored.
+    /// TODO: Can this be shortcutted to a BrokerLink trait that proposes a From and To with 
+    /// an Option as return?
+    pub fn link<R: 'static + Clone + TryFrom<T> + TryInto<T>>(&self, broker_r: &Broker<R>) {
         let listener_r = Listener {
             broker: self.clone(),
         };
@@ -111,11 +121,10 @@ impl<T: 'static + Clone> Broker<T> {
             .clone()
             .add_subsystem(Subsystem::Handler(Box::new(listener_r)))
             .unwrap();
-        self
-            .clone()
+        self.clone()
             .add_subsystem(Subsystem::Handler(Box::new(listener_s)))
             .unwrap();
-    }    
+    }
 }
 
 pub struct Listener<S: Clone> {
@@ -123,26 +132,28 @@ pub struct Listener<S: Clone> {
 }
 
 impl<R: Clone + TryInto<S>, S: 'static + Clone> SubsystemListener<R> for Listener<S> {
-    fn messages(&mut self, msgs: Vec<&R>) -> Vec<R> {
-        self.broker.enqueue_msgs(
-            msgs.iter()
-                .filter_map(|&msg| msg.clone().try_into().ok())
-                .collect(),
-        );
+    fn messages(&mut self, msgs: Vec<&R>) -> Vec<(Destination, R)> {
+        for msg in msgs {
+            if let Ok(msg) = msg.clone().try_into() {
+                if let Err(e) = self.broker.enqueue_msg(msg) {
+                    log::error!("While sending message: {e}");
+                }
+            }
+        }
         let _ = self.broker.process();
         vec![]
     }
 }
 
 struct Intern<T> {
-    main_tx: Sender<T>,
+    main_tx: Sender<(Destination, T)>,
     subsystems: Vec<Subsystem<T>>,
-    msg_queue: Vec<Vec<T>>,
+    msg_queue: Vec<Vec<(Destination, T)>>,
 }
 
 impl<T: Clone> Intern<T> {
     pub fn new() -> Self {
-        let (main_tx, main_rx) = channel::<T>();
+        let (main_tx, main_rx) = channel::<(Destination, T)>();
         Self {
             main_tx,
             subsystems: vec![Subsystem::Sender(main_rx)],
@@ -151,7 +162,7 @@ impl<T: Clone> Intern<T> {
     }
 
     // Returns a clone of the transmission-queue.
-    pub fn clone_tx(&self) -> Sender<T> {
+    pub fn clone_tx(&self) -> Sender<(Destination, T)> {
         self.main_tx.clone()
     }
 
@@ -169,11 +180,11 @@ impl<T: Clone> Intern<T> {
     /// time, that you won't get what you expect.
     pub fn process(&mut self) -> Result<usize, BrokerError> {
         let mut msg_count: usize = 0;
-        let mut new_msgs: Vec<Vec<T>> = vec![];
+        let mut new_msgs: Vec<Vec<(Destination, T)>> = vec![];
 
         // First get all new messages and concat with messages from last round.
         for (index, ss) in self.subsystems.iter().enumerate() {
-            let mut msgs: Vec<T> = self
+            let mut msgs: Vec<(Destination, T)> = self
                 .msg_queue
                 .get_mut(index)
                 .expect("Get msg_queue")
@@ -190,11 +201,16 @@ impl<T: Clone> Intern<T> {
         for (index, ss) in self.subsystems.iter_mut().enumerate() {
             let mut msg_queue = vec![];
             for (index_nm, nms) in new_msgs.iter().enumerate() {
-                if index_nm == index || nms.is_empty() {
-                    msg_count += nms.len();
-                    continue;
-                }
-                msg_queue.append(&mut ss.put_messages(nms.iter().collect()));
+                let msgs = nms
+                    .iter()
+                    .filter(|nm| match nm.0 {
+                        Destination::All => true,
+                        Destination::Others => index_nm != index,
+                        Destination::This => index_nm == index,
+                    })
+                    .map(|nm| &nm.1)
+                    .collect();
+                msg_queue.append(&mut ss.put_messages(msgs));
             }
             self.msg_queue.push(msg_queue);
         }
@@ -204,20 +220,20 @@ impl<T: Clone> Intern<T> {
 }
 
 pub enum Subsystem<T> {
-    Sender(Receiver<T>),
+    Sender(Receiver<(Destination, T)>),
     Tap(Sender<T>),
     Handler(Box<dyn SubsystemListener<T>>),
 }
 
 impl<T: Clone> Subsystem<T> {
-    fn get_messages(&self) -> Vec<T> {
+    fn get_messages(&self) -> Vec<(Destination, T)> {
         match self {
             Self::Sender(s) => s.try_iter().collect(),
             _ => vec![],
         }
     }
 
-    fn put_messages(&mut self, msgs: Vec<&T>) -> Vec<T> {
+    fn put_messages(&mut self, msgs: Vec<&T>) -> Vec<(Destination, T)> {
         match self {
             Self::Tap(s) => {
                 msgs.iter().for_each(|&msg| {
@@ -234,7 +250,7 @@ impl<T: Clone> Subsystem<T> {
 }
 
 pub trait SubsystemListener<T> {
-    fn messages(&mut self, from_broker: Vec<&T>) -> Vec<T>;
+    fn messages(&mut self, from_broker: Vec<&T>) -> Vec<(Destination, T)>;
 }
 
 #[cfg(test)]
@@ -245,6 +261,8 @@ mod tests {
     pub enum BrokerTest {
         MsgA,
         MsgB,
+        MsgC,
+        MsgD,
     }
 
     pub struct Tps {
@@ -252,14 +270,14 @@ mod tests {
     }
 
     impl SubsystemListener<BrokerTest> for Tps {
-        fn messages(&mut self, msgs: Vec<&BrokerTest>) -> Vec<BrokerTest> {
+        fn messages(&mut self, msgs: Vec<&BrokerTest>) -> Vec<(Destination, BrokerTest)> {
             let mut output = vec![];
             log::debug!("Msgs are: {:?} - Replies are: {:?}", msgs, self.reply);
 
             for msg in msgs {
                 if let Some(bm) = self.reply.iter().find(|repl| &repl.0 == msg) {
                     log::debug!("Found message");
-                    output.push(bm.1.clone());
+                    output.push((Destination::Others, bm.1.clone()));
                 }
             }
             output
@@ -284,12 +302,12 @@ mod tests {
         broker.add_subsystem(Subsystem::Tap(tap_tx))?;
 
         // Shouldn't reply to a msg_b, so only 1 message.
-        broker.emit_msgs(vec![bm_b.clone()])?;
+        broker.emit_msg(bm_b.clone())?;
         assert_eq!(tap.try_iter().count(), 1);
 
         // Should reply to msg_a, so the tap should have 2 messages - the original
         // and the reply.
-        broker.emit_msgs(vec![bm_a.clone()])?;
+        broker.emit_msg(bm_a.clone())?;
         broker.process()?;
         assert_eq!(tap.try_iter().count(), 2);
 
@@ -298,9 +316,91 @@ mod tests {
         broker.add_subsystem(Subsystem::Handler(Box::new(Tps {
             reply: vec![(bm_a.clone(), bm_b)],
         })))?;
-        broker.emit_msgs(vec![bm_a])?;
+        broker.emit_msg(bm_a)?;
         broker.process()?;
         assert_eq!(tap.try_iter().count(), 3);
+
+        Ok(())
+    }
+
+    struct DestinationTest {
+        reply_tx: Sender<BrokerTest>,
+        listen: BrokerTest,
+        dest: Destination,
+    }
+
+    impl DestinationTest {
+        fn start(
+            b: &mut Broker<BrokerTest>,
+            listen: BrokerTest,
+            dest: Destination,
+        ) -> Result<Receiver<BrokerTest>, BrokerError> {
+            let (reply_tx, reply_rx) = channel::<BrokerTest>();
+            b.add_subsystem(Subsystem::Handler(Box::new(Self {
+                reply_tx,
+                listen,
+                dest,
+            })))?;
+            Ok(reply_rx)
+        }
+    }
+
+    impl SubsystemListener<BrokerTest> for DestinationTest {
+        fn messages(&mut self, msgs: Vec<&BrokerTest>) -> Vec<(Destination, BrokerTest)> {
+            for msg in msgs {
+                if msg == &self.listen {
+                    return vec![(self.dest, BrokerTest::MsgA)];
+                }
+                if matches!(msg, BrokerTest::MsgA) {
+                    if let Err(e) = self.reply_tx.send(msg.clone()) {
+                        log::error!("While sending: {e}");
+                    }
+                }
+            }
+            vec![]
+        }
+    }
+
+    fn received(wanted: &[bool], rxs: &[&Receiver<BrokerTest>]) -> bool {
+        if wanted.len() != rxs.len() {
+            log::error!("Not same length");
+            return false;
+        }
+        
+        let mut effective = vec![];
+        for rx in rxs {
+            effective.push(rx.try_iter().count() > 0);
+        }
+        if effective == wanted {
+            return true;
+        } else {
+            log::error!("Wanted: {wanted:?} - Got: {effective:?}");
+            return false;
+        }
+    }
+
+    /// Test different destinations.
+    #[test]
+    fn test_destination() -> Result<(), BrokerError> {
+        // let _ = flexi_logger::Logger::try_with_str("debug").unwrap();
+        let _ = env_logger::try_init();
+
+        let broker = &mut Broker::<BrokerTest>::new();
+        let t1 = &DestinationTest::start(broker, BrokerTest::MsgB, Destination::All)?;
+        let t2 = &DestinationTest::start(broker, BrokerTest::MsgC, Destination::Others)?;
+        let t3 = &DestinationTest::start(broker, BrokerTest::MsgD, Destination::This)?;
+
+        broker.emit_msg(BrokerTest::MsgB)?;
+        broker.process()?;
+        assert!(received(&[true, true, true], &[t1, t2, t3]));
+
+        broker.emit_msg(BrokerTest::MsgC)?;
+        broker.process()?;
+        assert!(received(&[true, false, true], &[t1, t2, t3]));
+
+        broker.emit_msg(BrokerTest::MsgD)?;
+        broker.process()?;
+        assert!(received(&[false, false, true], &[t1, t2, t3]));
 
         Ok(())
     }

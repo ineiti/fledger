@@ -8,7 +8,7 @@ use std::{
 use thiserror::Error;
 
 use flutils::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
+    broker::{Broker, BrokerError, Subsystem, SubsystemListener, Destination},
     nodeids::U256,
     time::block_on,
 };
@@ -84,7 +84,7 @@ impl Network {
 }
 
 impl SubsystemListener<BrokerNetwork> for Network {
-    fn messages(&mut self, bms: Vec<&BrokerNetwork>) -> Vec<BrokerNetwork> {
+    fn messages(&mut self, bms: Vec<&BrokerNetwork>) -> Vec<(Destination, BrokerNetwork)> {
         let inner_cl = Arc::clone(&self.inner);
         for bm in bms.iter().map(|&b| b.clone()) {
             self.broker_tx.send(bm).expect("Send broker message");

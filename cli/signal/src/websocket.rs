@@ -1,12 +1,4 @@
-mod config;
-/// Very simple rendez-vous server that allows new nodes to send their node_info.
-/// It also allows the nodes to fetch all existing node_infos of all the other nodes.
-mod state;
-
 use async_trait::async_trait;
-use flexi_logger::Logger;
-use log::{error, info, warn};
-use structopt::StructOpt;
 
 use std::{
     net::{TcpListener, TcpStream},
@@ -16,12 +8,9 @@ use std::{
 use tungstenite::{accept, protocol::Role, Message, WebSocket};
 
 use flnet::signal::websocket::{
-    MessageCallback, NewConnectionCallback, WSError, WSMessage, WebSocketConnection,
+    MessageCallbackSend, NewConnectionCallback, WSError, WSMessage, WebSocketConnection,
     WebSocketServer,
 };
-use config::Config;
-
-use state::ServerState;
 
 pub struct UnixWebSocket {
     cb: Arc<Mutex<Option<NewConnectionCallback>>>,
@@ -35,7 +24,7 @@ impl WebSocketServer for UnixWebSocket {
 }
 
 impl UnixWebSocket {
-    fn new() -> UnixWebSocket {
+    pub fn new() -> UnixWebSocket {
         let server = TcpListener::bind("0.0.0.0:8765").unwrap();
         let uws = UnixWebSocket {
             cb: Arc::new(Mutex::new(None)),
@@ -58,12 +47,8 @@ impl UnixWebSocket {
 
 struct UnixWSConnection {
     websocket: WebSocket<TcpStream>,
-    cb: Arc<Mutex<Option<MessageCallback>>>,
+    cb: Arc<Mutex<Option<MessageCallbackSend>>>,
 }
-
-unsafe impl Send for UnixWSConnection {}
-
-unsafe impl Sync for UnixWSConnection {}
 
 impl UnixWSConnection {
     fn new(stream: TcpStream) -> Result<Box<UnixWSConnection>, WSError> {
@@ -87,7 +72,7 @@ impl UnixWSConnection {
                     }
                 }
                 Err(e) => {
-                    warn!("Closing connection: {:?}", e);
+                    log::warn!("Closing connection: {:?}", e);
                     return;
                 }
             }
@@ -98,37 +83,15 @@ impl UnixWSConnection {
 
 #[async_trait]
 impl WebSocketConnection for UnixWSConnection {
-    fn set_cb_wsmessage(&mut self, cb: MessageCallback) {
+    fn set_cb_wsmessage(&mut self, cb: MessageCallbackSend) {
         let mut cb_lock = self.cb.lock().unwrap();
         cb_lock.replace(cb);
     }
 
-    fn send(&mut self, msg: String) -> Result<(), WSError> {
+    async fn send(&mut self, msg: String) -> Result<(), WSError> {
         self.websocket
             .write_message(Message::Text(msg))
             .map_err(|e| WSError::Underlying(e.to_string()))?;
         Ok(())
-    }
-
-    fn reconnect(&mut self) -> Result<(),WSError>  {
-        Err(WSError::Underlying("Reconnect not implemented".to_string()))
-    }
-
-}
-
-fn main() {
-    let cfg = Config::from_args();
-    Logger::try_with_str("error, signal=".to_string() + cfg.logger_str())
-        .unwrap()
-        .start()
-        .unwrap();
-    let ws = Box::new(UnixWebSocket::new());
-    let port = cfg.port;
-    match ServerState::new(cfg, ws) {
-        Ok(state) => {
-            info!("Server started and listening on port {}", port);
-            state.wait_done();
-        }
-        Err(e) => error!("Couldn't start server: {}", e),
     }
 }

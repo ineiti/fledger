@@ -11,7 +11,7 @@ use flnet::{
     signal::web_rtc::{ConnType, NodeStat, WebRTCConnectionState},
 };
 use flutils::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
+    broker::{Broker, BrokerError, Subsystem, SubsystemListener, Destination},
     nodeids::U256,
     time::now,
 };
@@ -117,7 +117,7 @@ impl Stats {
             let stats: Vec<NodeStat> = self.collect();
 
             self.broker
-                .enqueue_msg(BrokerNetworkCall::SendWSStats(stats).into());
+                .enqueue_msg(BrokerNetworkCall::SendWSStats(stats).into())?;
         }
         if self.ping_all_counter == 0 {
             self.ping_all()?;
@@ -211,7 +211,7 @@ impl Stats {
                             msg: Message::V1(MessageV1::Ping()),
                         }
                         .to_net(),
-                    );
+                    )?;
                     stat.1.ping_tx += 1;
                 }
             }
@@ -250,7 +250,7 @@ impl Stats {
 }
 
 impl SubsystemListener<BrokerMessage> for Stats {
-    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
+    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<(Destination, BrokerMessage)> {
         for msg in msgs {
             if let Err(e) = match msg {
                 BrokerMessage::NetworkReply(BrokerNetworkReply::ConnectionState(cs)) => self.upsert(cs),
