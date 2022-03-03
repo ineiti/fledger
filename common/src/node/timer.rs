@@ -1,4 +1,6 @@
-use crate::broker::{BInput, Broker, BrokerMessage};
+use flutils::broker::Broker;
+
+use crate::node::modules::messages::BrokerMessage;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerTimer {
@@ -10,7 +12,7 @@ pub enum BrokerTimer {
 /// services can subscribe to them.
 pub struct Timer {
     seconds: u32,
-    broker: Broker,
+    broker: Broker<BrokerMessage>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -38,7 +40,7 @@ where
 }
 
 impl Timer {
-    pub fn new(broker: Broker) {
+    pub fn start(broker: Broker<BrokerMessage>) {
         let mut timer_struct = Timer { seconds: 0, broker };
         schedule_repeating(move || timer_struct.process());
     }
@@ -46,7 +48,7 @@ impl Timer {
     fn emit(&mut self, msg: BrokerTimer) {
         if let Err(e) = self
             .broker
-            .emit(vec![BInput::BM(BrokerMessage::Timer(msg.clone()))])
+            .emit_msgs(vec![BrokerMessage::Timer(msg.clone())])
         {
             log::warn!("While emitting {:?}, got error: {:?}", msg, e);
         }
@@ -58,6 +60,6 @@ impl Timer {
             self.emit(BrokerTimer::Minute);
             self.seconds = 60;
         }
-        self.seconds = self.seconds - 1;
+        self.seconds -= 1;
     }
 }

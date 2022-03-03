@@ -2,7 +2,7 @@
 name = "flnode"
 version = "0.1.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
-edition = "2018"
+edition = "2021"
 description = "gtk for WebRTC Fledger communication"
 repository = "https://github.com/ineiti/fledger-1-webrtc"
 license = "AGPLv3"
@@ -15,6 +15,9 @@ crate-type = ["cdylib"]
 local = []
 
 [dependencies]
+flutils = {path="../../flutils"}
+flmodules = {path="../../flmodules"}
+flnet = {path="../../flnet"}
 common = {path = "../../common"}
 wasm-webrtc = {path = "../../wasm-webrtc", features=["node"]}
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }

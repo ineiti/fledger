@@ -1,17 +1,22 @@
 [package]
 authors = ["Linus Gasser <linus@gasser.blue>"]
-edition = "2018"
+edition = "2021"
 name = "common"
 version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+flnet = {path="../flnet"}
+flutils = {path = "../flutils"}
+flmodules = {path = "../flmodules"}
+transitive_from = "0.1.3"
 async-trait = "0.1.51"
 rand = "0.7"
 serde = { version = "1.0.127", features = ["derive"] }
 serde_derive = "1.0.127"
 serde_json = "1.0.66"
+serde_yaml = "0.8"
 toml = "0.5.8"
 
 # The "js" is to make sure it also works for the flnode and web crates
@@ -25,6 +30,7 @@ sha2 = "0.9.5"
 
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 timer = "0.2"
+itertools = "0.10.3"
 
 [dependencies.web-sys]
 features = [
@@ -66,3 +72,4 @@ tokio = {version = "1", features = ["rt", "macros"]}
 simplelog = "0.10"
 anyhow = "1"
 flexi_logger = "0.19"
+env_logger = "0.9.0"

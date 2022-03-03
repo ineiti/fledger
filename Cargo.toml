@@ -6,5 +6,8 @@ members = [
     "wasm-webrtc",
     "common",
     "vendor/names",
-    "web"
+    "web",
+    "flmodules",
+    "flutils",
+    "flnet"
 ]

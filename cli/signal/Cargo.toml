@@ -2,11 +2,14 @@
 name = "signal"
 version = "0.1.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+flutils = {path="../../flutils"}
+flmodules = {path="../../flmodules"}
+flnet = {path="../../flnet"}
 common = {path = "../../common"}
 serde = "1.0.127"
 serde_json = "1.0.66"

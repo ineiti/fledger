@@ -1,11 +1,13 @@
-use crate::{signal::web_rtc::PeerInfo, types::U256};
+use flutils::{broker::Broker, nodeids::U256};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 use crate::{
-    broker::Broker,
-    node::network::connection_state::{CSEnum, CSError, ConnectionState},
-    signal::web_rtc::WebRTCSpawner,
+    network::{
+        connection_state::{CSEnum, CSError, ConnectionState},
+        BrokerNetwork,
+    },
+    signal::web_rtc::{PeerInfo, WebRTCSpawner},
 };
 
 #[derive(Error, Debug)]
@@ -36,7 +38,7 @@ pub struct NodeConnection {
 impl NodeConnection {
     pub async fn new(
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
-        broker: Broker,
+        broker: Broker<BrokerNetwork>,
         id_local: U256,
         id_remote: U256,
     ) -> Result<NodeConnection, NCError> {
@@ -67,15 +69,14 @@ impl NodeConnection {
     /// If the connection is in setup phase, the message is queued.
     /// If the connection is idle, an error is returned.
     pub async fn send(&mut self, msg: String) -> Result<(), NCError> {
+        log::trace!("Sending {}", msg);
         let conn_result = {
             if self.outgoing.get_connection_open().await? {
                 Some(&mut self.outgoing)
+            } else if self.incoming.get_connection_open().await? {
+                Some(&mut self.incoming)
             } else {
-                if self.incoming.get_connection_open().await? {
-                    Some(&mut self.incoming)
-                } else {
-                    None
-                }
+                None
             }
         };
         match conn_result {
@@ -91,8 +92,8 @@ impl NodeConnection {
                 Ok(())
             }
             None => {
+                self.msg_queue.push(msg);
                 if self.outgoing.get_connection_state() == CSEnum::Idle {
-                    self.msg_queue.push(msg);
                     self.outgoing.start_connection(None).await?;
                 }
                 Ok(())

@@ -1,14 +1,9 @@
-use crate::{node::logic::text_messages::TextMessagesStorage, types::StorageError};
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
-use crate::{
-    broker::Broker,
-    node::{config::NodeConfig, logic::stats::NDStats, network::NetworkState},
-    types::DataStorage,
-};
+use flutils::{broker::Broker, data_storage::DataStorageBase};
+use flnet::config::NodeConfig;
+
+use crate::node::{modules::messages::BrokerMessage, stats::NDStats};
 
 /// The NodeState is the shared global state of every node.
 /// It must only be stored as Arc<Mutex<NodeState>>.
@@ -21,55 +16,32 @@ pub struct NodeData {
     /// The node configuration
     pub node_config: NodeConfig,
     /// Storage to be used
-    pub storage: Box<dyn DataStorage>,
+    pub storage: Box<dyn DataStorageBase>,
     /// Broker that can be cloned
-    pub broker: Broker,
+    pub broker: Broker<BrokerMessage>,
 
     // Subsystem data
-    /// State of the network
-    pub network_state: NetworkState,
     /// Statistics of the connection
     pub stats: NDStats,
-    /// Messages sent and received
-    pub messages: TextMessagesStorage,
-}
-
-pub struct TempDS {
-    kvs: HashMap<String, String>,
-}
-
-impl TempDS {
-    pub fn new() -> Box<Self> {
-        Box::new(Self {
-            kvs: HashMap::new(),
-        })
-    }
-}
-
-impl DataStorage for TempDS {
-    fn load(&self, key: &str) -> Result<String, StorageError> {
-        Ok(self.kvs.get(key).unwrap_or(&"".to_string()).clone())
-    }
-
-    fn save(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
-        self.kvs.insert(key.to_string(), value.to_string());
-        Ok(())
-    }
+    /// Handles a random number of connections
+    pub random_connections: flmodules::random_connections::Module,
+    /// Gossip-events sent and received
+    pub gossip_events: flmodules::gossip_events::Module,
 }
 
 impl NodeData {
-    pub fn new(node_config: NodeConfig, storage: Box<dyn DataStorage>) -> Arc<Mutex<Self>> {
+    pub fn new(node_config: NodeConfig, storage: Box<dyn DataStorageBase>) -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(Self {
-            node_config,
             storage,
             broker: Broker::new(),
-            network_state: NetworkState::new(),
             stats: NDStats::new(),
-            messages: TextMessagesStorage::new(),
+            random_connections: flmodules::random_connections::Module::new(
+                flmodules::random_connections::Config::default(),
+            ),
+            gossip_events: flmodules::gossip_events::Module::new(
+                flmodules::gossip_events::Config::new(node_config.our_node.get_id()),
+            ),
+            node_config,
         }))
-    }
-
-    pub fn new_test() -> Arc<Mutex<Self>> {
-        Self::new(NodeConfig::new(), TempDS::new())
     }
 }

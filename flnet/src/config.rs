@@ -1,4 +1,3 @@
-use crate::types::U256;
 use ed25519_dalek::{Keypair, PublicKey};
 use rand::rngs::OsRng;
 use serde_derive::{Deserialize, Serialize};
@@ -7,6 +6,7 @@ use std::{
     fmt::{Debug, Error, Formatter},
 };
 use thiserror::Error;
+use flutils::nodeids::U256;
 
 #[derive(Error, Debug)]
 pub enum ConfigError {
@@ -35,7 +35,7 @@ impl NodeInfo {
     /// Creates a new NodeInfo with a random name.
     pub fn new(pubkey: PublicKey) -> NodeInfo {
         NodeInfo {
-            info: names::Generator::default().next().unwrap().to_string(),
+            info: names::Generator::default().next().unwrap(),
             client: "Node".to_string(),
             pubkey,
             node_capacities: NodeCapacities::new(),
@@ -54,7 +54,7 @@ impl TryFrom<NodeInfoToml> for NodeInfo {
         Ok(NodeInfo {
             info: nit.info,
             client: nit.client,
-            pubkey: nit.pubkey.ok_or(ConfigError::PublicKeyMissing)?.clone(),
+            pubkey: nit.pubkey.ok_or(ConfigError::PublicKeyMissing)?,
             node_capacities: nit.node_capacities.into(),
         })
     }
@@ -83,7 +83,7 @@ impl PartialEq for NodeInfo {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 /// This holds all boolean node capacities. Currently the following are implemented:
 /// - leader: indicates a node that will store all relevant messages and serve them to clients
 pub struct NodeCapacities {
@@ -119,6 +119,12 @@ pub struct NodeConfig {
     pub our_node: NodeInfo,
     /// the cryptographic keypair as a vector of bytes
     pub keypair: Keypair,
+}
+
+impl Default for NodeConfig {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NodeConfig {
@@ -160,7 +166,7 @@ impl Clone for NodeConfig {
 impl TryFrom<String> for NodeConfig {
     type Error = ConfigError;
     fn try_from(str: String) -> Result<Self, ConfigError> {
-        let t: Toml = if str.len() > 0 {
+        let t: Toml = if !str.is_empty() {
             toml::from_str(str.as_str())?
         } else {
             Toml { v1: None }
@@ -179,10 +185,10 @@ impl TryFrom<String> for NodeConfig {
         };
         let our_node = match nct.our_node {
             Some(mut on) => {
-                on.pubkey.replace(keypair.public.clone());
+                on.pubkey.replace(keypair.public);
                 NodeInfo::try_from(on)?
             }
-            None => NodeInfo::new(keypair.public.clone()),
+            None => NodeInfo::new(keypair.public),
         };
         Ok(NodeConfig {
             our_node,
@@ -229,7 +235,7 @@ impl From<&NodeInfo> for NodeInfoToml {
             id: None,
             info: ni.info.clone(),
             client: ni.client.clone(),
-            pubkey: Some(ni.pubkey.clone()),
+            pubkey: Some(ni.pubkey),
             node_capacities: Some(NodeCapacitiesToml::from(&ni.node_capacities)),
         }
     }

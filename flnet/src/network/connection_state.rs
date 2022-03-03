@@ -1,25 +1,20 @@
 use crate::{
-    broker::BrokerMessage,
-    node::{
-        network::{ConnStats, NetworkConnectionState, NodeMessage},
-        BrokerNetwork,
-    },
-    signal::web_rtc::{PeerInfo, WSSignalMessage},
-    types::U256,
+    network::{ConnStats, NetworkConnectionState, NetworkMessage, BrokerNetwork},
+    signal::web_rtc::PeerInfo,
 };
+use flutils::{broker::Broker, nodeids::U256};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use web_sys::{RtcDataChannelState, RtcIceConnectionState};
 
-use crate::{
-    broker::Broker,
-    signal::web_rtc::{
-        ConnType, ConnectionError, ConnectionStateMap, PeerMessage, SetupError, WebRTCConnection,
-        WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCBMessage, WebRTCSpawner,
-    },
+use crate::signal::web_rtc::{
+    ConnType, ConnectionError, ConnectionStateMap, PeerMessage, SetupError, WebRTCConnection,
+    WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCBMessage, WebRTCSpawner,
 };
+
+use super::BrokerNetworkReply;
 
 #[derive(Error, Debug)]
 pub enum CSError {
@@ -61,8 +56,8 @@ impl CSDir {
             CSDir::Outgoing => (id_local, id_remote),
         };
         PeerInfo {
-            id_init: id_init.clone(),
-            id_follow: id_follow.clone(),
+            id_init: *id_init,
+            id_follow: *id_follow,
             message,
         }
     }
@@ -80,7 +75,7 @@ pub struct ConnectionState {
     web_rtc: Arc<Mutex<WebRTCSpawner>>,
     conn_setup: Option<Box<dyn WebRTCConnectionSetup>>,
     direction: CSDir,
-    broker: Broker,
+    broker: Broker<BrokerNetwork>,
     connection: Arc<Mutex<Connection>>,
 }
 
@@ -89,7 +84,7 @@ impl ConnectionState {
     pub async fn new(
         incoming: bool,
         web_rtc: Arc<Mutex<WebRTCSpawner>>,
-        broker: Broker,
+        broker: Broker<BrokerNetwork>,
         id_local: U256,
         id_remote: U256,
     ) -> Result<ConnectionState, CSError> {
@@ -158,7 +153,10 @@ impl ConnectionState {
                     if self.get_connection_state() == CSEnum::HasDataChannel {
                         reset = reset || state_dc == &RtcDataChannelState::Closed;
                         if reset {
-                            warn!("State_dc is: {:?}", state_dc);
+                            warn!(
+                                "State_dc is: {state_dc:?} - s.ice_connection is: {:?}",
+                                s.ice_connection
+                            );
                         }
                     } else {
                         warn!(
@@ -177,10 +175,7 @@ impl ConnectionState {
                     .await?;
             }
         }
-        self.broker
-            .enqueue_bm(BrokerMessage::Network(BrokerNetwork::ConnectionState(
-                self.get_ncs(stat),
-            )));
+        self.broker.enqueue_msg(self.get_ncs(stat).into());
         Ok(())
     }
 
@@ -262,10 +257,7 @@ impl ConnectionState {
         }
         if self.get_connection_state() != CSEnum::Idle {
             self.update_connection(CSEnum::Idle, None);
-            self.broker
-                .enqueue_bm(BrokerMessage::Network(BrokerNetwork::ConnectionState(
-                    self.get_ncs(None),
-                )));
+            self.broker.enqueue_msg(self.get_ncs(None).into());
         }
         if self.direction == CSDir::Incoming {
             error!("Cannot start incoming connection")
@@ -323,15 +315,15 @@ impl ConnectionState {
                     .expect("Getting connection")
                     .web_rtc_setup(msg);
                 // This is not really necessary, but speeds up the time for the connection
-                if let Err(_) = broker.process() {
+                if broker.process().is_err() {
                     warn!("Couldn't lock process");
                 }
             }))
             .await;
         self.broker
-            .enqueue_bm(BrokerMessage::Network(BrokerNetwork::ConnectionState(
+            .enqueue_msg(BrokerNetworkReply::ConnectionState(
                 self.get_ncs(None),
-            )));
+            ).into());
         self.conn_setup = Some(rtc_conn);
         self.update_connection(CSEnum::Setup, None);
         Ok(())
@@ -360,7 +352,7 @@ impl ConnectionState {
 }
 
 struct Connection {
-    broker: Broker,
+    broker: Broker<BrokerNetwork>,
     direction: CSDir,
     id_local: U256,
     id_remote: U256,
@@ -369,7 +361,12 @@ struct Connection {
 }
 
 impl Connection {
-    fn new(broker: Broker, direction: CSDir, id_local: U256, id_remote: U256) -> Self {
+    fn new(
+        broker: Broker<BrokerNetwork>,
+        direction: CSDir,
+        id_local: U256,
+        id_remote: U256,
+    ) -> Self {
         Self {
             broker,
             direction,
@@ -388,12 +385,12 @@ impl Connection {
             WebRTCSetupCBMessage::Connection(conn) => {
                 info!("Connected {:?}", self.direction);
                 let mut broker = self.broker.clone();
-                let id = self.id_remote.clone();
-                conn.set_cb_message(Box::new(move |msg| {
-                    if let Ok(msg) = serde_json::from_str(&msg) {
-                        if let Err(e) =
-                            broker.emit_bm(BrokerMessage::NodeMessage(NodeMessage { id, msg }))
-                        {
+                let id = self.id_remote;
+                let our_id = self.id_local;
+                conn.set_cb_message(Box::new(move |msg_str| {
+                    log::trace!("{}->{}: {:?}", our_id, id, msg_str);
+                    if let Ok(msg) = serde_json::from_str(&msg_str) {
+                        if let Err(e) = broker.emit_msg(NetworkMessage { id, msg }.from_net()) {
                             error!("While emitting webrtc: {:?}", e);
                         }
                     }
@@ -401,9 +398,9 @@ impl Connection {
                 self.state = CSEnum::HasDataChannel;
                 self.connected = Some(conn);
                 self.broker
-                    .enqueue_bm(BrokerMessage::Network(BrokerNetwork::ConnectionState(
+                    .enqueue_msg(BrokerNetworkReply::ConnectionState(
                         self.get_ncs(None),
-                    )));
+                    ).into());
             }
         }
     }
@@ -412,15 +409,12 @@ impl Connection {
         let peer_info = self
             .direction
             .get_peer_info(&self.id_local, &self.id_remote, message);
-        self.broker
-            .enqueue_bm(BrokerMessage::Network(BrokerNetwork::WebSocket(
-                WSSignalMessage::PeerSetup(peer_info),
-            )));
+        self.broker.enqueue_msg(peer_info.send().into());
     }
 
     fn get_ncs(&self, stat: Option<ConnectionStateMap>) -> NetworkConnectionState {
         NetworkConnectionState {
-            id: self.id_remote.clone(),
+            id: self.id_remote,
             dir: self.direction.get_conn_state(),
             c: self.state.clone(),
             s: stat.map(|s| ConnStats {
@@ -444,6 +438,6 @@ impl Connection {
                 }
             }
         }
-        return false;
+        false
     }
 }

@@ -1,16 +1,14 @@
 use async_trait::async_trait;
-use common::signal::web_rtc::SetupError;
+use js_sys::Reflect;
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-
-use js_sys::Reflect;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::RtcConfiguration;
 
-use common::signal::web_rtc::{
-    ConnectionStateMap, WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCB,
+use flnet::signal::web_rtc::{
+    ConnectionStateMap, SetupError, WebRTCConnectionSetup, WebRTCConnectionState, WebRTCSetupCB,
     WebRTCSetupCBMessage,
 };
 
@@ -50,7 +48,9 @@ impl WebRTCConnectionSetupWasm {
     /// Once two nodes are set up, they need to exchang the offer and the answer string.
     /// Followed by that they need to exchange the ice strings, in either order.
     /// Only after exchanging this information can the msg_send and msg_receive methods be used.
-    pub fn new(nt: WebRTCConnectionState) -> Result<Box<dyn WebRTCConnectionSetup>, SetupError> {
+    pub fn new_box(
+        nt: WebRTCConnectionState,
+    ) -> Result<Box<dyn WebRTCConnectionSetup>, SetupError> {
         // If no stun server is configured, only local IPs will be sent in the browser.
         // At least the node webrtc does the correct thing...
         let mut config = RtcConfiguration::new();
@@ -79,8 +79,8 @@ impl WebRTCConnectionSetupWasm {
         ice_start(&rp_conn, Arc::clone(&rn.callback));
         let cb_clone = Arc::clone(&rn.callback);
         match nt {
-            WebRTCConnectionState::Initializer => dc_create_init(rp_conn.clone(), cb_clone),
-            WebRTCConnectionState::Follower => dc_create_follow(rp_conn.clone(), cb_clone),
+            WebRTCConnectionState::Initializer => dc_create_init(rp_conn, cb_clone),
+            WebRTCConnectionState::Follower => dc_create_follow(rp_conn, cb_clone),
         };
         Ok(Box::new(rn))
     }
@@ -183,7 +183,7 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
     // Sends the ICE string to the WebRTC.
     async fn ice_put(&mut self, ice: String) -> Result<(), SetupError> {
         let els: Vec<&str> = ice.split(":-:").collect();
-        if els.len() != 3 || els[0] == "" {
+        if els.len() != 3 || els[0].is_empty() {
             warn!("wrong ice candidate string: {}", ice);
             return Ok(());
         }
@@ -218,23 +218,20 @@ impl WebRTCConnectionSetup for WebRTCConnectionSetupWasm {
 }
 
 fn ice_start(rp_conn: &RtcPeerConnection, callback: Arc<Mutex<Option<WebRTCSetupCB>>>) {
-    let onicecandidate_callback1 =
-        Closure::wrap(
-            Box::new(move |ev: RtcPeerConnectionIceEvent| match ev.candidate() {
-                Some(candidate) => {
-                    let cand = format!(
-                        "{}:-:{}:-:{}",
-                        candidate.candidate(),
-                        candidate.sdp_mid().unwrap(),
-                        candidate.sdp_m_line_index().unwrap()
-                    );
-                    if let Some(cb) = callback.lock().unwrap().as_mut() {
-                        cb(WebRTCSetupCBMessage::Ice(cand.clone()));
-                    }
-                }
-                None => {}
-            }) as Box<dyn FnMut(RtcPeerConnectionIceEvent)>,
-        );
+    let onicecandidate_callback1 = Closure::wrap(Box::new(move |ev: RtcPeerConnectionIceEvent| {
+        if let Some(candidate) = ev.candidate() {
+            let cand = format!(
+                "{}:-:{}:-:{}",
+                candidate.candidate(),
+                candidate.sdp_mid().unwrap(),
+                candidate.sdp_m_line_index().unwrap()
+            );
+            if let Some(cb) = callback.lock().unwrap().as_mut() {
+                cb(WebRTCSetupCBMessage::Ice(cand));
+            }
+        }
+    })
+        as Box<dyn FnMut(RtcPeerConnectionIceEvent)>);
     rp_conn.set_onicecandidate(Some(onicecandidate_callback1.as_ref().unchecked_ref()));
     onicecandidate_callback1.forget();
 }
@@ -263,7 +260,7 @@ fn dc_set_onopen(
     let mut dccc = Some(dcc.clone());
     let mut rpc = Some(rp_conn.take().unwrap());
     let ondatachannel_open = Closure::wrap(Box::new(move |_ev: Event| {
-        let conn = WebRTCConnectionWasm::new(dccc.take().unwrap(), rpc.take().unwrap());
+        let conn = WebRTCConnectionWasm::new_box(dccc.take().unwrap(), rpc.take().unwrap());
         if let Some(cb) = callback.lock().unwrap().as_mut() {
             cb(WebRTCSetupCBMessage::Connection(conn));
         }

@@ -1,14 +1,10 @@
 use async_trait::async_trait;
-use common::signal::websocket::WSError;
-use std::{cell::RefCell, rc::Rc};
-
 use log::{debug, error, info, warn};
-
+use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-
 use web_sys::{ErrorEvent, MessageEvent, WebSocket};
 
-use common::signal::websocket::{MessageCallback, WSMessage, WebSocketConnection};
+use flnet::signal::websocket::{MessageCallback, WSError, WSMessage, WebSocketConnection};
 
 pub struct WebSocketWasm {
     cb: Rc<RefCell<Option<MessageCallback>>>,
@@ -22,7 +18,7 @@ impl WebSocketWasm {
         let ws = WebSocket::new(addr).map_err(|e| WSError::Underlying(format!("{:?}", e)))?;
         let mut wsw = WebSocketWasm {
             cb: Rc::new(RefCell::new(None)),
-            ws: ws.clone(),
+            ws,
             addr: addr.to_string(),
         };
         wsw.attach_callbacks();

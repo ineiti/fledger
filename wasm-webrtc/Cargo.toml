@@ -2,12 +2,14 @@
 name = "wasm-webrtc"
 version = "0.1.0"
 authors = ["Linus Gasser <linus@gasser.blue>"]
-edition = "2018"
+edition = "2021"
 
 [features]
 node = []
 
 [dependencies]
+flnet = {path="../flnet"}
+flutils = {path = "../flutils"}
 common = {path = "../common"}
 wasm-bindgen = { version = "0.2.74", features = ["serde-serialize"] }
 js-sys = "0.3.51"

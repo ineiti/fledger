@@ -2,7 +2,7 @@
 name = "fledger-web"
 version = "0.1.0"
 authors = ["Linus Gasser <ineiti@gasser.blue>"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -11,6 +11,9 @@ crate-type = ["cdylib", "rlib"]
 local = []
 
 [dependencies]
+flmodules = {path="../flmodules"}
+flutils = {path="../flutils"}
+flnet = {path="../flnet"}
 chrono = "0.4"
 anyhow = "1.0.42"
 js-sys = "0.3.51"

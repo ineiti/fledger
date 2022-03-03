@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{MessageEvent, RtcDataChannel, RtcPeerConnection, RtcSignalingState};
 
-use common::signal::web_rtc::{
+use flnet::signal::web_rtc::{
     ConnType, ConnectionError, ConnectionStateMap, SignalingState, WebRTCConnection,
     WebRTCMessageCB,
 };
@@ -14,7 +14,7 @@ pub struct WebRTCConnectionWasm {
 }
 
 impl WebRTCConnectionWasm {
-    pub fn new(dc: RtcDataChannel, conn: RtcPeerConnection) -> Box<dyn WebRTCConnection> {
+    pub fn new_box(dc: RtcDataChannel, conn: RtcPeerConnection) -> Box<dyn WebRTCConnection> {
         Box::new(WebRTCConnectionWasm { dc, conn })
     }
 }
@@ -24,23 +24,18 @@ impl WebRTCConnection for WebRTCConnectionWasm {
     /// Send a message to the other node. This call blocks until the message
     /// is queued.
     fn send(&self, s: String) -> Result<(), ConnectionError> {
-        Ok(self
-            .dc
+        self.dc
             .send_with_str(&s)
-            .map_err(|e| ConnectionError::Underlying(format!("{:?}", e)))?)
+            .map_err(|e| ConnectionError::Underlying(format!("{:?}", e)))
     }
 
     /// Sets the callback for incoming messages.
     fn set_cb_message(&self, mut cb: WebRTCMessageCB) {
-        let onmessage_callback =
-            Closure::wrap(
-                Box::new(move |ev: MessageEvent| match ev.data().as_string() {
-                    Some(message) => {
-                        cb(message);
-                    }
-                    None => {}
-                }) as Box<dyn FnMut(MessageEvent)>,
-            );
+        let onmessage_callback = Closure::wrap(Box::new(move |ev: MessageEvent| {
+            if let Some(message) = ev.data().as_string() {
+                cb(message);
+            }
+        }) as Box<dyn FnMut(MessageEvent)>);
         self.dc
             .set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
         onmessage_callback.forget();

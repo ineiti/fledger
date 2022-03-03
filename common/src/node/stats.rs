@@ -1,29 +1,26 @@
-use crate::{
-    broker::Subsystem,
-    node::{
-        logic::messages::NodeMessage,
-        network::{BrokerNetwork, NetworkConnectionState},
-    },
-};
 use core::f64;
 use std::{
     collections::HashMap,
-    sync::{mpsc::Sender, Arc, Mutex},
+    sync::{Arc, Mutex},
 };
 use thiserror::Error;
 
-use crate::{
-    broker::{BInput, BrokerError, BrokerMessage, SubsystemListener},
-    node::{
-        config::{NodeConfig, NodeInfo},
-        logic::messages::{Message, MessageV1},
-        network::{connection_state::CSEnum, ConnStats},
-        node_data::NodeData,
-        timer::BrokerTimer,
-        version::VERSION_STRING,
-    },
+use flnet::{
+    config::{NodeConfig, NodeInfo},
+    network::{connection_state::CSEnum, ConnStats, NetworkConnectionState, BrokerNetworkReply, BrokerNetworkCall},
     signal::web_rtc::{ConnType, NodeStat, WebRTCConnectionState},
-    types::{now, U256},
+};
+use flutils::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
+    nodeids::U256,
+    utils::now,
+};
+
+use crate::node::{
+    modules::messages::{BrokerMessage, Message, MessageV1, NodeMessage},
+    node_data::NodeData,
+    timer::BrokerTimer,
+    version::VERSION_STRING,
 };
 
 #[derive(Debug, Error)]
@@ -38,17 +35,25 @@ pub enum SNError {
 
 pub struct NDStats {
     pub nodes: HashMap<U256, StatNode>,
+    pub list: Vec<NodeInfo>,
 }
 
 impl NDStats {
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),
+            list: vec![],
         }
     }
 
     pub fn update_nodes(&mut self, nodes: HashMap<U256, StatNode>) {
         self.nodes = nodes;
+    }
+}
+
+impl Default for NDStats {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -80,22 +85,23 @@ impl StatNode {
 pub struct Stats {
     node_data: Arc<Mutex<NodeData>>,
     node_config: NodeConfig,
-    broker_tx: Sender<BInput>,
+    broker: Broker<BrokerMessage>,
     last_stats: f64,
     ping_all_counter: u32,
 }
 
 impl Stats {
-    pub fn new(node_data: Arc<Mutex<NodeData>>) {
-        let (node_config, mut broker) = {
+    pub fn start(node_data: Arc<Mutex<NodeData>>) {
+        let (node_config, broker) = {
             let nd = node_data.lock().unwrap();
             (nd.node_config.clone(), nd.broker.clone())
         };
         broker
+            .clone()
             .add_subsystem(Subsystem::Handler(Box::new(Stats {
                 node_data,
                 node_config,
-                broker_tx: broker.clone_tx(),
+                broker,
                 last_stats: 0.,
                 ping_all_counter: 0,
             })))
@@ -110,17 +116,14 @@ impl Stats {
 
             let stats: Vec<NodeStat> = self.collect();
 
-            self.broker_tx
-                .send(BInput::BM(BrokerMessage::Network(
-                    BrokerNetwork::SendStats(stats),
-                )))
-                .map_err(|_| SNError::OutputQueue)?;
+            self.broker
+                .enqueue_msg(BrokerNetworkCall::SendWSStats(stats).into());
         }
         if self.ping_all_counter == 0 {
             self.ping_all()?;
             self.ping_all_counter = 5;
         }
-        self.ping_all_counter = self.ping_all_counter - 1;
+        self.ping_all_counter -= 1;
         Ok(())
     }
 
@@ -140,7 +143,7 @@ impl Stats {
         let expired: Vec<U256> = nodes
             .iter()
             .filter(|(_k, v)| self.last_stats - v.last_contact > stats_ignore)
-            .map(|(k, _v)| k.clone())
+            .map(|(k, _v)| *k)
             .collect();
         for k in expired {
             nodes.remove(&k);
@@ -156,7 +159,7 @@ impl Stats {
             // Ignore our node and nodes that are inactive
             .filter(|(&k, _v)| k != our_id)
             .map(|(k, v)| NodeStat {
-                id: k.clone(),
+                id: *k,
                 version: VERSION_STRING.to_string(),
                 ping_ms: 0u32,
                 ping_rx: v.ping_rx,
@@ -168,9 +171,9 @@ impl Stats {
     fn upsert(&mut self, ncs: &NetworkConnectionState) -> Result<(), SNError> {
         let mut nodes = self.get_stats_nodes();
         nodes
-            .entry(ncs.id.clone())
+            .entry(ncs.id)
             .or_insert_with(|| StatNode::new(None, now()));
-        nodes.entry(ncs.id.clone()).and_modify(|s| {
+        nodes.entry(ncs.id).and_modify(|s| {
             let cs = ConnState::from_states(ncs.c.clone(), ncs.s.clone());
             if ncs.dir == WebRTCConnectionState::Initializer {
                 s.outgoing = cs;
@@ -183,11 +186,11 @@ impl Stats {
     }
 
     /// Update a NodeInfo
-    fn update_list(&mut self, nul: &Vec<NodeInfo>) -> Result<(), SNError> {
+    fn update_list(&mut self, nul: &[NodeInfo]) -> Result<(), SNError> {
         let mut nodes = self.get_stats_nodes();
         for ni in nul {
             let s = nodes
-                .entry(ni.get_id().clone())
+                .entry(ni.get_id())
                 .or_insert_with(|| StatNode::new(None, now()));
             s.node_info = Some(ni.clone());
         }
@@ -202,13 +205,13 @@ impl Stats {
         for stat in nodes.iter_mut() {
             if let Some(ni) = stat.1.node_info.as_ref() {
                 if our_id != ni.get_id() {
-                    let msg = Message::V1(MessageV1::Ping()).to_string()?;
-                    self.broker_tx
-                        .send(BInput::BM(BrokerMessage::Network(BrokerNetwork::WebRTC(
-                            ni.get_id(),
-                            msg,
-                        ))))
-                        .map_err(|_| SNError::OutputQueue)?;
+                    self.broker.enqueue_msg(
+                        NodeMessage {
+                            id: ni.get_id(),
+                            msg: Message::V1(MessageV1::Ping()),
+                        }
+                        .to_net(),
+                    );
                     stat.1.ping_tx += 1;
                 }
             }
@@ -226,9 +229,9 @@ impl Stats {
         let from = nm.id;
         let mut nodes = self.get_stats_nodes();
         nodes
-            .entry(from.clone())
+            .entry(from)
             .or_insert_with(|| StatNode::new(None, now()));
-        nodes.entry(from.clone()).and_modify(|s| {
+        nodes.entry(from).and_modify(|s| {
             s.last_contact = now();
             s.ping_rx += 1;
         });
@@ -246,13 +249,13 @@ impl Stats {
     }
 }
 
-impl SubsystemListener for Stats {
-    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BInput> {
+impl SubsystemListener<BrokerMessage> for Stats {
+    fn messages(&mut self, msgs: Vec<&BrokerMessage>) -> Vec<BrokerMessage> {
         for msg in msgs {
             if let Err(e) = match msg {
-                BrokerMessage::Network(BrokerNetwork::ConnectionState(cs)) => self.upsert(cs),
-                BrokerMessage::Network(BrokerNetwork::UpdateList(ul)) => self.update_list(ul),
-                BrokerMessage::NodeMessage(nm) => self.ping_rcv(nm),
+                BrokerMessage::NetworkReply(BrokerNetworkReply::ConnectionState(cs)) => self.upsert(cs),
+                BrokerMessage::NetworkReply(BrokerNetworkReply::RcvWSUpdateList(ul)) => self.update_list(ul),
+                BrokerMessage::NodeMessageIn(nm) => self.ping_rcv(nm),
                 BrokerMessage::Timer(BrokerTimer::Second) => self.send_stats(),
                 _ => Ok(()),
             } {
