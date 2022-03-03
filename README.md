@@ -37,7 +37,7 @@ What it will never do:
 Currently the following components are available:
 - [Signal server](./cli/signal) - for the webRTC rendez-vous
 - [Web node](./web) - for running the node in a browser
-- [CLI node](./cli/node) - for running a node in a CLI
+- [CLI node](./cli/flnode) - for running a node in a CLI
 - [Node](./common) - the actual code for the Fledger nodes
 
 As a first step, the WebRTC communication has been set up.
