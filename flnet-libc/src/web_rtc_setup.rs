@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use async_std::task::block_on;
 use webrtc::{
     api::{
         interceptor_registry::register_default_interceptors, media_engine::MediaEngine, APIBuilder,
@@ -21,7 +22,7 @@ use webrtc::{
 
 use flnet::signal::web_rtc::{
     ConnType, ConnectionStateMap, DataChannelState, SetupError, SignalingState,
-    WebRTCConnectionSetup, WebRTCSetupCB, WebRTCSetupCBMessage,
+    WebRTCConnectionSetup, WebRTCSetupCB, WebRTCSetupCBMessage, WebRTCConnectionState,
 };
 
 use crate::web_rtc_connection::WebRTCConnectionLibc;
@@ -32,7 +33,16 @@ pub struct WebRTCConnectionSetupLibc {
 }
 
 impl WebRTCConnectionSetupLibc {
-    pub async fn new_async_stuff(init: bool) -> Result<WebRTCConnectionSetupLibc, SetupError> {
+    pub fn new_box(
+        nt: WebRTCConnectionState,
+    ) -> Result<Box<dyn WebRTCConnectionSetup>, SetupError> {
+        // TODO: Allow for async new_box
+        block_on(async move{Self::new_box_async(nt).await})
+    }
+
+    pub async fn new_box_async(
+        nt: WebRTCConnectionState,
+    ) -> Result<Box<dyn WebRTCConnectionSetup>, SetupError> {
         // Create a MediaEngine object to configure the supported codec
         let mut m = MediaEngine::default();
 
@@ -68,7 +78,7 @@ impl WebRTCConnectionSetupLibc {
             connection: Arc::new(api.new_peer_connection(config).await.map_err(to_error)?),
         };
 
-        if !init {
+        if nt == WebRTCConnectionState::Follower {
             // Register data channel creation handling
             let cb = Arc::clone(&web_rtc.callback);
             web_rtc
@@ -133,7 +143,7 @@ impl WebRTCConnectionSetupLibc {
             }))
             .await;
 
-        Ok(web_rtc)
+        Ok(Box::new(web_rtc))
     }
 
     fn get_desc(sdp_type: RTCSdpType, sdp: String) -> RTCSessionDescription {

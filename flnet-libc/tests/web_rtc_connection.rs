@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 
 use flnet::signal::web_rtc::{
-    SetupError, WebRTCConnection, WebRTCConnectionSetup, WebRTCSetupCBMessage,
+    SetupError, WebRTCConnection, WebRTCConnectionSetup, WebRTCSetupCBMessage, WebRTCConnectionState,
 };
 use flnet_libc::web_rtc_setup::WebRTCConnectionSetupLibc;
 use flutils::time::wait_ms;
@@ -10,8 +10,8 @@ use flutils::time::wait_ms;
 async fn connection_setup() -> Result<(), SetupError> {
     let _ = env_logger::try_init();
 
-    let mut init = Node::new(true).await;
-    let mut follow = Node::new(false).await;
+    let mut init = Node::new(WebRTCConnectionState::Initializer).await;
+    let mut follow = Node::new(WebRTCConnectionState::Follower).await;
     log::debug!("Started init and follow node");
 
     let offer = init.setup.make_offer().await?;
@@ -40,13 +40,13 @@ async fn connection_setup() -> Result<(), SetupError> {
 struct Node {
     rx: mpsc::Receiver<WebRTCSetupCBMessage>,
     msg_rx: Option<mpsc::Receiver<String>>,
-    setup: WebRTCConnectionSetupLibc,
+    setup: Box<dyn WebRTCConnectionSetup>,
     conn: Option<Box<dyn WebRTCConnection>>,
 }
 
 impl Node {
-    async fn new(init: bool) -> Self {
-        let mut setup = WebRTCConnectionSetupLibc::new_async_stuff(init)
+    async fn new(conn: WebRTCConnectionState) -> Self {
+        let mut setup = WebRTCConnectionSetupLibc::new_box_async(conn)
             .await
             .unwrap();
         let (tx, rx) = mpsc::channel();

@@ -8,7 +8,7 @@ use std::{
 use thiserror::Error;
 
 use flutils::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemListener, Destination},
+    broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
     nodeids::U256,
     time::block_on,
 };

@@ -5,9 +5,12 @@ use std::sync::{
 
 use async_trait::async_trait;
 
-use super::websocket::{
-    MessageCallback, NewConnectionCallback, WSError, WSMessage, WebSocketConnection,
-    WebSocketServer,
+use super::{
+    web_rtc::{WSSignalMessageFromNode, WSSignalMessageToNode},
+    websocket::{
+        MessageCallback, NewConnectionCallback, WSError, WSMessage, WebSocketConnection,
+        WebSocketServer,
+    },
 };
 
 pub struct WebSocketSimul {
@@ -51,9 +54,54 @@ impl WebSocketSimul {
         };
     }
 
+    pub fn send_ws_msg_from(
+        &mut self,
+        conn: usize,
+        msg: WSSignalMessageFromNode,
+    ) -> Result<(), WSError> {
+        self.send_msg(
+            conn,
+            serde_json::to_string(&msg).map_err(|e| WSError::Underlying(e.to_string()))?,
+        );
+        Ok(())
+    }
+
+    pub fn send_ws_msg_to(
+        &mut self,
+        conn: usize,
+        msg: WSSignalMessageToNode,
+    ) -> Result<(), WSError> {
+        self.send_msg(
+            conn,
+            serde_json::to_string(&msg).map_err(|e| WSError::Underlying(e.to_string()))?,
+        );
+        Ok(())
+    }
+
     pub fn recv_msg(&mut self, conn: usize) -> Vec<String> {
         let int = self.int.lock().unwrap();
         int.conn_tx[conn].try_iter().collect()
+    }
+
+    pub fn recv_ws_msg_from(
+        &mut self,
+        conn: usize,
+    ) -> Result<Vec<WSSignalMessageFromNode>, WSError> {
+        self.recv_msg(conn)
+            .iter()
+            .map(|s| serde_json::from_str(s).map_err(|e| WSError::Underlying(e.to_string())))
+            .collect()
+    }
+
+    pub fn recv_ws_msg_to(&mut self, conn: usize) -> Result<Vec<WSSignalMessageToNode>, WSError> {
+        self.recv_msg(conn)
+            .iter()
+            .map(|s| serde_json::from_str(s).map_err(|e| WSError::Underlying(e.to_string())))
+            .collect()
+    }
+
+    pub fn process(&mut self) {
+        self.int.lock().unwrap().process()
     }
 }
 
@@ -74,7 +122,11 @@ impl Intern {
         }
     }
 
-    pub fn new_connection(&mut self, cb: Arc<Mutex<Option<MessageCallback>>>, rx: Receiver<String>) -> usize {
+    pub fn new_connection(
+        &mut self,
+        cb: Arc<Mutex<Option<MessageCallback>>>,
+        rx: Receiver<String>,
+    ) -> usize {
         self.conn_cb.push(cb);
         self.conn_tx.push(rx);
         self.conn_cb.len() - 1
@@ -119,7 +171,10 @@ pub struct WebSocketConnectionDummy {
 }
 
 impl WebSocketConnectionDummy {
-    pub fn new(cb: Arc<Mutex<Option<MessageCallback>>>, tx: Sender<String>) -> WebSocketConnectionDummy {
+    pub fn new(
+        cb: Arc<Mutex<Option<MessageCallback>>>,
+        tx: Sender<String>,
+    ) -> WebSocketConnectionDummy {
         WebSocketConnectionDummy { cb, tx }
     }
 }
@@ -127,11 +182,15 @@ impl WebSocketConnectionDummy {
 #[async_trait]
 impl WebSocketConnection for WebSocketConnectionDummy {
     fn set_cb_wsmessage(&mut self, cb: MessageCallback) {
-        self.cb.lock().unwrap().replace(cb);
+        if let Ok(mut cb_lock) = self.cb.try_lock() {
+            *cb_lock = Some(cb);
+        }
     }
 
     fn send(&mut self, msg: String) -> Result<(), WSError> {
-        self.tx.send(msg).map_err(|e| WSError::Underlying(e.to_string()))
+        self.tx
+            .send(msg)
+            .map_err(|e| WSError::Underlying(e.to_string()))
     }
 
     fn reconnect(&mut self) -> Result<(), WSError> {

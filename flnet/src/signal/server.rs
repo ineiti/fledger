@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::{Error, Formatter},
     sync::{Arc, Mutex},
 };
 
@@ -22,7 +23,7 @@ use super::{
 /// PeerInfo messages between nodes.
 /// It also handles statistics by forwarding NodeStats to a listener.
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Message {
     Input(MessageInput),
     Output(MessageOutput),
@@ -36,7 +37,17 @@ pub enum MessageInput {
     Timer,
 }
 
-#[derive(Clone)]
+impl std::fmt::Debug for MessageInput {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self {
+            MessageInput::NewConnection(_) => write!(f, "NewConnection"),
+            MessageInput::WebSocket(_) => write!(f, "WebSocket"),
+            MessageInput::Timer => write!(f, "Timer"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum MessageOutput {
     NodeStats(Vec<NodeStat>),
     NewNode(U256),
@@ -44,7 +55,7 @@ pub enum MessageOutput {
 
 pub struct SignalServer {
     connections: HashMap<U256, Arc<Mutex<Box<dyn WebSocketConnection>>>>,
-    setup: HashMap<U256, Arc<Mutex<Box<dyn WebSocketConnection>>>>,
+    connection_ids: HashMap<U256, Arc<Mutex<U256>>>,
     info: HashMap<U256, NodeInfo>,
     ttl: HashMap<U256, u64>,
     ttl_init: u64,
@@ -75,7 +86,7 @@ impl SignalServer {
     pub fn new(ttl_init: u64) -> SignalServer {
         SignalServer {
             connections: HashMap::new(),
-            setup: HashMap::new(),
+            connection_ids: HashMap::new(),
             info: HashMap::new(),
             ttl: HashMap::new(),
             ttl_init,
@@ -87,7 +98,7 @@ impl SignalServer {
         match msg_in {
             MessageInput::NewConnection(conn) => self.msg_in_conn(conn),
             MessageInput::WebSocket((dst, msg)) => {
-                self.send_connection(&dst, msg.clone());
+                self.send_msg_node(&dst, msg.clone());
             }
             MessageInput::Timer => self.msg_in_timer(),
         }
@@ -122,17 +133,20 @@ impl SignalServer {
 
     fn msg_in_conn(&mut self, conn: &Arc<Mutex<Box<dyn WebSocketConnection>>>) {
         let id = U256::rnd();
-        self.setup.insert(id.clone(), conn.clone());
+        self.connections.insert(id.clone(), conn.clone());
+        let id_arc = Arc::new(Mutex::new(id));
         self.ttl.insert(id.clone(), self.ttl_init);
+        self.connection_ids.insert(id.clone(), Arc::clone(&id_arc));
         let mut broker_cl = self.broker.clone();
         conn.lock().unwrap().set_cb_wsmessage(Box::new(move |msg| {
+            let id = id_arc.lock().unwrap().clone();
             if let Err(e) =
-                broker_cl.emit_msg_dest(Destination::This, Message::WebSocket(id.clone(), msg))
+                broker_cl.emit_msg_dest(Destination::Others, Message::WebSocket(id.clone(), msg))
             {
                 log::error!("While sending ws message: {e}");
             }
         }));
-        self.send_setup(
+        self.send_msg(
             &id,
             serde_json::to_string(&WSSignalMessageToNode::Challenge(2u64, id)).unwrap(),
         );
@@ -168,18 +182,11 @@ impl SignalServer {
             log::warn!("Got node with wrong signature: {:?}", e);
             return vec![];
         }
-        if let Some(conn) = self.setup.remove(id) {
-            self.connections
-                .insert(msg.node_info.get_id(), conn.clone());
-            let mut broker_cl = self.broker.clone();
+        if let Some(conn) = self.connections.remove(id) {
             let node_id = msg.node_info.get_id();
-            conn.lock().unwrap().set_cb_wsmessage(Box::new(move |msg| {
-                if let Err(e) =
-                    broker_cl.emit_msg_dest(Destination::This, Message::WebSocket(node_id, msg))
-                {
-                    log::error!("While sending ws message: {e}");
-                }
-            }));
+            self.connections.insert(node_id, conn.clone());
+            let id_arc = self.connection_ids.remove(id).unwrap();
+            *id_arc.lock().unwrap() = node_id.clone();
         } else {
             log::warn!("Got announcement from a non-setup node: {id}");
             return vec![];
@@ -191,7 +198,7 @@ impl SignalServer {
     }
 
     fn ws_list_ids(&mut self, id: &U256) -> Vec<MessageOutput> {
-        self.send_connection(
+        self.send_msg_node(
             id,
             WSSignalMessageToNode::ListIDsReply(self.info.values().cloned().collect()),
         );
@@ -199,15 +206,15 @@ impl SignalServer {
     }
 
     fn ws_clear(&mut self) -> Vec<MessageOutput> {
-        self.setup.clear();
         self.connections.clear();
+        self.connection_ids.clear();
         self.info.clear();
         vec![]
     }
 
     fn ws_peer_setup(&mut self, id: &U256, pi: PeerInfo) -> Vec<MessageOutput> {
         if let Some(dst) = pi.get_remote(id) {
-            self.send_connection(&dst, WSSignalMessageToNode::PeerSetup(pi));
+            self.send_msg_node(&dst, WSSignalMessageToNode::PeerSetup(pi));
         }
         vec![]
     }
@@ -216,8 +223,8 @@ impl SignalServer {
         vec![MessageOutput::NodeStats(ns)]
     }
 
-    fn send_setup(&self, id: &U256, msg: String) {
-        if let Some(conn) = self.setup.get(id) {
+    fn send_msg(&self, id: &U256, msg: String) {
+        if let Some(conn) = self.connections.get(id) {
             if let Ok(mut conn) = conn.lock() {
                 if let Err(e) = conn.send(msg) {
                     log::error!("While sending setup: {e}");
@@ -226,20 +233,14 @@ impl SignalServer {
         }
     }
 
-    fn send_connection(&self, id: &U256, msg: WSSignalMessageToNode) {
-        if let Some(conn) = self.setup.get(id) {
-            if let Ok(mut conn) = conn.lock() {
-                if let Err(e) = conn.send(serde_json::to_string(&msg).unwrap()) {
-                    log::error!("While sending setup: {e}");
-                }
-            }
-        }
+    fn send_msg_node(&self, id: &U256, msg: WSSignalMessageToNode) {
+        self.send_msg(id, serde_json::to_string(&msg).unwrap());
     }
 
     fn remove_node(&mut self, id: &U256) {
         self.ttl.remove(id);
-        self.setup.remove(id);
         self.connections.remove(id);
+        self.connection_ids.remove(id);
     }
 }
 
@@ -259,16 +260,65 @@ impl SubsystemListener<Message> for SignalServer {
 
 #[cfg(test)]
 mod test {
-    use crate::signal::dummy::WebSocketSimul;
+    use ed25519_dalek::Signer;
+    use thiserror::Error;
+
+    use crate::{
+        config::NodeConfig,
+        signal::{dummy::WebSocketSimul, websocket::WSError},
+    };
 
     use super::*;
 
+    #[derive(Debug, Error)]
+    enum TestError {
+        #[error(transparent)]
+        Broker(#[from] flutils::broker::BrokerError),
+        #[error(transparent)]
+        WS(#[from] WSError),
+    }
+
     #[test]
-    fn test_signal_server() -> Result<(), BrokerError> {
+    fn test_signal_server() -> Result<(), TestError> {
+        let _ = env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .parse_env("RUST_LOG")
+            .try_init();
+
         let mut wss = WebSocketSimul::new();
         let ws = wss.new_server();
-        let server = SignalServer::start(Box::new(ws), 2)?;
+        let _server = SignalServer::start(Box::new(ws), 2)?;
         let i = wss.new_incoming_connection();
+
+        let mut chall_vec = wss.recv_ws_msg_to(i)?;
+        log::debug!("Got challenge: {:?}", chall_vec);
+        assert_eq!(1, chall_vec.len());
+        let (version, challenge) =
+            if let WSSignalMessageToNode::Challenge(v, c) = chall_vec.pop().unwrap() {
+                (v, c)
+            } else {
+                panic!("Expected Challenge");
+            };
+
+        let nc = NodeConfig::new();
+        let ma = MessageAnnounce {
+            version,
+            challenge,
+            node_info: nc.our_node.clone(),
+            signature: nc.keypair.sign(&challenge.to_bytes()),
+        };
+        wss.send_ws_msg_from(i, WSSignalMessageFromNode::Announce(ma))?;
+        assert_eq!(0, wss.recv_ws_msg_to(i)?.len());
+
+        wss.send_ws_msg_from(i, WSSignalMessageFromNode::ListIDsRequest)?;
+        let mut nodes_vec = wss.recv_ws_msg_to(i)?;
+        assert_eq!(1, nodes_vec.len());
+        let list = if let WSSignalMessageToNode::ListIDsReply(n) = nodes_vec.pop().unwrap() {
+            n
+        } else {
+            panic!("Expected ListIDsReply");
+        };
+        assert_eq!(1, list.len());
 
         Ok(())
     }

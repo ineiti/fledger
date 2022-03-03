@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use webrtc::data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel};
 
 use flnet::signal::web_rtc::{
-    ConnectionError, ConnectionStateMap, WebRTCConnection, WebRTCMessageCB,
+    ConnectionError, ConnectionStateMap, WebRTCConnection, WebRTCMessageCB, ConnType, SignalingState,
 };
 
 pub struct WebRTCConnectionLibc {
@@ -49,6 +49,16 @@ impl WebRTCConnection for WebRTCConnectionLibc {
     }
 
     async fn get_state(&self) -> Result<ConnectionStateMap, ConnectionError> {
-        todo!()
+        Ok(ConnectionStateMap {
+            type_local: ConnType::Unknown,
+            type_remote: ConnType::Unknown,
+            signaling: SignalingState::Setup,
+            ice_gathering: flnet::signal::web_rtc::IceGatheringState::New,
+            ice_connection: flnet::signal::web_rtc::IceConnectionState::New,
+            data_connection: None,
+            rx_bytes: 0,
+            tx_bytes: 0,
+            delay_ms: 0,
+        })
     }
 }

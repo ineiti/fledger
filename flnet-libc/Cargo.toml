@@ -11,6 +11,7 @@ flnet = {path="../flnet"}
 flutils = {path="../flutils"}
 
 async-trait = "0.1.51"
+async-std = "1.10.0"
 webrtc = "0.4.0"
 tokio = { version = "1.15.0", features = ["full"] }
 anyhow = "1.0.53"
@@ -18,6 +19,7 @@ serde = { version = "1.0.133", features = ["derive"] }
 serde_json = "1.0.75"
 log = "0.4.14"
 futures = "0.3.21"
+thiserror = "1.0.30"
 
 [dev-dependencies]
 env_logger = "0.9.0"
