@@ -1,4 +1,0 @@
-FROM rust
-WORKDIR /fledger
-COPY ./target/release/signal signal
-ENTRYPOINT ["/fledger/signal"]

@@ -1,0 +1,43 @@
+[package]
+name = "fledger-web"
+version = "0.6.0"
+authors = ["Linus Gasser <ineiti@gasser.blue>"]
+edition = "2021"
+description = "Web interface for fledger"
+repository = "https://github.com/ineiti/fledger"
+license = "AGPLv3"
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+local = []
+
+[dependencies]
+flmodules = {path="../shared/flmodules", features = ["nosend"], version = "0.6"}
+flutils = {path="../shared/flutils", features = ["wasm"], version = "0.6"}
+flnet = {path="../shared/flnet", features = ["wasm"], version = "0.6"}
+flnode = {path = "../shared/flnode", features = ["wasm"], version = "0.6"}
+flnet-wasm = {path = "../impl/flnet-wasm", version = "0.6"}
+
+chrono = "0.4"
+anyhow = "1"
+js-sys = "0.3"
+regex = "1"
+log = "0.4"
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+console_error_panic_hook = "0.1"
+wasm-bindgen-futures = "0.4"
+wasm-logger = "0.2"
+urlencoding = "2"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  'Window',
+  'Location'
+]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+

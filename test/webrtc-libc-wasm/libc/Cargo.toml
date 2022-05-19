@@ -1,0 +1,20 @@
+[package]
+name = "fltest-libc"
+version = "0.6.0"
+edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "Test connection-setup for libc"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["test", "libc", "webrtc", "websocket", "fledger"]
+
+[dependencies]
+flnet = {path="../../../shared/flnet", version = "0.6"}
+flnet-libc = {path="../../../impl/flnet-libc", version = "0.6"}
+flutils = {path="../../../shared/flutils", version = "0.6"}
+
+tokio = { version = "1", features = ["full"] }
+log = "0.4"
+thiserror = "1"

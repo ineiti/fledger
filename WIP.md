@@ -2,15 +2,117 @@
 
 ## Current high-level goal
 
+- Update docker
 - Create usable crates for a signalling server and webrtc clients
 
 ## Current concrete goal
 
-- Cleanup network.rs, signal.rs, types.rs, to be able to move them easier.
+- Publish fledger crates in crates.io
+  - Cleanup
+    - update READMEs
+    - add minimal documentation to crates
 
 ### Things to do
 
 # Dates
+
+2022-05-18:
+- Updated version to 0.6.0
+- Cleaned up Cargo.tomls
+- Started updating READMEs
+- flnet-wasm includes old parking-lot crate because of wasm-timer - but don't want to replace it...
+
+2022-05-16:
+- Finish porting of old fledger code:
+  - Add flnode binary
+  - Add webpage
+- update web
+- Add connection-type again
+- ping-timeout now correctly disconnects nodes
+- Reconnection between two browsers doesn't work when quickly reconnecting -> probably difficult to fix
+- Check if it's possible to use flutils::broker::Async instead of cfgattr -> No
+
+2022-05-13:
+- added test/fledger-node to test quickly reconnecting between webrtc-wasm
+
+2022-05-12:
+- fix web_rtc_libc to remove callbacks in reset
+- Fixing part of WASM
+- change ping-module:
+  - remove "waiting nodes" and just ping every node that is under a certain threshold
+  - add counting of pings
+- replace local "femme" with fixed upstream
+
+2022-05-11:
+- Fast reconnection between to CLIs does not work - "DataChannel is not opened" 
+
+2022-05-05:
+- Display some of the statistics in the browser
+- Reconnection two CLIs doesn't work
+- Fix browser/src/lib.rs to work with new code
+
+2022-05-04:
+- run browser without panics
+
+2022-05-03:
+- browser/src/lib.rs compiles now
+
+2022-05-02:
+- Finish fledger-cli
+  - Check why gossip module does excessive messaging
+- Add web
+  - check why the flmodules cannot be used with wasm - probably needs the proper #[cfg_attr] annotations
+
+2022-04-29:
+- Fix TODO in broker with regard to wrong registration of subsystem
+- Rewrote random connection module
+
+2022-04-24:
+- Finish DataStorageFile
+- Add configuration options to fledger CLI
+- Available nodes are not updated, so a node will not try to connect to a new node
+- follower drops messages because it's not correctly connected - but the gossip event module
+  still sends a message - why? Does the random module send out a ListUpdate before it has the
+  node connected?
+
+2022-04-23:
+- add ping-module
+- read and write gossip.storage
+- Check why it doesn't correctly connect to the signalling server
+
+2022-04-22:
+- flnode/test/gossip_2 doesn't work anymore
+- link timer
+- add module-field in node messages at random
+
+2022-04-21:
+- Added flmodules and flnode crates
+- Link it all together
+
+2022-04-15:
+- Check dependencies in Cargo.toml and clean up
+- Clean up wasm and libc webrtc implementations
+
+2022-04-14:
+- follow TODOs
+
+2022-04-13:
+- First working inter-wasm-libc communication
+- Separated wasm and libc implementations in flnet
+- re-think WebSocketConnection::send - should it be async?
+- Test libc webrtc implementation against wasm implementation
+  - Setup new webrtc connection
+- Find out why the ice candidate strings are not recognized
+- Pass disconnect event in libc-webrtc
+
+2022-03-16:
+- Test libc websocket implementation
+- clean-up flnet-libc/tests/websocket
+
+2022-02-05:
+- Remove wasm from node
+- Cleanup network.rs, signal.rs, types.rs, to be able to move them easier.
+- move things around
 
 2022-02-01:
 - starting to cleanup network, broker, and types, before the move of the different parts

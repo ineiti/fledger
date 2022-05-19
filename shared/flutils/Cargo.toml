@@ -1,0 +1,38 @@
+[package]
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "Things for fledger that didn't fit anywhere else"
+edition = "2021"
+homepage = "https://fledg.re"
+keywords = ["test", "utils", "fledger"]
+license = "MIT OR Apache-2.0"
+name = "flutils"
+readme = "README.md"
+repository = "https://github.com/ineiti/fledger"
+version = "0.6.0"
+
+[features]
+node = ["wasm"]
+wasm = ["dep:wasm-bindgen-futures", "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-timer", "dep:web-sys"]
+
+[dependencies]
+async-trait = "0.1"
+chrono = "0.4"
+env_logger = "0.9"
+futures = "0.3"
+log = "0.4"
+rand = "0.8"
+serde = {version = "1", features = ["derive"]}
+serde_yaml = "0.8"
+sha2 = "0.10"
+thiserror = "1"
+tokio = {version = "1", features = ["rt", "macros", "time"]}
+
+js-sys = {version = "0.3", optional = true}
+wasm-bindgen = {version = "0.2", features = ["serde-serialize"], optional = true}
+wasm-bindgen-futures = {version = "0.4", optional = true}
+wasm-timer = {version = "0.2", optional = true}
+web-sys = {version = "0.3", optional = true}
+
+[dev-dependencies]
+flexi_logger = "0.22"
+tokio = {version = "1", features = ["rt", "macros"]}

@@ -1,0 +1,8 @@
+[workspace]
+
+members = [
+    "flmodules",
+    "flnet",
+    "flnode",
+    "flutils"
+]

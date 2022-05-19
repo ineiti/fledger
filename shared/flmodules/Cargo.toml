@@ -1,0 +1,29 @@
+[package]
+name = "flmodules"
+version = "0.6.0"
+edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "Modules used in fledger"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["test", "utils", "fledger"]
+
+[features]
+nosend = []
+
+[dependencies]
+flutils = { path = "../flutils", version = "0.6" }
+
+serde = { version = "1", features = ["derive"] }
+serde_derive = "1"
+serde_yaml = "0.8"
+sha2 = "0.10"
+rand = "0.8"
+thiserror = "1"
+log = "0.4"
+itertools = "0.10"
+async-trait = "0.1"
+futures = "0.3"
+tokio = "1"

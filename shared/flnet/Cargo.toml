@@ -1,0 +1,38 @@
+[package]
+name = "flnet"
+version = "0.6.0"
+edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "Network setup and communication"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["network", "fledger"]
+categories = ["network-programming"]
+
+[features]
+wasm = []
+
+[dependencies]
+flutils = {path = "../flutils", version = "0.6"}
+
+# The "js" is to make sure it also works for the flnode and web crates
+getrandom = { version = "0.2", features = ["js"] }
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_derive = "1"
+serde_json = "1"
+toml = "0.5"
+names = "0.13"
+thiserror = "1"
+futures = "0.3"
+log = "0.4"
+sha2 = "0.10"
+ed25519-compact = "1"
+itertools = "0.10"
+
+bimap = "0.6"
+
+[dev-dependencies]
+env_logger = "0.9"

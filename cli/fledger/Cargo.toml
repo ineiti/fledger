@@ -1,0 +1,24 @@
+[package]
+name = "fledger"
+version = "0.6.0"
+edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "The fledger server as a CLI"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["network", "signalling", "webrtc"]
+categories = ["network-programming"]
+
+[dependencies]
+flnet = { path = "../../shared/flnet", version = "0.6" }
+flnet-libc = { path = "../../impl/flnet-libc", version = "0.6" }
+flutils = { path = "../../shared/flutils", version = "0.6" }
+flnode = { path = "../../shared/flnode", version = "0.6" }
+
+tokio = { version = "1", features = ["full"] }
+thiserror = "1"
+env_logger = "0.9"
+log = "0.4"
+clap = "3"
