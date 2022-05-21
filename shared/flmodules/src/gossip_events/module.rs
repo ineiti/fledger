@@ -1,4 +1,4 @@
-use flutils::nodeids::{NodeID, NodeIDs, U256};
+use crate::nodeids::{NodeID, NodeIDs, U256};
 use serde::{Deserialize, Serialize};
 
 use super::events::*;

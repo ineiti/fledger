@@ -1,4 +1,4 @@
-use flutils::data_storage::{DataStorage, DataStorageBase, StorageError};
+use flarch::data_storage::{DataStorage, DataStorageBase, StorageError};
 use wasm_bindgen::{prelude::*, JsValue};
 
 #[wasm_bindgen(

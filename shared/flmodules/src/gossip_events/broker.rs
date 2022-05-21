@@ -1,12 +1,9 @@
 use async_trait::async_trait;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use flutils::{
+use crate::{
     broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
     nodeids::{NodeID, U256},
-};
-
-use crate::{
     random_connections::module::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
     timer::TimerMessage,
 };
@@ -196,9 +193,9 @@ impl SubsystemListener<GossipMessage> for Translate {
 mod tests {
     use std::error::Error;
 
-    use flutils::{nodeids::NodeID, start_logging, arch::now};
-
     use crate::gossip_events::events::{Category, Event};
+    use crate::nodeids::NodeID;
+    use flarch::{start_logging, tasks::now};
 
     use super::*;
 

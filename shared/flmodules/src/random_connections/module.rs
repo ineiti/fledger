@@ -1,7 +1,7 @@
 use itertools::concat;
 use serde::{Deserialize, Serialize};
 
-use flutils::nodeids::{NodeID, NodeIDs, U256};
+use crate::nodeids::{NodeID, NodeIDs, U256};
 
 use super::storage::RandomStorage;
 
@@ -240,7 +240,7 @@ impl From<RandomOut> for RandomMessage {
 
 #[cfg(test)]
 mod tests {
-    use flutils::start_logging;
+    use flarch::start_logging;
 
     use crate::random_connections::nodes::Nodes;
 

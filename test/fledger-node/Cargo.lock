@@ -306,7 +306,7 @@ dependencies = [
  "flnet",
  "flnet-wasm",
  "flnode",
- "flutils",
+ "flarch",
  "log",
  "thiserror",
  "wasm-bindgen",
@@ -319,7 +319,7 @@ name = "flmodules"
 version = "0.6.0"
 dependencies = [
  "async-trait",
- "flutils",
+ "flarch",
  "futures",
  "itertools",
  "log",
@@ -339,7 +339,7 @@ dependencies = [
  "async-trait",
  "bimap",
  "ed25519-compact",
- "flutils",
+ "flarch",
  "futures",
  "getrandom 0.2.6",
  "itertools",
@@ -362,7 +362,7 @@ dependencies = [
  "console_error_panic_hook",
  "femme",
  "flnet",
- "flutils",
+ "flarch",
  "futures",
  "getrandom 0.2.6",
  "js-sys",
@@ -391,7 +391,7 @@ dependencies = [
  "ed25519-dalek",
  "flmodules",
  "flnet",
- "flutils",
+ "flarch",
  "futures",
  "getrandom 0.2.6",
  "itertools",
@@ -410,7 +410,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "flutils"
+name = "flarch"
 version = "0.6.0"
 dependencies = [
  "async-trait",

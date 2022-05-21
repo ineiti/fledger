@@ -1,4 +1,4 @@
-use flutils::nodeids::{NodeID, NodeIDs};
+use crate::nodeids::{NodeID, NodeIDs};
 use serde::{Deserialize, Serialize};
 
 use super::storage::PingStorage;

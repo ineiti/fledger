@@ -15,8 +15,8 @@ wasm = []
 
 [dependencies]
 flnet = {path="../flnet", version = "0.6"}
-flutils = {path = "../flutils", version = "0.6"}
 flmodules = {path = "../flmodules", version = "0.6"}
+flarch = {path = "../../arch/flarch", version = "0.6"}
 
 transitive_from = "0.1"
 async-trait = "0.1"

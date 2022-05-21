@@ -1,15 +1,14 @@
-use flnet::network::NodeMessage;
 use flnet::{
     config::NodeConfig,
-    network::{NetReply, Network, NetworkMessage},
+    network::{NetReply, Network, NetworkMessage, NodeMessage},
     signal::{server::SignalServer, websocket::WSError},
 };
 use flnet_libc::{
     web_rtc_setup::WebRTCConnectionSetupLibc, web_socket_client::WebSocketClient,
     web_socket_server::WebSocketServer,
 };
-use flutils::nodeids::U256;
-use flutils::{broker::Broker, start_logging_filter};
+use flarch::nodeids::U256;
+use flarch::{broker::Broker, start_logging_filter};
 use thiserror::Error;
 
 const URL: &str = "ws://localhost:8765";
@@ -19,7 +18,7 @@ enum MainError {
     #[error(transparent)]
     WS(#[from] WSError),
     #[error(transparent)]
-    Broker(#[from] flutils::broker::BrokerError),
+    Broker(#[from] flmodules::broker::BrokerError),
 }
 
 #[tokio::main]
@@ -97,7 +96,7 @@ mod tests {
     use super::*;
     use std::sync::mpsc::Receiver;
 
-    use flutils::arch::wait_ms;
+    use flarch::arch::wait_ms;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_two_nodes() -> Result<(), MainError> {

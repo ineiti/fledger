@@ -239,7 +239,7 @@ name = "flmodules"
 version = "0.5.0"
 dependencies = [
  "async-trait",
- "flutils",
+ "flarch",
  "futures",
  "itertools",
  "log",
@@ -258,7 +258,7 @@ dependencies = [
  "async-trait",
  "bimap",
  "ed25519-compact",
- "flutils",
+ "flarch",
  "futures",
  "getrandom 0.2.6",
  "log",
@@ -282,7 +282,7 @@ dependencies = [
  "env_logger",
  "flmodules",
  "flnet",
- "flutils",
+ "flarch",
  "futures",
  "getrandom 0.2.6",
  "itertools",
@@ -301,7 +301,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "flutils"
+name = "flarch"
 version = "0.5.0"
 dependencies = [
  "async-trait",

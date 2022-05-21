@@ -1,5 +1,5 @@
 use ed25519_compact::{KeyPair, PublicKey, Seed, Noise, Signature};
-use flutils::nodeids::U256;
+use flmodules::nodeids::U256;
 use serde_derive::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,

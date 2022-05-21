@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::mpsc::RecvError;
 use thiserror::Error;
 
-use flutils::{broker::Broker, nodeids::U256};
+use flmodules::{broker::Broker, nodeids::U256};
 
 use crate::{config::NodeInfo, network::{NetCall, node_connection::Direction}};
 
@@ -16,7 +16,7 @@ pub enum SetupError {
     #[error("While sending: {0}")]
     Send(String),
     #[error(transparent)]
-    Broker(#[from] flutils::broker::BrokerError),
+    Broker(#[from] flmodules::broker::BrokerError),
     #[error(transparent)]
     Recv(#[from] RecvError),
     #[error(transparent)]

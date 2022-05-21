@@ -7,15 +7,15 @@ use flmodules::{
     },
     ping::{broker::PingBroker, module::PingConfig},
     timer::TimerMessage,
+    broker::{Broker, BrokerError},
 };
 use flnet::{
     config::{ConfigError, NodeConfig},
     network::{NetCall, NetworkMessage},
 };
-use flutils::{
-    broker::{Broker, BrokerError},
+use flarch::{
     data_storage::{DataStorage, DataStorageBase, StorageError},
-    arch::now,
+    tasks::now,
 };
 
 use crate::modules::{random::RandomBroker, stat::StatBroker};
@@ -204,7 +204,7 @@ mod tests {
         events::{Category, Event},
         module::GossipIn,
     };
-    use flutils::{data_storage::TempDSB, start_logging};
+    use flarch::{data_storage::TempDSB, start_logging};
 
     use super::*;
 

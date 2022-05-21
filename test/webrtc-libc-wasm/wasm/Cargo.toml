@@ -14,9 +14,9 @@ keywords = ["test", "libc", "webrtc", "websocket", "fledger"]
 crate-type = ["cdylib"]
 
 [dependencies]
-flutils = {path="../../../shared/flutils", features=["node"], version = "0.6"}
+flarch = {path="../../../arch/flarch", features=["node"], version = "0.6"}
 flnet = {path="../../../shared/flnet", features=["wasm"], version = "0.6"}
-flnet-wasm = {path = "../../../impl/flnet-wasm", version = "0.6"}
+flnet-wasm = {path = "../../../arch/flnet-wasm", version = "0.6"}
 
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 js-sys = "0.3"

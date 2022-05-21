@@ -1,6 +1,6 @@
-use flmodules::timer::TimerMessage;
+use flarch::start_logging;
+use flmodules::{broker::Broker, timer::TimerMessage};
 use flnode::node_data::Brokers;
-use flutils::{broker::Broker, start_logging};
 mod helpers;
 use helpers::*;
 
@@ -18,7 +18,8 @@ async fn ping_n(nbr_nodes: usize) -> Result<(), NetworkError> {
     let mut net = Network::new();
     log::info!("Creating {nbr_nodes} nodes");
     let mut timer = Broker::new();
-    net.add_nodes(Brokers::ENABLE_RAND | Brokers::ENABLE_PING, nbr_nodes).await?;
+    net.add_nodes(Brokers::ENABLE_RAND | Brokers::ENABLE_PING, nbr_nodes)
+        .await?;
     for node in net.nodes.values_mut() {
         node.node_data.add_timer(timer.clone()).await;
     }

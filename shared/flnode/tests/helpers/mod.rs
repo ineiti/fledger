@@ -1,6 +1,11 @@
 use std::{collections::HashMap, sync::mpsc::Receiver};
 
-use flmodules::timer::TimerMessage;
+use flarch::data_storage::TempDSB;
+use flmodules::{
+    broker::{Broker, BrokerError},
+    nodeids::U256,
+    timer::TimerMessage,
+};
 use flnet::{
     config::{NodeConfig, NodeInfo},
     network::{
@@ -8,13 +13,8 @@ use flnet::{
         NetCall, NetReply, NetworkMessage,
     },
 };
-use flutils::{
-    broker::{Broker, BrokerError},
-    data_storage::TempDSB,
-    nodeids::U256,
-};
 
-use flnode::node_data::{NodeData, NodeDataError, Brokers};
+use flnode::node_data::{Brokers, NodeData, NodeDataError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -50,8 +50,8 @@ impl Network {
         Ok(())
     }
 
-    pub async fn tick(&mut self) -> Result<(), NetworkError>{
-        for node in self.nodes.values_mut(){
+    pub async fn tick(&mut self) -> Result<(), NetworkError> {
+        for node in self.nodes.values_mut() {
             node.timer.emit_msg(TimerMessage::Second).await?;
         }
         Ok(())
@@ -173,14 +173,12 @@ impl Node {
         {
             node_config = NodeConfig::new();
         }
-        let mut node_data = NodeData::start_some(TempDSB::new(), node_config, broker_net.clone(), brokers).await?;
+        let mut node_data =
+            NodeData::start_some(TempDSB::new(), node_config, broker_net.clone(), brokers).await?;
         let timer = Broker::new();
         node_data.add_timer(timer.clone()).await;
 
-        Ok(Self {
-            node_data,
-            timer,
-        })
+        Ok(Self { node_data, timer })
     }
 
     pub fn node_info(&self) -> NodeInfo {

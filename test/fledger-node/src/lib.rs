@@ -1,6 +1,6 @@
 use flnet_wasm::{web_socket_client::WebSocketClient, web_rtc::web_rtc_spawner};
 use flnode::{node_data::NodeData, node::Node};
-use flutils::{data_storage::{DataStorageBase}, wait_ms};
+use flarch::{data_storage::{DataStorageBase}, wait_ms};
 use wasm_bindgen::{prelude::*};
 
 mod data_storage;

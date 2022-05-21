@@ -8,7 +8,7 @@ The latest version is always available at https://web.fledg.re
 To run it locally, you need to have the following installed:
 - `rust` >= 1.60.0
 - `wasm-pack` >= 0.10.2
-- `npm` >= 7.19.1
+- `node` >= v16
 
 Once this is installed, you can run it like this:
 
@@ -24,6 +24,3 @@ make build_local serve
 ```
 
 But this means that you also need to have a local `flsignal` and eventually one or two `fledger` running.
-
-# HTML / CSS
-

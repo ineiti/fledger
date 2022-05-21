@@ -865,7 +865,7 @@ dependencies = [
  "async-trait",
  "bimap",
  "ed25519-compact",
- "flutils",
+ "flarch",
  "futures",
  "getrandom 0.2.6",
  "itertools",
@@ -887,7 +887,7 @@ dependencies = [
  "async-std",
  "async-trait",
  "flnet",
- "flutils",
+ "flarch",
  "futures",
  "log",
  "native-tls",
@@ -906,14 +906,14 @@ version = "0.6.0"
 dependencies = [
  "flnet",
  "flnet-libc",
- "flutils",
+ "flarch",
  "log",
  "thiserror",
  "tokio",
 ]
 
 [[package]]
-name = "flutils"
+name = "flarch"
 version = "0.6.0"
 dependencies = [
  "async-trait",

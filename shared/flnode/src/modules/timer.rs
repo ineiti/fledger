@@ -1,5 +1,5 @@
-use flmodules::timer::TimerMessage;
-use flutils::{arch::schedule_repeating, broker::Broker, block_on};
+use flarch::{block_on, tasks::schedule_repeating};
+use flmodules::{broker::Broker, timer::TimerMessage};
 
 /// The Timer structure sends out periodic signals to the system so that
 /// services can subscribe to them.

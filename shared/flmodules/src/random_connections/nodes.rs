@@ -1,5 +1,5 @@
 use core::cmp::min;
-use flutils::nodeids::{NodeID, NodeIDs};
+use crate::nodeids::{NodeID, NodeIDs};
 use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -134,7 +134,7 @@ impl Nodes {
 mod tests {
     use core::fmt::Error;
 
-    use flutils::start_logging;
+    use flarch::start_logging;
 
     use super::*;
 

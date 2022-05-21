@@ -1,4 +1,4 @@
-use flutils::broker::{Broker, BrokerError, Translate};
+use flmodules::broker::{Broker, BrokerError, Translate};
 
 use super::websocket::{
     WSClientInput, WSClientMessage, WSClientOutput, WSServerInput, WSServerMessage, WSServerOutput,

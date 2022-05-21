@@ -1,6 +1,6 @@
 use flnet::signal::server::SignalServer;
 use flnet_libc::web_socket_server::WebSocketServer;
-use flutils::start_logging;
+use flarch::start_logging;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

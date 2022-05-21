@@ -15,7 +15,8 @@ categories = ["network-programming"]
 wasm = []
 
 [dependencies]
-flutils = {path = "../flutils", version = "0.6"}
+flarch = {path = "../../arch/flarch", version = "0.6"}
+flmodules = {path = "../flmodules", version = "0.6"}
 
 # The "js" is to make sure it also works for the flnode and web crates
 getrandom = { version = "0.2", features = ["js"] }

@@ -1,8 +1,5 @@
-use flnet::network::NetCall;
-use flnet::network::NetworkError;
-use flnet_wasm::web_rtc::WebRTCConnection;
-use flnet_wasm::web_socket_client::WSClientError;
-use flnet_wasm::web_socket_client::WebSocketClient;
+use flnet::network::{NetCall,NetworkError};
+use flnet_wasm::{web_rtc::WebRTCConnection,web_socket_client::{WSClientError,WebSocketClient}};
 use std::sync::mpsc::channel;
 
 use thiserror::Error;
@@ -13,7 +10,7 @@ use flnet::{
     network::{NetReply, Network, NetworkMessage},
     signal::websocket::WSError,
 };
-use flutils::{broker::Subsystem, arch::wait_ms};
+use flarch::{broker::Subsystem, arch::wait_ms};
 
 const URL: &str = "ws://localhost:8765";
 
@@ -24,7 +21,7 @@ enum StartError {
     #[error(transparent)]
     Network(#[from] NetworkError),
     #[error(transparent)]
-    Broker(#[from] flutils::broker::BrokerError),
+    Broker(#[from] flmodules::broker::BrokerError),
     #[error(transparent)]
     Client(#[from] WSClientError),
 }

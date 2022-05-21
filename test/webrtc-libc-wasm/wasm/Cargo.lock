@@ -239,7 +239,7 @@ dependencies = [
  "async-trait",
  "bimap",
  "ed25519-compact",
- "flutils",
+ "flarch",
  "futures",
  "getrandom 0.2.6",
  "itertools",
@@ -262,7 +262,7 @@ dependencies = [
  "console_error_panic_hook",
  "femme",
  "flnet",
- "flutils",
+ "flarch",
  "futures",
  "getrandom 0.2.6",
  "js-sys",
@@ -288,7 +288,7 @@ dependencies = [
  "console_error_panic_hook",
  "flnet",
  "flnet-wasm",
- "flutils",
+ "flarch",
  "futures",
  "js-sys",
  "log",
@@ -304,7 +304,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "flutils"
+name = "flarch"
 version = "0.6.0"
 dependencies = [
  "async-trait",

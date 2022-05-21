@@ -7,12 +7,10 @@ use flmodules::{
         storage::RandomStorage,
     },
     timer::TimerMessage,
-};
-use flnet::network::{NetCall, NetworkMessage};
-use flutils::{
     broker::{self, Broker, BrokerError, Destination, SubsystemListener},
     nodeids::U256,
 };
+use flnet::network::{NetCall, NetworkMessage};
 
 pub struct RandomBroker {
     pub storage: RandomStorage,
@@ -62,7 +60,7 @@ impl Translate {
         id: U256,
     ) -> Result<Broker<RandomMessage>, BrokerError> {
         let mut rc = Broker::new();
-        rc.add_subsystem(flutils::broker::Subsystem::Handler(Box::new(Translate {
+        rc.add_subsystem(flmodules::broker::Subsystem::Handler(Box::new(Translate {
             storage_tx,
             module: RandomConnections::new(Config::default()),
             id,

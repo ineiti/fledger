@@ -1,9 +1,8 @@
 use async_trait::async_trait;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use flutils::broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener};
-
 use crate::{
+    broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
     random_connections::module::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
     timer::TimerMessage,
 };

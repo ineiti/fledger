@@ -5,7 +5,7 @@ use std::{
 
 use async_trait::async_trait;
 use bimap::BiMap;
-use flutils::{
+use flmodules::{
     broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
     nodeids::U256,
 };

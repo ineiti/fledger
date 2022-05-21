@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::window;
 
 use flnet::{config::NodeInfo, network::NetworkConnectionState};
-use flutils::{
+use flarch::{
     data_storage::{DataStorageBase, DataStorageBaseImpl},
     nodeids::U256,
 };

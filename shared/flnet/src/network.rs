@@ -5,7 +5,7 @@ use std::fmt;
 use async_trait::async_trait;
 use thiserror::Error;
 
-use flutils::{
+use flmodules::{
     broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener, Translate},
     nodeids::U256,
 };
@@ -441,7 +441,7 @@ pub struct ConnStats {
 
 #[cfg(test)]
 mod tests {
-    use flutils::start_logging;
+    use flarch::start_logging;
 
     use super::*;
 

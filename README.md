@@ -56,7 +56,6 @@ of the network code:
   implementation of the networking logic
   - [flnode](./shared/flnode) - a generic implementation of a fledger-node, mostly connecting all
   _flmodules_ together and with the network
-  - [Utils](./shared/flutils) - the (in)famous place to put all the stuff that didn't find its place elsewhere
 
 ### Binaries
 
@@ -70,8 +69,9 @@ Currently the following components are available that are used to create the fle
 
 These are the actual implementations of the WebRTC and Websocket for wasm and libc:
 - [WebRTC and Websocket implementations](./impl) - wasm and libc implementations for WebRTC and Websockets
-  - [Libc implementation](./impl/flnet-libc) - implementations for libc
-  - [Wasm implementation](./impl/flnet-wasm) - implementations for wasm
+  - [Libc implementation](./arch/flnet-libc) - implementations for libc
+  - [Wasm implementation](./arch/flnet-wasm) - implementations for wasm
+  - [Architecture-dependant](./arch/flarch) - traits for the network implemenations, and some arch-dependant implementations
 - [Test directory](./test) - several implementations for testing
 
 ## Next steps

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use flutils::broker::{Broker, Destination, Subsystem, SubsystemListener};
+use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
 use thiserror::Error;
 
 use crate::signal::web_rtc::{
@@ -14,7 +14,7 @@ pub enum NCError {
     #[error(transparent)]
     Setup(#[from] crate::signal::web_rtc::SetupError),
     #[error(transparent)]
-    Broker(#[from] flutils::broker::BrokerError),
+    Broker(#[from] flmodules::broker::BrokerError),
 }
 
 #[derive(Debug, Clone, PartialEq)]

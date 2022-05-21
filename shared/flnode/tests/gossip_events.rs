@@ -1,6 +1,6 @@
-use flmodules::gossip_events::events;
+use flarch::start_logging;
+use flmodules::{gossip_events::events, nodeids::U256};
 use flnode::node_data::Brokers;
-use flutils::{nodeids::U256, start_logging};
 
 mod helpers;
 use helpers::*;

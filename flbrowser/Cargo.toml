@@ -15,10 +15,10 @@ local = []
 
 [dependencies]
 flmodules = {path="../shared/flmodules", features = ["nosend"], version = "0.6"}
-flutils = {path="../shared/flutils", features = ["wasm"], version = "0.6"}
+flarch = {path="../arch/flarch", features = ["wasm"], version = "0.6"}
 flnet = {path="../shared/flnet", features = ["wasm"], version = "0.6"}
 flnode = {path = "../shared/flnode", features = ["wasm"], version = "0.6"}
-flnet-wasm = {path = "../impl/flnet-wasm", version = "0.6"}
+flnet-wasm = {path = "../arch/flnet-wasm", version = "0.6"}
 
 chrono = "0.4"
 anyhow = "1"

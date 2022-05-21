@@ -11,10 +11,10 @@ readme = "README.md"
 keywords = ["test", "utils", "fledger"]
 
 [features]
-nosend = []
+nosend = ["dep:wasm-bindgen-futures"]
 
 [dependencies]
-flutils = { path = "../flutils", version = "0.6" }
+flarch = { path = "../../arch/flarch", version = "0.6" }
 
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
@@ -27,3 +27,5 @@ itertools = "0.10"
 async-trait = "0.1"
 futures = "0.3"
 tokio = "1"
+
+wasm-bindgen-futures = {version = "0.4", optional = true}

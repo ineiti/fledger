@@ -1,4 +1,4 @@
-src := $(shell find src ../../../shared/flnet ../../../wasm/flnet-wasm ../../../shared/flutils -name "*.rs")
+src := $(shell find src ../../../shared/flnet ../../../wasm/flnet-wasm ../../../arch/flarch -name "*.rs")
 wasm := static/wasm_bg.wasm
 TARGET := --debug
 build = wasm-pack build ${TARGET} --target nodejs --out-name wasm \

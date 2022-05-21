@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 
-use flutils::nodeids::U256;
+use crate::nodeids::U256;
 
 /// This holds a number of Events from of different categories. Every category can
 /// have its own configuration with regard of whether its events are unique to a

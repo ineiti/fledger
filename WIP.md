@@ -4,17 +4,28 @@
 
 - Update docker
 - Create usable crates for a signalling server and webrtc clients
+- Finalize usage of broker-modules in `Node` and `Network`:
+  - Create a `WebRTC` and a `Websocket` broker-module
+  - Pass these broker-modules to `Network`
+  - Pass a `Network` to the `Node` instead of the WebRTC and Websocket spawners
+- Should the flnet-wasm and flnet-libc directly offer a `Network`?
 
 ## Current concrete goal
 
 - Publish fledger crates in crates.io
   - Cleanup
-    - update READMEs
     - add minimal documentation to crates
+    - make github workflows pass
 
 ### Things to do
 
 # Dates
+
+2022-05-21:
+- cleanup `flutils`:
+  - move `broker` to flmodules
+  - move `arch` to `impl`, but rename `impl` to `arch`, and `arch` to `tasks`
+- update READMEs
 
 2022-05-18:
 - Updated version to 0.6.0
@@ -30,7 +41,7 @@
 - Add connection-type again
 - ping-timeout now correctly disconnects nodes
 - Reconnection between two browsers doesn't work when quickly reconnecting -> probably difficult to fix
-- Check if it's possible to use flutils::broker::Async instead of cfgattr -> No
+- Check if it's possible to use flmodules::broker::Async instead of cfgattr -> No
 
 2022-05-13:
 - added test/fledger-node to test quickly reconnecting between webrtc-wasm
