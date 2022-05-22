@@ -48,10 +48,10 @@ pub enum WebRTCInput {
     Reset,
 }
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(not(feature = "nosend"))]
 pub type WebRTCSpawner =
     Box<dyn Fn() -> Box<dyn Future<Output = Result<Broker<WebRTCMessage>, SetupError>> + Unpin + Send> + Send + Sync>;
-#[cfg(feature = "wasm")]
+#[cfg(feature = "nosend")]
 pub type WebRTCSpawner =
     Box<dyn Fn() -> Box<dyn Future<Output = Result<Broker<WebRTCMessage>, SetupError>> + Unpin>>;
 

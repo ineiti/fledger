@@ -122,7 +122,8 @@ impl Events {
         if let Some((id, ev)) = self
             .events
             .iter()
-            .find(|(_, v)| v.src == msg.src).map(|(id, ev)| (*id, ev.clone()))
+            .find(|(_, v)| v.src == msg.src)
+            .map(|(id, ev)| (*id, ev.clone()))
         {
             if ev.created > msg.created {
                 return false;
@@ -218,14 +219,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_double_unique(){
-        let mut evs = Events{
-            config: CategoryConfig{ unique: true, max_events: 10 },
+    fn test_double_unique() {
+        let mut evs = Events {
+            config: CategoryConfig {
+                unique: true,
+                max_events: 10,
+            },
             events: HashMap::new(),
         };
 
-        let e1 = Event{ category: Category::NodeInfo, src: U256::rnd(), created: 1., msg: "foo".into() };
-        let e2 = Event{ category: Category::NodeInfo, src: e1.src, created: 2., msg: "bar".into() };
+        let e1 = Event {
+            category: Category::NodeInfo,
+            src: U256::rnd(),
+            created: 1.,
+            msg: "foo".into(),
+        };
+        let e2 = Event {
+            category: Category::NodeInfo,
+            src: e1.src,
+            created: 2.,
+            msg: "bar".into(),
+        };
 
         assert_eq!(0, evs.events.len());
         assert!(evs.insert(e1.clone()));
@@ -238,14 +252,27 @@ mod tests {
     }
 
     #[test]
-    fn test_double_normal(){
-        let mut evs = Events{
-            config: CategoryConfig{ unique: false, max_events: 10 },
+    fn test_double_normal() {
+        let mut evs = Events {
+            config: CategoryConfig {
+                unique: false,
+                max_events: 10,
+            },
             events: HashMap::new(),
         };
 
-        let e1 = Event{ category: Category::NodeInfo, src: U256::rnd(), created: 1., msg: "foo".into() };
-        let e2 = Event{ category: Category::NodeInfo, src: e1.src, created: 2., msg: "bar".into() };
+        let e1 = Event {
+            category: Category::NodeInfo,
+            src: U256::rnd(),
+            created: 1.,
+            msg: "foo".into(),
+        };
+        let e2 = Event {
+            category: Category::NodeInfo,
+            src: e1.src,
+            created: 2.,
+            msg: "bar".into(),
+        };
 
         assert_eq!(0, evs.events.len());
         assert!(evs.insert(e1.clone()));

@@ -1,14 +1,14 @@
 use flnet::{
     config::NodeConfig,
-    network::{NetReply, Network, NetworkMessage, NodeMessage},
+    network::{NetReply, Network, NetworkMessage, NetCall},
     signal::{server::SignalServer, websocket::WSError},
 };
 use flnet_libc::{
     web_rtc_setup::WebRTCConnectionSetupLibc, web_socket_client::WebSocketClient,
     web_socket_server::WebSocketServer,
 };
-use flarch::nodeids::U256;
-use flarch::{broker::Broker, start_logging_filter};
+use flmodules::{broker::Broker, nodeids::U256};
+use flarch::{start_logging_filter};
 use thiserror::Error;
 
 const URL: &str = "ws://localhost:8765";
@@ -36,8 +36,8 @@ async fn main() -> Result<(), MainError> {
     for msg in tap1 {
         log::debug!("Node 1: {msg:?}");
         if let NetworkMessage::Reply(NetReply::RcvNodeMessage(nm)) = msg {
-            log::info!("Got message from other node: {}", nm.msg);
-            send(&mut broker1, nm.id, "Reply from libc").await;
+            log::info!("Got message from other node: {}", nm.1);
+            send(&mut broker1, nm.0, "Reply from libc").await;
         }
     }
 
@@ -81,11 +81,7 @@ async fn spawn_node() -> Result<(NodeConfig, Broker<NetworkMessage>), MainError>
 
 async fn send(src: &mut Broker<NetworkMessage>, id: U256, msg: &str) {
     src.emit_msg(
-        NodeMessage {
-            id,
-            msg: msg.to_string(),
-        }
-        .to_net(),
+        NetworkMessage::Call(NetCall::SendNodeMessage((id, msg.into())))
     )
     .await
     .expect("Sending to node");

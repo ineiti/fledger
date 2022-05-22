@@ -288,8 +288,8 @@ impl Network {
     }
 }
 
-#[cfg_attr(feature = "wasm", async_trait(?Send))]
-#[cfg_attr(not(feature = "wasm"), async_trait)]
+#[cfg_attr(feature = "nosend", async_trait(?Send))]
+#[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<NetworkMessage> for Network {
     async fn messages(&mut self, bms: Vec<NetworkMessage>) -> Vec<(Destination, NetworkMessage)> {
         let mut out = vec![];

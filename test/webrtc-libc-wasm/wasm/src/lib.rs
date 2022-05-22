@@ -10,7 +10,8 @@ use flnet::{
     network::{NetReply, Network, NetworkMessage},
     signal::websocket::WSError,
 };
-use flarch::{broker::Subsystem, arch::wait_ms};
+use flarch::{tasks::wait_ms};
+use flmodules::{broker::Subsystem};
 
 const URL: &str = "ws://localhost:8765";
 

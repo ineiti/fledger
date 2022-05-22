@@ -4,7 +4,8 @@ use flnet::{
     signal::{web_rtc::{SetupError, WebRTCMessage}, websocket::{WSClientMessage, WSClientOutput}},
 };
 use flnet_wasm::web_socket_client::WebSocketClient;
-use flarch::{broker::Broker, arch::wait_ms};
+use flarch::{tasks::wait_ms};
+use flmodules::{broker::Broker};
 use thiserror::Error;
 use wasm_bindgen_test::wasm_bindgen_test;
 

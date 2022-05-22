@@ -11,14 +11,13 @@ readme = "README.md"
 keywords = ["test", "utils", "fledger"]
 
 [features]
-wasm = []
+nosend = []
 
 [dependencies]
 flnet = {path="../flnet", version = "0.6"}
 flmodules = {path = "../flmodules", version = "0.6"}
 flarch = {path = "../../arch/flarch", version = "0.6"}
 
-transitive_from = "0.1"
 async-trait = "0.1"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
@@ -34,9 +33,7 @@ thiserror = "1"
 futures = "0.3"
 log = "0.4"
 sha2 = "0.10"
-ed25519-dalek = { version = "1", features = ["serde"] }
 ed25519-compact = "1"
-timer = "0.2"
 itertools = "0.10"
 chrono = "0.4"
 bitflags = "1"

@@ -134,8 +134,8 @@ impl Translate {
     }
 }
 
-#[cfg_attr(feature = "wasm", async_trait(?Send))]
-#[cfg_attr(not(feature = "wasm"), async_trait)]
+#[cfg_attr(feature = "nosend", async_trait(?Send))]
+#[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<RandomMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<RandomMessage>) -> Vec<(Destination, RandomMessage)> {
         let mut out = vec![];

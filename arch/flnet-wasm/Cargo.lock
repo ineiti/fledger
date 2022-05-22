@@ -12,12 +12,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.57"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08f9b8508dccb7687a1d6c4ce66b2b0ecef467c94667de27d8d7fe1f8d2a9cdc"
-
-[[package]]
 name = "async-trait"
 version = "0.1.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -233,6 +227,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "flarch"
+version = "0.6.0"
+dependencies = [
+ "chrono",
+ "env_logger",
+ "futures",
+ "js-sys",
+ "log",
+ "thiserror",
+ "tokio",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-timer",
+ "web-sys",
+]
+
+[[package]]
+name = "flmodules"
+version = "0.6.0"
+dependencies = [
+ "async-trait",
+ "flarch",
+ "futures",
+ "itertools",
+ "log",
+ "rand",
+ "serde",
+ "serde_derive",
+ "serde_yaml",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "flnet"
 version = "0.6.0"
 dependencies = [
@@ -240,6 +270,7 @@ dependencies = [
  "bimap",
  "ed25519-compact",
  "flarch",
+ "flmodules",
  "futures",
  "getrandom",
  "itertools",
@@ -257,12 +288,11 @@ dependencies = [
 name = "flnet-wasm"
 version = "0.6.0"
 dependencies = [
- "anyhow",
  "async-trait",
- "console_error_panic_hook",
  "femme",
- "flnet",
  "flarch",
+ "flmodules",
+ "flnet",
  "futures",
  "getrandom",
  "js-sys",
@@ -275,29 +305,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
- "wasm-logger",
- "wasm-timer",
- "web-sys",
-]
-
-[[package]]
-name = "flarch"
-version = "0.6.0"
-dependencies = [
- "async-trait",
- "chrono",
- "env_logger",
- "futures",
- "js-sys",
- "log",
- "rand",
- "serde",
- "serde_yaml",
- "sha2",
- "thiserror",
- "tokio",
- "wasm-bindgen",
- "wasm-bindgen-futures",
  "wasm-timer",
  "web-sys",
 ]
@@ -563,9 +570,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87f3e037eac156d1775da914196f0f37741a274155e34a0b7e427c35d2a2ecb9"
+checksum = "7b10983b38c53aebdf33f542c6275b0f58a238129d00c4ae0e6fb59738d783ca"
 
 [[package]]
 name = "os_str_bytes"
@@ -699,9 +706,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.5.5"
+version = "1.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a11647b6b25ff05a515cb92c365cec08801e83423a235b51e231e1808747286"
+checksum = "d83f127d94bdbcda4c8cc2e50f6f84f4b611f69c902699ca385a39c3a75f9ff1"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -710,9 +717,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.25"
+version = "0.6.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
+checksum = "49b3de9ec5dc0a3417da371aab17d729997c15010e7fd24ff707773a33bddb64"
 
 [[package]]
 name = "ryu"
@@ -1037,17 +1044,6 @@ checksum = "a77c5a6f82cc6093a321ca5fb3dc9327fe51675d477b3799b4a9375bac3b7b4c"
 dependencies = [
  "proc-macro2",
  "quote",
-]
-
-[[package]]
-name = "wasm-logger"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "074649a66bb306c8f2068c9016395fa65d8e08d2affcbf95acf3c24c3ab19718"
-dependencies = [
- "log",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]

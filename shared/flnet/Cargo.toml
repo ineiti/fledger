@@ -12,7 +12,7 @@ keywords = ["network", "fledger"]
 categories = ["network-programming"]
 
 [features]
-wasm = []
+nosend = []
 
 [dependencies]
 flarch = {path = "../../arch/flarch", version = "0.6"}

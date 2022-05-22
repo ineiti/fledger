@@ -3,8 +3,10 @@ use std::sync::mpsc::Receiver;
 use flnet::signal::web_rtc::{PeerMessage, SetupError, WebRTCInput, WebRTCMessage, WebRTCOutput};
 use flnet_wasm::{web_rtc::WebRTCConnection};
 use flarch::{
+    tasks::wait_ms,
+};
+use flmodules::{
     broker::{Broker, Destination, BrokerError},
-    arch::wait_ms,
 };
 use thiserror::Error;
 use wasm_bindgen_test::wasm_bindgen_test;

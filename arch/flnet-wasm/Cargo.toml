@@ -12,10 +12,9 @@ keywords = ["webrtc", "websocket", "async-hell", "fledger"]
 categories = ["network-programming", "wasm", "web-programming::websocket"]
 
 [dependencies]
-flnet = {path="../../shared/flnet", features = ["wasm"], version = "0.6"}
-flmodules = {path="../../shared/flmodules", features = ["wasm"], version = "0.6"}
+flnet = {path="../../shared/flnet", features = ["nosend"], version = "0.6"}
+flmodules = {path="../../shared/flmodules", features = ["nosend"], version = "0.6"}
 flarch = {path = "../flarch", features = ["wasm"], version = "0.6"}
-femme = "2"
 
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 js-sys = "0.3"
@@ -28,10 +27,6 @@ getrandom = { version = "0.2", features = ["js"] }
 thiserror = "1"
 async-trait = "0.1"
 log = "0.4"
-anyhow = "1"
-wasm-bindgen-test = "0.3"
-console_error_panic_hook = "0.1"
-wasm-logger = "0.2"
 wasm-timer = "0.2"
 parking_lot = { version = "0.11", features = ["wasm-bindgen"]}
 futures = "0.3"
@@ -72,3 +67,7 @@ features = [
   "Storage",
   "Navigator"
 ]
+
+[dev-dependencies]
+femme = "2"
+wasm-bindgen-test = "0.3"

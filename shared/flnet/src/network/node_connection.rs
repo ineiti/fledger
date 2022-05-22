@@ -233,8 +233,8 @@ impl NodeConnection {
     }
 }
 
-#[cfg_attr(feature = "wasm", async_trait(?Send))]
-#[cfg_attr(not(feature = "wasm"), async_trait)]
+#[cfg_attr(feature = "nosend", async_trait(?Send))]
+#[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<NCMessage> for NodeConnection {
     async fn messages(&mut self, msgs: Vec<NCMessage>) -> Vec<(Destination, NCMessage)> {
         let mut out = vec![];

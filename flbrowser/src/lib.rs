@@ -12,11 +12,9 @@ use std::{
 use wasm_bindgen::prelude::*;
 use web_sys::window;
 
+use flarch::data_storage::{DataStorageBase, DataStorageBaseImpl};
+use flmodules::nodeids::U256;
 use flnet::{config::NodeInfo, network::NetworkConnectionState};
-use flarch::{
-    data_storage::{DataStorageBase, DataStorageBaseImpl},
-    nodeids::U256,
-};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";

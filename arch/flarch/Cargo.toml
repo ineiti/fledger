@@ -15,15 +15,10 @@ node = ["wasm"]
 wasm = ["dep:wasm-bindgen-futures", "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-timer", "dep:web-sys"]
 
 [dependencies]
-async-trait = "0.1"
 chrono = "0.4"
 env_logger = "0.9"
 futures = "0.3"
 log = "0.4"
-rand = "0.8"
-serde = {version = "1", features = ["derive"]}
-serde_yaml = "0.8"
-sha2 = "0.10"
 thiserror = "1"
 tokio = {version = "1", features = ["rt", "macros", "time"]}
 
