@@ -15,8 +15,7 @@ use flmodules::{
 };
 use flnet::{
     config::{ConfigError, NodeConfig, NodeInfo},
-    network::{NetCall, Network, NetworkConnectionState, NetworkError, NetworkMessage},
-    signal::{web_rtc::WebRTCSpawner, websocket::WSClientMessage},
+    network::{NetCall, NetworkError, NetworkMessage, NetworkConnectionState},
 };
 
 use crate::{
@@ -58,15 +57,12 @@ impl Node {
     pub async fn new(
         storage: Box<dyn DataStorageBase>,
         node_config: NodeConfig,
-        _client: &str,
-        ws: Broker<WSClientMessage>,
-        web_rtc: WebRTCSpawner,
+        broker_net: Broker<NetworkMessage>,
     ) -> Result<Node, NodeError> {
-        let broker_net = Network::start(node_config.clone(), ws, web_rtc).await?;
         info!(
             "Starting node: {} = {}",
-            node_config.our_node.info,
-            node_config.our_node.get_id()
+            node_config.info.name,
+            node_config.info.get_id()
         );
         let mut node_data = NodeData::start(storage, node_config, broker_net.clone()).await?;
         node_data.add_timer(BrokerTimer::start()).await;
@@ -79,7 +75,7 @@ impl Node {
 
     /// Return a copy of the current node information
     pub fn info(&self) -> NodeInfo {
-        self.node_data.node_config.our_node.clone()
+        self.node_data.node_config.info.clone()
     }
 
     /// Requests a list of all connected nodes
@@ -148,7 +144,7 @@ impl Node {
     pub async fn add_chat_message(&mut self, msg: String) -> Result<(), NodeError> {
         let event = events::Event {
             category: events::Category::TextMessage,
-            src: self.node_data.node_config.our_node.get_id(),
+            src: self.node_data.node_config.info.get_id(),
             created: now(),
             msg,
         };

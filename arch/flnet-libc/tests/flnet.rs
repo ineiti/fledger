@@ -1,7 +1,9 @@
+mod dummy;
+use dummy::WebSocketSimul;
 use flnet::{
     config::NodeConfig,
     network::{NetCall, NetReply, Network, NetworkMessage},
-    signal::{dummy::WebSocketSimul, server::SignalServer},
+    signal::SignalServer,
 };
 use flnet_libc::web_rtc_setup::WebRTCConnectionSetupLibc;
 use thiserror::Error;
@@ -46,7 +48,7 @@ async fn test_nodes() -> Result<(), TestError> {
 
     log::debug!("Sending 1st message");
     let (tap_2, id2) = net2.get_tap().await?;
-    net1.emit_msg(NetCall::SendNodeMessage((nc2.our_node.get_id(), "hello".to_string())).into())
+    net1.emit_msg(NetCall::SendNodeMessage((nc2.info.get_id(), "hello".to_string())).into())
         .await?;
 
     log::debug!("Waiting for message to go through");
@@ -62,7 +64,7 @@ async fn test_nodes() -> Result<(), TestError> {
     }
 
     let (tap_1, id1) = net1.get_tap().await?;
-    net2.emit_msg(NetCall::SendNodeMessage((nc1.our_node.get_id(), "there".to_string())).into())
+    net2.emit_msg(NetCall::SendNodeMessage((nc1.info.get_id(), "there".to_string())).into())
         .await?;
 
     for msg in tap_1 {

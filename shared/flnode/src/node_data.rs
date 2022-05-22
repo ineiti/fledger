@@ -78,7 +78,7 @@ impl NodeData {
         broker_net: Broker<NetworkMessage>,
         brokers: Brokers,
     ) -> Result<Self, NodeDataError> {
-        let id = node_config.our_node.get_id();
+        let id = node_config.info.get_id();
         let gossip_storage = storage.get("fledger");
         let mut nd = Self {
             storage,
@@ -123,9 +123,9 @@ impl NodeData {
         gossip
             .add_event(Event {
                 category: Category::NodeInfo,
-                src: node_config.our_node.get_id(),
+                src: node_config.info.get_id(),
                 created: now(),
-                msg: serde_yaml::to_string(&node_config.our_node)?,
+                msg: serde_yaml::to_string(&node_config.info)?,
             })
             .await?;
         Ok(())
@@ -175,12 +175,12 @@ impl NodeData {
             }
         };
         let mut config = NodeConfig::try_from(config_str)?;
-        config.our_node.client = client.to_string();
+        config.info.client = client.to_string();
         storage_node.set(CONFIG_NAME, &config.to_string()?)?;
         log::info!(
             "Starting node: {} = {}",
-            config.our_node.info,
-            config.our_node.get_id()
+            config.info.name,
+            config.info.get_id()
         );
         Ok(config)
     }
@@ -217,7 +217,7 @@ mod tests {
         let mut nd = NodeData::start(storage.clone(), nc.clone(), Broker::new()).await?;
         let event = Event {
             category: Category::TextMessage,
-            src: nc.our_node.get_id(),
+            src: nc.info.get_id(),
             created: 0.,
             msg: "something".into(),
         };

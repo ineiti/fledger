@@ -1,4 +1,4 @@
-use flnet::signal::websocket::{WSServerMessage, WSServerOutput, 
+use flnet::websocket::{WSServerMessage, WSServerOutput, 
     WSClientInput, WSClientOutput, WSClientMessage, WSServerInput};
 use flnet_libc::{
     web_socket_client::WebSocketClient,
@@ -10,7 +10,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 enum ConnectError {
     #[error(transparent)]
-    WS(#[from] flnet::signal::websocket::WSError),
+    WS(#[from] flnet::websocket::WSError),
     #[error(transparent)]
     WSS(#[from] web_socket_server::WSSError),
     #[error(transparent)]

@@ -1,4 +1,4 @@
-use ed25519_compact::{KeyPair, PublicKey, Seed, Noise, Signature};
+use ed25519_compact::{KeyPair, Noise, PublicKey, Seed, Signature};
 use flmodules::nodeids::U256;
 use serde_derive::{Deserialize, Serialize};
 use std::{
@@ -20,24 +20,21 @@ pub enum ConfigError {
 /// NodeInfo is the public information of the node.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct NodeInfo {
-    /// Free text info, limited to 256 characters
-    pub info: String,
+    /// Name of the node, up to 256 bytes
+    pub name: String,
     /// What client this node runs on - "Node" or the navigator id
     pub client: String,
     /// the public key of the node
     pub pubkey: Vec<u8>,
-    /// node capacities of what this node can do
-    pub node_capacities: NodeCapacities,
 }
 
 impl NodeInfo {
     /// Creates a new NodeInfo with a random name.
     pub fn new(pubkey: PublicKey) -> NodeInfo {
         NodeInfo {
-            info: names::Generator::default().next().unwrap(),
+            name: names::Generator::default().next().unwrap(),
             client: "Node".to_string(),
             pubkey: pubkey.as_ref().to_vec(),
-            node_capacities: NodeCapacities::new(),
         }
     }
 
@@ -61,10 +58,9 @@ impl TryFrom<NodeInfoToml> for NodeInfo {
     type Error = ConfigError;
     fn try_from(nit: NodeInfoToml) -> Result<Self, ConfigError> {
         Ok(NodeInfo {
-            info: nit.info,
+            name: nit.info,
             client: nit.client,
             pubkey: nit.pubkey.ok_or(ConfigError::PublicKeyMissing)?,
-            node_capacities: nit.node_capacities.into(),
         })
     }
 }
@@ -75,8 +71,8 @@ impl Debug for NodeInfo {
 
         write!(
             f,
-            "NodeInfo: {{ info: '{}', client: '{}', node_capacities: {:?}, pubkey: {} }}",
-            self.info, self.client, self.node_capacities, pubkey
+            "NodeInfo: {{ info: '{}', client: '{}', pubkey: {} }}",
+            self.name, self.client, pubkey
         )
     }
 }
@@ -87,40 +83,11 @@ impl PartialEq for NodeInfo {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-/// This holds all boolean node capacities. Currently the following are implemented:
-/// - leader: indicates a node that will store all relevant messages and serve them to clients
-pub struct NodeCapacities {
-    pub leader: bool,
-}
-
-impl NodeCapacities {
-    /// Returns an initialized structure
-    pub fn new() -> Self {
-        Self { leader: false }
-    }
-}
-
-impl From<Option<NodeCapacitiesToml>> for NodeCapacities {
-    fn from(nct: Option<NodeCapacitiesToml>) -> Self {
-        match nct {
-            Some(n) => Self {
-                leader: n.leader.unwrap_or(false),
-            },
-            None => NodeCapacities::new(),
-        }
-    }
-}
-
 /// NodeConfig is stored on the node itself and contains the private key.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NodeConfig {
-    /// interval in ms between sending two statistics of connected nodes. 0 == disabled
-    pub send_stats: f64,
-    /// nodes that were not active for more than stats_ignore ms will not be sent
-    pub stats_ignore: f64,
-    /// our_node is the actual configuration of the node
-    pub our_node: NodeInfo,
+    /// info about this node
+    pub info: NodeInfo,
     /// the cryptographic keypair as a vector of bytes
     pub keypair: Vec<u8>,
 }
@@ -136,9 +103,7 @@ impl NodeConfig {
     pub fn new() -> Self {
         let keypair = KeyPair::from_seed(Seed::default());
         NodeConfig {
-            our_node: NodeInfo::new(keypair.pk),
-            send_stats: 30000.,
-            stats_ignore: 60000.,
+            info: NodeInfo::new(keypair.pk),
             keypair: keypair.as_ref().to_vec(),
         }
     }
@@ -151,7 +116,7 @@ impl NodeConfig {
         Ok(str)
     }
 
-    pub fn sign(&self, msg: [u8; 32]) -> Vec<u8>{
+    pub fn sign(&self, msg: [u8; 32]) -> Vec<u8> {
         let keypair = KeyPair::from_slice(&self.keypair).unwrap();
         keypair.sk.sign(&msg, Some(Noise::default())).to_vec()
     }
@@ -160,9 +125,7 @@ impl NodeConfig {
 impl Clone for NodeConfig {
     fn clone(&self) -> Self {
         NodeConfig {
-            send_stats: self.send_stats,
-            stats_ignore: self.stats_ignore,
-            our_node: self.our_node.clone(),
+            info: self.info.clone(),
             keypair: self.keypair.clone(),
         }
     }
@@ -196,9 +159,7 @@ impl TryFrom<String> for NodeConfig {
             None => NodeInfo::new(kp.pk),
         };
         Ok(NodeConfig {
-            our_node,
-            send_stats: nct.send_stats.unwrap_or(30000.),
-            stats_ignore: nct.stats_ignore.unwrap_or(60000.),
+            info: our_node,
             keypair,
         })
     }
@@ -207,8 +168,6 @@ impl TryFrom<String> for NodeConfig {
 /// Toml representation of the NodeConfig
 #[derive(Debug, Deserialize, Serialize)]
 struct NodeConfigToml {
-    pub send_stats: Option<f64>,
-    pub stats_ignore: Option<f64>,
     pub keypair: Option<Vec<u8>>,
     pub our_node: Option<NodeInfoToml>,
 }
@@ -216,9 +175,7 @@ struct NodeConfigToml {
 impl From<&NodeConfig> for NodeConfigToml {
     fn from(nc: &NodeConfig) -> Self {
         NodeConfigToml {
-            send_stats: Some(nc.send_stats),
-            stats_ignore: Some(nc.stats_ignore),
-            our_node: Some((&nc.our_node).into()),
+            our_node: Some((&nc.info).into()),
             keypair: Some(nc.keypair.clone()),
         }
     }
@@ -231,31 +188,15 @@ struct NodeInfoToml {
     pub info: String,
     pub client: String,
     pub pubkey: Option<Vec<u8>>,
-    pub node_capacities: Option<NodeCapacitiesToml>,
 }
 
 impl From<&NodeInfo> for NodeInfoToml {
     fn from(ni: &NodeInfo) -> Self {
         NodeInfoToml {
             id: None,
-            info: ni.info.clone(),
+            info: ni.name.clone(),
             client: ni.client.clone(),
             pubkey: Some(ni.pubkey.clone()),
-            node_capacities: Some(NodeCapacitiesToml::from(&ni.node_capacities)),
-        }
-    }
-}
-
-/// Toml representation of capacities
-#[derive(Debug, Deserialize, Serialize)]
-struct NodeCapacitiesToml {
-    pub leader: Option<bool>,
-}
-
-impl From<&NodeCapacities> for NodeCapacitiesToml {
-    fn from(nc: &NodeCapacities) -> Self {
-        Self {
-            leader: Some(nc.leader),
         }
     }
 }
@@ -277,7 +218,7 @@ mod tests {
         let nc_str = nc.to_string()?;
         let nc_clone = NodeConfig::try_from(nc_str)?;
         assert_eq!(nc.keypair, nc_clone.keypair);
-        assert_eq!(nc.our_node.pubkey, nc_clone.our_node.pubkey);
+        assert_eq!(nc.info.pubkey, nc_clone.info.pubkey);
         Ok(())
     }
 }

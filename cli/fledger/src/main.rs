@@ -1,12 +1,8 @@
 use clap::Parser;
 
-use flnet_libc::{
-    data_storage::DataStorageFile,
-    web_rtc_setup::web_rtc_spawner,
-    web_socket_client::WebSocketClient,
-};
-use flnode::{node::Node, node_data::NodeData};
 use flarch::{data_storage::DataStorageBase, start_logging_filter, tasks::wait_ms};
+use flnet_libc::{data_storage::DataStorageFile, network_start};
+use flnode::{node::Node, node_data::NodeData};
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug)]
@@ -35,18 +31,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let storage = DataStorageFile::new(args.config);
     let mut node_config = NodeData::get_config(storage.clone())?;
-    args.name.map(|name| node_config.our_node.info = name);
+    args.name.map(|name| node_config.info.name = name);
 
     log::info!("Starting app with version {}", VERSION_STRING);
 
     log::debug!("Connecting to websocket at {URL}");
-    let ws = WebSocketClient::connect(URL)
-        .await
-        .expect("Failed to connect to signalling server");
-
-    let mut node = Node::new(Box::new(storage), node_config, "cli", ws, web_rtc_spawner()).await?;
+    let network = network_start(node_config.clone(), URL).await?;
+    let mut node = Node::new(Box::new(storage), node_config, network).await?;
     let nc = node.info();
-    log::info!("Starting node {}: {}", nc.get_id(), nc.info);
+    log::info!("Starting node {}: {}", nc.get_id(), nc.name);
 
     log::info!("Started successfully");
     let mut i: i32 = 0;

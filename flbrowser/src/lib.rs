@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use flmodules::ping::storage::{PingStat, PingStorage};
-use flnet_wasm::{web_rtc::web_rtc_spawner, web_socket_client::WebSocketClient};
+use flnet_wasm::network_start;
 use flnode::{node::Node, node_data::NodeData, version::VERSION_STRING};
 use regex::Regex;
 use std::{
@@ -109,24 +109,17 @@ impl FledgerWeb {
     }
 
     async fn node_start(node_mutex: Arc<Mutex<Option<Node>>>) -> Result<()> {
-        let rtc_spawner = web_rtc_spawner();
         let my_storage = Box::new(DataStorageBaseImpl {});
-        let ws = WebSocketClient::connect(URL)
-            .await
-            .map_err(|e| anyhow!("couldn't create websocket: {:?}", e))?;
-        let client = if let Some(window) = web_sys::window() {
-            let navigator = window.navigator();
-            match navigator.user_agent() {
-                Ok(p) => p,
-                Err(_) => "n/a".to_string(),
-            }
-        } else {
-            "node".to_string()
-        };
+        // let ws = WebSocketClient::connect(URL)
+        //     .await
+        //     .map_err(|e| anyhow!("couldn't create websocket: {:?}", e))?;
         if let Ok(mut node) = node_mutex.try_lock() {
             let node_config = NodeData::get_config(my_storage.clone())?;
+            // let webrtc = WebRTCConn::new(web_rtc_spawner()).await?;
+            // let network = Network::start(node_config.clone(), ws, webrtc).await?;
+            let network = network_start(node_config.clone(), URL).await?;
             *node = Some(
-                Node::new(my_storage, node_config, &client, ws, rtc_spawner)
+                Node::new(my_storage, node_config, network)
                     .await
                     .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?,
             );
@@ -173,7 +166,7 @@ pub struct FledgerState {
 #[wasm_bindgen]
 impl FledgerState {
     pub fn get_node_name(&self) -> String {
-        self.info.info.clone()
+        self.info.name.clone()
     }
 
     pub fn get_node_table(&self) -> String {
@@ -220,14 +213,14 @@ impl FledgerState {
         let mut out = vec![];
         let mut nodes: Vec<(&U256, &NodeInfo)> =
             self.nodes_info.iter().map(|(k, v)| (k, v)).collect();
-        nodes.sort_by(|a, b| a.1.info.partial_cmp(&b.1.info).unwrap());
+        nodes.sort_by(|a, b| a.1.name.partial_cmp(&b.1.name).unwrap());
         for (id, ni) in &nodes {
             let stat = self
                 .stats
                 .get(id)
                 .map(|s| format!("{:?}", s.s.type_local))
                 .unwrap_or("n/a".into());
-            let info = ni.info.clone();
+            let info = ni.name.clone();
             if let Some(ping) = self.pings.stats.get(id) {
                 out.push(NodeDesc {
                     info,
@@ -290,7 +283,7 @@ impl FledgerMessages {
 
             let node: Vec<&NodeInfo> = nodes.iter().filter(|&ni| ni.get_id() == msg.src).collect();
             let from = if node.len() == 1 {
-                node[0].info.clone()
+                node[0].name.clone()
             } else {
                 format!("{}", msg.src)
             };

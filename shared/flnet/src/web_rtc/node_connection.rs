@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
 use thiserror::Error;
 
-use crate::signal::web_rtc::{
+use crate::web_rtc::messages::{
     ConnectionStateMap, DataChannelState, PeerMessage, WebRTCInput, WebRTCMessage, WebRTCOutput,
     WebRTCSpawner,
 };
@@ -12,7 +12,7 @@ pub enum NCError {
     #[error("Couldn't use output queue")]
     OutputQueue,
     #[error(transparent)]
-    Setup(#[from] crate::signal::web_rtc::SetupError),
+    Setup(#[from] crate::web_rtc::messages::SetupError),
     #[error(transparent)]
     Broker(#[from] flmodules::broker::BrokerError),
 }

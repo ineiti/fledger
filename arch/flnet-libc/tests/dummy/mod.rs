@@ -1,6 +1,6 @@
 use flmodules::broker::{Broker, BrokerError, Translate};
 
-use super::websocket::{
+use flnet::websocket::{
     WSClientInput, WSClientMessage, WSClientOutput, WSServerInput, WSServerMessage, WSServerOutput,
 };
 

@@ -9,16 +9,11 @@ use flmodules::{
     broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
     nodeids::U256,
 };
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    config::NodeInfo,
-    signal::{web_rtc::WSSignalMessageToNode, websocket::WSServerInput},
-};
+use crate::{config::NodeInfo, websocket::WSServerInput, web_rtc::messages::PeerInfo};
 
-use super::{
-    web_rtc::{MessageAnnounce, NodeStat, PeerInfo, WSSignalMessageFromNode},
-    websocket::{WSServerMessage, WSServerOutput},
-};
+use super::websocket::{WSServerMessage, WSServerOutput};
 
 /// This implements a signalling server. It can be used for tests, in the cli implementation, and
 /// will also be used later directly in the network struct to allow for direct node-node setups.
@@ -169,7 +164,7 @@ impl SignalServer {
         let id = msg.node_info.get_id();
         self.connection_ids.insert(id, index);
 
-        log::info!("Registration of node-id {}: {}", id, msg.node_info.info);
+        log::info!("Registration of node-id {}: {}", id, msg.node_info.name);
         self.info.insert(id, msg.node_info);
         vec![SignalOutput::NewNode(id).into()]
     }
@@ -242,6 +237,71 @@ impl SubsystemListener<SignalMessage> for SignalServer {
             .map(|msg| (Destination::Others, msg))
             .collect()
     }
+}
+
+/// Message is a list of messages to be sent between the node and the signal server.
+/// When a new node connects to the signalling server, the server starts by sending
+/// a "Challenge" to the node.
+/// The node can then announce itself using that challenge.
+/// - Challenge is sent by the signalling server to the node
+/// - ListIDsReply contains the NodeInfos of the currently connected nodes
+/// - PeerRequest is sent by a node to ask to connect to another node. The
+/// server will send a 'PeerReply' to the corresponding node, which will continue
+/// the protocol by sending its own PeerRequest.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub enum WSSignalMessageToNode {
+    Challenge(u64, U256),
+    ListIDsReply(Vec<NodeInfo>),
+    PeerSetup(PeerInfo),
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub enum WSSignalMessageFromNode {
+    Announce(MessageAnnounce),
+    ListIDsRequest,
+    ClearNodes,
+    PeerSetup(PeerInfo),
+    NodeStats(Vec<NodeStat>),
+}
+
+impl std::fmt::Display for WSSignalMessageToNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            WSSignalMessageToNode::Challenge(_, _) => write!(f, "Challenge"),
+            WSSignalMessageToNode::ListIDsReply(_) => write!(f, "ListIDsReply"),
+            WSSignalMessageToNode::PeerSetup(_) => write!(f, "PeerSetup"),
+        }
+    }
+}
+
+impl std::fmt::Display for WSSignalMessageFromNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            WSSignalMessageFromNode::Announce(_) => write!(f, "Announce"),
+            WSSignalMessageFromNode::ListIDsRequest => write!(f, "ListIDsRequest"),
+            WSSignalMessageFromNode::PeerSetup(_) => write!(f, "PeerSetup"),
+            WSSignalMessageFromNode::NodeStats(_) => write!(f, "NodeStats"),
+            WSSignalMessageFromNode::ClearNodes => write!(f, "ClearNodes"),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub struct MessageAnnounce {
+    pub version: u64,
+    pub challenge: U256,
+    pub node_info: NodeInfo,
+    pub signature: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub struct NodeStat {
+    pub id: U256,
+    pub version: String,
+    pub ping_ms: u32,
+    pub ping_rx: u32,
 }
 
 impl std::fmt::Debug for SignalInput {

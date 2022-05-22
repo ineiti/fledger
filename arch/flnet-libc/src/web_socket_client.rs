@@ -7,7 +7,7 @@ use futures::{stream::SplitSink, Sink, SinkExt, StreamExt};
 use std::pin::Pin;
 use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 
-use flnet::signal::websocket::{WSClientInput, WSClientMessage, WSClientOutput, WSError};
+use flnet::websocket::{WSClientInput, WSClientMessage, WSClientOutput, WSError};
 
 use crate::web_socket_server::WSSError;
 

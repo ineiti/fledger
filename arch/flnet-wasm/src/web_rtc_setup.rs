@@ -11,12 +11,12 @@ use web_sys::{
     RtcIceGatheringState,
 };
 
-use flnet::{
-    network::node_connection::Direction,
-    signal::web_rtc::{
+use flnet::web_rtc::{
+    messages::{
         ConnType, ConnectionStateMap, DataChannelState, IceConnectionState, IceGatheringState,
-        PeerMessage, SetupError, SignalingState, WebRTCMessage, WebRTCOutput, WebRTCInput,
+        PeerMessage, SetupError, SignalingState, WebRTCInput, WebRTCMessage, WebRTCOutput,
     },
+    node_connection::Direction,
 };
 
 use web_sys::{

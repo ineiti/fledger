@@ -1,4 +1,3 @@
-use crate::signal::websocket::WSClientInput;
 use itertools::concat;
 use std::fmt;
 
@@ -6,26 +5,22 @@ use async_trait::async_trait;
 use thiserror::Error;
 
 use flmodules::{
-    broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener, Translate},
+    broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
     nodeids::U256,
 };
 
 use crate::{
     config::{NodeConfig, NodeInfo},
-    network::node_connection::NCInput,
-    signal::{
-        web_rtc::{
-            ConnType, MessageAnnounce, NodeStat, PeerInfo, SetupError, SignalingState,
-            WSSignalMessageFromNode, WSSignalMessageToNode, WebRTCSpawner,
-        },
-        websocket::{WSClientMessage, WSClientOutput},
+    signal::{MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode},
+    web_rtc::{
+        messages::{ConnType, PeerInfo, SetupError, SignalingState},
+        node_connection::{Direction, NCInput, NCOutput},
+        WebRTCConnMessage,
     },
+    websocket::{WSClientInput, WSClientMessage, WSClientOutput},
 };
 
-pub mod node_connection;
-use node_connection::{NCError, NodeConnection};
-
-use self::node_connection::{Direction, NCMessage, NCOutput};
+use crate::web_rtc::node_connection::NCError;
 
 /**
  * The Network structure handles setting up webRTC connections for all connected nodes.
@@ -35,7 +30,6 @@ use self::node_connection::{Direction, NCMessage, NCOutput};
  * connections: If A and B are connected, and B and C are connected, C can connect to A by using
  * B as a signalling server.
  */
-
 #[derive(Error, Debug)]
 pub enum NetworkError {
     #[error("Connection not found")]
@@ -53,10 +47,7 @@ pub enum NetworkError {
 }
 
 pub struct Network {
-    broker: Broker<NetworkMessage>,
-    web_rtc: WebRTCSpawner,
     node_config: NodeConfig,
-    connections: Vec<U256>,
     get_update: usize,
 }
 
@@ -66,20 +57,20 @@ impl Network {
     pub async fn start(
         node_config: NodeConfig,
         ws: Broker<WSClientMessage>,
-        web_rtc: WebRTCSpawner,
+        web_rtc: Broker<WebRTCConnMessage>,
     ) -> Result<Broker<NetworkMessage>, NetworkError> {
         let mut broker = Broker::new();
         broker
             .add_subsystem(Subsystem::Handler(Box::new(Self {
-                broker: broker.clone(),
-                web_rtc,
                 node_config,
-                connections: vec![],
                 get_update: UPDATE_INTERVAL,
             })))
             .await?;
         broker
             .link_bi(ws, Box::new(Self::from_ws), Box::new(Self::to_ws))
+            .await;
+        broker
+            .link_bi(web_rtc, Box::new(Self::from_web_rtc), Box::new(Self::to_web_rtc))
             .await;
         Ok(broker)
     }
@@ -103,7 +94,7 @@ impl Network {
                 let ma = MessageAnnounce {
                     version,
                     challenge,
-                    node_info: self.node_config.our_node.clone(),
+                    node_info: self.node_config.info.clone(),
                     signature: self.node_config.sign(challenge.to_bytes()),
                 };
                 vec![
@@ -115,7 +106,7 @@ impl Network {
                 vec![NetReply::RcvWSUpdateList(list).into()]
             }
             WSSignalMessageToNode::PeerSetup(pi) => {
-                let own_id = self.node_config.our_node.get_id();
+                let own_id = self.node_config.info.get_id();
                 let remote_node = match pi.get_remote(&own_id) {
                     Some(id) => id,
                     None => {
@@ -127,11 +118,6 @@ impl Network {
                     &remote_node,
                     NCInput::Setup((pi.get_direction(&own_id), pi.message)),
                 )
-                .await
-                .unwrap_or_else(|err| {
-                    log::error!("Couldn't send: {err:?}");
-                    vec![]
-                })
             }
         }
     }
@@ -141,17 +127,17 @@ impl Network {
             NetCall::SendNodeMessage((id, msg_str)) => {
                 log::trace!(
                     "msg_call: {}->{}: {:?}",
-                    self.node_config.our_node.get_id(),
+                    self.node_config.info.get_id(),
                     id,
                     msg_str
                 );
-                self.send_msg(&id, msg_str).await
+                Ok(self.send(&id, NCInput::Text(msg_str)))
             }
             NetCall::SendWSStats(ss) => Ok(WSSignalMessageFromNode::NodeStats(ss.clone()).into()),
             NetCall::SendWSUpdateListRequest => Ok(WSSignalMessageFromNode::ListIDsRequest.into()),
             NetCall::SendWSClearNodes => Ok(WSSignalMessageFromNode::ClearNodes.into()),
             NetCall::SendWSPeer(pi) => Ok(WSSignalMessageFromNode::PeerSetup(pi).into()),
-            NetCall::Connect(id) => return Ok(vec![self.connect(&id).await?]),
+            NetCall::Connect(id) => return Ok(self.connect(&id)),
             NetCall::Disconnect(id) => return Ok(self.disconnect(&id).await?),
             NetCall::Tick => {
                 self.get_update -= 1;
@@ -186,7 +172,7 @@ impl Network {
                 .into()]
             }
             NCOutput::Setup((dir, pm)) => {
-                let mut id_init = self.node_config.our_node.get_id();
+                let mut id_init = self.node_config.info.get_id();
                 let mut id_follow = id;
                 if dir == Direction::Incoming {
                     (id_init, id_follow) = (id_follow, id_init);
@@ -203,58 +189,25 @@ impl Network {
 
     /// Sends a message to the node dst.
     /// If no connection is active yet, a new one will be created.
-    async fn send(
-        &mut self,
-        dst: &U256,
-        msg: NCInput,
-    ) -> Result<Vec<NetworkMessage>, NetworkError> {
-        self.ensure_connection(dst).await?;
-        Ok(vec![NetworkMessage::NodeConnection((
+    fn send(&mut self, dst: &U256, msg: NCInput) -> Vec<NetworkMessage> {
+        vec![NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((
             *dst,
-            NCMessage::Input(msg),
-        ))])
-    }
-
-    // Converts a message to an NCInput and makes sure that the connection exists.
-    async fn send_msg(
-        &mut self,
-        dst: &U256,
-        msg: String,
-    ) -> Result<Vec<NetworkMessage>, NetworkError> {
-        self.send(dst, NCInput::Text(msg)).await
+            msg,
+        )))]
     }
 
     /// Connect to the given node.
-    async fn connect(&mut self, dst: &U256) -> Result<NetworkMessage, NetworkError> {
-        self.ensure_connection(dst).await?;
-        return Ok(NetReply::Connected(*dst).into());
+    fn connect(&mut self, dst: &U256) -> Vec<NetworkMessage> {
+        vec![
+            NetworkMessage::WebRTC(WebRTCConnMessage::Connect(*dst)),
+            NetReply::Connected(*dst).into(),
+        ]
     }
 
     /// Disconnects from a given node.
     async fn disconnect(&mut self, dst: &U256) -> Result<Vec<NetworkMessage>, NetworkError> {
-        let msgs = self.send(dst, NCInput::Disconnect).await?;
+        let msgs = self.send(dst, NCInput::Disconnect);
         return Ok(concat([msgs, vec![NetReply::Disconnected(*dst).into()]]));
-    }
-
-    /// Ensures that a given connection exists.
-    async fn ensure_connection(&mut self, id: &U256) -> Result<(), NetworkError> {
-        if *id == self.node_config.our_node.get_id() {
-            return Err(NetworkError::ConnectMyself);
-        }
-
-        if !self.connections.contains(id) {
-            let nc = NodeConnection::new(&self.web_rtc).await?;
-            self.broker
-                .link_bi(
-                    nc.clone(),
-                    Self::from_nc(id.clone()),
-                    Self::to_nc(id.clone()),
-                )
-                .await;
-            self.connections.push(*id);
-        }
-
-        Ok(())
     }
 
     // Translator functions
@@ -270,21 +223,15 @@ impl Network {
         matches!(msg, WSClientMessage::Output(_)).then(|| NetworkMessage::WebSocket(msg))
     }
 
-    fn from_nc(id: U256) -> Translate<NCMessage, NetworkMessage> {
-        Box::new(move |msg| {
-            matches!(msg, NCMessage::Output(_)).then(|| NetworkMessage::NodeConnection((id, msg)))
-        })
+    fn to_web_rtc(msg: NetworkMessage) -> Option<WebRTCConnMessage> {
+        match msg {
+            NetworkMessage::WebRTC(msg) => matches!(msg, WebRTCConnMessage::InputNC(_)).then(|| msg),
+            _ => None,
+        }
     }
 
-    fn to_nc(id: U256) -> Translate<NetworkMessage, NCMessage> {
-        Box::new(move |msg| {
-            if let NetworkMessage::NodeConnection((dst, msg_nc)) = msg {
-                if dst == id && matches!(msg_nc, NCMessage::Input(_)) {
-                    return Some(msg_nc);
-                }
-            }
-            None
-        })
+    fn from_web_rtc(msg: WebRTCConnMessage) -> Option<NetworkMessage> {
+        matches!(msg, WebRTCConnMessage::OutputNC(_)).then(|| NetworkMessage::WebRTC(msg))
     }
 }
 
@@ -296,16 +243,17 @@ impl SubsystemListener<NetworkMessage> for Network {
         for msg in bms {
             log::trace!(
                 "{}: Processing message {msg}",
-                self.node_config.our_node.get_id()
+                self.node_config.info.get_id()
             );
             match msg {
                 NetworkMessage::Call(c) => out.extend(self.msg_call(c).await.unwrap()),
                 NetworkMessage::WebSocket(WSClientMessage::Output(ws)) => {
                     out.extend(self.msg_ws(ws).await)
                 }
-                NetworkMessage::NodeConnection((id, NCMessage::Output(msg))) => {
-                    out.extend(self.msg_node(id, msg).await)
-                }
+                NetworkMessage::WebRTC(WebRTCConnMessage::OutputNC((
+                    id,
+                    msg,
+                ))) => out.extend(self.msg_node(id, msg).await),
                 _ => {}
             }
         }
@@ -319,7 +267,7 @@ pub enum NetworkMessage {
     Call(NetCall),
     Reply(NetReply),
     WebSocket(WSClientMessage),
-    NodeConnection((U256, NCMessage)),
+    WebRTC(WebRTCConnMessage),
 }
 
 impl fmt::Display for NetworkMessage {
@@ -328,7 +276,7 @@ impl fmt::Display for NetworkMessage {
             NetworkMessage::Call(c) => write!(f, "Call({})", c),
             NetworkMessage::Reply(r) => write!(f, "Reply({})", r),
             NetworkMessage::WebSocket(_) => write!(f, "WebSocket()"),
-            NetworkMessage::NodeConnection((id, _)) => write!(f, "NodeConnection({}, ..)", id),
+            NetworkMessage::WebRTC(_) => write!(f, "WebRTC()"),
         }
     }
 }

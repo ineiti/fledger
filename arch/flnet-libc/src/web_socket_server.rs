@@ -14,7 +14,7 @@ use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
 
 use std::{io, sync::Arc};
 
-use flnet::signal::websocket::{WSError, WSServerInput, WSServerMessage, WSServerOutput};
+use flnet::websocket::{WSError, WSServerInput, WSServerMessage, WSServerOutput};
 
 #[derive(Error, Debug)]
 pub enum WSSError {
@@ -172,7 +172,7 @@ impl WSConnection {
 mod tests {
     use super::*;
     use crate::web_socket_client::WebSocketClient;
-    use flnet::signal::websocket::{WSClientInput, WSClientMessage, WSClientOutput};
+    use flnet::websocket::{WSClientInput, WSClientMessage, WSClientOutput};
     use flarch::start_logging;
     use std::sync::mpsc::Receiver;
 

@@ -1,4 +1,4 @@
-use flnet::signal::server::SignalServer;
+use flnet::signal::SignalServer;
 use flnet_libc::web_socket_server::WebSocketServer;
 use flarch::start_logging;
 

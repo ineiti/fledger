@@ -1,6 +1,8 @@
 use async_trait::async_trait;
-use flnet::signal::web_rtc::{PeerMessage, SetupError, WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner};
 use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
+use flnet::web_rtc::messages::{
+    PeerMessage, SetupError, WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner,
+};
 
 use crate::web_rtc_setup::WebRTCConnectionSetup;
 
@@ -79,7 +81,6 @@ impl SubsystemListener<WebRTCMessage> for WebRTCConnection {
         out
     }
 }
-
 
 pub fn web_rtc_spawner() -> WebRTCSpawner {
     Box::new(|| Box::new(Box::pin(WebRTCConnection::new_box())))

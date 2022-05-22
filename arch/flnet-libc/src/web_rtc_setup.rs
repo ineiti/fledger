@@ -25,12 +25,12 @@ use webrtc::{
     },
 };
 
-use flnet::{
-    network::node_connection::Direction,
-    signal::web_rtc::{
+use flnet::web_rtc::{
+    messages::{
         ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError, SignalingState,
         WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner,
     },
+    node_connection::Direction,
 };
 
 pub struct WebRTCConnectionSetupLibc {
@@ -298,8 +298,8 @@ impl WebRTCConnectionSetupLibc {
             type_local: ConnType::Unknown,
             type_remote: ConnType::Unknown,
             signaling,
-            ice_gathering: flnet::signal::web_rtc::IceGatheringState::New,
-            ice_connection: flnet::signal::web_rtc::IceConnectionState::New,
+            ice_gathering: flnet::web_rtc::messages::IceGatheringState::New,
+            ice_connection: flnet::web_rtc::messages::IceConnectionState::New,
             data_connection,
             rx_bytes: 0,
             tx_bytes: 0,

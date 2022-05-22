@@ -8,10 +8,8 @@ use flmodules::{
 };
 use flnet::{
     config::{NodeConfig, NodeInfo},
-    network::{
-        node_connection::{NCInput, NCMessage},
-        NetCall, NetReply, NetworkMessage,
-    },
+    network::{NetCall, NetReply, NetworkMessage},
+    web_rtc::{node_connection::NCInput, WebRTCConnMessage},
 };
 
 use flnode::node_data::{Brokers, NodeData, NodeDataError};
@@ -77,7 +75,7 @@ impl Network {
     async fn new_node(&mut self, brokers: Brokers) -> Result<(), NetworkError> {
         let mut broker = Broker::new();
         let node = Node::new(broker.clone(), self.nodes.len() as u32, brokers).await?;
-        let id = node.node_data.node_config.our_node.get_id();
+        let id = node.node_data.node_config.info.get_id();
         let (tap, _) = broker.get_tap().await?;
         self.node_taps.insert(id, tap);
         self.node_brokers.insert(id, broker);
@@ -139,11 +137,17 @@ impl Network {
                 from_id,
                 NetReply::RcvNodeMessage((id.clone(), msg_str)).into(),
             )],
-            NetworkMessage::NodeConnection((id_dst, NCMessage::Input(NCInput::Text(msg_node)))) => {
+            NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((
+                id_dst,
+                NCInput::Text(msg_node),
+            ))) => {
                 vec![(
                     id_dst.clone(),
-                    NetworkMessage::NodeConnection((*id, NCInput::Text(msg_node.clone()).into()))
-                        .into(),
+                    NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((
+                        *id,
+                        NCInput::Text(msg_node.clone()).into(),
+                    )))
+                    .into(),
                 )]
             }
             _ => vec![],
@@ -163,7 +167,7 @@ impl Node {
         brokers: Brokers,
     ) -> Result<Self, NodeDataError> {
         let mut node_config = NodeConfig::new();
-        while format!("{:x}", node_config.our_node.get_id())
+        while format!("{:x}", node_config.info.get_id())
             .chars()
             .next()
             .unwrap()
@@ -182,7 +186,7 @@ impl Node {
     }
 
     pub fn node_info(&self) -> NodeInfo {
-        self.node_data.node_config.our_node.clone()
+        self.node_data.node_config.info.clone()
     }
 
     pub async fn process(&mut self) {

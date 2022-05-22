@@ -2,13 +2,9 @@
 
 ## Current high-level goal
 
+- send regular `NodeStat`s to the signalling-server
 - Update docker
 - Create usable crates for a signalling server and webrtc clients
-- Finalize usage of broker-modules in `Node` and `Network`:
-  - Create a `WebRTC` and a `Websocket` broker-module
-  - Pass these broker-modules to `Network`
-  - Pass a `Network` to the `Node` instead of the WebRTC and Websocket spawners
-- Should the flnet-wasm and flnet-libc directly offer a `Network`?
 
 ## Current concrete goal
 
@@ -19,7 +15,20 @@
 
 ### Things to do
 
+- BUG: why does the flbrowser not connect directly to a CLI node sometimes?
+  - possibility: perhaps it waits for the CLI to connect, and doesn't initiate
+    a connection by itself?
+- DISPLAY: flbrowser displays last ping as descending, but it should increase
+- BUG: messages get deleted after restart
+
 # Dates
+
+2022-05-22:
+- Finalize usage of broker-modules in `Node` and `Network`:
+  - Create a `WebRTC` and a `Websocket` broker-module
+  - Pass these broker-modules to `Network`
+  - Pass a `Network` to the `Node` instead of the WebRTC and Websocket spawners
+  - flnet-wasm and flnet-libc should directly offer a `Network` for the specific arch
 
 2022-05-21:
 - cleanup `flutils`:

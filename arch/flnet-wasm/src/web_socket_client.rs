@@ -2,7 +2,7 @@ use std::sync::{Arc};
 use futures::lock::Mutex;
 
 use async_trait::async_trait;
-use flnet::signal::websocket::{WSClientInput, WSClientOutput, WSClientMessage};
+use flnet::websocket::{WSClientInput, WSClientOutput, WSClientMessage};
 use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
 use thiserror::Error;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
