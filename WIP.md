@@ -18,10 +18,12 @@
 - BUG: why does the flbrowser not connect directly to a CLI node sometimes?
   - possibility: perhaps it waits for the CLI to connect, and doesn't initiate
     a connection by itself?
-- DISPLAY: flbrowser displays last ping as descending, but it should increase
 - BUG: messages get deleted after restart
 
 # Dates
+
+2022-05-24:
+- DISPLAY: flbrowser displays last ping as descending, but it should increase
 
 2022-05-22:
 - Finalize usage of broker-modules in `Node` and `Network`:

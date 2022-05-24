@@ -240,7 +240,7 @@ impl FledgerState {
                 vec![
                     node.info,
                     format!("rx:{} tx:{}", node.ping.rx, node.ping.tx),
-                    node.ping.countdown.to_string(),
+                    node.ping.lastping.to_string(),
                     node.stat,
                 ]
                 .join("</td><td>")

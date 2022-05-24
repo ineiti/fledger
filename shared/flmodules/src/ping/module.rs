@@ -32,9 +32,9 @@ pub enum PingOut {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PingConfig {
     // How many ticks between two pings
-    pub interval: u16,
+    pub interval: u32,
     // How many ticks before a missing ping is counted as disconnection
-    pub timeout: u16,
+    pub timeout: u32,
 }
 
 pub struct Ping {
