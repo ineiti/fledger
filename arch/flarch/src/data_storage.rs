@@ -4,17 +4,17 @@ use std::{
 };
 use thiserror::Error;
 
-#[cfg(all(target_arch = "wasm32", feature = "node"))]
+#[cfg(feature = "node")]
 mod node;
-#[cfg(all(target_arch = "wasm32", feature = "node"))]
+#[cfg(feature = "node")]
 pub use node::*;
-#[cfg(all(target_arch = "wasm32", not(feature = "node")))]
+#[cfg(all(feature = "wasm", not(feature = "node")))]
 mod wasm;
-#[cfg(all(target_arch = "wasm32", not(feature = "node")))]
+#[cfg(all(feature = "wasm", not(feature = "node")))]
 pub use wasm::*;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "wasm"))]
 mod libc;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "wasm"))]
 pub use libc::*;
 
 #[derive(Error, Debug)]
@@ -23,69 +23,26 @@ pub enum StorageError {
     Underlying(String),
 }
 
-/// A DataStorageBase can give different DataStorages.
-/// Each DataStorage must present an independant namespace for `get`
-/// and `put`.
-pub trait DataStorageBase {
-    fn get(&self, base: &str) -> Box<dyn DataStorage>;
-
-    fn clone(&self) -> Box<dyn DataStorageBase>;
-}
-
-/// The DataStorage trait allows access to a persistent storage. Each module
-/// has it's own DataStorage, so there will never be a name clash.
+/// The DataStorage trait allows access to a persistent storage.
 pub trait DataStorage {
     fn get(&self, key: &str) -> Result<String, StorageError>;
 
     fn set(&mut self, key: &str, value: &str) -> Result<(), StorageError>;
 
     fn remove(&mut self, key: &str) -> Result<(), StorageError>;
-}
 
-/// A temporary DataStorageBase that hands out ephemeral, memory-base
-/// DataStorages.
-#[derive(Debug)]
-pub struct TempDSB {
-    kvs_base: Arc<Mutex<HashMap<String, HashMap<String, String>>>>,
-}
-
-impl TempDSB {
-    pub fn new() -> Box<Self> {
-        Box::new(Self {
-            kvs_base: Arc::new(Mutex::new(HashMap::new())),
-        })
-    }
-}
-
-impl DataStorageBase for TempDSB {
-    fn get(&self, entry: &str) -> Box<dyn DataStorage> {
-        TempDS::new(Arc::clone(&self.kvs_base), entry.into())
-    }
-    fn clone(&self) -> Box<dyn DataStorageBase> {
-        Box::new(TempDSB {
-            kvs_base: Arc::clone(&self.kvs_base),
-        })
-    }
+    fn clone(&self) -> Box<dyn DataStorage>;
 }
 
 /// A temporary DataStorage.
 pub struct TempDS {
-    kvs: Arc<Mutex<HashMap<String, HashMap<String, String>>>>,
-    entry: String,
+    kvs: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl TempDS {
     pub fn new(
-        kvs: Arc<Mutex<HashMap<String, HashMap<String, String>>>>,
-        entry: String,
     ) -> Box<Self> {
-        {
-            let mut kvs_lock = kvs.lock().unwrap();
-            if !kvs_lock.contains_key(&entry){
-                kvs_lock.insert(entry.clone(), HashMap::new());
-            }
-        }
-        Box::new(Self { kvs, entry })
+        Box::new(Self { kvs: Arc::new(Mutex::new(HashMap::new()))})
     }
 }
 
@@ -95,8 +52,8 @@ impl DataStorage for TempDS {
             .kvs
             .try_lock()
             .map_err(|e| StorageError::Underlying(e.to_string()))?;
-        if let Some(kvs_entry) = kvs.get_mut(&self.entry) {
-            Ok(kvs_entry.get(key).unwrap_or(&"".to_string()).clone())
+        if let Some(kvs_entry) = kvs.get_mut(key) {
+            Ok(kvs_entry.clone())
         } else {
             Ok("".to_string())
         }
@@ -107,7 +64,7 @@ impl DataStorage for TempDS {
             .kvs
             .try_lock()
             .map_err(|e| StorageError::Underlying(e.to_string()))?;
-        kvs.get_mut(&self.entry).unwrap().insert(key.to_string(), value.to_string());
+        kvs.insert(key.to_string(), value.to_string());
         Ok(())
     }
 
@@ -116,8 +73,12 @@ impl DataStorage for TempDS {
             .kvs
             .try_lock()
             .map_err(|e| StorageError::Underlying(e.to_string()))?;
-        kvs.get_mut(&self.entry).unwrap().remove(key);
+        kvs.remove(key);
         Ok(())
+    }
+
+    fn clone(&self) -> Box<dyn DataStorage>{
+        Box::new(Self{kvs: Arc::clone(&self.kvs)})
     }
 }
 

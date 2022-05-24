@@ -5,6 +5,7 @@
 - BUG: why does the flbrowser not connect directly to a CLI node sometimes?
   - possibility: perhaps it waits for the CLI to connect, and doesn't initiate
     a connection by itself?
+    - make test/fledger-node work again
 - CLEANUP:
   - npm audit in flbrowser - 'npm audit --fix' breaks things
 - send regular `NodeStat`s to the signalling-server
@@ -17,11 +18,9 @@
   - Cleanup
     - add minimal documentation to crates
     - make github workflows pass
+    - correctly interpret old config data
 
 ### Things to do
-
-- CLEANUP:
-  - rename `DataStorage` and perhaps move it back to flarch?
 
 # Dates
 
@@ -31,6 +30,7 @@
 - CLEANUP:
   - move `NodeData` into `Node`
   - `npm audit fix` in flbrowser
+  - rename `DataStorage` and perhaps move it back to flarch?
 
 2022-05-22:
 - Finalize usage of broker-modules in `Node` and `Network`:

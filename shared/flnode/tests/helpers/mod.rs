@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::mpsc::Receiver};
 
-use flarch::data_storage::TempDSB;
+use flarch::data_storage::TempDS;
 use flmodules::{
     broker::{Broker, BrokerError},
     nodeids::U256,
@@ -180,7 +180,7 @@ impl NodeTimer {
             node_config = NodeConfig::new();
         }
         let mut node_data =
-            Node::start_some(TempDSB::new(), node_config, broker_net.clone(), brokers).await?;
+            Node::start_some(TempDS::new(), node_config, broker_net.clone(), brokers).await?;
         let timer = Broker::new();
         node_data.add_timer(timer.clone()).await;
 

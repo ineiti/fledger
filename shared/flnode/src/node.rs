@@ -4,7 +4,7 @@ use log::{error, info};
 use thiserror::Error;
 
 use flarch::{
-    data_storage::{DataStorage, DataStorageBase, StorageError},
+    data_storage::{DataStorage, StorageError},
     tasks::now,
 };
 use flmodules::{
@@ -59,7 +59,7 @@ pub struct Node {
     /// The node configuration
     pub node_config: NodeConfig,
     /// Storage to be used
-    pub storage: Box<dyn DataStorageBase>,
+    pub storage: Box<dyn DataStorage>,
     /// Network broker
     pub broker_net: Broker<NetworkMessage>,
 
@@ -72,8 +72,6 @@ pub struct Node {
     pub gossip: GossipBroker,
     /// Pings all connected nodes and informs about failing nodes
     pub ping: PingBroker,
-
-    gossip_storage: Box<dyn DataStorage>,
 }
 
 pub const CONFIG_NAME: &str = "nodeConfig";
@@ -84,7 +82,7 @@ impl Node {
     /// new messages from the signalling server and from other nodes.
     /// The actual logic is handled in Logic.
     pub async fn start(
-        storage: Box<dyn DataStorageBase>,
+        storage: Box<dyn DataStorage>,
         node_config: NodeConfig,
         broker_net: Broker<NetworkMessage>,
     ) -> Result<Self, NodeError> {
@@ -96,7 +94,7 @@ impl Node {
 
     /// Same as `start`, but only initialize a subset of brokers.
     pub async fn start_some(
-        storage: Box<dyn DataStorageBase>,
+        storage: Box<dyn DataStorage>,
         node_config: NodeConfig,
         broker_net: Broker<NetworkMessage>,
         brokers: Brokers,
@@ -108,7 +106,6 @@ impl Node {
         );
 
         let id = node_config.info.get_id();
-        let gossip_storage = storage.get("fledger");
         let mut nd = Self {
             storage,
             node_config,
@@ -117,13 +114,12 @@ impl Node {
             random: RandomBroker::start(id, Broker::new()).await?,
             gossip: GossipBroker::start(id, Broker::new()).await?,
             ping: PingBroker::start(PingConfig::default(), Broker::new()).await?,
-            gossip_storage,
         };
         if brokers.contains(Brokers::ENABLE_RAND) {
             nd.random = RandomBroker::start(id, nd.broker_net.clone()).await?;
             if brokers.contains(Brokers::ENABLE_GOSSIP) {
                 let mut gossip = GossipBroker::start(id, nd.random.broker.clone()).await?;
-                Self::init_gossip(&mut gossip, &nd.gossip_storage).await?;
+                Self::init_gossip(&mut gossip, &nd.storage).await?;
                 nd.gossip = gossip;
             }
             if brokers.contains(Brokers::ENABLE_PING) {
@@ -169,7 +165,7 @@ impl Node {
         self.gossip.broker.process().await?;
         self.ping.broker.process().await?;
         self.update();
-        self.gossip_storage
+        self.storage
             .set(STORAGE_GOSSIP_EVENTS, &self.gossip.storage.get()?)?;
         Ok(())
     }
@@ -254,13 +250,10 @@ impl Node {
     /// Static method
 
     /// Fetches the config
-    pub fn get_config(storage: Box<dyn DataStorageBase>) -> Result<NodeConfig, NodeError> {
+    pub fn get_config(storage: Box<dyn DataStorage>) -> Result<NodeConfig, NodeError> {
         let client = "unknown";
 
-        // New config place
-        let storage_node = storage.get("fledger");
-
-        let config_str = match storage_node.get(CONFIG_NAME) {
+        let config_str = match storage.get(CONFIG_NAME) {
             Ok(s) => s,
             Err(_) => {
                 log::info!("Couldn't load configuration - start with empty");
@@ -269,7 +262,7 @@ impl Node {
         };
         let mut config = NodeConfig::try_from(config_str)?;
         config.info.client = client.to_string();
-        Self::set_config(storage_node, &config.to_string()?)?;
+        Self::set_config(storage, &config.to_string()?)?;
         Ok(config)
     }
 
@@ -282,7 +275,7 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use flarch::{data_storage::TempDSB, start_logging};
+    use flarch::{data_storage::TempDS, start_logging};
     use flmodules::gossip_events::{
         events::{Category, Event},
         module::GossipIn,
@@ -294,7 +287,7 @@ mod tests {
     async fn test_storage() -> Result<(), Box<dyn std::error::Error>> {
         start_logging();
 
-        let storage = TempDSB::new();
+        let storage = TempDS::new();
         let nc = NodeConfig::new();
         let mut nd = Node::start(storage.clone(), nc.clone(), Broker::new()).await?;
         let event = Event {

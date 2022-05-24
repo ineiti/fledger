@@ -8,7 +8,6 @@ use thiserror::Error;
 use web_rtc_setup::web_rtc_spawner;
 use web_socket_client::WebSocketClient;
 
-pub mod data_storage;
 pub mod web_rtc_setup;
 pub mod web_socket_client;
 pub mod web_socket_server;

@@ -1,34 +1,89 @@
-use crate::data_storage::{DataStorage, DataStorageBase, StorageError};
+use std::{
+    fs::{create_dir_all, remove_file, File},
+    path::PathBuf,
+};
 
-pub struct DataStorageBaseImpl {}
+use crate::data_storage::{DataStorage, StorageError};
 
-impl DataStorageBaseImpl {
-    pub fn new() -> Box<Self> {
-        Box::new(Self{})
+pub struct DataStorageFile {
+    dir: PathBuf,
+    base: String,
+}
+
+impl DataStorageFile {
+    pub fn new(root: String, base: String) -> Self {
+        let mut dir = PathBuf::new();
+        dir.push(root);
+        if !dir.exists() {
+            create_dir_all(dir.clone()).expect("Creating directory");
+        }
+        Self { dir, base }
+    }
+
+    fn name(&self, key: &str) -> PathBuf {
+        let mut name = self.dir.clone();
+        name.push(if self.base.is_empty() {
+            format!("fledger_{}.toml", key)
+        } else {
+            format!("{}_{}.toml", self.base, key)
+        });
+        name
     }
 }
 
-impl DataStorageBase for DataStorageBaseImpl {
-    fn get(&self, _: &str) -> Box<dyn DataStorage> {
-        Box::new(DataStorageImpl {})
-    }
-    fn clone(&self) -> Box<dyn DataStorageBase> {
-        Box::new(DataStorageBaseImpl {})
-    }
-}
+use std::io::prelude::*;
 
-pub struct DataStorageImpl {}
-
-impl DataStorage for DataStorageImpl {
-    fn get(&self, _: &str) -> Result<String, StorageError> {
-        Ok("".to_string())
+impl DataStorage for DataStorageFile {
+    fn get(&self, key: &str) -> Result<String, StorageError> {
+        let name = &self.name(key);
+        Ok(if name.exists() {
+            let mut contents = String::new();
+            File::open(name)
+                .map_err(|e| StorageError::Underlying(format!("While opening file: {:?}", e)))?
+                .read_to_string(&mut contents)
+                .map_err(|e| StorageError::Underlying(format!("While reading file: {:?}", e)))?;
+            contents
+        } else {
+            "".into()
+        })
     }
 
-    fn set(&mut self, _: &str, _: &str) -> Result<(), StorageError> {
+    fn set(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
+        File::create(self.name(key))
+            .map_err(|e| StorageError::Underlying(format!("While creating file: {:?}", e)))?
+            .write_all(value.as_bytes())
+            .map_err(|e| StorageError::Underlying(format!("While writing file: {:?}", e)))?;
         Ok(())
     }
 
-    fn remove(&mut self, _: &str) -> Result<(), StorageError> {
+    fn remove(&mut self, key: &str) -> Result<(), StorageError> {
+        remove_file(self.name(key))
+            .map_err(|e| StorageError::Underlying(format!("While removing file: {:?}", e)))?;
+        Ok(())
+    }
+
+    fn clone(&self) -> Box<dyn DataStorage> {
+        Box::new(DataStorageFile {
+            dir: self.dir.clone(),
+            base: self.base.clone(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
+
+    use super::*;
+
+    #[test]
+    fn write_read() -> Result<(), Box<dyn Error>> {
+        let storage = DataStorageFile::new("/tmp/test".into(), "one".into());
+        storage.set("two", "three")?;
+        assert_eq!("three", storage.get("two")?);
+
+        let storage = DataStorageFile::new("/tmp/test".into(), "one".into());
+        assert_eq!("three", data.get("one").get("two")?);
         Ok(())
     }
 }

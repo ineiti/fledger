@@ -12,7 +12,7 @@ use std::{
 use wasm_bindgen::prelude::*;
 use web_sys::window;
 
-use flarch::data_storage::{DataStorageBase, DataStorageBaseImpl};
+use flarch::data_storage::DataStorageLocal;
 use flmodules::nodeids::U256;
 use flnet::{config::NodeInfo, network::NetworkConnectionState};
 
@@ -109,7 +109,7 @@ impl FledgerWeb {
     }
 
     async fn node_start(node_mutex: Arc<Mutex<Option<Node>>>) -> Result<()> {
-        let my_storage = Box::new(DataStorageBaseImpl {});
+        let my_storage = DataStorageLocal::new("fledger");
         // let ws = WebSocketClient::connect(URL)
         //     .await
         //     .map_err(|e| anyhow!("couldn't create websocket: {:?}", e))?;
@@ -130,7 +130,7 @@ impl FledgerWeb {
     }
 
     fn set_config(data: &str) {
-        if let Err(err) = Node::set_config(DataStorageBaseImpl {}.get("fledger"), data) {
+        if let Err(err) = Node::set_config(DataStorageLocal::new("fledger"), data) {
             log::warn!("Got error while saving config: {}", err);
         }
     }

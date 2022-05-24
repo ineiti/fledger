@@ -1,4 +1,4 @@
-use crate::data_storage::{DataStorageBase, DataStorage, StorageError};
+use crate::data_storage::{DataStorage, StorageError};
 use wasm_bindgen::{prelude::*, JsValue};
 
 #[wasm_bindgen(
@@ -16,24 +16,15 @@ extern "C" {
     pub fn fsunlink(name: &str) -> Result<(), JsValue>;
 }
 
-pub struct DataStorageBaseImpl {}
-
-impl DataStorageBase for DataStorageBaseImpl {
-    fn get(&self, base: &str) -> Box<dyn DataStorage> {
-        Box::new(DataStorageImpl {
-            base: base.to_string(),
-        })
-    }
-    fn clone(&self) -> Box<dyn DataStorageBase> {
-        Box::new(Self {})
-    }
-}
-
-pub struct DataStorageImpl {
+pub struct DataStorageNode {
     base: String,
 }
 
-impl DataStorageImpl {
+impl DataStorageNode {
+    pub fn new(base: String) -> Self {
+        Self { base }
+    }
+    
     fn name(&self, key: &str) -> String {
         if self.base.is_empty() {
             format!("fledger_{}.toml", key)
@@ -43,7 +34,7 @@ impl DataStorageImpl {
     }
 }
 
-impl DataStorage for DataStorageImpl {
+impl DataStorage for DataStorageNode {
     fn get(&self, key: &str) -> Result<String, StorageError> {
         let name = &self.name(key);
         Ok(if fsexists(name) {
@@ -67,5 +58,10 @@ impl DataStorage for DataStorageImpl {
         };
         Ok(())
     }
-}
 
+    fn clone(&self) -> Box<dyn DataStorage> {
+        Box::new(Self {
+            base: self.base.clone(),
+        })
+    }
+}

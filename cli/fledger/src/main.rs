@@ -1,8 +1,8 @@
 use clap::Parser;
 
-use flarch::{data_storage::DataStorageBase, start_logging_filter, tasks::wait_ms};
-use flnet_libc::{data_storage::DataStorageFile, network_start};
-use flnode::{node::Node};
+use flarch::{start_logging_filter, tasks::wait_ms, data_storage::{DataStorageFile, DataStorage}};
+use flnet_libc::network_start;
+use flnode::node::Node;
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug)]
@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     start_logging_filter(vec!["fl"]);
 
     let args = Args::parse();
-    let storage = DataStorageFile::new(args.config);
+    let storage = DataStorageFile::new(args.config, "fledger".into());
     let mut node_config = Node::get_config(storage.clone())?;
     args.name.map(|name| node_config.info.name = name);
 

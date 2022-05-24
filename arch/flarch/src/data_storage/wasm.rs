@@ -1,28 +1,23 @@
 use web_sys::window;
 
-use crate::data_storage::{DataStorage, DataStorageBase, StorageError};
+use crate::data_storage::{DataStorage, StorageError};
 
-pub struct DataStorageBaseImpl {}
+pub struct DataStorageLocal {
+    base: String,
+}
 
-impl DataStorageBase for DataStorageBaseImpl {
-    fn get(&self, base_str: &str) -> Box<dyn DataStorage> {
+impl DataStorageLocal {
+    pub fn new(base_str: &str) -> Box<dyn DataStorage> {
         let base = if base_str.is_empty() {
             "".to_string()
         } else {
             base_str.to_string() + "_"
         };
-        Box::new(DataStorageImpl { base })
-    }
-    fn clone(&self) -> Box<dyn DataStorageBase> {
-        Box::new(DataStorageBaseImpl {})
+        Box::new(DataStorageLocal { base })
     }
 }
 
-pub struct DataStorageImpl {
-    base: String,
-}
-
-impl DataStorage for DataStorageImpl {
+impl DataStorage for DataStorageLocal {
     fn get(&self, key: &str) -> Result<String, StorageError> {
         let key_entry = format!("{}{}", self.base, key);
         Ok(window()
@@ -55,5 +50,9 @@ impl DataStorage for DataStorageImpl {
             .unwrap()
             .remove_item(&key_entry)
             .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))
+    }
+
+    fn clone(&self) -> Box<dyn DataStorage> {
+        Box::new(DataStorageLocal {base: self.base.clone()})
     }
 }
