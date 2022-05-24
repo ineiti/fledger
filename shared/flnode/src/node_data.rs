@@ -1,21 +1,18 @@
 use thiserror::Error;
 
+use flarch::data_storage::{DataStorage, DataStorageBase, StorageError};
 use flmodules::{
+    broker::{Broker, BrokerError},
     gossip_events::{
         broker::GossipBroker,
-        events::{Category, Event},
+        module::{GossipIn, GossipMessage},
     },
     ping::{broker::PingBroker, module::PingConfig},
     timer::TimerMessage,
-    broker::{Broker, BrokerError},
 };
 use flnet::{
     config::{ConfigError, NodeConfig},
     network::{NetCall, NetworkMessage},
-};
-use flarch::{
-    data_storage::{DataStorage, DataStorageBase, StorageError},
-    tasks::now,
 };
 
 use crate::modules::{random::RandomBroker, stat::StatBroker};
@@ -94,7 +91,7 @@ impl NodeData {
             nd.random = RandomBroker::start(id, nd.broker_net.clone()).await?;
             if brokers.contains(Brokers::ENABLE_GOSSIP) {
                 let mut gossip = GossipBroker::start(id, nd.random.broker.clone()).await?;
-                Self::init_gossip(&mut gossip, &nd.gossip_storage, &nd.node_config).await?;
+                Self::init_gossip(&mut gossip, &nd.gossip_storage).await?;
                 nd.gossip = gossip;
             }
             if brokers.contains(Brokers::ENABLE_PING) {
@@ -112,7 +109,6 @@ impl NodeData {
     async fn init_gossip(
         gossip: &mut GossipBroker,
         gossip_storage: &Box<dyn DataStorage>,
-        node_config: &NodeConfig,
     ) -> Result<(), NodeDataError> {
         let gossip_msgs_str = gossip_storage.get(STORAGE_GOSSIP_EVENTS).unwrap();
         if !gossip_msgs_str.is_empty() {
@@ -120,13 +116,12 @@ impl NodeData {
                 log::warn!("Couldn't load gossip messages: {}", e);
             }
         }
+        gossip.storage.set(&gossip_msgs_str)?;
         gossip
-            .add_event(Event {
-                category: Category::NodeInfo,
-                src: node_config.info.get_id(),
-                created: now(),
-                msg: serde_yaml::to_string(&node_config.info)?,
-            })
+            .broker
+            .emit_msg(GossipMessage::Input(GossipIn::SetStorage(
+                gossip.storage.clone(),
+            )))
             .await?;
         Ok(())
     }
@@ -200,11 +195,11 @@ pub enum NodeDataError {
 
 #[cfg(test)]
 mod tests {
+    use flarch::{data_storage::TempDSB, start_logging};
     use flmodules::gossip_events::{
         events::{Category, Event},
         module::GossipIn,
     };
-    use flarch::{data_storage::TempDSB, start_logging};
 
     use super::*;
 
