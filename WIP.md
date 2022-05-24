@@ -5,6 +5,8 @@
 - BUG: why does the flbrowser not connect directly to a CLI node sometimes?
   - possibility: perhaps it waits for the CLI to connect, and doesn't initiate
     a connection by itself?
+- CLEANUP:
+  - npm audit in flbrowser - 'npm audit --fix' breaks things
 - send regular `NodeStat`s to the signalling-server
 - Update docker
 - Create usable crates for a signalling server and webrtc clients
@@ -20,7 +22,6 @@
 
 - CLEANUP:
   - rename `DataStorage` and perhaps move it back to flarch?
-  - npm audit in flbrowser
 
 # Dates
 
@@ -29,6 +30,7 @@
 - BUG: messages get deleted after restart
 - CLEANUP:
   - move `NodeData` into `Node`
+  - `npm audit fix` in flbrowser
 
 2022-05-22:
 - Finalize usage of broker-modules in `Node` and `Network`:
