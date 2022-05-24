@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use flmodules::ping::storage::{PingStat, PingStorage};
 use flnet_wasm::network_start;
-use flnode::{node::Node, node_data::NodeData, version::VERSION_STRING};
+use flnode::{node::Node, version::VERSION_STRING};
 use regex::Regex;
 use std::{
     collections::HashMap,
@@ -97,7 +97,7 @@ impl FledgerWeb {
                         log::error!("Couldn't add message: {:?}", e);
                     }
                 }
-                n.list().await.map_err(|e| anyhow!(e))?;
+                n.request_list().await.map_err(|e| anyhow!(e))?;
                 n.process().await.map_err(|e| anyhow!(e))?;
             } else {
                 log::warn!("Couldn't lock node");
@@ -114,12 +114,12 @@ impl FledgerWeb {
         //     .await
         //     .map_err(|e| anyhow!("couldn't create websocket: {:?}", e))?;
         if let Ok(mut node) = node_mutex.try_lock() {
-            let node_config = NodeData::get_config(my_storage.clone())?;
+            let node_config = Node::get_config(my_storage.clone())?;
             // let webrtc = WebRTCConn::new(web_rtc_spawner()).await?;
             // let network = Network::start(node_config.clone(), ws, webrtc).await?;
             let network = network_start(node_config.clone(), URL).await?;
             *node = Some(
-                Node::new(my_storage, node_config, network)
+                Node::start(my_storage, node_config, network)
                     .await
                     .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?,
             );
@@ -154,7 +154,7 @@ impl FledgerWeb {
 pub struct FledgerState {
     info: NodeInfo,
     nodes_info: HashMap<U256, NodeInfo>,
-    stats: HashMap<U256, NetworkConnectionState>,
+    states: HashMap<U256, NetworkConnectionState>,
     pings: PingStorage,
     msgs: FledgerMessages,
     pub msgs_system: u32,
@@ -193,8 +193,8 @@ struct NodeDesc {
 
 impl FledgerState {
     fn new(node: &Node) -> Result<Self> {
-        let info = node.info();
-        let msgs = node.get_chat_messages();
+        let info = node.node_config.info.clone();
+        let msgs = node.gossip.chat_events();
         let nodes_info = node.nodes_info_all()?;
         Ok(Self {
             info,
@@ -204,8 +204,8 @@ impl FledgerState {
             msgs_system: 0,
             msgs_local: 0,
             mana: 0,
-            stats: node.nodes_stat(),
-            pings: node.nodes_ping(),
+            states: node.stat.states.clone(),
+            pings: node.ping.storage.clone(),
         })
     }
 
@@ -216,7 +216,7 @@ impl FledgerState {
         nodes.sort_by(|a, b| a.1.name.partial_cmp(&b.1.name).unwrap());
         for (id, ni) in &nodes {
             let stat = self
-                .stats
+                .states
                 .get(id)
                 .map(|s| format!("{:?}", s.s.type_local))
                 .unwrap_or("n/a".into());

@@ -2,7 +2,7 @@ use clap::Parser;
 
 use flarch::{data_storage::DataStorageBase, start_logging_filter, tasks::wait_ms};
 use flnet_libc::{data_storage::DataStorageFile, network_start};
-use flnode::{node::Node, node_data::NodeData};
+use flnode::{node::Node};
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug)]
@@ -30,15 +30,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args = Args::parse();
     let storage = DataStorageFile::new(args.config);
-    let mut node_config = NodeData::get_config(storage.clone())?;
+    let mut node_config = Node::get_config(storage.clone())?;
     args.name.map(|name| node_config.info.name = name);
 
     log::info!("Starting app with version {}", VERSION_STRING);
 
     log::debug!("Connecting to websocket at {URL}");
     let network = network_start(node_config.clone(), URL).await?;
-    let mut node = Node::new(Box::new(storage), node_config, network).await?;
-    let nc = node.info();
+    let mut node = Node::start(Box::new(storage), node_config, network).await?;
+    let nc = &node.node_config.info;
     log::info!("Starting node {}: {}", nc.get_id(), nc.name);
 
     log::info!("Started successfully");
@@ -52,9 +52,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if i % 3 == 2 {
             log::info!("Nodes are: {:?}", node.nodes_online()?);
-            let ping = node.nodes_ping();
+            let ping = &node.ping.storage;
             log::info!("Nodes countdowns are: {:?}", ping.stats);
-            log::info!("Chat messages are: {:?}", node.get_chat_messages());
+            log::info!("Chat messages are: {:?}", node.gossip.chat_events());
         }
         wait_ms(1000).await;
     }

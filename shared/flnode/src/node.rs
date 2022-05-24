@@ -9,19 +9,21 @@ use flarch::{
 };
 use flmodules::{
     broker::{Broker, BrokerError},
-    gossip_events::events::{self, Category},
-    nodeids::{NodeID, U256},
-    ping::storage::PingStorage,
+    gossip_events::{
+        broker::GossipBroker,
+        events::{self, Category},
+        module::{GossipIn, GossipMessage},
+    },
+    nodeids::NodeID,
+    ping::{broker::PingBroker, module::PingConfig},
+    timer::TimerMessage,
 };
 use flnet::{
     config::{ConfigError, NodeConfig, NodeInfo},
-    network::{NetCall, NetworkError, NetworkMessage, NetworkConnectionState},
+    network::{NetCall, NetworkError, NetworkMessage},
 };
 
-use crate::{
-    modules::timer::BrokerTimer,
-    node_data::{NodeData, NodeDataError},
-};
+use crate::modules::{random::RandomBroker, stat::StatBroker, timer::BrokerTimer};
 
 #[derive(Error, Debug)]
 pub enum NodeError {
@@ -37,14 +39,41 @@ pub enum NodeError {
     Broker(#[from] BrokerError),
     #[error(transparent)]
     Yaml(#[from] serde_yaml::Error),
-    #[error(transparent)]
-    NodeData(#[from] NodeDataError),
 }
+
+use bitflags::bitflags;
+bitflags! {
+    pub struct Brokers: u32 {
+        const ENABLE_STAT = 0b1;
+        const ENABLE_RAND = 0b10;
+        const ENABLE_GOSSIP = 0b100;
+        const ENABLE_PING = 0b1000;
+        const ENABLE_ALL = 0b1111;
+    }
+}
+
+const STORAGE_GOSSIP_EVENTS: &str = "gossip_events";
 
 /// The node structure holds it all together. It is the main structure of the project.
 pub struct Node {
-    node_data: NodeData,
-    broker_net: Broker<NetworkMessage>,
+    /// The node configuration
+    pub node_config: NodeConfig,
+    /// Storage to be used
+    pub storage: Box<dyn DataStorageBase>,
+    /// Network broker
+    pub broker_net: Broker<NetworkMessage>,
+
+    // Subsystem data
+    /// Stores the connection data
+    pub stat: StatBroker,
+    /// Handles a random number of connections
+    pub random: RandomBroker,
+    /// Gossip-events sent and received
+    pub gossip: GossipBroker,
+    /// Pings all connected nodes and informs about failing nodes
+    pub ping: PingBroker,
+
+    gossip_storage: Box<dyn DataStorage>,
 }
 
 pub const CONFIG_NAME: &str = "nodeConfig";
@@ -54,43 +83,102 @@ impl Node {
     /// This also initializes the network and starts listening for
     /// new messages from the signalling server and from other nodes.
     /// The actual logic is handled in Logic.
-    pub async fn new(
+    pub async fn start(
         storage: Box<dyn DataStorageBase>,
         node_config: NodeConfig,
         broker_net: Broker<NetworkMessage>,
-    ) -> Result<Node, NodeError> {
+    ) -> Result<Self, NodeError> {
+        let mut node =
+            Self::start_some(storage, node_config, broker_net, Brokers::ENABLE_ALL).await?;
+        node.add_timer(BrokerTimer::start()).await;
+        Ok(node)
+    }
+
+    /// Same as `start`, but only initialize a subset of brokers.
+    pub async fn start_some(
+        storage: Box<dyn DataStorageBase>,
+        node_config: NodeConfig,
+        broker_net: Broker<NetworkMessage>,
+        brokers: Brokers,
+    ) -> Result<Self, NodeError> {
         info!(
             "Starting node: {} = {}",
             node_config.info.name,
             node_config.info.get_id()
         );
-        let mut node_data = NodeData::start(storage, node_config, broker_net.clone()).await?;
-        node_data.add_timer(BrokerTimer::start()).await;
 
-        Ok(Node {
-            node_data,
+        let id = node_config.info.get_id();
+        let gossip_storage = storage.get("fledger");
+        let mut nd = Self {
+            storage,
+            node_config,
             broker_net,
-        })
+            stat: StatBroker::start(Broker::new()).await?,
+            random: RandomBroker::start(id, Broker::new()).await?,
+            gossip: GossipBroker::start(id, Broker::new()).await?,
+            ping: PingBroker::start(PingConfig::default(), Broker::new()).await?,
+            gossip_storage,
+        };
+        if brokers.contains(Brokers::ENABLE_RAND) {
+            nd.random = RandomBroker::start(id, nd.broker_net.clone()).await?;
+            if brokers.contains(Brokers::ENABLE_GOSSIP) {
+                let mut gossip = GossipBroker::start(id, nd.random.broker.clone()).await?;
+                Self::init_gossip(&mut gossip, &nd.gossip_storage).await?;
+                nd.gossip = gossip;
+            }
+            if brokers.contains(Brokers::ENABLE_PING) {
+                nd.ping =
+                    PingBroker::start(PingConfig::default(), nd.random.broker.clone()).await?;
+            }
+        }
+        if brokers.contains(Brokers::ENABLE_STAT) {
+            nd.stat = StatBroker::start(nd.broker_net.clone()).await?;
+        }
+
+        Ok(nd)
     }
 
-    /// Return a copy of the current node information
-    pub fn info(&self) -> NodeInfo {
-        self.node_data.node_config.info.clone()
+    /// Adds a timer broker to the Node. Automatically called by Node::start.
+    pub async fn add_timer(&mut self, mut timer: Broker<TimerMessage>) {
+        timer
+            .forward(
+                self.broker_net.clone(),
+                Box::new(|msg| (msg == TimerMessage::Second).then(|| NetCall::Tick.into())),
+            )
+            .await;
+        self.random.add_timer(timer.clone()).await;
+        self.gossip.add_timer(timer.clone()).await;
+        self.ping.add_timer(timer).await;
     }
 
-    /// Requests a list of all connected nodes
-    pub async fn list(&mut self) -> Result<(), NodeError> {
-        self.broker_net
-            .emit_msg(NetCall::SendWSUpdateListRequest.into())
-            .await?;
-        Ok(())
+    /// Update all data-storage. Goes through all storage modules, reads the queues of messages,
+    /// and processes the ones with updated data.
+    pub fn update(&mut self) {
+        self.stat.update();
+        self.random.update();
+        self.gossip.update();
+        self.ping.update();
     }
 
     /// Start processing of network and logic messages, in case they haven't been
     /// called automatically.
     /// Also updates all storage fields in the node_data field.
     pub async fn process(&mut self) -> Result<(), NodeError> {
-        self.node_data.process().await?;
+        self.broker_net.process().await?;
+        self.random.broker.process().await?;
+        self.gossip.broker.process().await?;
+        self.ping.broker.process().await?;
+        self.update();
+        self.gossip_storage
+            .set(STORAGE_GOSSIP_EVENTS, &self.gossip.storage.get()?)?;
+        Ok(())
+    }
+
+    /// Requests a list of all connected nodes
+    pub async fn request_list(&mut self) -> Result<(), NodeError> {
+        self.broker_net
+            .emit_msg(NetCall::SendWSUpdateListRequest.into())
+            .await?;
         Ok(())
     }
 
@@ -104,18 +192,18 @@ impl Node {
     /// Gets the current list of connected nodes - these are the nodes that this node is
     /// currently connected to, and can be shorter than the list of all nodes in the system.
     pub fn nodes_connected(&self) -> Result<Vec<NodeInfo>, NodeError> {
-        self.nodes_info(self.node_data.random.storage.connected.get_nodes().0)
+        self.nodes_info(self.random.storage.connected.get_nodes().0)
     }
 
     /// Returns all currently online nodes in the whole system. Every node will only connect
     /// to a subset of these nodes, which can be get with `nodes_connected`.
     pub fn nodes_online(&self) -> Result<Vec<NodeInfo>, NodeError> {
-        self.nodes_info(self.node_data.random.storage.known.0.clone())
+        self.nodes_info(self.random.storage.known.0.clone())
     }
 
     /// Returns a list of known nodes from the local storage
     pub fn nodes_info_all(&self) -> Result<HashMap<NodeID, NodeInfo>, NodeError> {
-        let events = self.node_data.gossip.events(Category::NodeInfo);
+        let events = self.gossip.events(Category::NodeInfo);
 
         let mut nodeinfos = HashMap::new();
         for ni in events {
@@ -130,38 +218,101 @@ impl Node {
         Ok(nodeinfos)
     }
 
-    /// Returns the data about pinging the nodes
-    pub fn nodes_ping(&self) -> PingStorage {
-        self.node_data.ping.storage.clone()
-    }
-
-    /// Returns the stat data of the connected nodes
-    pub fn nodes_stat(&self) -> HashMap<U256, NetworkConnectionState> {
-        self.node_data.stat.states.clone()
-    }
-
     /// Adds a new chat message that will be broadcasted to the system.
     pub async fn add_chat_message(&mut self, msg: String) -> Result<(), NodeError> {
         let event = events::Event {
             category: events::Category::TextMessage,
-            src: self.node_data.node_config.info.get_id(),
+            src: self.node_config.info.get_id(),
             created: now(),
             msg,
         };
-        self.node_data.gossip.add_event(event).await?;
+        self.gossip.add_event(event).await?;
         Ok(())
     }
 
-    /// Returns all chat messages from the local storage.
-    pub fn get_chat_messages(&self) -> Vec<events::Event> {
-        self.node_data.gossip.chat_events()
+    // Reads the gossip configuration and stores it in the gossip-storage.
+    async fn init_gossip(
+        gossip: &mut GossipBroker,
+        gossip_storage: &Box<dyn DataStorage>,
+    ) -> Result<(), NodeError> {
+        let gossip_msgs_str = gossip_storage.get(STORAGE_GOSSIP_EVENTS).unwrap();
+        if !gossip_msgs_str.is_empty() {
+            if let Err(e) = gossip.storage.set(&gossip_msgs_str) {
+                log::warn!("Couldn't load gossip messages: {}", e);
+            }
+        }
+        gossip.storage.set(&gossip_msgs_str)?;
+        gossip
+            .broker
+            .emit_msg(GossipMessage::Input(GossipIn::SetStorage(
+                gossip.storage.clone(),
+            )))
+            .await?;
+        Ok(())
     }
 
     /// Static method
 
+    /// Fetches the config
+    pub fn get_config(storage: Box<dyn DataStorageBase>) -> Result<NodeConfig, NodeError> {
+        let client = "unknown";
+
+        // New config place
+        let storage_node = storage.get("fledger");
+
+        let config_str = match storage_node.get(CONFIG_NAME) {
+            Ok(s) => s,
+            Err(_) => {
+                log::info!("Couldn't load configuration - start with empty");
+                "".to_string()
+            }
+        };
+        let mut config = NodeConfig::try_from(config_str)?;
+        config.info.client = client.to_string();
+        Self::set_config(storage_node, &config.to_string()?)?;
+        Ok(config)
+    }
+
     /// Updates the config of the node
     pub fn set_config(mut storage: Box<dyn DataStorage>, config: &str) -> Result<(), NodeError> {
         storage.set(CONFIG_NAME, config)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use flarch::{data_storage::TempDSB, start_logging};
+    use flmodules::gossip_events::{
+        events::{Category, Event},
+        module::GossipIn,
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_storage() -> Result<(), Box<dyn std::error::Error>> {
+        start_logging();
+
+        let storage = TempDSB::new();
+        let nc = NodeConfig::new();
+        let mut nd = Node::start(storage.clone(), nc.clone(), Broker::new()).await?;
+        let event = Event {
+            category: Category::TextMessage,
+            src: nc.info.get_id(),
+            created: 0.,
+            msg: "something".into(),
+        };
+        nd.gossip
+            .broker
+            .emit_msg(GossipIn::AddEvent(event.clone()).into())
+            .await?;
+        nd.process().await?;
+
+        let nd2 = Node::start(storage.clone(), nc.clone(), Broker::new()).await?;
+        let events = nd2.gossip.storage.events(Category::TextMessage);
+        assert_eq!(1, events.len());
+        assert_eq!(&event, events.get(0).unwrap());
         Ok(())
     }
 }

@@ -12,7 +12,7 @@ use flnet::{
     web_rtc::{node_connection::NCInput, WebRTCConnMessage},
 };
 
-use flnode::node_data::{Brokers, NodeData, NodeDataError};
+use flnode::node::{NodeError, Brokers, Node};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -20,11 +20,11 @@ pub enum NetworkError {
     #[error(transparent)]
     Broker(#[from] BrokerError),
     #[error(transparent)]
-    NodeData(#[from] NodeDataError),
+    NodeData(#[from] NodeError),
 }
 
 pub struct Network {
-    pub nodes: HashMap<U256, Node>,
+    pub nodes: HashMap<U256, NodeTimer>,
     pub messages: u64,
     node_brokers: HashMap<U256, Broker<NetworkMessage>>,
     node_taps: HashMap<U256, Receiver<NetworkMessage>>,
@@ -74,12 +74,12 @@ impl Network {
 
     async fn new_node(&mut self, brokers: Brokers) -> Result<(), NetworkError> {
         let mut broker = Broker::new();
-        let node = Node::new(broker.clone(), self.nodes.len() as u32, brokers).await?;
-        let id = node.node_data.node_config.info.get_id();
+        let node_timer = NodeTimer::new(broker.clone(), self.nodes.len() as u32, brokers).await?;
+        let id = node_timer.node.node_config.info.get_id();
         let (tap, _) = broker.get_tap().await?;
         self.node_taps.insert(id, tap);
         self.node_brokers.insert(id, broker);
-        self.nodes.insert(id, node);
+        self.nodes.insert(id, node_timer);
         Ok(())
     }
 
@@ -155,18 +155,20 @@ impl Network {
     }
 }
 
-pub struct Node {
-    pub node_data: NodeData,
+pub struct NodeTimer {
+    pub node: Node,
     pub timer: Broker<TimerMessage>,
 }
 
-impl Node {
+impl NodeTimer {
     pub async fn new(
         broker_net: Broker<NetworkMessage>,
         start: u32,
         brokers: Brokers,
-    ) -> Result<Self, NodeDataError> {
+    ) -> Result<Self, NodeError> {
         let mut node_config = NodeConfig::new();
+        // Make sure the public key starts with a hex nibble corresponding to its position in the test.
+        // This simplifies a lot debugging when there are multiple nodes.
         while format!("{:x}", node_config.info.get_id())
             .chars()
             .next()
@@ -178,19 +180,19 @@ impl Node {
             node_config = NodeConfig::new();
         }
         let mut node_data =
-            NodeData::start_some(TempDSB::new(), node_config, broker_net.clone(), brokers).await?;
+            Node::start_some(TempDSB::new(), node_config, broker_net.clone(), brokers).await?;
         let timer = Broker::new();
         node_data.add_timer(timer.clone()).await;
 
-        Ok(Self { node_data, timer })
+        Ok(Self { node: node_data, timer })
     }
 
     pub fn node_info(&self) -> NodeInfo {
-        self.node_data.node_config.info.clone()
+        self.node.node_config.info.clone()
     }
 
     pub async fn process(&mut self) {
-        self.node_data
+        self.node
             .process()
             .await
             .err()
@@ -199,6 +201,6 @@ impl Node {
 
     #[allow(dead_code)]
     pub fn messages(&mut self) -> usize {
-        self.node_data.gossip.chat_events().len()
+        self.node.gossip.chat_events().len()
     }
 }

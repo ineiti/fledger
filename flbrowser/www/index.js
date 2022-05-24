@@ -1,7 +1,6 @@
 import { FledgerWeb } from "fledger-web";
 
 const fw = FledgerWeb.new();
-console.log("started fledger web");
 
 setInterval(() => {
     const state = fw.tick();

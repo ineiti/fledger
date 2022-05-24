@@ -1,7 +1,7 @@
 use flarch::start_logging;
 use flmodules::{broker::Broker, timer::TimerMessage};
-use flnode::node_data::Brokers;
 mod helpers;
+use flnode::node::Brokers;
 use helpers::*;
 
 #[tokio::test]
@@ -20,18 +20,18 @@ async fn ping_n(nbr_nodes: usize) -> Result<(), NetworkError> {
     let mut timer = Broker::new();
     net.add_nodes(Brokers::ENABLE_RAND | Brokers::ENABLE_PING, nbr_nodes)
         .await?;
-    for node in net.nodes.values_mut() {
-        node.node_data.add_timer(timer.clone()).await;
+    for node_timer in net.nodes.values_mut() {
+        node_timer.node.add_timer(timer.clone()).await;
     }
     net.process(5).await;
     timer.emit_msg(TimerMessage::Second).await?;
 
-    for node in net.nodes.values_mut() {
-        node.node_data.update();
-        assert_eq!(0, node.node_data.ping.storage.failed.len());
+    for node_timer in net.nodes.values_mut() {
+        node_timer.node.update();
+        assert_eq!(0, node_timer.node.ping.storage.failed.len());
         assert_eq!(
-            node.node_data.random.storage.connected.0.len(),
-            node.node_data.ping.storage.stats.len()
+            node_timer.node.random.storage.connected.0.len(),
+            node_timer.node.ping.storage.stats.len()
         );
     }
 

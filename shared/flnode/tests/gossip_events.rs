@@ -1,8 +1,8 @@
 use flarch::start_logging;
 use flmodules::{gossip_events::events, nodeids::U256};
-use flnode::node_data::Brokers;
 
 mod helpers;
+use flnode::node::Brokers;
 use helpers::*;
 
 #[tokio::test]
@@ -38,9 +38,9 @@ async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
         let nbr = net
             .nodes
             .values_mut()
-            .map(|node| {
-                node.node_data.update();
-                node.messages()
+            .map(|node_timer| {
+                node_timer.node.update();
+                node_timer.messages()
             })
             .reduce(|n, nbr| n + nbr)
             .unwrap();
@@ -81,8 +81,8 @@ async fn add_chat_message(net: &mut Network, id: &U256, step: i32) {
         created: step as f64,
         msg: "msg".into(),
     };
-    let node = net.nodes.get_mut(id).expect("getting node");
-    node.node_data
+    let node_timer = net.nodes.get_mut(id).expect("getting node");
+    node_timer.node
         .gossip
         .add_event(msg)
         .await
