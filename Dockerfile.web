@@ -1,0 +1,2 @@
+FROM nginx
+COPY flbrowser/www/dist/ /usr/share/nginx/html

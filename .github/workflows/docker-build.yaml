@@ -1,8 +1,9 @@
 name: Docker Build
 on:
   push:
-    branches:
-    - main
+    # DEBUG: enable again
+    # branches:
+    # - main
 
 jobs:
   build:
@@ -13,11 +14,13 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-          node_modules
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
           ~/.npm
+          **/target/
+          flbrowser/www/node_modules
         key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-build-
@@ -32,35 +35,35 @@ jobs:
       run: make update_version
 
     - name: Build signal server
-      run: cargo build --release -p signal
+      run: cd cli && cargo build --release -p flsignal
 
     - name: Build flnode for docker server
-      run: |
-        cd cli/flnode
-        make build
+      run: cd cli && cargo build --release -p fledger
 
     - name: Build web server
-      run: cd web; make build
+      run: cd flbrowser && make build
 
     - name: Docker build signal
       uses: mr-smithers-excellent/docker-build-push@v5
       with:
-        image: fledgre/signal
+        image: fledgre/flsignal
         registry: docker.io
         dockerfile: Dockerfile.signal
+        directory: cli
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
-        tags: latest
+        tags: dev
 
-    - name: Docker build flnode
+    - name: Docker build fledger
       uses: mr-smithers-excellent/docker-build-push@v5
       with:
-        image: fledgre/flnode
+        image: fledgre/fledger
         registry: docker.io
-        dockerfile: Dockerfile.flnode
+        dockerfile: Dockerfile.fledger
+        directory: cli
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
-        tags: latest
+        tags: dev
 
     - name: Docker build web
       uses: mr-smithers-excellent/docker-build-push@v5
@@ -70,7 +73,7 @@ jobs:
         dockerfile: Dockerfile.web
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
-        tags: latest
+        tags: dev
 
   deploy:
     runs-on: ubuntu-latest
@@ -85,6 +88,5 @@ jobs:
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         script: |
-          docker-compose pull
-          docker-compose down
+          docker-compose pull -q
           docker-compose up -d

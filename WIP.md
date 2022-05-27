@@ -12,19 +12,20 @@
 - Create usable crates for a signalling server and webrtc clients
   - add minimal documentation to crates
   - Publish fledger crates in crates.io
-- Update docker
 
 ## Current concrete goal
 
-- Cleanup
-  - correctly interpret old config data
 
 ### Things to do
+
+- Cleanup
+  - correctly interpret old config data
 
 # Dates
 
 2022-05-2x:
 - make github workflows pass
+- Update docker
 
 2022-05-24:
 - DISPLAY: flbrowser displays last ping as descending, but it should increase
