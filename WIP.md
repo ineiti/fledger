@@ -9,20 +9,22 @@
 - CLEANUP:
   - npm audit in flbrowser - 'npm audit --fix' breaks things
 - send regular `NodeStat`s to the signalling-server
-- Update docker
 - Create usable crates for a signalling server and webrtc clients
+  - add minimal documentation to crates
+  - Publish fledger crates in crates.io
+- Update docker
 
 ## Current concrete goal
 
-- Publish fledger crates in crates.io
-  - Cleanup
-    - add minimal documentation to crates
-    - make github workflows pass
-    - correctly interpret old config data
+- Cleanup
+  - correctly interpret old config data
 
 ### Things to do
 
 # Dates
+
+2022-05-2x:
+- make github workflows pass
 
 2022-05-24:
 - DISPLAY: flbrowser displays last ping as descending, but it should increase

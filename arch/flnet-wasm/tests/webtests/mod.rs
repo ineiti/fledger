@@ -1,4 +1,4 @@
-use flnet::network::{node_connection::NCError};
+use flnet::web_rtc::node_connection::NCError;
 use flmodules::broker::BrokerError;
 use thiserror::Error;
 

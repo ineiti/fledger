@@ -1,6 +1,6 @@
 use std::sync::mpsc::Receiver;
 
-use flnet::signal::web_rtc::{PeerMessage, SetupError, WebRTCInput, WebRTCMessage, WebRTCOutput};
+use flnet::web_rtc::messages::{PeerMessage, SetupError, WebRTCInput, WebRTCMessage, WebRTCOutput};
 use flnet_wasm::{web_rtc::WebRTCConnection};
 use flarch::{
     tasks::wait_ms,
@@ -22,7 +22,7 @@ enum TestError {
     #[error(transparent)]
     Logger(#[from] log::SetLoggerError),
     #[error(transparent)]
-    Setup(#[from] flnet::signal::web_rtc::SetupError),
+    Setup(#[from] flnet::web_rtc::messages::SetupError),
 }
 
 #[wasm_bindgen_test]

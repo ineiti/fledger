@@ -1,11 +1,10 @@
 use flnet::{
     config::NodeConfig,
-    network::{Network, NetworkError, NetworkMessage},
-    signal::{web_rtc::{SetupError, WebRTCMessage}, websocket::{WSClientMessage, WSClientOutput}},
+    network::{NetworkError, NetworkMessage},
+    websocket::{WSClientMessage, WSClientOutput},
 };
-use flnet_wasm::web_socket_client::WebSocketClient;
+use flnet_wasm::{network_start, NetworkSetupError};
 use flarch::{tasks::wait_ms};
-use flmodules::{broker::Broker};
 use thiserror::Error;
 use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -19,6 +18,8 @@ enum TestError {
     Broker(#[from] flmodules::broker::BrokerError),
     #[error(transparent)]
     Logger(#[from] log::SetLoggerError),
+    #[error(transparent)]
+    Setup(#[from] NetworkSetupError)
 }
 
 #[wasm_bindgen_test]
@@ -29,18 +30,13 @@ async fn test_websocket() {
     });
 }
 
-pub async fn dummy_webrtc() -> Result<Broker<WebRTCMessage>, SetupError> {
-    Ok(Broker::new())
-}
-
 async fn test_websocket_error() -> Result<(), TestError> {
     // wasm_logger::init(wasm_logger::Config::default());
     // femme::with_level(femme::LevelFilter::Trace);
 
-    let ws = WebSocketClient::connect("ws://localhost:8765").await?;
     let nc = NodeConfig::new();
 
-    let mut net = Network::start(nc, ws, Box::new(|| Box::new(Box::pin(dummy_webrtc())))).await?;
+    let mut net = network_start(nc, "ws://localhost:8765").await?;
 
     let (net_tap, _) = net.get_tap().await?;
     for i in 0..10 {
