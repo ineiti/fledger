@@ -51,7 +51,7 @@ jobs:
         directory: cli
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
-        tags: dev
+        tags: latest
 
     - name: Docker build fledger
       uses: mr-smithers-excellent/docker-build-push@v5
@@ -62,7 +62,7 @@ jobs:
         directory: cli
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
-        tags: dev
+        tags: latest
 
     - name: Docker build web
       uses: mr-smithers-excellent/docker-build-push@v5
@@ -72,7 +72,7 @@ jobs:
         dockerfile: Dockerfile.web
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
-        tags: dev
+        tags: latest
 
   deploy:
     runs-on: ubuntu-latest
