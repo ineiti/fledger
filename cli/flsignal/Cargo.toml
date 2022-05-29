@@ -1,0 +1,22 @@
+[package]
+name = "flsignal"
+version = "0.6.0"
+edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "The signalling server as a CLI"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["network", "signalling", "webrtc"]
+categories = ["network-programming"]
+
+[dependencies]
+flnet = { path = "../../shared/flnet", version = "0.6" }
+flnet-libc = { path = "../../arch/flnet-libc", version = "0.6" }
+flarch = { path = "../../arch/flarch", version = "0.6" }
+
+tokio = { version = "1", features = ["full"] }
+thiserror = "1"
+env_logger = "0.9"
+log = "0.4"

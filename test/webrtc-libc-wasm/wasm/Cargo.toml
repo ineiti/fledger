@@ -1,0 +1,70 @@
+[package]
+name = "fltest-wasm"
+version = "0.6.0"
+edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "Test connection-setup for wasm"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["test", "libc", "webrtc", "websocket", "fledger"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+flarch = {path="../../../arch/flarch", features=["node"], version = "0.6"}
+flnet-wasm = {path = "../../../arch/flnet-wasm", version = "0.6"}
+flnet = {path="../../../shared/flnet", features=["nosend"], version = "0.6"}
+flmodules = {path="../../../shared/flmodules", features=["nosend"], version = "0.6"}
+
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+js-sys = "0.3"
+wasm-bindgen-futures = "0.4"
+futures = { version = "0.3", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_derive = "1"
+serde_json = "1"
+
+rand = { version = "0.7", features = ["wasm-bindgen"] }
+console_error_panic_hook = "0.1"
+async-trait = "0.1"
+wasm-logger = "0.2"
+log = "0.4"
+thiserror = "1"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  'Headers',
+  'Request',
+  'RequestInit',
+  'RequestMode',
+  'Response',
+  'Window',
+  'ReadableStream',
+  "MessageEvent",
+  "RtcPeerConnection",
+  "RtcSignalingState",
+  "RtcSdpType",
+  "RtcSessionDescriptionInit",
+  "RtcPeerConnectionIceEvent",
+  "RtcIceCandidate",
+  "RtcIceCandidateInit",
+  "RtcIceConnectionState",
+  "RtcIceGatheringState",
+  "RtcDataChannel",
+  "RtcDataChannelEvent",
+  "RtcDataChannelState",
+
+  "BinaryType",
+  "Blob",
+  "ErrorEvent",
+  "FileReader",
+  "MessageEvent",
+  "ProgressEvent",
+  "WebSocket",
+  "Location",
+
+]

@@ -1,0 +1,33 @@
+[package]
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "Common implementations for libc and wasm"
+edition = "2021"
+homepage = "https://fledg.re"
+keywords = ["arch", "common", "fledger"]
+license = "MIT OR Apache-2.0"
+name = "flarch"
+readme = "README.md"
+repository = "https://github.com/ineiti/fledger"
+version = "0.6.0"
+
+[features]
+node = ["wasm"]
+wasm = ["dep:wasm-bindgen-futures", "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-timer", "dep:web-sys"]
+
+[dependencies]
+chrono = "0.4"
+env_logger = "0.9"
+futures = "0.3"
+log = "0.4"
+thiserror = "1"
+tokio = {version = "1", features = ["rt", "macros", "time"]}
+
+js-sys = {version = "0.3", optional = true}
+wasm-bindgen = {version = "0.2", features = ["serde-serialize"], optional = true}
+wasm-bindgen-futures = {version = "0.4", optional = true}
+wasm-timer = {version = "0.2", optional = true}
+web-sys = {version = "0.3", optional = true}
+
+[dev-dependencies]
+flexi_logger = "0.22"
+tokio = {version = "1", features = ["rt", "macros"]}

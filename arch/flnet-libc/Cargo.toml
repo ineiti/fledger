@@ -1,0 +1,33 @@
+[package]
+name = "flnet-libc"
+version = "0.6.0"
+edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "Network implementation for libc"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["network", "fledger", "webrtc", "websocket", "libc"]
+categories = ["network-programming"]
+
+[dependencies]
+flnet = { path = "../../shared/flnet", version = "0.6" }
+flmodules = { path = "../../shared/flmodules", version = "0.6" }
+flarch = { path = "../flarch", version = "0.6" }
+
+async-trait = "0.1"
+webrtc = "0.4"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+futures = "0.3"
+thiserror = "1"
+tokio-tungstenite = { version = "0.17", features = ["native-tls"] }
+native-tls = "0.2"
+rand = "0.8"
+
+[dev-dependencies]
+env_logger = "0.9"
+test-log = "0.2"

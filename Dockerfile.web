@@ -1,2 +1,2 @@
 FROM nginx
-COPY web/www/dist/ /usr/share/nginx/html
+COPY flbrowser/www/dist/ /usr/share/nginx/html

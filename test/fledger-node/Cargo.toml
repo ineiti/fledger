@@ -1,0 +1,33 @@
+[package]
+name = "fledger-node"
+version = "0.6.0"
+edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "The fledger server as a CLI using node, to test wasm"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["network", "signalling", "webrtc"]
+categories = ["network-programming"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+local = []
+
+[dependencies]
+flarch = {path="../../arch/flarch", features = ["node"], version = "0.6"}
+flnet-wasm = { path = "../../arch/flnet-wasm", version = "0.6" }
+flmodules = {path="../../shared/flmodules", features = ["nosend"], version = "0.6"}
+flnet = {path="../../shared/flnet", features = ["nosend"], version = "0.6"}
+flnode = {path = "../../shared/flnode", features = ["nosend"], version = "0.6"}
+
+thiserror = "1"
+env_logger = "0.9"
+log = "0.4"
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4"
+console_error_panic_hook = "0.1"
+femme = "2"

@@ -1,28 +1,30 @@
 # Fledger - the fast, fun, easy ledger
 
-The main goal of Fledger is to have a blockchain with nodes that are so
-lightweight that you can run them in the browser.
-When running a node, each user must be able to receive _Mana_ in a reasonable
-timeframe (minutes), so she can use the ledger.
+Fledger's main goal is to create a web3 experience in the browser.
+Once the code starts in your browser, it will connect to other browsers,
+and start sharing your diskspace, CPU, and network bandwidth.
+No need to 
+- install a node on a server, the browser is enough
+- buy a token to participate, your node will receive some after 1 minute
+- get rich by investing early in a Ponzi scheme
 
 For a more thorough introduction to the goals of fledger, see here: [Fledger Docs](https://fledg.re)
 
-A first use-case of Fledger is to have a decentralized webserver:
+A first use-case of Fledger is to have a decentralized chat-application:
 1. A user clicks on the link to the website
 1. The browser downloads the fledger code
-1. Connecting to fledger, the browser gets the data for the website and displays it
-1. While the user reads the website, the browser participates in fledger and
-pays for the view
+1. Connecting to fledger, the browser gets the messages and displays them
 
 But of course there are many more things you can do:
+- Store a decentralized website
 - Decentralized user management like [DARCs](https://www.c4dt.org/article/darc/)
 - Smart contract execution using WASM contracts
 - General storage / backup service
 
-On the technical side, Fledger will have:
-- BFT consensus using ByzCoinX
-- Proof-of-work using transactions instead of hashing
-- Sharding inspired by OmniLedger
+On the technical side, Fledger has / will have:
+- Gossip-based sharing of information
+- Proof-of-participation to distribute _Mana_ to participants (instead of miners)
+- Different consensus layers, depending on the need: implicit trust, ledger based
 
 So the goal is to be able to serve both short-term online users like browsers,
 but also long-term users who have a server where they can run a fledger node.
@@ -34,29 +36,50 @@ What it will never do:
 
 ## State of Fledger
 
-Currently the following components are available:
-- [Signal server](./cli/signal) - for the webRTC rendez-vous
-- [Web node](./web) - for running the node in a browser
-- [CLI node](./cli/flnode) - for running a node in a CLI
-- [Node](./common) - the actual code for the Fledger nodes
+There has been a big rewrite of the first version of Fledger with the goal to:
+- provide libraries for the webrtc-connections
+- separate the different functionalities as standalone modules
+- start implementing a real gossip-based chat application
 
-As a first step, the WebRTC communication has been set up.
-This works now for Chrome, Firefox, and Safari, as well as in the CLI using
-node.
+The code is written in a way that it can run in a wasm environment on
+browser or node, as well as in a libc environment.
+Some of the code can also be reused in other projects.
+
+### Library Crates
+
+A set of _shared_ crates implement the basic functionality, without the actual implementation
+of the network code:
+
+- [Shared libraries](./shared) - generic code usable by both implementations
+  - [Decentralized modules](./shared/flmodules/) - modules that are usable for decentralized projects
+  - [Networking](./shared/flnet) - traits for the Websocket and the WebRTC, as well as a generic
+  implementation of the networking logic
+  - [flnode](./shared/flnode) - a generic implementation of a fledger-node, mostly connecting all
+  _flmodules_ together and with the network
+
+### Binaries
+
+Currently the following components are available that are used to create the fledger-binaries:
+- [Command Line Interfaces](./cli) - command line binaries
+  - [Signalling server](./cli/flsignal) - the signalling server for the WebRTC connections
+  - [Fledger node](./cli/fledger) - a fledger node implementation for the command line
+- [Browser implementation](./flbrowser) - web-frontend using the wasm-implementation
+
+### Implementations and Tests
+
+These are the actual implementations of the WebRTC and Websocket for wasm and libc:
+- [WebRTC and Websocket implementations](./impl) - wasm and libc implementations for WebRTC and Websockets
+  - [Libc implementation](./arch/flnet-libc) - implementations for libc
+  - [Wasm implementation](./arch/flnet-wasm) - implementations for wasm
+  - [Architecture-dependant](./arch/flarch) - traits for the network implemenations, and some arch-dependant implementations
+- [Test directory](./test) - several implementations for testing
 
 ## Next steps
 
 The following next steps are in the pipeline:
-- clean up network and make crates:
-  - for signalling-server
-  - for network-layer
-  - for wasm and linux client
-    - create and publish also an npm package
-    - write test-clients
 - Create a nicer display of the chat, perhaps with markdown display of messages
 - Create a minimum consensus for people to try it out in the browser at
-https://fledg.re
-- Link server nodes with browser nodes
+https://web.fledg.re
 - Create two chains: identity chain for nodes, and a first worker chain
 - Add WASM smart contracts
 - Add sharding to have more than one worker chain
@@ -64,16 +87,15 @@ https://fledg.re
 
 # Running it
 
-The simplest way to run it is to go to https://fledg.re and follow the
+The simplest way to run it is to go to https://web.fledg.re and follow the
 instructions.
 
 ## Running it on a server
 
-Get the `docker-compose.yaml` and run it:
+Supposing you have rust installed, you can run:
 
 ```bash
-wget https://github.com/ineiti/fledger/raw/main/docker-compose.yaml
-docker-compose up -d
+cargo run cli/fledger
 ```
 
 This will create a new file called `fledger.toml` in the `fledger` directory
@@ -84,16 +106,26 @@ be set up.
 
 ## Running it locally for testing
 
-If rust, wasm-pack, and npm is installed in a recent version, you can simply
+If rust, wasm-pack, and npm are installed in a recent version, you can simply
 run it locally by calling:
 
 ```bash
 make serve_local
 ```
 
+This will run a local signalling server and two nodes that start to communicate.
+Additionally you can open your browser and point ot to http://localhost:8080 to
+access the node in the browser.
+
 # Changelog
 
 ```
+- 0.6.0 - 2022-05-??
+  - Rewrite of networking layer
+  - Use real gossiped decentralized message passing
+  - Offer crates for using parts of fledger directly
+- 0.5.0 - 2022-??-??
+  - Rewrote big parts of the library and application to make it more modular
 - 0.4.1 - 2021-09-16
   - Using thiserror::Error instead of String
 - 0.4.0 - 2021-07-27

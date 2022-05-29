@@ -1,5 +1,5 @@
 update_version:
-	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > common/src/node/version.rs
+	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > shared/flnode/src/version.rs
 
 kill_bg:
 	pkill -f signal &
@@ -15,3 +15,14 @@ serve_local: kill_bg build_local
 	make -C web serve &
 	make -C cli/flnode run2
 	open localhost:8080
+
+update_crates:
+	for cargo in $$( find . -name Cargo.toml ); do \
+		echo $$cargo; \
+		(cd $$(dirname $$cargo) && cargo update); \
+	done
+
+unused_crates:
+	for cargo in $$( find . -name Cargo.toml ); do \
+		(cd $$(dirname $$cargo) && cargo +nightly udeps -q ); \
+	done

@@ -1,0 +1,73 @@
+[package]
+name = "flnet-wasm"
+version = "0.6.0"
+edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "Network implementation for wasm"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["webrtc", "websocket", "async-hell", "fledger"]
+categories = ["network-programming", "wasm", "web-programming::websocket"]
+
+[dependencies]
+flnet = {path="../../shared/flnet", features = ["nosend"], version = "0.6"}
+flmodules = {path="../../shared/flmodules", features = ["nosend"], version = "0.6"}
+flarch = {path = "../flarch", features = ["wasm"], version = "0.6"}
+
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+js-sys = "0.3"
+wasm-bindgen-futures = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_derive = "1"
+serde_json = "1"
+
+getrandom = { version = "0.2", features = ["js"] }
+thiserror = "1"
+async-trait = "0.1"
+log = "0.4"
+wasm-timer = "0.2"
+parking_lot = { version = "0.11", features = ["wasm-bindgen"]}
+futures = "0.3"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  'Headers',
+  'Request',
+  'RequestInit',
+  'RequestMode',
+  'Response',
+  'Window',
+  'ReadableStream',
+  "MessageEvent",
+  "RtcConfiguration",
+  "RtcPeerConnection",
+  "RtcSignalingState",
+  "RtcSdpType",
+  "RtcSessionDescriptionInit",
+  "RtcPeerConnectionIceEvent",
+  "RtcIceCandidate",
+  "RtcIceCandidateInit",
+  "RtcIceConnectionState",
+  "RtcIceGatheringState",
+  "RtcDataChannel",
+  "RtcDataChannelEvent",
+  "RtcDataChannelState",
+
+  "BinaryType",
+  "Blob",
+  "ErrorEvent",
+  "FileReader",
+  "MessageEvent",
+  "ProgressEvent",
+  "WebSocket",
+  "Document",
+  "Storage",
+  "Navigator"
+]
+
+[dev-dependencies]
+femme = "2"
+wasm-bindgen-test = "0.3"
