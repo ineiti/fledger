@@ -19,6 +19,7 @@ flarch = { path = "../../arch/flarch", version = "0.6" }
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
 serde_yaml = "0.8"
+serde_with = {version = "1", features = ["hex", "json"]}
 sha2 = "0.10"
 rand = "0.8"
 thiserror = "1"

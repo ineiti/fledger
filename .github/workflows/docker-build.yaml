@@ -1,9 +1,8 @@
 name: Docker Build
 on:
   push:
-    # DEBUG: enable again
-    # branches:
-    # - main
+    branches:
+    - main
 
 jobs:
   build:

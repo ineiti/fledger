@@ -82,13 +82,92 @@ impl EventsStorage {
     }
 
     pub fn get(&self) -> Result<String, serde_yaml::Error> {
-        serde_yaml::to_string(self)
+        serde_yaml::to_string(&EventsStorageSave::V2(self.clone()))
     }
 
     pub fn set(&mut self, data: &str) -> Result<(), serde_yaml::Error> {
-        self.storage = serde_yaml::from_str::<EventsStorage>(data)?.storage;
+        self.storage = EventsStorageSave::from_str(data)?.storage;
         Ok(())
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+enum EventsStorageSave {
+    V1(EventsStorageV1),
+    V2(EventsStorage),
+}
+
+impl EventsStorageSave {
+    fn from_str(data: &str) -> Result<EventsStorage, serde_yaml::Error> {
+        if let Ok(es) = serde_yaml::from_str::<EventsStorageSave>(data) {
+            return Ok(es.to_latest());
+        }
+        serde_yaml::from_str::<EventsStorageV1>(data).map(|es| es.to_latest())
+    }
+
+    fn to_latest(self) -> EventsStorage {
+        match self {
+            EventsStorageSave::V1(es) => es.to_latest(),
+            EventsStorageSave::V2(es) => es,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+struct EventsStorageV1 {
+    storage: HashMap<Category, EventsV1>,
+}
+
+impl EventsStorageV1 {
+    fn to_latest(self) -> EventsStorage {
+        EventsStorage {
+            storage: self
+                .storage
+                .into_iter()
+                .map(|(k, v)| (k, v.to_latest()))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+struct U256V1([u8; 32]);
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+struct EventsV1 {
+    config: CategoryConfig,
+    events: HashMap<U256V1, EventV1>,
+}
+
+impl EventsV1 {
+    fn to_latest(self) -> Events {
+        Events {
+            config: self.config,
+            events: self
+                .events
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        k.0.into(),
+                        Event {
+                            category: v.category,
+                            src: v.src.0.into(),
+                            created: v.created,
+                            msg: v.msg,
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+struct EventV1 {
+    pub category: Category,
+    pub src: U256V1,
+    pub created: f64,
+    pub msg: String,
 }
 
 impl Default for EventsStorage {
@@ -216,6 +295,10 @@ impl Event {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
+    use flarch::now;
+
     use super::*;
 
     #[test]
@@ -283,5 +366,72 @@ mod tests {
         assert_eq!(2, evs.events.len());
         assert!(evs.events.get(&e1.get_id()).is_some());
         assert!(evs.events.get(&e2.get_id()).is_some());
+    }
+
+    #[test]
+    fn test_storage() -> Result<(), Box<dyn Error>> {
+        let esv1 = EventsStorageV1::test();
+        let esv1_str = serde_yaml::to_string(&esv1)?;
+        let mut es = EventsStorage::default();
+        es.set(&esv1_str)?;
+        assert_eq!(esv1, EventsStorageV1::from_v2(es));
+        Ok(())
+    }
+
+    impl EventsStorage {
+        fn test() -> Self {
+            let mut es = EventsStorage::default();
+            es.add_event(Event {
+                category: Category::NodeInfo,
+                src: U256::rnd(),
+                created: now(),
+                msg: "Some info here".into(),
+            });
+            es
+        }
+    }
+
+    impl EventsStorageV1 {
+        fn test() -> Self {
+            Self::from_v2(EventsStorage::test())
+        }
+
+        fn from_v2(es: EventsStorage) -> Self {
+            Self {
+                storage: es
+                    .storage
+                    .into_iter()
+                    .map(|(k, v)| {
+                        (
+                            k,
+                            EventsV1 {
+                                config: v.config,
+                                events: v
+                                    .events
+                                    .into_iter()
+                                    .map(|(k, v)| {
+                                        (
+                                            U256V1::from_u256(k),
+                                            EventV1 {
+                                                category: v.category,
+                                                src: U256V1::from_u256(v.src),
+                                                created: v.created,
+                                                msg: v.msg,
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                            },
+                        )
+                    })
+                    .collect(),
+            }
+        }
+    }
+
+    impl U256V1 {
+        pub fn from_u256(u: U256) -> Self {
+            Self { 0: u.to_bytes() }
+        }
     }
 }

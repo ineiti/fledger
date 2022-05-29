@@ -1,6 +1,7 @@
 use ed25519_compact::{KeyPair, Noise, PublicKey, Seed, Signature};
 use flmodules::nodeids::U256;
 use serde_derive::{Deserialize, Serialize};
+use serde_with::{base64::Base64, serde_as};
 use std::{
     convert::TryFrom,
     fmt::{Debug, Error, Formatter},
@@ -11,6 +12,8 @@ use thiserror::Error;
 pub enum ConfigError {
     #[error("Didn't find public key")]
     PublicKeyMissing,
+    #[error("Couldn't decode")]
+    NoInfo,
     #[error(transparent)]
     DecodeToml1(#[from] toml::de::Error),
     #[error(transparent)]
@@ -18,6 +21,7 @@ pub enum ConfigError {
 }
 
 /// NodeInfo is the public information of the node.
+#[serde_as]
 #[derive(Deserialize, Serialize, Clone)]
 pub struct NodeInfo {
     /// Name of the node, up to 256 bytes
@@ -25,7 +29,21 @@ pub struct NodeInfo {
     /// What client this node runs on - "Node" or the navigator id
     pub client: String,
     /// the public key of the node
+    #[serde_as(as = "Base64")]
     pub pubkey: Vec<u8>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+enum NodeInfoSave {
+    NodeInfoV2(NodeInfo),
+}
+
+impl NodeInfoSave {
+    fn to_latest(self) -> NodeInfo {
+        match self {
+            NodeInfoSave::NodeInfoV2(ni) => ni,
+        }
+    }
 }
 
 impl NodeInfo {
@@ -33,7 +51,7 @@ impl NodeInfo {
     pub fn new(pubkey: PublicKey) -> NodeInfo {
         NodeInfo {
             name: names::Generator::default().next().unwrap(),
-            client: "Node".to_string(),
+            client: "libc".to_string(),
             pubkey: pubkey.as_ref().to_vec(),
         }
     }
@@ -51,6 +69,52 @@ impl NodeInfo {
             Err(_) => return false,
         };
         pubkey.verify(msg, &sig).is_ok()
+    }
+
+    pub fn decode(data: &str) -> Result<Self, ConfigError> {
+        if let Ok(info) = serde_yaml::from_str::<NodeInfoSave>(data) {
+            return Ok(info.to_latest());
+        }
+        NodeInfoV1::from_str(data)
+            .ok_or(ConfigError::NoInfo)
+            .map(|i| i.into())
+    }
+
+    pub fn encode(&self) -> String {
+        serde_yaml::to_string(&NodeInfoSave::NodeInfoV2(self.clone())).unwrap()
+    }
+}
+
+/// NodeInfo is the public information of the node.
+#[derive(Deserialize, Serialize, Clone)]
+pub struct NodeInfoV1 {
+    /// Name of the node, up to 256 bytes
+    pub info: String,
+    /// What client this node runs on - "libc" or the navigator id
+    pub client: String,
+    /// the public key of the node
+    pub pubkey: Vec<u8>,
+}
+
+impl NodeInfoV1 {
+    fn from_str(data: &str) -> Option<Self> {
+        if let Ok(info) = serde_json::from_str::<NodeInfoV1>(data) {
+            return Some(info);
+        }
+        if let Ok(info) = toml::from_str::<NodeInfoV1>(data) {
+            return Some(info);
+        }
+        None
+    }
+}
+
+impl From<NodeInfoV1> for NodeInfo {
+    fn from(ni: NodeInfoV1) -> Self {
+        NodeInfo {
+            name: ni.info,
+            client: ni.client,
+            pubkey: ni.pubkey,
+        }
     }
 }
 
@@ -84,11 +148,13 @@ impl PartialEq for NodeInfo {
 }
 
 /// NodeConfig is stored on the node itself and contains the private key.
+#[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NodeConfig {
     /// info about this node
     pub info: NodeInfo,
     /// the cryptographic keypair as a vector of bytes
+    #[serde_as(as = "Base64")]
     pub keypair: Vec<u8>,
 }
 
@@ -108,43 +174,36 @@ impl NodeConfig {
         }
     }
 
-    /// Returns a toml representation of the config.
-    pub fn to_string(&self) -> Result<String, ConfigError> {
-        let str = toml::to_string(&Toml {
-            v1: Some(self.into()),
-        })?;
-        Ok(str)
+    /// Returns a yaml representation of the config.
+    pub fn encode(&self) -> String {
+        serde_yaml::to_string(&NodeConfigSave::NodeConfigV1(self.clone())).unwrap()
     }
 
-    pub fn sign(&self, msg: [u8; 32]) -> Vec<u8> {
-        let keypair = KeyPair::from_slice(&self.keypair).unwrap();
-        keypair.sk.sign(&msg, Some(Noise::default())).to_vec()
-    }
-}
-
-impl Clone for NodeConfig {
-    fn clone(&self) -> Self {
-        NodeConfig {
-            info: self.info.clone(),
-            keypair: self.keypair.clone(),
+    /// Returns the configuration or an error. Correctly handles
+    /// old toml-configurations.
+    pub fn decode(data: &str) -> Result<Self, ConfigError> {
+        if let Ok(nc) = serde_yaml::from_str::<NodeConfigSave>(data) {
+            return Ok(nc.to_latest());
         }
+        Self::from_toml(data)
     }
-}
 
-/// Parses the string as a config for the node. If the ledger is not available, it returns an error.
-/// If the our_node is missing, it is created.
-impl TryFrom<String> for NodeConfig {
-    type Error = ConfigError;
-    fn try_from(str: String) -> Result<Self, ConfigError> {
-        let t: Toml = if !str.is_empty() {
-            toml::from_str(str.as_str())?
+    /// Returns the signature on the given hash with the private
+    /// key stored in the config. The hash must be of length 32
+    /// bytes.
+    pub fn sign(&self, hash: [u8; 32]) -> Vec<u8> {
+        let keypair = KeyPair::from_slice(&self.keypair).unwrap();
+        keypair.sk.sign(&hash, Some(Noise::default())).to_vec()
+    }
+
+    /// This is for compatibility with old nodes.
+    fn from_toml(data: &str) -> Result<Self, ConfigError> {
+        let t: Toml = if !data.is_empty() {
+            toml::from_str(data)?
         } else {
-            Toml { v1: None }
+            return Ok(NodeConfig::new());
         };
 
-        if t.v1.is_none() {
-            return Ok(NodeConfig::new());
-        }
         let nct = t.v1.unwrap();
         let keypair = match nct.keypair {
             Some(kp) => kp,
@@ -162,6 +221,28 @@ impl TryFrom<String> for NodeConfig {
             info: our_node,
             keypair,
         })
+    }
+}
+
+impl Clone for NodeConfig {
+    fn clone(&self) -> Self {
+        NodeConfig {
+            info: self.info.clone(),
+            keypair: self.keypair.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+enum NodeConfigSave {
+    NodeConfigV1(NodeConfig),
+}
+
+impl NodeConfigSave {
+    fn to_latest(self) -> NodeConfig {
+        match self {
+            NodeConfigSave::NodeConfigV1(nc) => nc,
+        }
     }
 }
 
@@ -210,13 +291,18 @@ struct Toml {
 
 #[cfg(test)]
 mod tests {
+    use flarch::start_logging;
+
     use super::*;
 
     #[test]
     fn save_load() -> Result<(), ConfigError> {
+        start_logging();
+
         let nc = NodeConfig::new();
-        let nc_str = nc.to_string()?;
-        let nc_clone = NodeConfig::try_from(nc_str)?;
+        let nc_str = nc.encode();
+        log::debug!("NodeConfig is: {nc_str}");
+        let nc_clone = NodeConfig::decode(&nc_str)?;
         assert_eq!(nc.keypair, nc_clone.keypair);
         assert_eq!(nc.info.pubkey, nc_clone.info.pubkey);
         Ok(())

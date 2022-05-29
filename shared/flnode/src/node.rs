@@ -11,7 +11,7 @@ use flmodules::{
     broker::{Broker, BrokerError},
     gossip_events::{
         broker::GossipBroker,
-        events::{self, Category},
+        events::{self, Category, Event},
         module::{GossipIn, GossipMessage},
     },
     nodeids::NodeID,
@@ -52,8 +52,6 @@ bitflags! {
     }
 }
 
-const STORAGE_GOSSIP_EVENTS: &str = "gossip_events";
-
 /// The node structure holds it all together. It is the main structure of the project.
 pub struct Node {
     /// The node configuration
@@ -74,7 +72,8 @@ pub struct Node {
     pub ping: PingBroker,
 }
 
-pub const CONFIG_NAME: &str = "nodeConfig";
+const STORAGE_GOSSIP_EVENTS: &str = "gossip_events";
+const STORAGE_CONFIG: &str = "nodeConfig";
 
 impl Node {
     /// Create new node by loading the config from the storage.
@@ -118,9 +117,8 @@ impl Node {
         if brokers.contains(Brokers::ENABLE_RAND) {
             nd.random = RandomBroker::start(id, nd.broker_net.clone()).await?;
             if brokers.contains(Brokers::ENABLE_GOSSIP) {
-                let mut gossip = GossipBroker::start(id, nd.random.broker.clone()).await?;
-                Self::init_gossip(&mut gossip, &nd.storage).await?;
-                nd.gossip = gossip;
+                nd.gossip = GossipBroker::start(id, nd.random.broker.clone()).await?;
+                Self::init_gossip(&mut nd.gossip, &nd.storage, &nd.node_config.info).await?;
             }
             if brokers.contains(Brokers::ENABLE_PING) {
                 nd.ping =
@@ -203,8 +201,8 @@ impl Node {
 
         let mut nodeinfos = HashMap::new();
         for ni in events {
-            // For some reason I cannot get to work the from_str in a .iter().map()
-            match serde_yaml::from_str::<NodeInfo>(&ni.msg) {
+            // For some reason I cannot get it to work the from_str in a .iter().map()
+            match NodeInfo::decode(&ni.msg) {
                 Ok(info) => {
                     nodeinfos.insert(info.get_id(), info);
                 }
@@ -230,6 +228,7 @@ impl Node {
     async fn init_gossip(
         gossip: &mut GossipBroker,
         gossip_storage: &Box<dyn DataStorage>,
+        node_info: &NodeInfo,
     ) -> Result<(), NodeError> {
         let gossip_msgs_str = gossip_storage.get(STORAGE_GOSSIP_EVENTS).unwrap();
         if !gossip_msgs_str.is_empty() {
@@ -237,7 +236,12 @@ impl Node {
                 log::warn!("Couldn't load gossip messages: {}", e);
             }
         }
-        gossip.storage.set(&gossip_msgs_str)?;
+        gossip.storage.add_event(Event {
+            category: Category::NodeInfo,
+            src: node_info.get_id(),
+            created: now(),
+            msg: node_info.encode(),
+        });
         gossip
             .broker
             .emit_msg(GossipMessage::Input(GossipIn::SetStorage(
@@ -253,22 +257,22 @@ impl Node {
     pub fn get_config(storage: Box<dyn DataStorage>) -> Result<NodeConfig, NodeError> {
         let client = "unknown";
 
-        let config_str = match storage.get(CONFIG_NAME) {
+        let config_str = match storage.get(STORAGE_CONFIG) {
             Ok(s) => s,
             Err(_) => {
                 log::info!("Couldn't load configuration - start with empty");
                 "".to_string()
             }
         };
-        let mut config = NodeConfig::try_from(config_str)?;
+        let mut config = NodeConfig::decode(&config_str)?;
         config.info.client = client.to_string();
-        Self::set_config(storage, &config.to_string()?)?;
+        Self::set_config(storage, &config.encode())?;
         Ok(config)
     }
 
     /// Updates the config of the node
     pub fn set_config(mut storage: Box<dyn DataStorage>, config: &str) -> Result<(), NodeError> {
-        storage.set(CONFIG_NAME, config)?;
+        storage.set(STORAGE_CONFIG, config)?;
         Ok(())
     }
 }
@@ -306,6 +310,17 @@ mod tests {
         let events = nd2.gossip.storage.events(Category::TextMessage);
         assert_eq!(1, events.len());
         assert_eq!(&event, events.get(0).unwrap());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_store_node() -> Result<(), Box<dyn std::error::Error>> {
+        start_logging();
+
+        let mut node = Node::start(TempDS::new(), NodeConfig::new(), Broker::new()).await?;
+        node.update();
+        log::debug!("storage is: {:?}", node.gossip.storage);
+        assert_eq!(1, node.gossip.events(Category::NodeInfo).len());
         Ok(())
     }
 }

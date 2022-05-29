@@ -1,6 +1,6 @@
 use rand::random;
-use serde::de::{self, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
+use serde_with::{hex::Hex, serde_as};
 use sha2::digest::{consts::U32, generic_array::GenericArray};
 use std::num::ParseIntError;
 use std::{fmt, str::FromStr};
@@ -16,8 +16,9 @@ pub enum ParseError {
 
 /// Nicely formatted 256 bit structure
 // #[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct U256([u8; 32]);
+#[serde_as]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct U256(#[serde_as(as = "Hex")] [u8; 32]);
 
 impl fmt::Display for U256 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -102,44 +103,6 @@ impl fmt::LowerHex for U256 {
             f.write_fmt(format_args!("{:02x}", byte))?;
         }
         Ok(())
-    }
-}
-
-// Implements a serializer that shows the U256 in a nicer way. Instead of creating an array of u8,
-// it gives a string of hex values.
-impl Serialize for U256 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&format!("{:x}", self))
-    }
-}
-
-struct U256Visitor;
-
-impl<'de> Visitor<'de> for U256Visitor {
-    type Value = U256;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a hex string")
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        U256::from_str(value)
-            .map_err(|_| de::Error::invalid_value(de::Unexpected::Str(value), &self))
-    }
-}
-
-impl<'de> Deserialize<'de> for U256 {
-    fn deserialize<D>(deserializer: D) -> Result<U256, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_str(U256Visitor)
     }
 }
 

@@ -1,4 +1,5 @@
 use itertools::concat;
+use core::panic;
 use std::fmt;
 
 use async_trait::async_trait;
@@ -11,7 +12,7 @@ use flmodules::{
 
 use crate::{
     config::{NodeConfig, NodeInfo},
-    signal::{MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode},
+    signal::{MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION},
     web_rtc::{
         messages::{ConnType, PeerInfo, SetupError, SignalingState},
         node_connection::{Direction, NCInput, NCOutput},
@@ -91,6 +92,9 @@ impl Network {
             };
         match msg_node {
             WSSignalMessageToNode::Challenge(version, challenge) => {
+                if version != SIGNAL_VERSION {
+                    panic!("Wrong signal-server version: got {version}, expected {SIGNAL_VERSION}.");
+                }
                 let ma = MessageAnnounce {
                     version,
                     challenge,

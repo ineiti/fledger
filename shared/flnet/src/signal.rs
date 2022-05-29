@@ -10,6 +10,7 @@ use flmodules::{
     nodeids::U256,
 };
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, base64::Base64};
 
 use crate::{config::NodeInfo, websocket::WSServerInput, web_rtc::messages::PeerInfo};
 
@@ -47,6 +48,8 @@ pub struct SignalServer {
     ttl: HashMap<usize, u64>,
     ttl_init: u64,
 }
+
+pub const SIGNAL_VERSION: u64 = 3;
 
 impl SignalServer {
     /// Creates a new SignalServer.
@@ -145,7 +148,7 @@ impl SignalServer {
         self.connection_ids.insert(challenge, index);
         self.ttl.insert(index, self.ttl_init);
         let challenge_msg =
-            serde_json::to_string(&WSSignalMessageToNode::Challenge(2u64, challenge)).unwrap();
+            serde_json::to_string(&WSSignalMessageToNode::Challenge(SIGNAL_VERSION, challenge)).unwrap();
         vec![WSServerInput::Message((index, challenge_msg)).into()]
     }
 
@@ -288,11 +291,13 @@ impl std::fmt::Display for WSSignalMessageFromNode {
     }
 }
 
+#[serde_as]
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct MessageAnnounce {
     pub version: u64,
     pub challenge: U256,
     pub node_info: NodeInfo,
+    #[serde_as(as="Base64")]
     pub signature: Vec<u8>,
 }
 
