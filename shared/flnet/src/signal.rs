@@ -8,11 +8,12 @@ use bimap::BiMap;
 use flmodules::{
     broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
     nodeids::U256,
+    timer::{BrokerTimer, TimerMessage},
 };
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, base64::Base64};
+use serde_with::{base64::Base64, serde_as};
 
-use crate::{config::NodeInfo, websocket::WSServerInput, web_rtc::messages::PeerInfo};
+use crate::{config::NodeInfo, web_rtc::messages::PeerInfo, websocket::WSServerInput};
 
 use super::websocket::{WSServerMessage, WSServerOutput};
 
@@ -46,7 +47,7 @@ pub struct SignalServer {
     connection_ids: BiMap<U256, usize>,
     info: HashMap<U256, NodeInfo>,
     ttl: HashMap<usize, u64>,
-    ttl_init: u64,
+    ttl_minutes: u64,
 }
 
 pub const SIGNAL_VERSION: u64 = 3;
@@ -55,7 +56,7 @@ impl SignalServer {
     /// Creates a new SignalServer.
     pub async fn new(
         ws_server: Broker<WSServerMessage>,
-        ttl_init: u64,
+        ttl_minutes: u64,
     ) -> Result<Broker<SignalMessage>, BrokerError> {
         let mut broker = Broker::new();
         broker
@@ -63,7 +64,7 @@ impl SignalServer {
                 connection_ids: BiMap::new(),
                 info: HashMap::new(),
                 ttl: HashMap::new(),
-                ttl_init,
+                ttl_minutes,
             })))
             .await?;
         broker
@@ -71,6 +72,15 @@ impl SignalServer {
                 ws_server,
                 Box::new(Self::link_wss_ss),
                 Box::new(Self::link_ss_wss),
+            )
+            .await;
+        BrokerTimer::start()
+            .forward(
+                broker.clone(),
+                Box::new(|msg| {
+                    matches!(msg, TimerMessage::Minute)
+                        .then(|| SignalMessage::Input(SignalInput::Timer))
+                }),
             )
             .await;
         Ok(broker)
@@ -105,7 +115,7 @@ impl SignalServer {
             WSServerOutput::Message((index, msg_s)) => {
                 self.ttl
                     .entry(index.clone())
-                    .and_modify(|ttl| *ttl = self.ttl_init);
+                    .and_modify(|ttl| *ttl = self.ttl_minutes);
                 if let Ok(msg_ws) = serde_json::from_str::<WSSignalMessageFromNode>(&msg_s) {
                     return self.msg_ws_process(index, msg_ws);
                 }
@@ -146,9 +156,10 @@ impl SignalServer {
         log::debug!("Sending challenge to new connetion");
         let challenge = U256::rnd();
         self.connection_ids.insert(challenge, index);
-        self.ttl.insert(index, self.ttl_init);
+        self.ttl.insert(index, self.ttl_minutes);
         let challenge_msg =
-            serde_json::to_string(&WSSignalMessageToNode::Challenge(SIGNAL_VERSION, challenge)).unwrap();
+            serde_json::to_string(&WSSignalMessageToNode::Challenge(SIGNAL_VERSION, challenge))
+                .unwrap();
         vec![WSServerInput::Message((index, challenge_msg)).into()]
     }
 
@@ -297,7 +308,7 @@ pub struct MessageAnnounce {
     pub version: u64,
     pub challenge: U256,
     pub node_info: NodeInfo,
-    #[serde_as(as="Base64")]
+    #[serde_as(as = "Base64")]
     pub signature: Vec<u8>,
 }
 

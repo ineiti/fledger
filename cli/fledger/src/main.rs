@@ -2,11 +2,11 @@ use clap::Parser;
 
 use flarch::{
     data_storage::{DataStorage, DataStorageFile},
-    start_logging_filter,
     tasks::wait_ms,
 };
+use flnet::signal::SIGNAL_VERSION;
 use flnet_libc::network_start;
-use flnode::node::Node;
+use flnode::{node::Node, version::VERSION_STRING};
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug)]
@@ -27,20 +27,30 @@ struct Args {
     /// Signalling server URL
     #[clap(short, long, default_value = "wss://signal.fledg.re")]
     signal_url: String,
-}
 
-const VERSION_STRING: &str = "123";
+    /// Verbosity of the logger
+    #[clap(flatten)]
+    verbosity: clap_verbosity_flag::Verbosity,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    start_logging_filter(vec!["fl"]);
-
     let args = Args::parse();
+
+    let mut logger = env_logger::Builder::new();
+    logger.filter_module("fl", args.verbosity.log_level_filter());
+    logger.parse_env("RUST_LOG");
+    logger.try_init().expect("Failed to initialize logger");
+
     let storage = DataStorageFile::new(args.config, "fledger".into());
     let mut node_config = Node::get_config(storage.clone())?;
     args.name.map(|name| node_config.info.name = name);
 
-    log::info!("Starting app with version {}", VERSION_STRING);
+    log::info!(
+        "Starting app with version {}/{}",
+        SIGNAL_VERSION,
+        VERSION_STRING
+    );
 
     log::debug!("Connecting to websocket at {}", args.signal_url);
     let network = network_start(node_config.clone(), &args.signal_url).await?;

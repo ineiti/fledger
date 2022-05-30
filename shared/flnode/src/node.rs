@@ -16,14 +16,14 @@ use flmodules::{
     },
     nodeids::NodeID,
     ping::{broker::PingBroker, module::PingConfig},
-    timer::TimerMessage,
+    timer::{BrokerTimer, TimerMessage},
 };
 use flnet::{
     config::{ConfigError, NodeConfig, NodeInfo},
     network::{NetCall, NetworkError, NetworkMessage},
 };
 
-use crate::modules::{random::RandomBroker, stat::StatBroker, timer::BrokerTimer};
+use crate::modules::{random::RandomBroker, stat::StatBroker};
 
 #[derive(Error, Debug)]
 pub enum NodeError {

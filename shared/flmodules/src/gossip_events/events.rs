@@ -22,7 +22,7 @@ impl EventsStorage {
             Events {
                 config: CategoryConfig {
                     unique: false,
-                    max_events: 20,
+                    max_events: 50,
                 },
                 events: HashMap::new(),
             },
@@ -32,7 +32,7 @@ impl EventsStorage {
             Events {
                 config: CategoryConfig {
                     unique: true,
-                    max_events: 50,
+                    max_events: 100,
                 },
                 events: HashMap::new(),
             },
