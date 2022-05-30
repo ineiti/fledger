@@ -41,17 +41,20 @@
         <button id="send_msg" type="button" class="btn btn-primary" style="float: right;">Send</button>
 
         <br>
-        <h3>Messages</h3>
-        <div id="messages"></div>
-
-        <br>
         <h3>Statistics</h3>
         <ul>
+          <li>Nodes connected: <span id="nodes_connected"></span></li>
           <li>Nodes online: <span id="nodes_online"></span></li>
+          <li>Nodes known: <span id="nodes_known"></span></li>
           <!-- <li>Messages stored total: <span id="msgs_system"></span></li>
           <li>Messages stored locally: <span id="msgs_local"></span></li>
           <li>Mana: <span id="mana"></span></li> -->
         </ul>
+
+        <br>
+        <h3>Messages</h3>
+        <div id="messages"></div>
+
       </div>
       <div class="tab-pane fade" id="status" role="tabpanel" aria-labelledby="profile-tab">
         <p>The goal of Fledger is to have a full node running in the web browser.

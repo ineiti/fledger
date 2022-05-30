@@ -160,7 +160,9 @@ pub struct FledgerState {
     pub msgs_system: u32,
     pub msgs_local: u32,
     pub mana: u32,
+    pub nodes_known: usize,
     pub nodes_online: usize,
+    pub nodes_connected: usize,
 }
 
 #[wasm_bindgen]
@@ -198,7 +200,9 @@ impl FledgerState {
         let nodes_info = node.nodes_info_all()?;
         Ok(Self {
             info,
-            nodes_online: nodes_info.len(),
+            nodes_known: nodes_info.len(),
+            nodes_online: node.nodes_online()?.len(),
+            nodes_connected: node.nodes_connected()?.len(),
             msgs: FledgerMessages::new(msgs, &nodes_info.clone().into_values().collect()),
             nodes_info,
             msgs_system: 0,

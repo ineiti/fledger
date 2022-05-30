@@ -28,7 +28,9 @@ function update_html(state) {
     sh("node_info", state.get_node_name());
     sh("version", state.get_version());
     sh("messages", state.get_msgs())
+    sh("nodes_known", state.nodes_known);
     sh("nodes_online", state.nodes_online);
+    sh("nodes_connected", state.nodes_connected);
 //     sh("msgs_system", state.msgs_system);
 //     sh("msgs_local", state.msgs_local);
 //     sh("mana", state.mana);
