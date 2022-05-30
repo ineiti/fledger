@@ -88,4 +88,5 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         script: |
           docker-compose pull -q
+          docker-compose down
           docker-compose up -d

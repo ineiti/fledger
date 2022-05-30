@@ -1,6 +1,10 @@
 use clap::Parser;
 
-use flarch::{start_logging_filter, tasks::wait_ms, data_storage::{DataStorageFile, DataStorage}};
+use flarch::{
+    data_storage::{DataStorage, DataStorageFile},
+    start_logging_filter,
+    tasks::wait_ms,
+};
 use flnet_libc::network_start;
 use flnode::node::Node;
 
@@ -9,7 +13,7 @@ use flnode::node::Node;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// Path to the configuration directory
-    #[clap(short, long, default_value = "./fledger")]
+    #[clap(short, long, default_value = "./flnode")]
     config: String,
 
     /// Set the name of the node - reverts to a random value if not given
@@ -19,10 +23,13 @@ struct Args {
     /// Uptime interval - to stress test disconnections
     #[clap(short, long)]
     uptime_sec: Option<usize>,
+
+    /// Signalling server URL
+    #[clap(short, long, default_value = "wss://signal.fledg.re")]
+    signal_url: String,
 }
 
 const VERSION_STRING: &str = "123";
-const URL: &str = "ws://localhost:8765";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -35,8 +42,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     log::info!("Starting app with version {}", VERSION_STRING);
 
-    log::debug!("Connecting to websocket at {URL}");
-    let network = network_start(node_config.clone(), URL).await?;
+    log::debug!("Connecting to websocket at {}", args.signal_url);
+    let network = network_start(node_config.clone(), &args.signal_url).await?;
     let mut node = Node::start(Box::new(storage), node_config, network).await?;
     let nc = &node.node_config.info;
     log::info!("Starting node {}: {}", nc.get_id(), nc.name);
