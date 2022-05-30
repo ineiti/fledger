@@ -110,13 +110,8 @@ impl FledgerWeb {
 
     async fn node_start(node_mutex: Arc<Mutex<Option<Node>>>) -> Result<()> {
         let my_storage = DataStorageLocal::new("fledger");
-        // let ws = WebSocketClient::connect(URL)
-        //     .await
-        //     .map_err(|e| anyhow!("couldn't create websocket: {:?}", e))?;
         if let Ok(mut node) = node_mutex.try_lock() {
             let node_config = Node::get_config(my_storage.clone())?;
-            // let webrtc = WebRTCConn::new(web_rtc_spawner()).await?;
-            // let network = Network::start(node_config.clone(), ws, webrtc).await?;
             let network = network_start(node_config.clone(), URL).await?;
             *node = Some(
                 Node::start(my_storage, node_config, network)
