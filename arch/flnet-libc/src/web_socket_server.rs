@@ -72,6 +72,14 @@ impl WebSocketServer {
 
         Ok(broker)
     }
+
+    fn stop(&self) -> Vec<(Destination, WSServerMessage)> {
+        self.conn_thread.abort();
+        return vec![(
+            Destination::Others,
+            WSServerMessage::Output(WSServerOutput::Stopped),
+        )];
+    }
 }
 
 #[async_trait]
@@ -86,16 +94,15 @@ impl SubsystemListener<WSServerMessage> for WebSocketServer {
                     WSServerInput::Message((id, msg)) => {
                         let mut connections = self.connections.lock().await;
                         if let Some(conn) = connections.get_mut(id) {
-                            conn.send(msg).await.unwrap();
+                            if let Err(e) = conn.send(msg).await {
+                                log::error!("Error while sending: {e}");
+                                return self.stop();
+                            }
                         }
                     }
                     WSServerInput::Stop => {
                         log::warn!("Stopping thread");
-                        self.conn_thread.abort();
-                        return vec![(
-                            Destination::Others,
-                            WSServerMessage::Output(WSServerOutput::Stopped),
-                        )];
+                        return self.stop();
                     }
                 }
             }
@@ -172,8 +179,8 @@ impl WSConnection {
 mod tests {
     use super::*;
     use crate::web_socket_client::WebSocketClient;
-    use flnet::websocket::{WSClientInput, WSClientMessage, WSClientOutput};
     use flarch::start_logging;
+    use flnet::websocket::{WSClientInput, WSClientMessage, WSClientOutput};
     use std::sync::mpsc::Receiver;
 
     async fn send_client_server(
