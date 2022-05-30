@@ -87,7 +87,7 @@ impl Node {
     ) -> Result<Self, NodeError> {
         let mut node =
             Self::start_some(storage, node_config, broker_net, Brokers::ENABLE_ALL).await?;
-        node.add_timer(BrokerTimer::start()).await;
+        node.add_timer(BrokerTimer::start().await?).await;
         Ok(node)
     }
 
