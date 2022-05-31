@@ -26,3 +26,12 @@ unused_crates:
 	for cargo in $$( find . -name Cargo.toml ); do \
 		(cd $$(dirname $$cargo) && cargo +nightly udeps -q ); \
 	done
+
+docker_dev:
+	cd cli && \
+	cargo build --release -p flsignal && \
+	cargo build --release -p fledger
+	docker build cli -f Dockerfile.fledger -t fledgre/fledger:dev
+	docker build cli -f Dockerfile.flsignal -t fledgre/flsignal:dev
+	docker push fledgre/fledger:dev
+	docker push fledgre/flsignal:dev

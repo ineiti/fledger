@@ -47,7 +47,7 @@ jobs:
       with:
         image: fledgre/flsignal
         registry: docker.io
-        dockerfile: Dockerfile.signal
+        dockerfile: Dockerfile.flsignal
         directory: cli
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
