@@ -11,11 +11,12 @@
   - add `build` and `test` to main `Makefile` instead of only having it in
   the github-workflow
   - make all tests pass again
-- send regular `NodeStat`s to the signalling-server
-- a change in the version of the signalling server should stop `fledger` and `flbrowser`
-- Create usable crates for a signalling server and webrtc clients
-  - add minimal documentation to crates
-  - Publish fledger crates in crates.io
+- FEATURES:
+  - send regular `NodeStat`s to the signalling-server
+  - a change in the version of the signalling server should stop `fledger` and `flbrowser`
+  - Create usable crates for a signalling server and webrtc clients
+    - add minimal documentation to crates
+    - Publish fledger crates in crates.io
 
 ## Current concrete goal
 

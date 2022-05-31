@@ -28,10 +28,11 @@ unused_crates:
 	done
 
 docker_dev:
-	cd cli && \
-	cargo build --release -p flsignal && \
-	cargo build --release -p fledger
-	docker build cli -f Dockerfile.fledger -t fledgre/fledger:dev
-	docker build cli -f Dockerfile.flsignal -t fledgre/flsignal:dev
-	docker push fledgre/fledger:dev
-	docker push fledgre/flsignal:dev
+	rustup target add x86_64-unknown-linux-gnu
+	mkdir -p cli/target/debug-x86
+	docker run -ti -v $(PWD):/mnt/fledger:cached \
+		rust:latest /mnt/fledger/run_docker.sh
+	for cli in fledger flsignal; do \
+		docker build cli/target/debug-x86 -f Dockerfile.$$cli -t fledgre/$$cli:dev && \
+		docker push fledgre/$$cli:dev; \
+	done
