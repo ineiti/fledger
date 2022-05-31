@@ -41,6 +41,7 @@ pub enum SignalOutput {
     WebSocket((U256, WSSignalMessageFromNode)),
     NodeStats(Vec<NodeStat>),
     NewNode(U256),
+    Stopped
 }
 
 pub struct SignalServer {
@@ -120,9 +121,9 @@ impl SignalServer {
                     return self.msg_ws_process(index, msg_ws);
                 }
             }
-            WSServerOutput::Connect(index) => return self.msg_ws_connect(index),
-            WSServerOutput::Disconnect(id) => self.remove_node(id),
-            WSServerOutput::Stopped => todo!(),
+            WSServerOutput::NewConnection(index) => return self.msg_ws_connect(index),
+            WSServerOutput::Disconnection(id) => self.remove_node(id),
+            WSServerOutput::Stopped => return vec![SignalMessage::Output(SignalOutput::Stopped)],
         }
         vec![]
     }

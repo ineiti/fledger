@@ -48,14 +48,15 @@ pub enum WSServerMessage {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum WSServerOutput {
     Message((usize, String)),
-    Connect(usize),
-    Disconnect(usize),
+    NewConnection(usize),
+    Disconnection(usize),
     Stopped,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum WSServerInput {
     Message((usize, String)),
+    Close(usize),
     Stop,
 }
 

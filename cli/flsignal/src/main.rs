@@ -1,5 +1,5 @@
 use clap::Parser;
-use flnet::signal::SignalServer;
+use flnet::signal::{SignalMessage, SignalOutput, SignalServer};
 use flnet_libc::web_socket_server::WebSocketServer;
 
 /// Fledger signalling server
@@ -27,6 +27,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Started listening on port 8765");
     for msg in msgs {
         log::debug!("{:?}", msg);
+        if matches!(msg, SignalMessage::Output(SignalOutput::Stopped)) {
+            log::error!("Server stopped working - exiting");
+            return Ok(());
+        }
     }
     Ok(())
 }

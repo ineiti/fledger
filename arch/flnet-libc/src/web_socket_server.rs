@@ -8,6 +8,8 @@ use futures::{
 use thiserror::Error;
 use tokio::{
     net::{TcpListener, TcpStream},
+    select,
+    sync::oneshot,
     task::JoinHandle,
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
@@ -50,7 +52,7 @@ impl WebSocketServer {
                             log::trace!("Got new connection");
                             connections_cl.lock().await.push(conn);
                             broker_cl
-                                .emit_msg(WSServerMessage::Output(WSServerOutput::Connect(
+                                .emit_msg(WSServerMessage::Output(WSServerOutput::NewConnection(
                                     connection_id,
                                 )))
                                 .await
@@ -72,14 +74,6 @@ impl WebSocketServer {
 
         Ok(broker)
     }
-
-    fn stop(&self) -> Vec<(Destination, WSServerMessage)> {
-        self.conn_thread.abort();
-        return vec![(
-            Destination::Others,
-            WSServerMessage::Output(WSServerOutput::Stopped),
-        )];
-    }
 }
 
 #[async_trait]
@@ -96,13 +90,23 @@ impl SubsystemListener<WSServerMessage> for WebSocketServer {
                         if let Some(conn) = connections.get_mut(id) {
                             if let Err(e) = conn.send(msg).await {
                                 log::error!("Error while sending: {e}");
-                                return self.stop();
+                                conn.close();
                             }
+                        }
+                    }
+                    WSServerInput::Close(id) => {
+                        let mut connections = self.connections.lock().await;
+                        if let Some(conn) = connections.get_mut(id) {
+                            conn.close();
                         }
                     }
                     WSServerInput::Stop => {
                         log::warn!("Stopping thread");
-                        return self.stop();
+                        self.conn_thread.abort();
+                        return vec![(
+                            Destination::Others,
+                            WSServerMessage::Output(WSServerOutput::Stopped),
+                        )];
                     }
                 }
             }
@@ -113,6 +117,7 @@ impl SubsystemListener<WSServerMessage> for WebSocketServer {
 
 pub struct WSConnection {
     websocket: SplitSink<WebSocketStream<TcpStream>, Message>,
+    tx: Option<oneshot::Sender<bool>>,
 }
 
 impl WSConnection {
@@ -125,43 +130,61 @@ impl WSConnection {
             .await
             .map_err(|e| WSError::Underlying(e.to_string()))?;
         let (wr, rd) = websocket.split();
-        let uwsc = WSConnection { websocket: wr };
+        let (tx, rx) = oneshot::channel();
+        let uwsc = WSConnection {
+            websocket: wr,
+            tx: Some(tx),
+        };
 
-        WSConnection::loop_read(broker, rd, id).await;
+        WSConnection::loop_read(broker, rd, rx, id).await;
         Ok(uwsc)
     }
 
     async fn loop_read(
         mut broker: Broker<WSServerMessage>,
         mut ws: SplitStream<WebSocketStream<TcpStream>>,
+        mut rx: oneshot::Receiver<bool>,
         id: usize,
     ) {
         tokio::spawn(async move {
             loop {
-                if let Some(msg_ws) = ws.next().await {
-                    if let Some(out) = match msg_ws {
-                        Ok(msg) => match msg {
-                            Message::Text(s) => {
-                                Some(WSServerMessage::Output(WSServerOutput::Message((id, s))))
-                            }
-                            Message::Close(_) => {
-                                Some(WSServerMessage::Output(WSServerOutput::Disconnect(id)))
-                            }
-                            _ => None,
-                        },
-                        Err(e) => {
-                            log::warn!("Closing connection because of error: {e:?}");
-                            Some(WSServerMessage::Output(WSServerOutput::Disconnect(id)))
-                        }
-                    } {
+                select! {
+                    _ = (&mut rx) => {
                         broker
-                            .emit_msg(out.clone())
-                            .await
-                            .expect("While sending message to broker.");
-                        if matches!(out, WSServerMessage::Output(WSServerOutput::Disconnect(_))) {
-                            break;
+                        .emit_msg(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
+                        .await
+                        .expect("While sending message to broker.");
+                        return;
+                    },
+                    ws_out = ws.next() =>
+                        if let Some(msg_ws) = ws_out {
+                            if let Some(out) = match msg_ws {
+                                Ok(msg) => match msg {
+                                    Message::Text(s) => {
+                                        Some(WSServerMessage::Output(WSServerOutput::Message((id, s))))
+                                    }
+                                    Message::Close(_) => {
+                                        Some(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
+                                    }
+                                    _ => None,
+                                },
+                                Err(e) => {
+                                    log::warn!("Closing connection because of error: {e:?}");
+                                    Some(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
+                                }
+                            } {
+                                broker
+                                    .emit_msg(out.clone())
+                                    .await
+                                    .expect("While sending message to broker.");
+                                if matches!(
+                                    out,
+                                    WSServerMessage::Output(WSServerOutput::Disconnection(_))
+                                ) {
+                                    return;
+                                }
+                            }
                         }
-                    }
                 }
             }
         });
@@ -172,6 +195,14 @@ impl WSConnection {
             .send(Message::Text(msg))
             .await
             .map_err(|e| WSError::Underlying(e.to_string()))
+    }
+
+    fn close(&mut self) {
+        if let Some(tx) = self.tx.take() {
+            tx.send(true)
+                .err()
+                .map(|_| log::error!("Closing Websocket failed"));
+        }
     }
 }
 
