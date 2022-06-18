@@ -26,3 +26,13 @@ unused_crates:
 	for cargo in $$( find . -name Cargo.toml ); do \
 		(cd $$(dirname $$cargo) && cargo +nightly udeps -q ); \
 	done
+
+docker_dev:
+	rustup target add x86_64-unknown-linux-gnu
+	mkdir -p cli/target/debug-x86
+	docker run -ti -v $(PWD):/mnt/fledger:cached \
+		rust:latest /mnt/fledger/run_docker.sh
+	for cli in fledger flsignal; do \
+		docker build cli/target/debug-x86 -f Dockerfile.$$cli -t fledgre/$$cli:dev && \
+		docker push fledgre/$$cli:dev; \
+	done

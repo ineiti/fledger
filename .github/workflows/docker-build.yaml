@@ -47,8 +47,8 @@ jobs:
       with:
         image: fledgre/flsignal
         registry: docker.io
-        dockerfile: Dockerfile.signal
-        directory: cli
+        dockerfile: Dockerfile.flsignal
+        directory: cli/target/release
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
         tags: latest
@@ -59,7 +59,7 @@ jobs:
         image: fledgre/fledger
         registry: docker.io
         dockerfile: Dockerfile.fledger
-        directory: cli
+        directory: cli/target/release
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
         tags: latest

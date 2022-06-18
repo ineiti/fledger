@@ -1,4 +1,4 @@
 FROM rust
 WORKDIR /fledger
-COPY ./target/release/fledger fledger
+COPY ./fledger fledger
 ENTRYPOINT ["/fledger/fledger", "-vv"]
