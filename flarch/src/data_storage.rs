@@ -88,12 +88,10 @@ mod tests {
 
     #[test]
     fn test_storage() -> Result<(), Box<dyn std::error::Error>>{
-        let dsb = TempDSB::new();
-        let mut ds = dsb.get("one");
+        let mut ds = TempDS::new();
         ds.set("two", "three")?;
 
-        let dsb2 = dsb.clone();
-        let ds2 = dsb2.get("one");
+        let ds2 = ds.clone();
         assert_eq!("three", ds2.get("two")?);
         Ok(())
     }

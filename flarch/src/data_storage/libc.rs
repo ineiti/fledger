@@ -78,12 +78,12 @@ mod tests {
 
     #[test]
     fn write_read() -> Result<(), Box<dyn Error>> {
-        let storage = DataStorageFile::new("/tmp/test".into(), "one".into());
+        let mut storage = DataStorageFile::new("/tmp/test".into(), "one".into());
         storage.set("two", "three")?;
         assert_eq!("three", storage.get("two")?);
 
         let storage = DataStorageFile::new("/tmp/test".into(), "one".into());
-        assert_eq!("three", data.get("one").get("two")?);
+        assert_eq!("three", storage.get("two")?);
         Ok(())
     }
 }
