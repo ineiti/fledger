@@ -12,9 +12,9 @@ keywords = ["webrtc", "websocket", "async-hell", "fledger"]
 categories = ["network-programming", "wasm", "web-programming::websocket"]
 
 [dependencies]
-flnet = {path="../../shared/flnet", features = ["nosend"], version = "0.6"}
+flnet = {path="../../flnet", features = ["nosend"], version = "0.6"}
 flmodules = {path="../../shared/flmodules", features = ["nosend"], version = "0.6"}
-flarch = {path = "../flarch", features = ["wasm"], version = "0.6"}
+flarch = {path = "../../flarch", features = ["wasm"], version = "0.6"}
 
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 js-sys = "0.3"

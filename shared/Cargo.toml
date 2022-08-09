@@ -2,6 +2,5 @@
 
 members = [
     "flmodules",
-    "flnet",
     "flnode",
 ]

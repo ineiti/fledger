@@ -18,10 +18,10 @@ crate-type = ["cdylib", "rlib"]
 local = []
 
 [dependencies]
-flarch = {path="../../arch/flarch", features = ["node"], version = "0.6"}
+flarch = {path="../../flarch", features = ["node"], version = "0.6"}
 flnet-wasm = { path = "../../arch/flnet-wasm", version = "0.6" }
 flmodules = {path="../../shared/flmodules", features = ["nosend"], version = "0.6"}
-flnet = {path="../../shared/flnet", features = ["nosend"], version = "0.6"}
+flnet = {path="../../../flnet", features = ["nosend"], version = "0.6"}
 flnode = {path = "../../shared/flnode", features = ["nosend"], version = "0.6"}
 
 thiserror = "1"

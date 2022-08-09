@@ -12,9 +12,9 @@ keywords = ["network", "fledger", "webrtc", "websocket", "libc"]
 categories = ["network-programming"]
 
 [dependencies]
-flnet = { path = "../../shared/flnet", version = "0.6" }
+flnet = { path = "../../flnet", version = "0.6" }
 flmodules = { path = "../../shared/flmodules", version = "0.6" }
-flarch = { path = "../flarch", version = "0.6" }
+flarch = { path = "../../flarch", version = "0.6" }
 
 async-trait = "0.1"
 webrtc = "0.4"

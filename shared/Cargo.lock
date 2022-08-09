@@ -261,7 +261,6 @@ dependencies = [
  "async-trait",
  "bimap",
  "ed25519-compact",
- "env_logger",
  "flarch",
  "flmodules",
  "futures",
