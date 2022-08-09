@@ -13,7 +13,7 @@ categories = ["network-programming", "wasm", "web-programming::websocket"]
 
 [dependencies]
 flnet = {path="../../flnet", features = ["nosend"], version = "0.6"}
-flmodules = {path="../../shared/flmodules", features = ["nosend"], version = "0.6"}
+flmodules = {path="../../flmodules", features = ["nosend"], version = "0.6"}
 flarch = {path = "../../flarch", features = ["wasm"], version = "0.6"}
 
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }

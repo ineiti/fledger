@@ -14,7 +14,7 @@ keywords = ["test", "libc", "webrtc", "websocket", "fledger"]
 flnet = {path="../../../../flnet", version = "0.6"}
 flnet-libc = {path="../../../arch/flnet-libc", version = "0.6"}
 flarch = {path="../../../flarch", version = "0.6"}
-flmodules = {path="../../../shared/flmodules", version = "0.6"}
+flmodules = {path="../../../flmodules", version = "0.6"}
 
 tokio = { version = "1", features = ["full"] }
 log = "0.4"

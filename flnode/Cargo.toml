@@ -14,9 +14,9 @@ keywords = ["test", "utils", "fledger"]
 nosend = []
 
 [dependencies]
-flnet = {path="../../flnet", version = "0.6"}
+flnet = {path="../flnet", version = "0.6"}
 flmodules = {path = "../flmodules", version = "0.6"}
-flarch = {path = "../../flarch", version = "0.6"}
+flarch = {path = "../flarch", version = "0.6"}
 
 async-trait = "0.1"
 rand = "0.8"

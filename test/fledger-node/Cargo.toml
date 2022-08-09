@@ -20,9 +20,9 @@ local = []
 [dependencies]
 flarch = {path="../../flarch", features = ["node"], version = "0.6"}
 flnet-wasm = { path = "../../arch/flnet-wasm", version = "0.6" }
-flmodules = {path="../../shared/flmodules", features = ["nosend"], version = "0.6"}
+flmodules = {path="../../flmodules", features = ["nosend"], version = "0.6"}
 flnet = {path="../../../flnet", features = ["nosend"], version = "0.6"}
-flnode = {path = "../../shared/flnode", features = ["nosend"], version = "0.6"}
+flnode = {path = "../../flnode", features = ["nosend"], version = "0.6"}
 
 thiserror = "1"
 env_logger = "0.9"

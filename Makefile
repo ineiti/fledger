@@ -1,3 +1,12 @@
+CARGOS := arch/flnet-{libc,wasm} cli/{fledger,flsignal} flarch flbrowser \
+			flmodules flnet flnode test/{fledger_node,webrtc-libc-wasm/{libc,wasm}}
+
+check:
+	for c in ${CARGOS}; do \
+	  echo Checking $$c; \
+	  ( cd $$c && cargo check ); \
+	done
+
 update_version:
 	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > shared/flnode/src/version.rs
 
