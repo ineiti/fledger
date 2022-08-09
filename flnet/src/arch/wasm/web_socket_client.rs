@@ -1,26 +1,17 @@
-use std::sync::{Arc};
-use futures::lock::Mutex;
-
 use async_trait::async_trait;
-use flnet::websocket::{WSClientInput, WSClientOutput, WSClientMessage};
-use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
-use thiserror::Error;
+use futures::lock::Mutex;
+use std::sync::Arc;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{ErrorEvent, MessageEvent, WebSocket};
+
+use crate::websocket::{WSClientError, WSClientInput, WSClientMessage, WSClientOutput};
+use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
 
 pub struct WebSocketClient {
     ws: Arc<Mutex<WebSocket>>,
 }
 
 unsafe impl Send for WebSocketClient {}
-
-#[derive(Error, Debug)]
-pub enum WSClientError {
-    #[error("While connecting {0}")]
-    Connection(String),
-    #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
-}
 
 impl WebSocketClient {
     pub async fn connect(url: &str) -> Result<Broker<WSClientMessage>, WSClientError> {

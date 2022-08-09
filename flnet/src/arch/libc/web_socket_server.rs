@@ -5,7 +5,6 @@ use futures::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
-use thiserror::Error;
 use tokio::{
     net::{TcpListener, TcpStream},
     select,
@@ -14,21 +13,9 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
 
-use std::{io, sync::Arc};
+use std::sync::Arc;
 
-use flnet::websocket::{WSError, WSServerInput, WSServerMessage, WSServerOutput};
-
-#[derive(Error, Debug)]
-pub enum WSSError {
-    #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
-    #[error(transparent)]
-    Join(#[from] tokio::task::JoinError),
-    #[error(transparent)]
-    Client(#[from] tokio_tungstenite::tungstenite::Error),
-    #[error(transparent)]
-    IO(#[from] io::Error),
-}
+use crate::websocket::{WSError, WSSError, WSServerInput, WSServerMessage, WSServerOutput};
 
 pub struct WebSocketServer {
     connections: Arc<Mutex<Vec<WSConnection>>>,
@@ -210,8 +197,8 @@ impl WSConnection {
 mod tests {
     use super::*;
     use crate::web_socket_client::WebSocketClient;
+    use crate::websocket::{WSClientInput, WSClientMessage, WSClientOutput};
     use flarch::start_logging;
-    use flnet::websocket::{WSClientInput, WSClientMessage, WSClientOutput};
     use std::sync::mpsc::Receiver;
 
     async fn send_client_server(

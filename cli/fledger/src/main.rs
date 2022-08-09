@@ -5,7 +5,7 @@ use flarch::{
     tasks::wait_ms,
 };
 use flnet::signal::SIGNAL_VERSION;
-use flnet_libc::network_start;
+use flnet::network_start;
 use flnode::{node::Node, version::VERSION_STRING};
 
 /// Fledger node CLI binary

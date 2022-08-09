@@ -1,41 +1,100 @@
 [package]
-name = "flnet"
-version = "0.6.0"
-edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
-description = "Network setup and communication"
-repository = "https://github.com/ineiti/fledger"
-license = "MIT OR Apache-2.0"
-homepage = "https://fledg.re"
-readme = "README.md"
-keywords = ["network", "fledger"]
 categories = ["network-programming"]
+description = "Network setup and communication"
+edition = "2021"
+homepage = "https://fledg.re"
+keywords = ["network", "fledger"]
+license = "MIT OR Apache-2.0"
+name = "flnet"
+readme = "README.md"
+repository = "https://github.com/ineiti/fledger"
+version = "0.6.0"
 
 [features]
+libc = ["native-tls", "rand", "tokio", "tokio-tungstenite", "webrtc"]
 nosend = []
+wasm = [
+  "nosend",
+  "getrandom/js",
+  "js-sys",
+  "parking_lot",
+  "wasm-bindgen",
+  "wasm-bindgen-futures",
+  "wasm-timer",
+  "web-sys",
+]
 
 [dependencies]
 flarch = {path = "../flarch", version = "0.6"}
 flmodules = {path = "../flmodules", version = "0.6"}
 
-# The "js" is to make sure it also works for the flnode and web crates
-getrandom = { version = "0.2", features = ["js"] }
 async-trait = "0.1"
-serde = { version = "1", features = ["derive"] }
+bimap = "0.6"
+ed25519-compact = "1"
+futures = "0.3"
+getrandom = {version = "0.2"}
+itertools = "0.10"
+log = "0.4"
+names = "0.13"
+serde = {version = "1", features = ["derive"]}
 serde_derive = "1"
 serde_json = "1"
-serde_yaml = "0.8"
 serde_with = {version = "1", features = ["json", "base64"]}
-toml = "0.5"
-names = "0.13"
-thiserror = "1"
-futures = "0.3"
-log = "0.4"
+serde_yaml = "0.8"
 sha2 = "0.10"
-ed25519-compact = "1"
-itertools = "0.10"
+thiserror = "1"
+toml = "0.5"
 
-bimap = "0.6"
+# For libc
+native-tls = {version = "0.2", optional = true}
+rand = {version = "0.8", optional = true}
+tokio = {version = "1", features = ["full"], optional = true}
+tokio-tungstenite = {version = "0.17", features = ["native-tls"], optional = true}
+webrtc = {version = "0.4", optional = true}
+
+# For wasm
+js-sys = {version = "0.3", optional = true}
+parking_lot = {version = "0.11", features = ["wasm-bindgen"], optional = true}
+wasm-bindgen = {version = "0.2", features = ["serde-serialize"], optional = true}
+wasm-bindgen-futures = {version = "0.4", optional = true}
+wasm-timer = {version = "0.2", optional = true}
+[dependencies.web-sys]
+features = [
+  'Headers',
+  'Request',
+  'RequestInit',
+  'RequestMode',
+  'Response',
+  'Window',
+  'ReadableStream',
+  "MessageEvent",
+  "RtcConfiguration",
+  "RtcPeerConnection",
+  "RtcSignalingState",
+  "RtcSdpType",
+  "RtcSessionDescriptionInit",
+  "RtcPeerConnectionIceEvent",
+  "RtcIceCandidate",
+  "RtcIceCandidateInit",
+  "RtcIceConnectionState",
+  "RtcIceGatheringState",
+  "RtcDataChannel",
+  "RtcDataChannelEvent",
+  "RtcDataChannelState",
+  "BinaryType",
+  "Blob",
+  "ErrorEvent",
+  "FileReader",
+  "MessageEvent",
+  "ProgressEvent",
+  "WebSocket",
+  "Document",
+  "Storage",
+  "Navigator",
+]
+optional = true
+version = "0.3"
 
 [dev-dependencies]
 env_logger = "0.9"

@@ -7,6 +7,27 @@ pub enum WSError {
     Underlying(String),
 }
 
+#[derive(Error, Debug)]
+pub enum WSClientError {
+    #[error("While connecting {0}")]
+    Connection(String),
+    #[error(transparent)]
+    Broker(#[from] flmodules::broker::BrokerError),
+}
+
+#[cfg(feature = "libc")]
+#[derive(Error, Debug)]
+pub enum WSSError {
+    #[error(transparent)]
+    Broker(#[from] flmodules::broker::BrokerError),
+    #[error(transparent)]
+    Join(#[from] tokio::task::JoinError),
+    #[error(transparent)]
+    Client(#[from] tokio_tungstenite::tungstenite::Error),
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum WSClientMessage {
     Output(WSClientOutput),

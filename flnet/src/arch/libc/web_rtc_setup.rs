@@ -25,7 +25,7 @@ use webrtc::{
     },
 };
 
-use flnet::web_rtc::{
+use crate::web_rtc::{
     messages::{
         ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError, SignalingState,
         WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner,
@@ -298,8 +298,8 @@ impl WebRTCConnectionSetupLibc {
             type_local: ConnType::Unknown,
             type_remote: ConnType::Unknown,
             signaling,
-            ice_gathering: flnet::web_rtc::messages::IceGatheringState::New,
-            ice_connection: flnet::web_rtc::messages::IceConnectionState::New,
+            ice_gathering: crate::web_rtc::messages::IceGatheringState::New,
+            ice_connection: crate::web_rtc::messages::IceConnectionState::New,
             data_connection,
             rx_bytes: 0,
             tx_bytes: 0,

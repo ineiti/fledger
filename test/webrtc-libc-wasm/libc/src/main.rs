@@ -1,29 +1,29 @@
+use thiserror::Error;
+
 use flnet::{
+    network_start,
+    NetworkSetupError,
     config::NodeConfig,
-    network::{NetReply, Network, NetworkMessage, NetCall},
-    signal::{server::SignalServer, websocket::WSError},
-};
-use flnet_libc::{
-    web_rtc_setup::WebRTCConnectionSetupLibc, web_socket_client::WebSocketClient,
+    network::{NetReply, NetworkMessage, NetCall},
+    signal::SignalServer,
     web_socket_server::WebSocketServer,
 };
 use flmodules::{broker::Broker, nodeids::U256};
 use flarch::{start_logging_filter};
-use thiserror::Error;
 
 const URL: &str = "ws://localhost:8765";
 
 #[derive(Debug, Error)]
 enum MainError {
     #[error(transparent)]
-    WS(#[from] WSError),
+    NetworkSetup(#[from] NetworkSetupError),
     #[error(transparent)]
     Broker(#[from] flmodules::broker::BrokerError),
 }
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
-    start_logging_filter(vec!["libc", "broker", "flnet_libc", "flnet"]);
+    start_logging_filter(vec!["libc", "broker", "flnet"]);
 
     log::info!("Starting signalling server");
     start_signal_server().await;
@@ -59,20 +59,11 @@ async fn spawn_node() -> Result<(NodeConfig, Broker<NetworkMessage>), MainError>
 
     log::info!(
         "Starting node {}: {}",
-        nc.our_node.get_id(),
-        nc.our_node.info
+        nc.info.get_id(),
+        nc.info.name
     );
     log::debug!("Connecting to websocket at {URL}");
-    let ws = WebSocketClient::connect(URL)
-        .await
-        .expect("Failed to connect to signalling server");
-
-    log::debug!("Starting network");
-    let net = Network::start(
-        nc.clone(),
-        ws,
-        Box::new(|| Box::new(Box::pin(WebRTCConnectionSetupLibc::new_box()))),
-    )
+    let net = network_start(nc.clone(), URL)
     .await
     .expect("Starting node failed");
 
@@ -96,7 +87,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_two_nodes() -> Result<(), MainError> {
-        start_logging_filter(vec!["libc", "broker", "flnet_libc", "flnet"]);
+        start_logging_filter(vec!["libc", "broker", "flnet"]);
 
         log::info!("Starting signalling server");
         start_signal_server().await;

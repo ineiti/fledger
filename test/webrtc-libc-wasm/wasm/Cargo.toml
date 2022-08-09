@@ -15,8 +15,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 flarch = {path="../../../flarch", features=["node"], version = "0.6"}
-flnet-wasm = {path = "../../../arch/flnet-wasm", version = "0.6"}
-flnet = {path="../../../../flnet", features=["nosend"], version = "0.6"}
+flnet = {path="../../../flnet", features=["wasm"], version = "0.6"}
 flmodules = {path="../../../flmodules", features=["nosend"], version = "0.6"}
 
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }

@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use flmodules::ping::storage::{PingStat, PingStorage};
-use flnet_wasm::network_start;
+use flnet::network_start;
 use flnode::{node::Node, version::VERSION_STRING};
 use regex::Regex;
 use std::{

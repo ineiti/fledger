@@ -11,8 +11,7 @@ readme = "README.md"
 keywords = ["test", "libc", "webrtc", "websocket", "fledger"]
 
 [dependencies]
-flnet = {path="../../../../flnet", version = "0.6"}
-flnet-libc = {path="../../../arch/flnet-libc", version = "0.6"}
+flnet = {path="../../../flnet", version = "0.6", features = ["libc"]}
 flarch = {path="../../../flarch", version = "0.6"}
 flmodules = {path="../../../flmodules", version = "0.6"}
 

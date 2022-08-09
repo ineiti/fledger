@@ -1,4 +1,4 @@
-use flnet_wasm::{network_start};
+use flnet::{network_start};
 use flnode::{node::Node};
 use flarch::{data_storage::{DataStorage, DataStorageNode}, wait_ms};
 use wasm_bindgen::{prelude::*};

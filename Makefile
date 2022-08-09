@@ -1,4 +1,4 @@
-CARGOS := arch/flnet-{libc,wasm} cli/{fledger,flsignal} flarch flbrowser \
+CARGOS := cli/{fledger,flsignal} flarch flbrowser \
 			flmodules flnet flnode test/{fledger_node,webrtc-libc-wasm/{libc,wasm}}
 
 check:

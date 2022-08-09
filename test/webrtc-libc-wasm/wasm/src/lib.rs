@@ -1,14 +1,14 @@
-use flnet::network::{NetCall,NetworkError};
-use flnet_wasm::{web_rtc::WebRTCConnection,web_socket_client::{WSClientError,WebSocketClient}};
 use std::sync::mpsc::channel;
 
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
 use flnet::{
+    network::{NetCall,NetworkError},
+    network_start,
+    NetworkSetupError,
     config::{NodeConfig, NodeInfo},
-    network::{NetReply, Network, NetworkMessage},
-    signal::websocket::WSError,
+    network::{NetReply, NetworkMessage},
 };
 use flarch::{tasks::wait_ms};
 use flmodules::{broker::Subsystem};
@@ -18,26 +18,18 @@ const URL: &str = "ws://localhost:8765";
 #[derive(Debug, Error)]
 enum StartError {
     #[error(transparent)]
-    WS(#[from] WSError),
+    NetworkSetup(#[from] NetworkSetupError),
     #[error(transparent)]
     Network(#[from] NetworkError),
     #[error(transparent)]
     Broker(#[from] flmodules::broker::BrokerError),
-    #[error(transparent)]
-    Client(#[from] WSClientError),
 }
 
 async fn run_app() -> Result<(), StartError> {
     log::info!("Starting app");
 
     let nc = NodeConfig::new();
-    let ws = WebSocketClient::connect(URL).await?;
-    let mut net = Network::start(
-        nc.clone(),
-        ws,
-        Box::new(|| Box::new(Box::pin(WebRTCConnection::new_box()))),
-    )
-    .await?;
+    let mut net = network_start(nc.clone(), URL).await?;
     let (tx, rx) = channel();
     net.add_subsystem(Subsystem::Tap(tx)).await?;
     let mut i: i32 = 0;
@@ -56,7 +48,7 @@ async fn run_app() -> Result<(), StartError> {
                     NetReply::RcvWSUpdateList(list) => {
                         let other: Vec<NodeInfo> = list
                             .iter()
-                            .filter(|n| n.get_id() != nc.our_node.get_id())
+                            .filter(|n| n.get_id() != nc.info.get_id())
                             .cloned()
                             .collect();
                         log::info!("Got list: {:?}", other);
