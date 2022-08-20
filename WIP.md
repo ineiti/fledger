@@ -2,27 +2,18 @@
 
 ## Current high-level goal
 
-- BUG: why does the flbrowser not connect directly to a CLI node sometimes?
-  - possibility: perhaps it waits for the CLI to connect, and doesn't initiate
-    a connection by itself?
-    - make test/fledger-node work again
-- CLEANUP:
-  - npm audit in flbrowser - 'npm audit --fix' breaks things
-  - add `build` and `test` to main `Makefile` instead of only having it in
-  the github-workflow
-  - make all tests pass again
-- FEATURES:
-  - send regular `NodeStat`s to the signalling-server
-  - a change in the version of the signalling server should stop `fledger` and `flbrowser`
-  - Create usable crates for a signalling server and webrtc clients
-    - add minimal documentation to crates
-    - Publish fledger crates in crates.io
-
 ## Current concrete goal
+
+- Create usable crates for a signalling server and webrtc clients
+  - add minimal documentation to crates
+  - have examples for both wasm and libc
+  - Publish fledger crates in crates.io
 
 ### Things to do
 
 # Dates
+
+2022-08-xx:
 
 2022-05-29:
 - make github workflows pass

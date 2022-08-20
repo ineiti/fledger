@@ -11,7 +11,8 @@ update_version:
 	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > shared/flnode/src/version.rs
 
 kill_bg:
-	pkill -f signal &
+	pkill -f flsignal &
+	pkill -f fledger &
 	pkill -f "npm run start" &
 
 build_local_web:
@@ -24,10 +25,13 @@ build_local_cli:
 build_local: build_local_web build_local_cli
 
 serve_local: kill_bg build_local
-	( cd cli/flsignal && cargo run ) &
-	make -C flbrowser serve &
-	( cd cli/fledger && cargo run & cargo run -- --config ./flnode2 & )
-	open localhost:8080
+	( cd cli/flsignal && cargo run -- -vv ) &
+	sleep 4
+	make -C flbrowser serve_local &
+	( cd cli/fledger && ( cargo run -- -vv -s ws://localhost:8765 & \
+		cargo run -- --config ./flnode2 -vv -s ws://localhost:8765 & ) )
+	sleep 2
+	open http://localhost:8080
 
 update_crates:
 	for cargo in $$( find . -name Cargo.toml ); do \

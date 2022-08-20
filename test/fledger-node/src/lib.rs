@@ -48,7 +48,7 @@ async fn runit()  -> Result<(), Box<dyn std::error::Error>> {
             log::info!("Nodes are: {:?}", node.nodes_online()?);
             let ping = node.ping.storage.clone();
             log::info!("Nodes countdowns are: {:?}", ping.stats);
-            log::info!("Chat messages are: {:?}", node.gossip.chat_events());
+            log::debug!("Chat messages are: {:?}", node.gossip.chat_events());
         }
         wait_ms(1000).await;
     }

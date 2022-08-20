@@ -50,11 +50,10 @@ Some of the code can also be reused in other projects.
 A set of _shared_ crates implement the basic functionality, without the actual implementation
 of the network code:
 
-- [Shared libraries](./shared) - generic code usable by both implementations
-  - [Decentralized modules](./shared/flmodules/) - modules that are usable for decentralized projects
-  - [Networking](./shared/flnet) - traits for the Websocket and the WebRTC, as well as a generic
+- [Decentralized modules](./flmodules/) - modules that are usable for decentralized projects
+- [Networking](./flnet) - traits for the Websocket and the WebRTC, as well as a generic
   implementation of the networking logic
-  - [flnode](./shared/flnode) - a generic implementation of a fledger-node, mostly connecting all
+- [flnode](./flnode) - a generic implementation of a fledger-node, mostly connecting all
   _flmodules_ together and with the network
 
 ### Binaries
@@ -68,11 +67,10 @@ Currently the following components are available that are used to create the fle
 ### Implementations and Tests
 
 These are the actual implementations of the WebRTC and Websocket for wasm and libc:
-- [WebRTC and Websocket implementations](./impl) - wasm and libc implementations for WebRTC and Websockets
-  - [Libc implementation](./arch/flnet-libc) - implementations for libc
-  - [Wasm implementation](./arch/flnet-wasm) - implementations for wasm
-  - [Architecture-dependant](./arch/flarch) - traits for the network implemenations, and some arch-dependant implementations
+- [WebRTC and Websocket implementations](./flnet) - wasm and libc implementations for WebRTC and Websockets
+- [Architecture-dependant](./flarch) - some arch-dependant implementations
 - [Test directory](./test) - several implementations for testing
+- [Example directory](./example) - example for how to use flnet
 
 ## Next steps
 

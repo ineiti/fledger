@@ -34,7 +34,7 @@ pub trait DataStorage {
     fn clone(&self) -> Box<dyn DataStorage>;
 }
 
-/// A temporary DataStorage.
+/// A temporary DataStorage that keeps the data only during its lifetime.
 pub struct TempDS {
     kvs: Arc<Mutex<HashMap<String, String>>>,
 }
