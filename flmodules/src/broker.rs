@@ -138,20 +138,23 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
     pub async fn process_retry(&mut self, mut retries: i32) -> Result<usize, BrokerError> {
         let mut intern = self.intern.try_lock();
         while intern.is_none() && retries != 0 {
+            if retries > 0 {
+                retries -= 1;
+            }
             log::trace!("Couldn't lock intern - trying again in 100ms");
             wait_ms(100).await;
             intern = self.intern.try_lock();
-            if retries > 0 {
-                retries -= 1;
-                if retries == 0 {
-                    log::warn!(
-                        "Couldn't lock intern for {} - stop trying",
-                        std::any::type_name::<T>()
-                    );
-                }
-            }
         }
-        intern.ok_or(BrokerError::Locked)?.process().await
+
+        if let Some(mut i) = intern {
+            return i.process().await;
+        }
+        log::trace!(
+            "Couldn't lock intern for {} - stop trying",
+            std::any::type_name::<T>()
+        );
+        
+        Err(BrokerError::Locked)
     }
 
     pub async fn process(&mut self) -> Result<usize, BrokerError> {
@@ -166,7 +169,7 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
 
     /// Emit a message to a given destination of other listeners.
     pub async fn emit_msg_dest(&mut self, dst: Destination, msg: T) -> Result<usize, BrokerError> {
-        self.intern_tx.send((dst, msg)).await?;
+        self.intern_tx.send((dst, msg)).await.unwrap();
         self.process_retry(10).await
     }
 

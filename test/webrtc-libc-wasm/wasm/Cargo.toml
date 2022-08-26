@@ -1,6 +1,6 @@
 [package]
 name = "fltest-wasm"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "Test connection-setup for wasm"
@@ -14,9 +14,9 @@ keywords = ["test", "libc", "webrtc", "websocket", "fledger"]
 crate-type = ["cdylib"]
 
 [dependencies]
-flarch = {path="../../../flarch", features=["node"], version = "0.6"}
-flnet = {path="../../../flnet", features=["wasm"], version = "0.6"}
-flmodules = {path="../../../flmodules", features=["nosend"], version = "0.6"}
+flarch = {path="../../../flarch", features=["node"], version = "0.7"}
+flnet = {path="../../../flnet", features=["wasm"], version = "0.7"}
+flmodules = {path="../../../flmodules", features=["nosend"], version = "0.7"}
 
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 js-sys = "0.3"

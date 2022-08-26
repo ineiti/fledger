@@ -6,6 +6,8 @@ pub mod signal;
 pub mod web_rtc;
 pub mod websocket;
 
+pub use flmodules::broker;
+
 #[derive(Error, Debug)]
 pub enum NetworkSetupError {
     #[error(transparent)]
@@ -19,11 +21,15 @@ pub enum NetworkSetupError {
     Network(#[from] network::NetworkError),
 }
 
+#[cfg(feature = "testing")]
+pub mod testing;
+
 #[cfg(all(feature = "libc", feature = "wasm"))]
 std::compile_error!("flnet cannot have 'libc' and 'wasm' feature simultaneously");
 
 #[cfg(feature = "libc")]
 mod arch {
+    use super::*;
     mod libc;
     use crate::{
         config::NodeConfig,
@@ -31,7 +37,6 @@ mod arch {
         web_rtc::WebRTCConn,
         NetworkSetupError,
     };
-    use flmodules::broker::Broker;
     pub use libc::*;
     use web_rtc_setup::web_rtc_spawner;
     use web_socket_client::WebSocketClient;
@@ -39,18 +44,19 @@ mod arch {
     pub async fn network_start(
         node_config: NodeConfig,
         signal_url: &str,
-    ) -> Result<Broker<NetworkMessage>, NetworkSetupError> {
+    ) -> Result<broker::Broker<NetworkMessage>, NetworkSetupError> {
         let webrtc = WebRTCConn::new(web_rtc_spawner()).await?;
         let ws = WebSocketClient::connect(signal_url).await?;
         Ok(Network::start(node_config.clone(), ws, webrtc).await?)
     }
 }
 
+
 #[cfg(feature = "wasm")]
 mod arch {
+    use super::*;
     mod wasm;
     pub use wasm::*;
-    use flmodules::broker::Broker;
     use crate::{
         config::NodeConfig,
         network::{Network, NetworkMessage},
@@ -63,7 +69,7 @@ mod arch {
     pub async fn network_start(
         node_config: NodeConfig,
         signal_url: &str,
-    ) -> Result<Broker<NetworkMessage>, NetworkSetupError> {
+    ) -> Result<broker::Broker<NetworkMessage>, NetworkSetupError> {
         let webrtc = WebRTCConn::new(web_rtc_spawner()).await?;
         let ws = WebSocketClient::connect(signal_url).await?;
         Ok(Network::start(node_config.clone(), ws, webrtc).await?)

@@ -9,9 +9,10 @@ license = "MIT OR Apache-2.0"
 name = "flnet"
 readme = "README.md"
 repository = "https://github.com/ineiti/fledger"
-version = "0.6.0"
+version = "0.7.0"
 
 [features]
+testing = []
 libc = ["native-tls", "rand", "tokio", "tokio-tungstenite", "webrtc"]
 nosend = []
 wasm = [
@@ -26,8 +27,8 @@ wasm = [
 ]
 
 [dependencies]
-flarch = {path = "../flarch", version = "0.6"}
-flmodules = {path = "../flmodules", version = "0.6"}
+flarch = {path = "../flarch", version = "0.7"}
+flmodules = {path = "../flmodules", version = "0.7"}
 
 async-trait = "0.1"
 bimap = "0.6"

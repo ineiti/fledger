@@ -1,6 +1,6 @@
 [package]
 name = "fledger-web"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Linus Gasser <ineiti@gasser.blue>"]
 edition = "2021"
 description = "Web interface for fledger"
@@ -14,10 +14,10 @@ crate-type = ["cdylib"]
 local = []
 
 [dependencies]
-flarch = {path="../flarch", features = ["wasm"], version = "0.6"}
-flmodules = {path="../flmodules", features = ["nosend"], version = "0.6"}
-flnet = {path="../flnet", features = ["wasm"], version = "0.6"}
-flnode = {path = "../flnode", features = ["nosend"], version = "0.6"}
+flarch = {path="../flarch", features = ["wasm"], version = "0.7"}
+flmodules = {path="../flmodules", features = ["nosend"], version = "0.7"}
+flnet = {path="../flnet", features = ["wasm"], version = "0.7"}
+flnode = {path = "../flnode", features = ["nosend"], version = "0.7"}
 
 chrono = "0.4"
 anyhow = "1"

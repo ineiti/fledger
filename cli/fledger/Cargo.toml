@@ -1,6 +1,6 @@
 [package]
 name = "fledger"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "The fledger server as a CLI"
@@ -12,9 +12,9 @@ keywords = ["network", "signalling", "webrtc"]
 categories = ["network-programming"]
 
 [dependencies]
-flnet = { path = "../../flnet", version = "0.6", features = ["libc"] }
-flarch = { path = "../../flarch", version = "0.6" }
-flnode = { path = "../../flnode", version = "0.6" }
+flnet = { path = "../../flnet", version = "0.7", features = ["libc"] }
+flarch = { path = "../../flarch", version = "0.7" }
+flnode = { path = "../../flnode", version = "0.7" }
 
 tokio = { version = "1", features = ["full"] }
 thiserror = "1"

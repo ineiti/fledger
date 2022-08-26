@@ -1,5 +1,5 @@
-use itertools::concat;
 use core::panic;
+use itertools::concat;
 use std::fmt;
 
 use async_trait::async_trait;
@@ -12,7 +12,9 @@ use flmodules::{
 
 use crate::{
     config::{NodeConfig, NodeInfo},
-    signal::{MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION},
+    signal::{
+        MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION,
+    },
     web_rtc::{
         messages::{ConnType, PeerInfo, SetupError, SignalingState},
         node_connection::{Direction, NCInput, NCOutput},
@@ -71,7 +73,11 @@ impl Network {
             .link_bi(ws, Box::new(Self::from_ws), Box::new(Self::to_ws))
             .await;
         broker
-            .link_bi(web_rtc, Box::new(Self::from_web_rtc), Box::new(Self::to_web_rtc))
+            .link_bi(
+                web_rtc,
+                Box::new(Self::from_web_rtc),
+                Box::new(Self::to_web_rtc),
+            )
             .await;
         Ok(broker)
     }
@@ -93,7 +99,9 @@ impl Network {
         match msg_node {
             WSSignalMessageToNode::Challenge(version, challenge) => {
                 if version != SIGNAL_VERSION {
-                    panic!("Wrong signal-server version: got {version}, expected {SIGNAL_VERSION}.");
+                    panic!(
+                        "Wrong signal-server version: got {version}, expected {SIGNAL_VERSION}."
+                    );
                 }
                 let ma = MessageAnnounce {
                     version,
@@ -195,8 +203,7 @@ impl Network {
     /// If no connection is active yet, a new one will be created.
     fn send(&mut self, dst: &U256, msg: NCInput) -> Vec<NetworkMessage> {
         vec![NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((
-            *dst,
-            msg,
+            *dst, msg,
         )))]
     }
 
@@ -229,7 +236,9 @@ impl Network {
 
     fn to_web_rtc(msg: NetworkMessage) -> Option<WebRTCConnMessage> {
         match msg {
-            NetworkMessage::WebRTC(msg) => matches!(msg, WebRTCConnMessage::InputNC(_)).then(|| msg),
+            NetworkMessage::WebRTC(msg) => {
+                matches!(msg, WebRTCConnMessage::InputNC(_)).then(|| msg)
+            }
             _ => None,
         }
     }
@@ -254,10 +263,9 @@ impl SubsystemListener<NetworkMessage> for Network {
                 NetworkMessage::WebSocket(WSClientMessage::Output(ws)) => {
                     out.extend(self.msg_ws(ws).await)
                 }
-                NetworkMessage::WebRTC(WebRTCConnMessage::OutputNC((
-                    id,
-                    msg,
-                ))) => out.extend(self.msg_node(id, msg).await),
+                NetworkMessage::WebRTC(WebRTCConnMessage::OutputNC((id, msg))) => {
+                    out.extend(self.msg_node(id, msg).await)
+                }
                 _ => {}
             }
         }
@@ -322,7 +330,7 @@ impl From<NetCall> for NetworkMessage {
 impl From<WSSignalMessageFromNode> for Vec<NetworkMessage> {
     fn from(msg: WSSignalMessageFromNode) -> Self {
         vec![NetworkMessage::WebSocket(
-            WSClientOutput::Message(serde_json::to_string(&msg).unwrap()).into(),
+            WSClientInput::Message(serde_json::to_string(&msg).unwrap()).into(),
         )]
     }
 }

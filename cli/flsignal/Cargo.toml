@@ -1,6 +1,6 @@
 [package]
 name = "flsignal"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "The signalling server as a CLI"
@@ -12,7 +12,7 @@ keywords = ["network", "signalling", "webrtc"]
 categories = ["network-programming"]
 
 [dependencies]
-flnet = { path = "../../flnet", version = "0.6", features = ["libc"] }
+flnet = { path = "../../flnet", version = "0.7", features = ["libc"] }
 
 tokio = { version = "1", features = ["full"] }
 thiserror = "1"

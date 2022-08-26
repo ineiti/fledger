@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "flarch"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "chrono",
  "env_logger",
@@ -739,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "flmodules"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "flarch",
@@ -758,7 +758,7 @@ dependencies = [
 
 [[package]]
 name = "flnet"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "bimap",

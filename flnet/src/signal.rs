@@ -154,7 +154,7 @@ impl SignalServer {
     }
 
     fn msg_ws_connect(&mut self, index: usize) -> Vec<SignalMessage> {
-        log::debug!("Sending challenge to new connetion");
+        log::debug!("Sending challenge to new connection");
         let challenge = U256::rnd();
         self.connection_ids.insert(challenge, index);
         self.ttl.insert(index, self.ttl_minutes);

@@ -48,7 +48,7 @@ It is common between the WASM and the libc implementation.
 Only the `flbrowser` and `fledger-cli` depend on the `flnet` crate with the
 appropriate feature set.
 
-You can find an example in the [ping-pong](examples/ping-pong/) directory.
+You can find an example in the [ping-pong](https://github.com/ineiti/fledger/tree/0.7.0/examples/ping-pong/) directory.
 
 ## libc
 
