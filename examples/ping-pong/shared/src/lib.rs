@@ -47,6 +47,8 @@ impl PingPong {
     }
 
     // Translates incoming messages from the network to messages that can be understood by PingPong.
+    // The only two messages that need to be interpreted are RcvNodeMessage and RcvWSUpdateList.
+    // All other messages coming from Network are ignored.
     pub fn from_net(msg: NetworkMessage) -> Option<PPMessage> {
         if let NetworkMessage::Reply(rep) = msg {
             match rep {
