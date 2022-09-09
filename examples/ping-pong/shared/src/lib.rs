@@ -169,6 +169,7 @@ mod test {
 
         // Send a Ping message from src to dst
         pp.emit_msg_dest(
+            10,
             Destination::NoTap,
             PPMessage::ToNetwork(dst_id.clone(), PPMessageNode::Ping),
         )
@@ -180,6 +181,7 @@ mod test {
 
         // Receive a ping message through the network
         net.emit_msg_dest(
+            10,
             Destination::NoTap,
             NetworkMessage::Reply(NetReply::RcvNodeMessage((
                 dst_id.clone(),

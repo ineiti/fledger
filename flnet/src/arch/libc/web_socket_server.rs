@@ -209,6 +209,7 @@ mod tests {
     ) {
         client
             .emit_msg_dest(
+                10,
                 Destination::NoTap,
                 WSClientInput::Message(txt.clone()).into(),
             )
@@ -228,6 +229,7 @@ mod tests {
     ) {
         server
             .emit_msg_dest(
+                10,
                 Destination::NoTap,
                 WSServerInput::Message((ch_index, txt.clone())).into(),
             )

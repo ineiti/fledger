@@ -173,9 +173,14 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
     }
 
     /// Emit a message to a given destination of other listeners.
-    pub async fn emit_msg_dest(&mut self, dst: Destination, msg: T) -> Result<usize, BrokerError> {
+    pub async fn emit_msg_dest(
+        &mut self,
+        retries: i32,
+        dst: Destination,
+        msg: T,
+    ) -> Result<usize, BrokerError> {
         self.intern_tx.send((dst, msg)).await.unwrap();
-        self.process_retry(10).await
+        self.process_retry(retries).await
     }
 
     /// Enqueue a single message to other listeners.
@@ -185,7 +190,7 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
 
     /// Try to emit and process a message to other listeners.
     pub async fn emit_msg(&mut self, msg: T) -> Result<usize, BrokerError> {
-        self.emit_msg_dest(Destination::Others, msg).await
+        self.emit_msg_dest(10, Destination::Others, msg).await
     }
 
     /// Connects to another broker. The message type of the other broker
@@ -258,19 +263,16 @@ impl<R: Async + Clone + fmt::Debug, S: 'static + Async + Clone + fmt::Debug> Sub
                 std::any::type_name::<S>()
             );
             self.broker
-                .enqueue_msg_dest(Destination::Forward(trail), msg_tr)
+                .emit_msg_dest(0, Destination::Forward(trail), msg_tr)
                 .await
                 .err()
                 .map(|e| {
-                    log::error!("While sending message: {e}");
+                    log::trace!(
+                        "{:p}: Translated message {} queued, but not processed: {e}",
+                        self,
+                        std::any::type_name::<S>()
+                    );
                 });
-            self.broker.process().await.err().map(|e| {
-                log::trace!(
-                    "{:p}: Translated message {} queued, but not processed: {e}",
-                    self,
-                    std::any::type_name::<S>()
-                );
-            });
             return true;
         }
         false
@@ -406,7 +408,8 @@ impl<T: Async + Clone + fmt::Debug> Intern<T> {
                 for (_, ss) in self.subsystems.iter_mut() {
                     match ss {
                         Subsystem::Translator(ref mut translator) => {
-                            translated |= translator.translate(trail.clone(), nms[i].1.clone()).await
+                            translated |=
+                                translator.translate(trail.clone(), nms[i].1.clone()).await
                         }
                         Subsystem::TranslatorCallback(translator) => {
                             translated |= (translator)(trail.clone(), nms[i].1.clone()).await
@@ -569,7 +572,8 @@ type SubsystemCallback<T> =
 #[cfg(feature = "nosend")]
 type SubsystemTranslatorCallback<T> = Box<dyn Fn(Vec<BrokerID>, T) -> BoxFuture<'static, bool>>;
 #[cfg(not(feature = "nosend"))]
-type SubsystemTranslatorCallback<T> = Box<dyn Fn(Vec<BrokerID>, T) -> BoxFuture<'static, bool> + Send + Sync>;
+type SubsystemTranslatorCallback<T> =
+    Box<dyn Fn(Vec<BrokerID>, T) -> BoxFuture<'static, bool> + Send + Sync>;
 
 #[cfg(test)]
 mod tests {

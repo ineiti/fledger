@@ -11,6 +11,10 @@
 
 ### Things to do
 
+- Clean up broker / network:
+  - change enums with `((a, b))` arguments to simple `(a, b)` arguments
+  - remove `Destination` from `SubsystemListener`
+
 # Dates
 
 2022-08-xx:
