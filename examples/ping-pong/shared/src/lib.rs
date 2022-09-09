@@ -7,37 +7,55 @@ use flnet::{
     network::{NetCall, NetworkMessage},
 };
 
+pub mod pony;
+
+/// This only runs on localhost.
 pub const URL: &str = "ws://localhost:8765";
 
+/// A PPMessage includes messages from the network, messages to be sent to
+/// the network, and receiving an updated list from the signalling server.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum PPMessage {
+    /// Contains the destination-id and the message to be sent. The
+    /// user only has to send the 'ping', the PingPong implementation
+    /// automatically sends a 'pong' reply and requests for an updated
+    /// list of nodes.
     ToNetwork(U256, PPMessageNode),
+    /// Contains source-id of the message as well as the message itself.
+    /// The user does not have to reply to incoming ping messages.
     FromNetwork(U256, PPMessageNode),
+    /// An updated list from the signalling server.
     List(Vec<U256>),
 }
 
+/// Every  contact is started with a ping and replied with a pong.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum PPMessageNode {
     Ping,
     Pong,
 }
 
+/// The PingPong structure is a simple implementation showing how to use the flnet
+/// module and the Broker to create a request/reply system for multiple
+/// nodes.
+/// To use the PingPong structure, it can be called from a libc binary or a
+/// wasm library.
 pub struct PingPong {
     id: U256,
     net: Broker<NetworkMessage>,
 }
 
 impl PingPong {
+    /// Create a new broker for PPMessages that can be used to receive and send pings.
+    /// Relevant messages from the network broker are forwarded to this broker and
+    /// processed to interpret ping's and pong's.
+    ///
     pub async fn new(
         id: U256,
         mut net: Broker<NetworkMessage>,
     ) -> Result<Broker<PPMessage>, BrokerError> {
-        // Create a broker for PPMessages and add this structure to it.
-        // Additionally, filter messages from the network broker before
-        // forwarding them to this broker.
-
         let mut pp_broker = Broker::new();
-        net.forward(pp_broker.clone(), Box::new(Self::from_net))
+        net.forward(pp_broker.clone(), Box::new(Self::net_to_pp))
             .await;
         pp_broker
             .add_subsystem(Subsystem::Handler(Box::new(Self { id, net })))
@@ -48,8 +66,10 @@ impl PingPong {
 
     // Translates incoming messages from the network to messages that can be understood by PingPong.
     // The only two messages that need to be interpreted are RcvNodeMessage and RcvWSUpdateList.
+    // For RcvNodeMessage, the enclosed message is interpreted as a PPMessageNode and sent to this
+    // broker.
     // All other messages coming from Network are ignored.
-    pub fn from_net(msg: NetworkMessage) -> Option<PPMessage> {
+    fn net_to_pp(msg: NetworkMessage) -> Option<PPMessage> {
         if let NetworkMessage::Reply(rep) = msg {
             match rep {
                 flnet::network::NetReply::RcvNodeMessage((from, node_msg)) => {
@@ -67,7 +87,8 @@ impl PingPong {
         }
     }
 
-    pub async fn send_net(&mut self, msg: NetCall) {
+    // Sends a generic NetCall type message to the network-broker.
+    async fn send_net(&mut self, msg: NetCall) {
         self.net
             .enqueue_msg(NetworkMessage::Call(msg.clone()))
             .await
@@ -75,22 +96,28 @@ impl PingPong {
             .map(|e| log::error!("While sending {:?} to net: {:?}", msg, e));
     }
 
-    pub async fn send_net_ppm(&mut self, id: U256, msg: &PPMessageNode) {
+    // Wraps a PPMessageNode into a json and sends it over the network to the
+    // dst address.
+    async fn send_net_ppm(&mut self, dst: U256, msg: &PPMessageNode) {
         self.send_net(NetCall::SendNodeMessage((
-            id,
+            dst,
             serde_json::to_string(msg).unwrap(),
         )))
         .await;
     }
 }
 
+// Process messages sent to the PPMessage broker:
+// ToNetwork messages are sent to the network, and automatically set up necessary connections.
+// For PPMessageNode::Ping messages, a pong is replied, and an update list request is sent to
+// the signalling server.
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<PPMessage> for PingPong {
     async fn messages(&mut self, msgs: Vec<PPMessage>) -> Vec<(Destination, PPMessage)> {
         for msg in msgs {
             log::trace!("{}: got message {:?}", self.id, msg);
-            
+
             match msg {
                 PPMessage::ToNetwork(from, ppm) => {
                     self.send_net_ppm(from, &ppm).await;
@@ -102,7 +129,15 @@ impl SubsystemListener<PPMessage> for PingPong {
                 _ => {}
             }
         }
+
+        // Because the self.send_net* methods only `enqueue` messages, a call to `process` is necessary
+        // to actually send the message.
+        // This is a small optimization, as the `emit` call will retry a couple of times, so
+        // multiple `emit` calls can delay the execution a lot more than `enqueue` calls followed
+        // by `process`.
         self.net.process().await.err();
+
+        // All messages are sent directly to the network broker.
         vec![]
     }
 }
@@ -116,6 +151,9 @@ mod test {
 
     use super::*;
 
+    // Tests single messages going into the structure doing the correct thing:
+    // - receive 'ping' from the user, send a 'ping' to the network
+    // - receive 'ping' from the network replies 'pong' and requests a new list
     #[tokio::test]
     async fn test_ping() -> Result<(), NetworkSetupError> {
         start_logging();
@@ -175,6 +213,8 @@ mod test {
     use flnet::testing::NetworkBrokerSimul;
     use tokio::time::sleep;
 
+    // Test a simulation of two nodes with the NetworkBrokerSimul
+    // and run for 3 rounds.
     #[tokio::test]
     async fn test_network() -> Result<(), NetworkSetupError> {
         start_logging();
@@ -202,8 +242,10 @@ mod test {
             sleep(Duration::from_millis(1000)).await;
             log::info!("");
 
-            pp1.emit_msg(PPMessage::ToNetwork(nc2.info.get_id(), PPMessageNode::Ping)).await?;
-            pp2.emit_msg(PPMessage::ToNetwork(nc1.info.get_id(), PPMessageNode::Ping)).await?;
+            pp1.emit_msg(PPMessage::ToNetwork(nc2.info.get_id(), PPMessageNode::Ping))
+                .await?;
+            pp2.emit_msg(PPMessage::ToNetwork(nc1.info.get_id(), PPMessageNode::Ping))
+                .await?;
         }
 
         Ok(())

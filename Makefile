@@ -19,10 +19,15 @@ build_local_web:
 	make -C flbrowser build_local 
 
 build_local_cli:
-	( cd cli/flsignal && cargo build )
-	( cd cli/fledger && cargo build )
+	cd cli && cargo build
 
 build_local: build_local_web build_local_cli
+
+serve_two: kill_bg build_local_cli
+	( cd cli && cargo run --bin flsignal -- -vv ) &
+	sleep 4
+	( cd cli && ( cargo run --bin fledger -- --config fledger/flnode -vv -s ws://localhost:8765 & \
+		cargo run --bin fledger -- --config fledger/flnode2 -vv -s ws://localhost:8765 & ) )
 
 serve_local: kill_bg build_local
 	( cd cli/flsignal && cargo run -- -vv ) &
@@ -52,4 +57,9 @@ docker_dev:
 	for cli in fledger flsignal; do \
 		docker build cli/target/debug-x86 -f Dockerfile.$$cli -t fledgre/$$cli:dev && \
 		docker push fledgre/$$cli:dev; \
+	done
+
+clean:
+	for c in ${CARGOS}; do \
+		( cd $$c && cargo clean ) ; \
 	done

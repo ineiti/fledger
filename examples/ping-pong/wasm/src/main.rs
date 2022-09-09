@@ -82,9 +82,12 @@ impl Component for App {
                         }
 
                         flarch::tasks::wait_ms(1000).await;
+                        pp.process().await.err().map(|e| log::error!("Couldn't process messages: {:?}", e));
+
                         for node in &list {
                             if node != &our_id {
-                                pp.emit_msg(PPMessage::ToNetwork(*node, PPMessageNode::Ping))
+                                log::info!("Sending ping to {}", node);
+                                pp.enqueue_msg(PPMessage::ToNetwork(*node, PPMessageNode::Ping))
                                     .await
                                     .err()
                                     .map(|e| log::error!("While sending ping: {:?}", e));
@@ -98,9 +101,10 @@ impl Component for App {
                     0,
                     format!("{:?}: {}", js_sys::Date::new_0().to_string().to_string(), s),
                 );
+                return true;
             }
         }
-        true
+        false
     }
 
     fn change(&mut self, _: Self::Properties) -> bool {
