@@ -24,13 +24,16 @@ pub enum BrokerError {
     SendMPSC(#[from] mpsc::SendError),
 }
 
+pub type BrokerID = U256;
+
 /// The Destination of the message
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Destination {
     All,
     Others,
     This,
     NoTap,
+    Forward(Vec<BrokerID>),
 }
 
 enum SubsystemAction<T> {
@@ -58,6 +61,8 @@ mod asy {
     impl<T: Sync + Send> Async for T {}
 }
 pub use asy::*;
+
+use crate::nodeids::U256;
 
 /// The broker connects the different subsystem together and offers
 /// a pub/sub system.
@@ -244,7 +249,7 @@ struct Translator<R: Clone, S: Async + Clone + fmt::Debug> {
 impl<R: Async + Clone + fmt::Debug, S: 'static + Async + Clone + fmt::Debug> SubsystemTranslator<R>
     for Translator<R, S>
 {
-    async fn translate(&mut self, msg: R) -> bool {
+    async fn translate(&mut self, trail: Vec<BrokerID>, msg: R) -> bool {
         let msg_res = (self.translate)(msg.clone());
         if let Some(msg_tr) = msg_res {
             log::trace!(
@@ -253,7 +258,7 @@ impl<R: Async + Clone + fmt::Debug, S: 'static + Async + Clone + fmt::Debug> Sub
                 std::any::type_name::<S>()
             );
             self.broker
-                .enqueue_msg(msg_tr)
+                .enqueue_msg_dest(Destination::Forward(trail), msg_tr)
                 .await
                 .err()
                 .map(|e| {
@@ -277,6 +282,7 @@ struct Intern<T: Async + Clone + fmt::Debug> {
     subsystems: HashMap<usize, Subsystem<T>>,
     msg_queue: HashMap<usize, Vec<(Destination, T)>>,
     subsystem_rx: mpsc::UnboundedReceiver<SubsystemAction<T>>,
+    id: BrokerID,
 }
 
 impl<T: Async + Clone + fmt::Debug> Intern<T> {
@@ -291,6 +297,7 @@ impl<T: Async + Clone + fmt::Debug> Intern<T> {
             subsystems,
             msg_queue,
             subsystem_rx,
+            id: U256::rnd(),
         }
     }
 
@@ -385,14 +392,24 @@ impl<T: Async + Clone + fmt::Debug> Intern<T> {
         for (_, nms) in new_msgs.iter_mut() {
             let mut i = 0;
             while i < nms.len() {
+                let mut trail = vec![];
+                if let Destination::Forward(t) = nms[i].0.clone() {
+                    trail.extend(t);
+                }
+                if trail.contains(&self.id) {
+                    i += 1;
+                    log::trace!("Endless forward-loop detected, aborting");
+                    continue;
+                }
+                trail.push(self.id);
                 let mut translated = false;
                 for (_, ss) in self.subsystems.iter_mut() {
                     match ss {
                         Subsystem::Translator(ref mut translator) => {
-                            translated |= translator.translate(nms[i].1.clone()).await
+                            translated |= translator.translate(trail.clone(), nms[i].1.clone()).await
                         }
                         Subsystem::TranslatorCallback(translator) => {
-                            translated |= (translator)(nms[i].1.clone()).await
+                            translated |= (translator)(trail.clone(), nms[i].1.clone()).await
                         }
                         _ => {}
                     }
@@ -425,7 +442,7 @@ impl<T: Async + Clone + fmt::Debug> Intern<T> {
                     let msgs = nms
                         .iter()
                         .filter(|nm| match nm.0 {
-                            Destination::All => true,
+                            Destination::All | Destination::Forward(_) => true,
                             Destination::Others => index_nm != index,
                             Destination::This => index_nm == index,
                             Destination::NoTap => !ss.is_tap(),
@@ -541,7 +558,7 @@ pub trait SubsystemListener<T: Async> {
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 pub trait SubsystemTranslator<T: Async> {
-    async fn translate(&mut self, from_broker: T) -> bool;
+    async fn translate(&mut self, trail: Vec<BrokerID>, from_broker: T) -> bool;
 }
 
 #[cfg(feature = "nosend")]
@@ -550,9 +567,9 @@ type SubsystemCallback<T> = Box<dyn Fn(Vec<T>) -> BoxFuture<'static, Vec<(Destin
 type SubsystemCallback<T> =
     Box<dyn Fn(Vec<T>) -> BoxFuture<'static, Vec<(Destination, T)>> + Send + Sync>;
 #[cfg(feature = "nosend")]
-type SubsystemTranslatorCallback<T> = Box<dyn Fn(T) -> BoxFuture<'static, bool>>;
+type SubsystemTranslatorCallback<T> = Box<dyn Fn(Vec<BrokerID>, T) -> BoxFuture<'static, bool>>;
 #[cfg(not(feature = "nosend"))]
-type SubsystemTranslatorCallback<T> = Box<dyn Fn(T) -> BoxFuture<'static, bool> + Send + Sync>;
+type SubsystemTranslatorCallback<T> = Box<dyn Fn(Vec<BrokerID>, T) -> BoxFuture<'static, bool> + Send + Sync>;
 
 #[cfg(test)]
 mod tests {
@@ -661,7 +678,7 @@ mod tests {
         async fn messages(&mut self, msgs: Vec<BrokerTest>) -> Vec<(Destination, BrokerTest)> {
             for msg in msgs {
                 if msg == self.listen {
-                    return vec![(self.dest, BrokerTest::MsgA)];
+                    return vec![(self.dest.clone(), BrokerTest::MsgA)];
                 }
                 if matches!(msg, BrokerTest::MsgA) {
                     if let Err(e) = self.reply_tx.send(msg.clone()) {
@@ -797,7 +814,7 @@ mod tests {
         Ok(())
     }
 
-    // Makes sure a link_bi does not interpret its own results.
+    // Test that a forwarding-loop doesn't block the system.
     #[tokio::test]
     async fn link_infinite() -> Result<(), Box<dyn std::error::Error>> {
         start_logging();
@@ -812,9 +829,11 @@ mod tests {
         )
         .await;
 
-        let (tap, _) = b.get_tap().await?;
+        let (tap_a, _) = a.get_tap().await?;
+        let (tap_b, _) = b.get_tap().await?;
         a.emit_msg(MessageA::One).await?;
-        assert_eq!(MessageA::One, tap.try_recv().unwrap());
+        assert!(tap_a.try_recv().is_ok());
+        assert!(tap_b.try_recv().is_err());
 
         Ok(())
     }
@@ -849,7 +868,7 @@ mod tests {
     #[tokio::test]
     async fn test_translator_callback() -> Result<(), Box<dyn std::error::Error>> {
         let mut b = Broker::new();
-        b.add_subsystem(Subsystem::TranslatorCallback(Box::new(|b_in| {
+        b.add_subsystem(Subsystem::TranslatorCallback(Box::new(|_, b_in| {
             Box::pin(test_translator_cb(b_in))
         })))
         .await?;
