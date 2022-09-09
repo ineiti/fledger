@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use flmodules::{
     broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
-    nodeids::U256,
+    nodeids::{NodeID, U256},
 };
 
 use crate::{
@@ -52,6 +52,7 @@ pub enum NetworkError {
 pub struct Network {
     node_config: NodeConfig,
     get_update: usize,
+    connections: Vec<NodeID>,
 }
 
 const UPDATE_INTERVAL: usize = 10;
@@ -67,6 +68,7 @@ impl Network {
             .add_subsystem(Subsystem::Handler(Box::new(Self {
                 node_config,
                 get_update: UPDATE_INTERVAL,
+                connections: vec![],
             })))
             .await?;
         broker
@@ -126,10 +128,16 @@ impl Network {
                         return vec![];
                     }
                 };
-                self.send(
-                    &remote_node,
-                    NCInput::Setup((pi.get_direction(&own_id), pi.message)),
-                )
+                concat(vec![
+                    if !self.connections.contains(&remote_node) {
+                        self.connect(&remote_node)
+                    } else {
+                        vec![]
+                    },
+                    vec![
+                        NCInput::Setup((pi.get_direction(&own_id), pi.message)).to_net(remote_node)
+                    ],
+                ])
             }
         }
     }
@@ -138,19 +146,29 @@ impl Network {
         match msg {
             NetCall::SendNodeMessage((id, msg_str)) => {
                 log::trace!(
-                    "msg_call: {}->{}: {:?}",
+                    "msg_call: {}->{}: {:?} / {:?}",
                     self.node_config.info.get_id(),
                     id,
-                    msg_str
+                    msg_str,
+                    self.connections
                 );
-                Ok(self.send(&id, NCInput::Text(msg_str)))
+
+                Ok(concat(vec![
+                    if !self.connections.contains(&id) {
+                        log::warn!("Got message to unconnected node and connecting first to {}", id);
+                        self.connect(&id)
+                    } else {
+                        vec![]
+                    },
+                    vec![NCInput::Text(msg_str).to_net(id)],
+                ]))
             }
             NetCall::SendWSStats(ss) => Ok(WSSignalMessageFromNode::NodeStats(ss.clone()).into()),
             NetCall::SendWSUpdateListRequest => Ok(WSSignalMessageFromNode::ListIDsRequest.into()),
             NetCall::SendWSClearNodes => Ok(WSSignalMessageFromNode::ClearNodes.into()),
             NetCall::SendWSPeer(pi) => Ok(WSSignalMessageFromNode::PeerSetup(pi).into()),
-            NetCall::Connect(id) => return Ok(self.connect(&id)),
-            NetCall::Disconnect(id) => return Ok(self.disconnect(&id).await?),
+            NetCall::Connect(id) => Ok(self.connect(&id)),
+            NetCall::Disconnect(id) => Ok(self.disconnect(&id).await),
             NetCall::Tick => {
                 self.get_update -= 1;
                 Ok((self.get_update == 0)
@@ -199,26 +217,28 @@ impl Network {
         }
     }
 
-    /// Sends a message to the node dst.
-    /// If no connection is active yet, a new one will be created.
-    fn send(&mut self, dst: &U256, msg: NCInput) -> Vec<NetworkMessage> {
-        vec![NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((
-            *dst, msg,
-        )))]
-    }
-
     /// Connect to the given node.
     fn connect(&mut self, dst: &U256) -> Vec<NetworkMessage> {
-        vec![
-            NetworkMessage::WebRTC(WebRTCConnMessage::Connect(*dst)),
-            NetReply::Connected(*dst).into(),
-        ]
+        let mut out = vec![NetReply::Connected(*dst).into()];
+        if self.connections.contains(dst) {
+            log::warn!("Already connected to {}", dst);
+        } else {
+            self.connections.push(dst.clone());
+            out.push(NetworkMessage::WebRTC(WebRTCConnMessage::Connect(*dst)));
+        }
+        out
     }
 
     /// Disconnects from a given node.
-    async fn disconnect(&mut self, dst: &U256) -> Result<Vec<NetworkMessage>, NetworkError> {
-        let msgs = self.send(dst, NCInput::Disconnect);
-        return Ok(concat([msgs, vec![NetReply::Disconnected(*dst).into()]]));
+    async fn disconnect(&mut self, dst: &U256) -> Vec<NetworkMessage> {
+        let mut out = vec![NetReply::Disconnected(*dst).into()];
+        if !self.connections.contains(dst) {
+            log::warn!("Already disconnected from {}", dst);
+        } else {
+            self.connections.retain(|id| id != dst);
+            out.push(NCInput::Disconnect.to_net(*dst));
+        }
+        out
     }
 
     // Translator functions
@@ -235,11 +255,13 @@ impl Network {
     }
 
     fn to_web_rtc(msg: NetworkMessage) -> Option<WebRTCConnMessage> {
-        match msg {
-            NetworkMessage::WebRTC(msg) => {
-                matches!(msg, WebRTCConnMessage::InputNC(_)).then(|| msg)
+        if let NetworkMessage::WebRTC(msg_webrtc) = msg {
+            match msg_webrtc {
+                WebRTCConnMessage::InputNC(_) | WebRTCConnMessage::Connect(_) => Some(msg_webrtc),
+                WebRTCConnMessage::OutputNC(_) => None,
             }
-            _ => None,
+        } else {
+            None
         }
     }
 

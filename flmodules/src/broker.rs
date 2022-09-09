@@ -153,7 +153,7 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
             "Couldn't lock intern for {} - stop trying",
             std::any::type_name::<T>()
         );
-        
+
         Err(BrokerError::Locked)
     }
 
@@ -252,9 +252,13 @@ impl<R: Async + Clone + fmt::Debug, S: 'static + Async + Clone + fmt::Debug> Sub
                 std::any::type_name::<R>(),
                 std::any::type_name::<S>()
             );
-            self.broker.enqueue_msg(msg_tr).await.err().map(|e| {
-                log::error!("While sending message: {e}");
-            });
+            self.broker
+                .enqueue_msg(msg_tr)
+                .await
+                .err()
+                .map(|e| {
+                    log::error!("While sending message: {e}");
+                });
             self.broker.process().await.err().map(|e| {
                 log::trace!(
                     "{:p}: Translated message {} queued, but not processed: {e}",
@@ -406,7 +410,7 @@ impl<T: Async + Clone + fmt::Debug> Intern<T> {
 
     async fn process_handle_messages(
         &mut self,
-        new_msgs: HashMap<usize, Vec<(Destination, T)>>,
+        queued_msgs: HashMap<usize, Vec<(Destination, T)>>,
     ) -> Vec<usize> {
         // Then send messages to all other subsystems, and collect
         // new messages for next call to 'process'.
@@ -414,7 +418,7 @@ impl<T: Async + Clone + fmt::Debug> Intern<T> {
         for (index, ss) in self.subsystems.iter_mut() {
             let mut msg_queue = vec![];
             if !ss.is_translator() {
-                for (index_nm, nms) in new_msgs.iter() {
+                for (index_nm, nms) in queued_msgs.iter() {
                     if nms.len() == 0 {
                         continue;
                     }
@@ -430,7 +434,7 @@ impl<T: Async + Clone + fmt::Debug> Intern<T> {
                         .cloned()
                         .collect();
                     match ss.put_messages(msgs).await {
-                        Ok(mut msgs_new) => msg_queue.append(&mut msgs_new),
+                        Ok(mut new_msgs) => msg_queue.append(&mut new_msgs),
                         Err(e) => {
                             ss_remove.push(*index);
                             log::error!("While sending messages: {}", e);
@@ -789,6 +793,28 @@ mod tests {
         // Remove the untranslated message
         tap_b_rx.recv().unwrap();
         assert!(tap_a_rx.try_recv().is_err());
+
+        Ok(())
+    }
+
+    // Makes sure a link_bi does not interpret its own results.
+    #[tokio::test]
+    async fn link_infinite() -> Result<(), Box<dyn std::error::Error>> {
+        start_logging();
+
+        let mut a = Broker::<MessageA>::new();
+        let mut b = Broker::<MessageA>::new();
+
+        a.link_bi(
+            b.clone(),
+            Box::new(|msg| Some(msg)),
+            Box::new(|msg| Some(msg)),
+        )
+        .await;
+
+        let (tap, _) = b.get_tap().await?;
+        a.emit_msg(MessageA::One).await?;
+        assert_eq!(MessageA::One, tap.try_recv().unwrap());
 
         Ok(())
     }

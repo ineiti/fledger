@@ -83,13 +83,11 @@ impl SubsystemListener<WebRTCConnMessage> for WebRTCConn {
         &mut self,
         msgs: Vec<WebRTCConnMessage>,
     ) -> Vec<(Destination, WebRTCConnMessage)> {
-        let mut out = vec![];
         for msg in msgs {
             match msg {
-                WebRTCConnMessage::InputNC(msg_in) => out.extend(vec![
-                    WebRTCConnMessage::Connect(msg_in.0.clone()),
-                    WebRTCConnMessage::InputNC(msg_in),
-                ]),
+                WebRTCConnMessage::InputNC(msg_in) => {
+                    log::warn!("Dropping message {:?} to unconnected node {}", msg_in.1, msg_in.0);
+                }
                 WebRTCConnMessage::Connect(dst) => {
                     self.ensure_connection(&dst)
                         .await
@@ -99,6 +97,6 @@ impl SubsystemListener<WebRTCConnMessage> for WebRTCConn {
                 _ => {}
             };
         }
-        out.into_iter().map(|msg| (Destination::All, msg)).collect()
+        vec![]
     }
 }

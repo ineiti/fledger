@@ -1,11 +1,13 @@
 use async_trait::async_trait;
-use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
+use flmodules::{broker::{Broker, Destination, Subsystem, SubsystemListener}, nodeids::NodeID};
 use thiserror::Error;
 
-use crate::web_rtc::messages::{
+use crate::{web_rtc::messages::{
     ConnectionStateMap, DataChannelState, PeerMessage, WebRTCInput, WebRTCMessage, WebRTCOutput,
     WebRTCSpawner,
-};
+}, network::NetworkMessage};
+
+use super::WebRTCConnMessage;
 
 #[derive(Error, Debug)]
 pub enum NCError {
@@ -262,5 +264,11 @@ impl From<NCInput> for NCMessage {
 impl From<NCOutput> for NCMessage {
     fn from(msg: NCOutput) -> NCMessage {
         NCMessage::Output(msg)
+    }
+}
+
+impl NCInput {
+    pub fn to_net(self, dst: NodeID) -> NetworkMessage {
+        NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((dst, self)))
     }
 }
