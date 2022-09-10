@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use flmodules::nodeids::U256;
 use flnet::{
-    broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
+    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
     network::{NetCall, NetworkMessage},
 };
 
@@ -72,7 +72,7 @@ impl PingPong {
     fn net_to_pp(msg: NetworkMessage) -> Option<PPMessage> {
         if let NetworkMessage::Reply(rep) = msg {
             match rep {
-                flnet::network::NetReply::RcvNodeMessage((from, node_msg)) => {
+                flnet::network::NetReply::RcvNodeMessage(from, node_msg) => {
                     serde_json::from_str::<PPMessageNode>(&node_msg)
                         .ok()
                         .map(|ppm| PPMessage::FromNetwork(from, ppm))
@@ -99,10 +99,10 @@ impl PingPong {
     // Wraps a PPMessageNode into a json and sends it over the network to the
     // dst address.
     async fn send_net_ppm(&mut self, dst: U256, msg: &PPMessageNode) {
-        self.send_net(NetCall::SendNodeMessage((
+        self.send_net(NetCall::SendNodeMessage(
             dst,
             serde_json::to_string(msg).unwrap(),
-        )))
+        ))
         .await;
     }
 }
@@ -114,7 +114,7 @@ impl PingPong {
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<PPMessage> for PingPong {
-    async fn messages(&mut self, msgs: Vec<PPMessage>) -> Vec<(Destination, PPMessage)> {
+    async fn messages(&mut self, msgs: Vec<PPMessage>) -> Vec<PPMessage> {
         for msg in msgs {
             log::trace!("{}: got message {:?}", self.id, msg);
 
@@ -147,6 +147,7 @@ mod test {
     use std::time::Duration;
 
     use flarch::start_logging;
+    use flmodules::broker::Destination;
     use flnet::{config::NodeConfig, network::NetReply, NetworkSetupError};
 
     use super::*;
@@ -183,10 +184,10 @@ mod test {
         net.emit_msg_dest(
             10,
             Destination::NoTap,
-            NetworkMessage::Reply(NetReply::RcvNodeMessage((
+            NetworkMessage::Reply(NetReply::RcvNodeMessage(
                 dst_id.clone(),
                 serde_json::to_string(&PPMessageNode::Ping).unwrap(),
-            ))),
+            )),
         )
         .await?;
         assert_eq!(
@@ -206,10 +207,10 @@ mod test {
     }
 
     fn node_msg(dst: &U256, msg: &PPMessageNode) -> NetworkMessage {
-        NetworkMessage::Call(NetCall::SendNodeMessage((
+        NetworkMessage::Call(NetCall::SendNodeMessage(
             dst.clone(),
             serde_json::to_string(msg).unwrap(),
-        )))
+        ))
     }
 
     use flnet::testing::NetworkBrokerSimul;

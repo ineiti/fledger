@@ -1,10 +1,10 @@
 use async_trait::async_trait;
-use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
 use futures::{
     lock::Mutex,
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
+use std::sync::Arc;
 use tokio::{
     net::{TcpListener, TcpStream},
     select,
@@ -13,9 +13,8 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
 
-use std::sync::Arc;
-
 use crate::websocket::{WSError, WSSError, WSServerInput, WSServerMessage, WSServerOutput};
+use flmodules::broker::{Broker, Subsystem, SubsystemListener};
 
 pub struct WebSocketServer {
     connections: Arc<Mutex<Vec<WSConnection>>>,
@@ -65,10 +64,7 @@ impl WebSocketServer {
 
 #[async_trait]
 impl SubsystemListener<WSServerMessage> for WebSocketServer {
-    async fn messages(
-        &mut self,
-        from_broker: Vec<WSServerMessage>,
-    ) -> Vec<(Destination, WSServerMessage)> {
+    async fn messages(&mut self, from_broker: Vec<WSServerMessage>) -> Vec<WSServerMessage> {
         for msg in from_broker {
             if let WSServerMessage::Input(msg_in) = msg {
                 match msg_in {
@@ -90,10 +86,7 @@ impl SubsystemListener<WSServerMessage> for WebSocketServer {
                     WSServerInput::Stop => {
                         log::warn!("Stopping thread");
                         self.conn_thread.abort();
-                        return vec![(
-                            Destination::Others,
-                            WSServerMessage::Output(WSServerOutput::Stopped),
-                        )];
+                        return vec![WSServerMessage::Output(WSServerOutput::Stopped)];
                     }
                 }
             }

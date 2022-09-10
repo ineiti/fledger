@@ -7,7 +7,7 @@ use flmodules::{
         storage::RandomStorage,
     },
     timer::TimerMessage,
-    broker::{self, Broker, BrokerError, Destination, SubsystemListener},
+    broker::{self, Broker, BrokerError, SubsystemListener},
     nodeids::U256,
 };
 use flnet::network::{NetCall, NetworkMessage};
@@ -79,7 +79,7 @@ impl Translate {
         Box::new(move |msg: NetworkMessage| {
             if let NetworkMessage::Reply(msg_net) = msg {
                 match msg_net {
-                    flnet::network::NetReply::RcvNodeMessage((id, msg_str)) => {
+                    flnet::network::NetReply::RcvNodeMessage(id, msg_str) => {
                         if let Ok(msg_rnd) = serde_yaml::from_str::<NodeMessage>(&msg_str) {
                             return Some(RandomIn::NodeMessageFromNetwork((id, msg_rnd)).into());
                         }
@@ -116,7 +116,7 @@ impl Translate {
                 RandomOut::DisconnectNode(id) => return Some(NetCall::Disconnect(id).into()),
                 RandomOut::NodeMessageToNetwork((id, msg)) => {
                     let msg_str = serde_yaml::to_string(&msg).unwrap();
-                    return Some(NetCall::SendNodeMessage((id, msg_str)).into());
+                    return Some(NetCall::SendNodeMessage(id, msg_str).into());
                 }
                 _ => {}
             }
@@ -137,7 +137,7 @@ impl Translate {
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<RandomMessage> for Translate {
-    async fn messages(&mut self, msgs: Vec<RandomMessage>) -> Vec<(Destination, RandomMessage)> {
+    async fn messages(&mut self, msgs: Vec<RandomMessage>) -> Vec<RandomMessage> {
         let mut out = vec![];
         for msg in msgs {
             log::trace!("{} processing {msg:?}", self.id);
@@ -152,7 +152,7 @@ impl SubsystemListener<RandomMessage> for Translate {
         }
 
         out.into_iter()
-            .map(|m| (Destination::Others, m.into()))
+            .map(|m| m.into())
             .collect()
     }
 }

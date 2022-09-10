@@ -5,7 +5,7 @@ use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{ErrorEvent, MessageEvent, WebSocket};
 
 use crate::websocket::{WSClientError, WSClientInput, WSClientMessage, WSClientOutput};
-use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
+use flmodules::broker::{Broker, Subsystem, SubsystemListener};
 
 pub struct WebSocketClient {
     ws: Arc<Mutex<WebSocket>>,
@@ -72,7 +72,7 @@ impl SubsystemListener<WSClientMessage> for WebSocketClient {
     async fn messages(
         &mut self,
         msgs: Vec<WSClientMessage>,
-    ) -> Vec<(Destination, WSClientMessage)> {
+    ) -> Vec<WSClientMessage> {
         if let Some(ws) = self.ws.try_lock() {
             for msg in msgs {
                 if let WSClientMessage::Input(msg_in) = msg {

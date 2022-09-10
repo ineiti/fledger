@@ -11,13 +11,12 @@
 
 ### Things to do
 
+# Dates
+
+2022-09-09:
 - Clean up broker / network:
   - change enums with `((a, b))` arguments to simple `(a, b)` arguments
   - remove `Destination` from `SubsystemListener`
-
-# Dates
-
-2022-08-xx:
 
 2022-05-29:
 - make github workflows pass

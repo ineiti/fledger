@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use flmodules::{
-    broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
+    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
     nodeids::NodeID,
 };
 use flnet::{
@@ -51,10 +51,10 @@ pub enum PonyMessageNet {
 
 impl PonyMessageNet {
     fn to_net(self, to: NodeID) -> PonyMessageBroker {
-        NetworkMessage::Call(NetCall::SendNodeMessage((
+        NetworkMessage::Call(NetCall::SendNodeMessage(
             to,
             serde_json::to_string(&self).unwrap(),
-        )))
+        ))
         .into()
     }
 }
@@ -102,7 +102,7 @@ impl SubsystemListener<PonyMessageBroker> for Pony {
     async fn messages(
         &mut self,
         msgs: Vec<PonyMessageBroker>,
-    ) -> Vec<(Destination, PonyMessageBroker)> {
+    ) -> Vec<PonyMessageBroker> {
         let mut out = vec![];
 
         for msg in msgs {
@@ -110,7 +110,7 @@ impl SubsystemListener<PonyMessageBroker> for Pony {
                 PonyMessageBroker::Network(net) => {
                     if let NetworkMessage::Reply(nr) = net {
                         match nr {
-                            flnet::network::NetReply::RcvNodeMessage((from, msg)) => {
+                            flnet::network::NetReply::RcvNodeMessage(from, msg) => {
                                 if let Ok(pony_msg) = serde_json::from_str(&msg) {
                                     if pony_msg == PonyMessageNet::Ping {
                                         out.push(PonyMessageNet::Pong.to_net(from));
@@ -137,15 +137,14 @@ impl SubsystemListener<PonyMessageBroker> for Pony {
             }
         }
 
-        out.into_iter()
-            .map(|msg| (Destination::Others, msg))
-            .collect()
+        out
     }
 }
 
 #[cfg(test)]
 mod test {
     use flarch::start_logging;
+    use flmodules::broker::Destination;
     use flnet::{network::NetReply, NetworkSetupError};
 
     use super::*;
@@ -172,10 +171,10 @@ mod test {
         net.emit_msg_dest(
             10,
             Destination::NoTap,
-            NetworkMessage::Reply(NetReply::RcvNodeMessage((
+            NetworkMessage::Reply(NetReply::RcvNodeMessage(
                 id,
                 serde_json::to_string(&PonyMessageNet::Ping).unwrap(),
-            ))),
+            )),
         )
         .await?;
         assert_eq!(

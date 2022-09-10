@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use flmodules::{
-    broker::{Broker, BrokerError, Destination, SubsystemListener, Translate},
+    broker::{Broker, BrokerError, SubsystemListener, Translate},
     nodeids::U256,
 };
 
@@ -82,7 +82,7 @@ impl SubsystemListener<WebRTCConnMessage> for WebRTCConn {
     async fn messages(
         &mut self,
         msgs: Vec<WebRTCConnMessage>,
-    ) -> Vec<(Destination, WebRTCConnMessage)> {
+    ) -> Vec<WebRTCConnMessage> {
         for msg in msgs {
             match msg {
                 WebRTCConnMessage::InputNC(msg_in) => {

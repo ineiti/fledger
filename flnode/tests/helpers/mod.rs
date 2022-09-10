@@ -133,9 +133,9 @@ impl Network {
                     (id_dst, NetReply::Connected(*id).into()),
                 ]
             }
-            NetworkMessage::Call(NetCall::SendNodeMessage((from_id, msg_str))) => vec![(
+            NetworkMessage::Call(NetCall::SendNodeMessage(from_id, msg_str)) => vec![(
                 from_id,
-                NetReply::RcvNodeMessage((id.clone(), msg_str)).into(),
+                NetReply::RcvNodeMessage(id.clone(), msg_str).into(),
             )],
             NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((
                 id_dst,

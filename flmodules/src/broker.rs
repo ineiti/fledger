@@ -522,7 +522,7 @@ impl<T: Async + Clone + fmt::Debug> Subsystem<T> {
             }
             Self::Handler(h) => {
                 let ret = h.messages(msgs).await;
-                ret
+                ret.into_iter().map(|m| (Destination::Others, m)).collect()
             }
             Self::Callback(h) => h(msgs).await,
             _ => vec![],
@@ -555,7 +555,7 @@ impl<T> fmt::Debug for Subsystem<T> {
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 pub trait SubsystemListener<T: Async> {
-    async fn messages(&mut self, from_broker: Vec<T>) -> Vec<(Destination, T)>;
+    async fn messages(&mut self, from_broker: Vec<T>) -> Vec<T>;
 }
 
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
@@ -585,8 +585,6 @@ mod tests {
     pub enum BrokerTest {
         MsgA,
         MsgB,
-        MsgC,
-        MsgD,
     }
 
     pub struct Tps {
@@ -596,14 +594,14 @@ mod tests {
     #[cfg_attr(feature = "nosend", async_trait(?Send))]
     #[cfg_attr(not(feature = "nosend"), async_trait)]
     impl SubsystemListener<BrokerTest> for Tps {
-        async fn messages(&mut self, msgs: Vec<BrokerTest>) -> Vec<(Destination, BrokerTest)> {
+        async fn messages(&mut self, msgs: Vec<BrokerTest>) -> Vec<BrokerTest> {
             let mut output = vec![];
             log::debug!("Msgs are: {:?} - Replies are: {:?}", msgs, self.reply);
 
             for msg in msgs {
                 if let Some(bm) = self.reply.iter().find(|repl| repl.0 == msg) {
                     log::debug!("Found message");
-                    output.push((Destination::Others, bm.1.clone()));
+                    output.push(bm.1.clone());
                 }
             }
             output
@@ -649,90 +647,6 @@ mod tests {
         broker.emit_msg(bm_a).await?;
         broker.process().await?;
         assert_eq!(tap.try_iter().count(), 3);
-
-        Ok(())
-    }
-
-    struct DestinationTest {
-        reply_tx: Sender<BrokerTest>,
-        listen: BrokerTest,
-        dest: Destination,
-    }
-
-    impl DestinationTest {
-        async fn start(
-            b: &mut Broker<BrokerTest>,
-            listen: BrokerTest,
-            dest: Destination,
-        ) -> Result<Receiver<BrokerTest>, BrokerError> {
-            let (reply_tx, reply_rx) = channel::<BrokerTest>();
-            b.add_subsystem(Subsystem::Handler(Box::new(Self {
-                reply_tx,
-                listen,
-                dest,
-            })))
-            .await?;
-            Ok(reply_rx)
-        }
-    }
-
-    #[cfg_attr(feature = "nosend", async_trait(?Send))]
-    #[cfg_attr(not(feature = "nosend"), async_trait)]
-    impl SubsystemListener<BrokerTest> for DestinationTest {
-        async fn messages(&mut self, msgs: Vec<BrokerTest>) -> Vec<(Destination, BrokerTest)> {
-            for msg in msgs {
-                if msg == self.listen {
-                    return vec![(self.dest.clone(), BrokerTest::MsgA)];
-                }
-                if matches!(msg, BrokerTest::MsgA) {
-                    if let Err(e) = self.reply_tx.send(msg.clone()) {
-                        log::error!("While sending: {e}");
-                    }
-                }
-            }
-            vec![]
-        }
-    }
-
-    fn received(wanted: &[bool], rxs: &[&Receiver<BrokerTest>]) -> bool {
-        if wanted.len() != rxs.len() {
-            log::error!("Not same length");
-            return false;
-        }
-
-        let mut effective = vec![];
-        for rx in rxs {
-            effective.push(rx.try_iter().count() > 0);
-        }
-        if effective == wanted {
-            return true;
-        } else {
-            log::error!("Wanted: {wanted:?} - Got: {effective:?}");
-            return false;
-        }
-    }
-
-    /// Test different destinations.
-    #[tokio::test]
-    async fn test_destination() -> Result<(), BrokerError> {
-        start_logging();
-
-        let broker = &mut Broker::<BrokerTest>::new();
-        let t1 = &DestinationTest::start(broker, BrokerTest::MsgB, Destination::All).await?;
-        let t2 = &DestinationTest::start(broker, BrokerTest::MsgC, Destination::Others).await?;
-        let t3 = &DestinationTest::start(broker, BrokerTest::MsgD, Destination::This).await?;
-
-        broker.emit_msg(BrokerTest::MsgB).await?;
-        broker.process().await?;
-        assert!(received(&[true, true, true], &[t1, t2, t3]));
-
-        broker.emit_msg(BrokerTest::MsgC).await?;
-        broker.process().await?;
-        assert!(received(&[true, false, true], &[t1, t2, t3]));
-
-        broker.emit_msg(BrokerTest::MsgD).await?;
-        broker.process().await?;
-        assert!(received(&[false, false, true], &[t1, t2, t3]));
 
         Ok(())
     }

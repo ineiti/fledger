@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use flarch::tasks::wait_ms;
-use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
+use flmodules::broker::{Broker, Subsystem, SubsystemListener};
 use tokio::net::TcpStream;
 
 use futures::{stream::SplitSink, Sink, SinkExt, StreamExt};
@@ -57,7 +57,7 @@ impl SubsystemListener<WSClientMessage> for WebSocketClient {
     async fn messages(
         &mut self,
         msgs: Vec<WSClientMessage>,
-    ) -> Vec<(Destination, WSClientMessage)> {
+    ) -> Vec<WSClientMessage> {
         for msg in msgs {
             if let WSClientMessage::Input(msg_in) = msg {
                 match msg_in {
@@ -74,7 +74,7 @@ impl SubsystemListener<WSClientMessage> for WebSocketClient {
                     }
                     WSClientInput::Disconnect => {
                         self.write.close().await.unwrap();
-                        return vec![(Destination::Others, WSClientOutput::Disconnect.into())];
+                        return vec![ WSClientOutput::Disconnect.into()];
                     }
                 }
             }

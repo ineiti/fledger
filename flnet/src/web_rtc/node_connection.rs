@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use flmodules::{broker::{Broker, Destination, Subsystem, SubsystemListener}, nodeids::NodeID};
+use flmodules::{broker::{Broker, Subsystem, SubsystemListener}, nodeids::NodeID};
 use thiserror::Error;
 
 use crate::{web_rtc::messages::{
@@ -238,7 +238,7 @@ impl NodeConnection {
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<NCMessage> for NodeConnection {
-    async fn messages(&mut self, msgs: Vec<NCMessage>) -> Vec<(Destination, NCMessage)> {
+    async fn messages(&mut self, msgs: Vec<NCMessage>) -> Vec<NCMessage> {
         let mut out = vec![];
         for msg in msgs {
             out.extend(match msg {
@@ -249,9 +249,7 @@ impl SubsystemListener<NCMessage> for NodeConnection {
             });
         }
 
-        out.into_iter()
-            .map(|msg| (Destination::Others, msg))
-            .collect()
+        out
     }
 }
 

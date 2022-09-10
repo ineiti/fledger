@@ -42,8 +42,8 @@ async fn run_app() -> Result<(), StartError> {
         while let Ok(msg) = rx.try_recv() {
             if let NetworkMessage::Reply(reply) = msg {
                 match reply {
-                    NetReply::RcvNodeMessage(node) => {
-                        log::info!("Got node message: {:?}", node)
+                    NetReply::RcvNodeMessage(id, msg_net) => {
+                        log::info!("Got node message: {} / {:?}", id, msg_net)
                     }
                     NetReply::RcvWSUpdateList(list) => {
                         let other: Vec<NodeInfo> = list
@@ -54,10 +54,10 @@ async fn run_app() -> Result<(), StartError> {
                         log::info!("Got list: {:?}", other);
                         if other.len() > 0 {
                             net.emit_msg(
-                                NetReply::RcvNodeMessage((
+                                NetReply::RcvNodeMessage(
                                     other.get(0).unwrap().get_id(),
                                     "Hello from Rust wasm".to_string(),
-                                )).into()
+                                ).into()
                             )
                             .await?;
                         }

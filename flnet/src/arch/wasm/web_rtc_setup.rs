@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use futures::lock::Mutex;
 use js_sys::Reflect;
 use log::{error, warn};
@@ -6,13 +7,11 @@ use std::sync::Arc;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    MessageEvent, RtcConfiguration, RtcDataChannelState, RtcIceConnectionState,
-    RtcIceGatheringState,
-    Event, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate, RtcIceCandidateInit,
-    RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit,
-    RtcSignalingState,
+    Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelEvent,
+    RtcDataChannelState, RtcIceCandidate, RtcIceCandidateInit, RtcIceConnectionState,
+    RtcIceGatheringState, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
+    RtcSessionDescriptionInit, RtcSignalingState,
 };
-use async_trait::async_trait;
 
 use crate::web_rtc::{
     messages::{
@@ -22,7 +21,7 @@ use crate::web_rtc::{
     },
     node_connection::Direction,
 };
-use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
+use flmodules::broker::{Broker, Subsystem, SubsystemListener};
 
 pub struct WebRTCConnectionSetup {
     pub rp_conn: RtcPeerConnection,
@@ -485,12 +484,12 @@ impl WebRTCConnection {
 
 #[async_trait(?Send)]
 impl SubsystemListener<WebRTCMessage> for WebRTCConnection {
-    async fn messages(&mut self, msgs: Vec<WebRTCMessage>) -> Vec<(Destination, WebRTCMessage)> {
+    async fn messages(&mut self, msgs: Vec<WebRTCMessage>) -> Vec<WebRTCMessage> {
         let mut out = vec![];
         for msg in msgs {
             if let WebRTCMessage::Input(msg_in) = msg {
                 match self.msg_in(msg_in).await {
-                    Ok(Some(msg)) => out.push((Destination::Others, msg)),
+                    Ok(Some(msg)) => out.push(msg),
                     Ok(None) => {}
                     Err(e) => {
                         log::warn!("Error processing message: {:?}", e);

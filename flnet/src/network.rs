@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use thiserror::Error;
 
 use flmodules::{
-    broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener},
+    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
     nodeids::{NodeID, U256},
 };
 
@@ -144,7 +144,7 @@ impl Network {
 
     async fn msg_call(&mut self, msg: NetCall) -> Result<Vec<NetworkMessage>, NetworkError> {
         match msg {
-            NetCall::SendNodeMessage((id, msg_str)) => {
+            NetCall::SendNodeMessage(id, msg_str) => {
                 log::trace!(
                     "msg_call: {}->{}: {:?} / {:?}",
                     self.node_config.info.get_id(),
@@ -185,7 +185,7 @@ impl Network {
         match msg_nc {
             NCOutput::Connected(_) => vec![NetReply::Connected(id).into()],
             NCOutput::Disconnected(_) => vec![NetReply::Disconnected(id).into()],
-            NCOutput::Text(msg) => vec![NetReply::RcvNodeMessage((id, msg)).into()],
+            NCOutput::Text(msg) => vec![NetReply::RcvNodeMessage(id, msg).into()],
             NCOutput::State((dir, state)) => {
                 vec![NetReply::ConnectionState(NetworkConnectionState {
                     id,
@@ -273,7 +273,7 @@ impl Network {
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<NetworkMessage> for Network {
-    async fn messages(&mut self, bms: Vec<NetworkMessage>) -> Vec<(Destination, NetworkMessage)> {
+    async fn messages(&mut self, bms: Vec<NetworkMessage>) -> Vec<NetworkMessage> {
         let mut out = vec![];
         for msg in bms {
             log::trace!(
@@ -291,7 +291,7 @@ impl SubsystemListener<NetworkMessage> for Network {
                 _ => {}
             }
         }
-        out.into_iter().map(|m| (Destination::Others, m)).collect()
+        out
     }
 }
 
@@ -318,7 +318,7 @@ impl fmt::Display for NetworkMessage {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum NetCall {
-    SendNodeMessage((U256, String)),
+    SendNodeMessage(U256, String),
     SendWSStats(Vec<NodeStat>),
     SendWSClearNodes,
     SendWSUpdateListRequest,
@@ -331,7 +331,7 @@ pub enum NetCall {
 impl fmt::Display for NetCall {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NetCall::SendNodeMessage(_) => write!(f, "SendNodeMessage()"),
+            NetCall::SendNodeMessage(_, _) => write!(f, "SendNodeMessage()"),
             NetCall::SendWSStats(_) => write!(f, "SendWSStats()"),
             NetCall::SendWSClearNodes => write!(f, "SendWSClearNodes"),
             NetCall::SendWSUpdateListRequest => write!(f, "SendWSUpdateListRequest"),
@@ -360,7 +360,7 @@ impl From<WSSignalMessageFromNode> for Vec<NetworkMessage> {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum NetReply {
-    RcvNodeMessage((U256, String)),
+    RcvNodeMessage(U256, String),
     RcvWSUpdateList(Vec<NodeInfo>),
     ConnectionState(NetworkConnectionState),
     Connected(U256),
@@ -370,7 +370,7 @@ pub enum NetReply {
 impl fmt::Display for NetReply {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NetReply::RcvNodeMessage(_) => write!(f, "RcvNodeMessage()"),
+            NetReply::RcvNodeMessage(_, _) => write!(f, "RcvNodeMessage()"),
             NetReply::RcvWSUpdateList(_) => write!(f, "RcvWSUpdateList()"),
             NetReply::ConnectionState(_) => write!(f, "ConnectionState()"),
             NetReply::Connected(_) => write!(f, "Connected()"),

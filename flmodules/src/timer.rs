@@ -1,4 +1,4 @@
-use crate::broker::{Broker, BrokerError, Destination, Subsystem, SubsystemListener};
+use crate::broker::{Broker, BrokerError, Subsystem, SubsystemListener};
 use async_trait::async_trait;
 use flarch::{block_on, tasks::schedule_repeating};
 
@@ -37,10 +37,10 @@ impl BrokerTimer {
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<TimerMessage> for BrokerTimer {
-    async fn messages(&mut self, _: Vec<TimerMessage>) -> Vec<(Destination, TimerMessage)> {
+    async fn messages(&mut self, _: Vec<TimerMessage>) -> Vec<TimerMessage> {
         if self.seconds == 0 {
             self.seconds = 59;
-            return vec![(Destination::Others, TimerMessage::Minute)];
+            return vec![TimerMessage::Minute];
         }
         self.seconds -= 1;
         vec![]

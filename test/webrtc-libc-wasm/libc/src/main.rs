@@ -35,9 +35,9 @@ async fn main() -> Result<(), MainError> {
 
     for msg in tap1 {
         log::debug!("Node 1: {msg:?}");
-        if let NetworkMessage::Reply(NetReply::RcvNodeMessage(nm)) = msg {
-            log::info!("Got message from other node: {}", nm.1);
-            send(&mut broker1, nm.0, "Reply from libc").await;
+        if let NetworkMessage::Reply(NetReply::RcvNodeMessage(id, msg_net)) = msg {
+            log::info!("Got message from other node: {}", msg_net);
+            send(&mut broker1, id, "Reply from libc").await;
         }
     }
 
@@ -72,7 +72,7 @@ async fn spawn_node() -> Result<(NodeConfig, Broker<NetworkMessage>), MainError>
 
 async fn send(src: &mut Broker<NetworkMessage>, id: U256, msg: &str) {
     src.emit_msg(
-        NetworkMessage::Call(NetCall::SendNodeMessage((id, msg.into())))
+        NetworkMessage::Call(NetCall::SendNodeMessage(id, msg.into()))
     )
     .await
     .expect("Sending to node");

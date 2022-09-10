@@ -1,5 +1,6 @@
 CARGOS := cli/{fledger,flsignal} flarch flbrowser \
-			flmodules flnet flnode test/{fledger_node,webrtc-libc-wasm/{libc,wasm}}
+			flmodules flnet flnode test/{fledger_node,webrtc-libc-wasm/{libc,wasm}} \
+			examples/ping-pong/{wasm,shared,libc}
 
 check:
 	for c in ${CARGOS}; do \

@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use flmodules::broker::{Broker, Destination, Subsystem, SubsystemListener};
+use flmodules::broker::{Broker, Subsystem, SubsystemListener};
 use futures::lock::Mutex;
 use webrtc::{
     api::{
@@ -435,12 +435,12 @@ impl WebRTCConnectionSetupLibc {
 
 #[async_trait]
 impl SubsystemListener<WebRTCMessage> for WebRTCConnectionSetupLibc {
-    async fn messages(&mut self, msgs: Vec<WebRTCMessage>) -> Vec<(Destination, WebRTCMessage)> {
+    async fn messages(&mut self, msgs: Vec<WebRTCMessage>) -> Vec<WebRTCMessage> {
         let mut out = vec![];
         for msg in msgs {
             if let WebRTCMessage::Input(msg_in) = msg {
                 match self.msg_in(msg_in).await {
-                    Ok(Some(msg)) => out.push((Destination::Others, msg)),
+                    Ok(Some(msg)) => out.push(msg),
                     Ok(None) => {}
                     Err(e) => {
                         log::warn!("{:p} Error processing message: {:?}", self, e);
