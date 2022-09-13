@@ -159,7 +159,7 @@ mod test {
         let (pp_tap, _) = ping_pong.get_tap().await?;
 
         ping_pong
-            .emit_msg_dest(10, Destination::NoTap, PonyMessage::NodeListRequest)
+            .emit_msg_dest(Destination::NoTap, PonyMessage::NodeListRequest)
             .await?;
         assert!(pp_tap.try_recv().is_err());
         assert_eq!(
@@ -169,7 +169,6 @@ mod test {
 
         let id = NodeID::rnd();
         net.emit_msg_dest(
-            10,
             Destination::NoTap,
             NetworkMessage::Reply(NetReply::RcvNodeMessage(
                 id,

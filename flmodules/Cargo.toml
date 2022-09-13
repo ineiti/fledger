@@ -27,6 +27,6 @@ log = "0.4"
 itertools = "0.10"
 async-trait = "0.1"
 futures = "0.3"
-tokio = "1"
+tokio = {version = "1", features = ["sync"]}
 
 wasm-bindgen-futures = {version = "0.4", optional = true}

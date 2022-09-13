@@ -10,6 +10,10 @@ pub fn block_on<F: Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
 
+pub fn spawn_local<F: Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
+}
+
 pub fn schedule_repeating<F>(cb: F)
 where
     F: 'static + FnMut(),

@@ -11,6 +11,10 @@ pub fn block_on<F: Future<Output = ()> + 'static + Send>(f: F) {
     tokio::spawn(async { f.await });
 }
 
+pub fn spawn_local<F: Future<Output = ()> + 'static + Send>(f: F) {
+    tokio::spawn(async { f.await });
+}
+
 pub fn schedule_repeating<F>(mut cb: F)
 where
     F: 'static + FnMut() + Send,

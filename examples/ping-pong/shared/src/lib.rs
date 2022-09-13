@@ -90,7 +90,7 @@ impl PingPong {
     // Sends a generic NetCall type message to the network-broker.
     async fn send_net(&mut self, msg: NetCall) {
         self.net
-            .enqueue_msg(NetworkMessage::Call(msg.clone()))
+            .emit_msg(NetworkMessage::Call(msg.clone()))
             .await
             .err()
             .map(|e| log::error!("While sending {:?} to net: {:?}", msg, e));
@@ -130,12 +130,6 @@ impl SubsystemListener<PPMessage> for PingPong {
             }
         }
 
-        // Because the self.send_net* methods only `enqueue` messages, a call to `process` is necessary
-        // to actually send the message.
-        // This is a small optimization, as the `emit` call will retry a couple of times, so
-        // multiple `emit` calls can delay the execution a lot more than `enqueue` calls followed
-        // by `process`.
-        self.net.process().await.err();
 
         // All messages are sent directly to the network broker.
         vec![]
@@ -170,7 +164,6 @@ mod test {
 
         // Send a Ping message from src to dst
         pp.emit_msg_dest(
-            10,
             Destination::NoTap,
             PPMessage::ToNetwork(dst_id.clone(), PPMessageNode::Ping),
         )
@@ -182,7 +175,6 @@ mod test {
 
         // Receive a ping message through the network
         net.emit_msg_dest(
-            10,
             Destination::NoTap,
             NetworkMessage::Reply(NetReply::RcvNodeMessage(
                 dst_id.clone(),

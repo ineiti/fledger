@@ -82,12 +82,11 @@ impl Component for App {
                         }
 
                         flarch::tasks::wait_ms(1000).await;
-                        pp.process().await.err().map(|e| log::error!("Couldn't process messages: {:?}", e));
 
                         for node in &list {
                             if node != &our_id {
                                 log::info!("Sending ping to {}", node);
-                                pp.enqueue_msg(PPMessage::ToNetwork(*node, PPMessageNode::Ping))
+                                pp.emit_msg(PPMessage::ToNetwork(*node, PPMessageNode::Ping))
                                     .await
                                     .err()
                                     .map(|e| log::error!("While sending ping: {:?}", e));

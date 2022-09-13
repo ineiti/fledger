@@ -158,10 +158,6 @@ impl Node {
     /// called automatically.
     /// Also updates all storage fields in the node_data field.
     pub async fn process(&mut self) -> Result<(), NodeError> {
-        self.broker_net.process().await?;
-        self.random.broker.process().await?;
-        self.gossip.broker.process().await?;
-        self.ping.broker.process().await?;
         self.update();
         self.storage
             .set(STORAGE_GOSSIP_EVENTS, &self.gossip.storage.get()?)?;

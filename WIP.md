@@ -10,8 +10,14 @@
   - Publish fledger crates in crates.io
 
 ### Things to do
+- Clean up broker / network:
+  - Remove `Destination::{All,Others,This}` - Test it
+  - Replace `process` with `async-task`
+  - Add `process_msg` with a `Destination::Settle<Vec<BrokerID>>`
 
 # Dates
+
+2022-09-12:
 
 2022-09-09:
 - Clean up broker / network:
