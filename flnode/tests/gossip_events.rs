@@ -1,4 +1,4 @@
-use flarch::start_logging;
+use flarch::{start_logging_filter_level};
 use flmodules::{gossip_events::events, nodeids::U256};
 
 mod helpers;
@@ -18,7 +18,7 @@ async fn gossip_30() -> Result<(), NetworkError> {
 }
 
 async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
-    start_logging();
+    start_logging_filter_level(vec![], log::LevelFilter::Debug);
 
     let mut net = Network::new();
     log::info!("Creating {nbr_nodes} nodes");
@@ -48,10 +48,7 @@ async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
 
         match step {
             s if s == steps => {
-                log::info!(
-                    "Checking messages {} == {nbr} and adding 2nd message",
-                    nbr_nodes
-                );
+                log::info!("Checking messages {nbr_nodes} == {nbr} and adding 2nd message");
                 assert_eq!(nbr_nodes, nbr);
                 add_chat_message(&mut net, id, step).await;
             }
@@ -82,8 +79,11 @@ async fn add_chat_message(net: &mut Network, id: &U256, step: i32) {
         msg: "msg".into(),
     };
     let node_timer = net.nodes.get_mut(id).expect("getting node");
-    node_timer.node
+    node_timer
+        .node
         .gossip
+        .as_mut()
+        .unwrap()
         .add_event(msg)
         .await
         .expect("adding new event");

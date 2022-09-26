@@ -48,7 +48,7 @@ impl WebRTCConn {
                     Self::from_nc(id.clone()),
                     Self::to_nc(id.clone()),
                 )
-                .await;
+                .await?;
             self.connections.push(*id);
         }
 
@@ -79,14 +79,15 @@ impl WebRTCConn {
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<WebRTCConnMessage> for WebRTCConn {
-    async fn messages(
-        &mut self,
-        msgs: Vec<WebRTCConnMessage>,
-    ) -> Vec<WebRTCConnMessage> {
+    async fn messages(&mut self, msgs: Vec<WebRTCConnMessage>) -> Vec<WebRTCConnMessage> {
         for msg in msgs {
             match msg {
                 WebRTCConnMessage::InputNC(msg_in) => {
-                    log::warn!("Dropping message {:?} to unconnected node {}", msg_in.1, msg_in.0);
+                    log::warn!(
+                        "Dropping message {:?} to unconnected node {}",
+                        msg_in.1,
+                        msg_in.0
+                    );
                 }
                 WebRTCConnMessage::Connect(dst) => {
                     self.ensure_connection(&dst)

@@ -28,7 +28,7 @@ impl NetworkBrokerSimul {
                 Self::nsh_net(nc_id.clone()),
                 Self::net_nsh(nc_id),
             )
-            .await;
+            .await?;
         self.nsh_broker
             .emit_msg(NSHubMessage::NewClient(nc.info.clone()))
             .await?;

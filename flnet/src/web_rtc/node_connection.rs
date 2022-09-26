@@ -1,11 +1,17 @@
 use async_trait::async_trait;
-use flmodules::{broker::{Broker, Subsystem, SubsystemListener}, nodeids::NodeID};
+use flmodules::{
+    broker::{Broker, Subsystem, SubsystemListener},
+    nodeids::NodeID,
+};
 use thiserror::Error;
 
-use crate::{web_rtc::messages::{
-    ConnectionStateMap, DataChannelState, PeerMessage, WebRTCInput, WebRTCMessage, WebRTCOutput,
-    WebRTCSpawner,
-}, network::NetworkMessage};
+use crate::{
+    network::NetworkMessage,
+    web_rtc::messages::{
+        ConnectionStateMap, DataChannelState, PeerMessage, WebRTCInput, WebRTCMessage,
+        WebRTCOutput, WebRTCSpawner,
+    },
+};
 
 use super::WebRTCConnMessage;
 
@@ -71,14 +77,14 @@ impl NodeConnection {
                 Box::new(Self::to_incoming),
                 Box::new(Self::from_incoming),
             )
-            .await;
+            .await?;
         broker
             .link_bi(
                 spawner().await?,
                 Box::new(Self::to_outgoing),
                 Box::new(Self::from_outgoing),
             )
-            .await;
+            .await?;
         let nc = NodeConnection {
             msg_queue: vec![],
             state_incoming: None,

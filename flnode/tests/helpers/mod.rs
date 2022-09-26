@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::mpsc::Receiver};
 
-use flarch::data_storage::TempDS;
+use flarch::data_storage::DataStorageTemp;
 use flmodules::{
     broker::{Broker, BrokerError},
     nodeids::U256,
@@ -12,7 +12,7 @@ use flnet::{
     web_rtc::{node_connection::NCInput, WebRTCConnMessage},
 };
 
-use flnode::node::{NodeError, Brokers, Node};
+use flnode::node::{Brokers, Node, NodeError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -50,7 +50,7 @@ impl Network {
 
     pub async fn tick(&mut self) -> Result<(), NetworkError> {
         for node in self.nodes.values_mut() {
-            node.timer.emit_msg(TimerMessage::Second).await?;
+            node.timer.settle_msg(TimerMessage::Second).await?;
         }
         Ok(())
     }
@@ -65,7 +65,7 @@ impl Network {
         for id in self.nodes.keys() {
             if let Some(broker) = self.node_brokers.get_mut(id) {
                 broker
-                    .emit_msg(NetReply::RcvWSUpdateList(list.clone()).into())
+                    .settle_msg(NetReply::RcvWSUpdateList(list.clone()).into())
                     .await?;
             }
         }
@@ -98,7 +98,7 @@ impl Network {
     #[allow(dead_code)]
     pub async fn send_message(&mut self, id: &U256, bm: NetworkMessage) {
         if let Some(ch) = self.node_brokers.get_mut(id) {
-            ch.emit_msg(bm).await.expect("Couldn't send message");
+            ch.settle_msg(bm).await.expect("Couldn't send message");
         }
     }
 
@@ -111,7 +111,7 @@ impl Network {
                     if let Some(broker) = self.node_brokers.get_mut(&id_dst) {
                         log::trace!("Send: {} -> {}: {:?}", id, id_dst, msg_out);
                         broker
-                            .emit_msg(msg_out)
+                            .settle_msg(msg_out)
                             .await
                             .expect("processing one message");
                         self.messages += 1;
@@ -180,11 +180,14 @@ impl NodeTimer {
             node_config = NodeConfig::new();
         }
         let mut node_data =
-            Node::start_some(TempDS::new(), node_config, broker_net.clone(), brokers).await?;
+            Node::start_some(Box::new(DataStorageTemp::new()), node_config, broker_net.clone(), brokers).await?;
         let timer = Broker::new();
         node_data.add_timer(timer.clone()).await;
 
-        Ok(Self { node: node_data, timer })
+        Ok(Self {
+            node: node_data,
+            timer,
+        })
     }
 
     pub fn node_info(&self) -> NodeInfo {
@@ -201,6 +204,6 @@ impl NodeTimer {
 
     #[allow(dead_code)]
     pub fn messages(&mut self) -> usize {
-        self.node.gossip.chat_events().len()
+        self.node.gossip.as_ref().unwrap().chat_events().len()
     }
 }

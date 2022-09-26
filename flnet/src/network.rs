@@ -73,14 +73,14 @@ impl Network {
             .await?;
         broker
             .link_bi(ws, Box::new(Self::from_ws), Box::new(Self::to_ws))
-            .await;
+            .await?;
         broker
             .link_bi(
                 web_rtc,
                 Box::new(Self::from_web_rtc),
                 Box::new(Self::to_web_rtc),
             )
-            .await;
+            .await?;
         Ok(broker)
     }
 
@@ -155,7 +155,10 @@ impl Network {
 
                 Ok(concat(vec![
                     if !self.connections.contains(&id) {
-                        log::warn!("Got message to unconnected node and connecting first to {}", id);
+                        log::warn!(
+                            "Got message to unconnected node and connecting first to {}",
+                            id
+                        );
                         self.connect(&id)
                     } else {
                         vec![]
@@ -166,7 +169,9 @@ impl Network {
             NetCall::SendWSStats(ss) => Ok(WSSignalMessageFromNode::NodeStats(ss.clone()).into()),
             NetCall::SendWSUpdateListRequest => Ok(WSSignalMessageFromNode::ListIDsRequest.into()),
             NetCall::SendWSClearNodes => Ok(WSSignalMessageFromNode::ClearNodes.into()),
-            NetCall::SendWSPeer(pi) => Ok(WSSignalMessageFromNode::PeerSetup(pi).into()),
+            NetCall::SendWSPeer(pi) => {
+                Ok(WSSignalMessageFromNode::PeerSetup(pi).into())
+            }
             NetCall::Connect(id) => Ok(self.connect(&id)),
             NetCall::Disconnect(id) => Ok(self.disconnect(&id).await),
             NetCall::Tick => {
@@ -245,13 +250,17 @@ impl Network {
 
     fn to_ws(msg: NetworkMessage) -> Option<WSClientMessage> {
         match msg {
-            NetworkMessage::WebSocket(msg) => matches!(msg, WSClientMessage::Input(_)).then(|| msg),
+            NetworkMessage::WebSocket(msg) => {
+                matches!(msg, WSClientMessage::Input(_)).then(|| msg)
+            }
             _ => None,
         }
     }
 
     fn from_ws(msg: WSClientMessage) -> Option<NetworkMessage> {
-        matches!(msg, WSClientMessage::Output(_)).then(|| NetworkMessage::WebSocket(msg))
+        matches!(msg, WSClientMessage::Output(_)).then(|| {
+            NetworkMessage::WebSocket(msg)
+        })
     }
 
     fn to_web_rtc(msg: NetworkMessage) -> Option<WebRTCConnMessage> {

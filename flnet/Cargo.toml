@@ -52,7 +52,7 @@ native-tls = {version = "0.2", optional = true}
 rand = {version = "0.8", optional = true}
 tokio = {version = "1", features = ["full"], optional = true}
 tokio-tungstenite = {version = "0.17", features = ["native-tls"], optional = true}
-webrtc = {version = "0.4", optional = true}
+webrtc = {version = "0.5", optional = true}
 
 # For wasm
 js-sys = {version = "0.3", optional = true}

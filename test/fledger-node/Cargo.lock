@@ -40,6 +40,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "base64"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
+
+[[package]]
 name = "bimap"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -164,6 +170,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a01d95850c592940db9b8194bc39f4bc0e89dee5c4265e4b1807c34a9aba453c"
+dependencies = [
+ "darling_core",
+ "darling_macro",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "859d65a907b6852c9361e3185c862aae7fafd2887876799fa55f5f99dc40d610"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c972679f83bdf9c42bd905396b6c3588a843a17f0f16dfcfa3e2c5d57441835"
+dependencies = [
+ "darling_core",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -228,7 +269,7 @@ dependencies = [
 
 [[package]]
 name = "flarch"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "chrono",
  "env_logger",
@@ -245,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "fledger-node"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "console_error_panic_hook",
  "env_logger",
@@ -253,7 +294,6 @@ dependencies = [
  "flarch",
  "flmodules",
  "flnet",
- "flnet-wasm",
  "flnode",
  "log",
  "thiserror",
@@ -263,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "flmodules"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "flarch",
@@ -273,6 +313,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_derive",
+ "serde_with",
  "serde_yaml",
  "sha2",
  "thiserror",
@@ -282,7 +323,7 @@ dependencies = [
 
 [[package]]
 name = "flnet"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "bimap",
@@ -292,33 +333,18 @@ dependencies = [
  "futures",
  "getrandom",
  "itertools",
- "log",
- "names",
- "serde",
- "serde_derive",
- "serde_json",
- "sha2",
- "thiserror",
- "toml",
-]
-
-[[package]]
-name = "flnet-wasm"
-version = "0.6.0"
-dependencies = [
- "async-trait",
- "flarch",
- "flmodules",
- "flnet",
- "futures",
- "getrandom",
  "js-sys",
  "log",
+ "names",
  "parking_lot",
  "serde",
  "serde_derive",
  "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "sha2",
  "thiserror",
+ "toml",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-timer",
@@ -327,7 +353,7 @@ dependencies = [
 
 [[package]]
 name = "flnode"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "bitflags",
@@ -350,6 +376,12 @@ dependencies = [
  "thiserror",
  "toml",
 ]
+
+[[package]]
+name = "fnv"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
 name = "futures"
@@ -485,10 +517,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
 name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
+
+[[package]]
+name = "ident_case"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "indexmap"
@@ -813,6 +857,31 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_with"
+version = "1.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "678b5a069e50bf00ecd22d0cd8ddf7c236f68581b03db652061ed5eb13a312ff"
+dependencies = [
+ "base64",
+ "hex",
+ "serde",
+ "serde_json",
+ "serde_with_macros",
+]
+
+[[package]]
+name = "serde_with_macros"
+version = "1.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e182d6ec6f05393cc0e5ed1bf81ad6db3a8feedf8ee515ecdd369809bcce8082"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -109,7 +109,7 @@ impl Translate {
                 Box::new(Self::link_rnd_gossip),
                 Box::new(Self::link_gossip_rnd),
             )
-            .await;
+            .await?;
         Ok(gossip)
     }
 
@@ -210,7 +210,7 @@ mod tests {
         let id2 = NodeID::rnd();
         let (tap_rnd, _) = broker_rnd.get_tap().await?;
         broker_rnd
-            .emit_msg(RandomMessage::Output(RandomOut::ListUpdate(
+            .settle_msg(RandomMessage::Output(RandomOut::ListUpdate(
                 vec![id2].into(),
             )))
             .await?;
@@ -224,7 +224,7 @@ mod tests {
         };
         let msg = MessageNode::Events(vec![event.clone()]);
         broker_rnd
-            .emit_msg(
+            .settle_msg(
                 RandomOut::NodeMessageFromNetwork((
                     id2,
                     ModuleMessage {
@@ -238,7 +238,7 @@ mod tests {
         gossip.update();
         assert_eq!(1, gossip.storage.events(event.category).len());
 
-        gossip.broker.emit_msg(GossipIn::Tick.into()).await?;
+        gossip.broker.settle_msg(GossipIn::Tick.into()).await?;
         assert_msg_reid(&tap_rnd, &id2)?;
         Ok(())
     }

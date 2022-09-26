@@ -71,7 +71,7 @@ impl Translate {
             Self::link_net_rnd(id),
             Box::new(Self::link_rnd_net),
         )
-        .await;
+        .await?;
         Ok(rc)
     }
 

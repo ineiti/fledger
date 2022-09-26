@@ -74,7 +74,7 @@ impl SignalServer {
                 Box::new(Self::link_wss_ss),
                 Box::new(Self::link_ss_wss),
             )
-            .await;
+            .await?;
         BrokerTimer::start().await?
             .forward(
                 broker.clone(),

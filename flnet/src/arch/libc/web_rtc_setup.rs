@@ -313,7 +313,6 @@ impl WebRTCConnectionSetupLibc {
     }
 
     async fn send_queue(&mut self) -> Result<(), SetupError> {
-        log::trace!("Send_queue of {} msgs", self.queue.len());
         let state_open = self.get_state().await?.data_connection == Some(DataChannelState::Open);
         if state_open || self.direction == Some(Direction::Incoming) {
             let rtc_data = self.rtc_data.lock().await;
@@ -382,7 +381,6 @@ impl WebRTCConnectionSetupLibc {
                     return Box::pin(async {});
                 }
                 let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
-                log::trace!("Message from DataChannel: '{}'", msg_str);
                 let mut broker = broker.clone();
                 Box::pin(async move {
                     broker

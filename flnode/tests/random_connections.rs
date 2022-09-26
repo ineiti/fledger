@@ -32,7 +32,7 @@ async fn connect_nodes_n(nbr_nodes: usize) -> Result<(), NetworkError> {
         nodes_visited.push(id);
         let node = net.nodes.get_mut(&id).unwrap();
         node.node.update();
-        let nd = node.node.random.storage.clone();
+        let nd = node.node.random.as_ref().unwrap().storage.clone();
         for n in nd.connected.0 {
             if nodes_to_visit.contains(&n.id) || nodes_visited.contains(&n.id) {
                 continue;

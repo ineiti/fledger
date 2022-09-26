@@ -78,7 +78,7 @@ impl Translate {
                 Box::new(Self::link_rnd_ping),
                 Box::new(Self::link_ping_rnd),
             )
-            .await;
+            .await?;
         Ok(gossip)
     }
 

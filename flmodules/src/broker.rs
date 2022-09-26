@@ -13,7 +13,7 @@ use futures::{future::BoxFuture, lock::Mutex};
 use thiserror::Error;
 use tokio::sync::mpsc;
 
-use flarch::{spawn_local};
+use flarch::spawn_local;
 
 #[derive(Debug, Error)]
 pub enum BrokerError {
@@ -24,17 +24,6 @@ pub enum BrokerError {
 }
 
 pub type BrokerID = U256;
-
-#[derive(Debug)]
-enum BrokerMessage<T: Async + Clone + fmt::Debug> {
-    All(T),
-    NoTap(T),
-    Forwarded(Vec<BrokerID>, T),
-    Handled(usize, T),
-    SubsystemAdd(usize, Subsystem<T>),
-    SubsystemRemove(usize),
-    Process(Vec<BrokerID>),
-}
 
 /// The Destination of the message
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,6 +71,7 @@ use crate::nodeids::U256;
 pub struct Broker<T: Async + Clone + fmt::Debug> {
     intern_tx: mpsc::UnboundedSender<InternMessage<T>>,
     subsystems: Arc<Mutex<usize>>,
+    id: BrokerID,
 }
 
 impl<T: 'static + Async + Clone + fmt::Debug> Default for Broker<T> {
@@ -98,16 +88,19 @@ impl<T: Async + Clone + fmt::Debug> Clone for Broker<T> {
         Self {
             intern_tx: self.intern_tx.clone(),
             subsystems: Arc::clone(&self.subsystems),
+            id: self.id,
         }
     }
 }
 
 impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
     pub fn new() -> Self {
-        let intern_tx = Intern::new();
+        let id = BrokerID::rnd();
+        let intern_tx = Intern::new(id);
         Self {
             intern_tx,
             subsystems: Arc::new(Mutex::new(0)),
+            id,
         }
     }
 
@@ -123,13 +116,15 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
                 subsystem, ss,
             )))
             .map_err(|_| BrokerError::SendQueue)?;
+        // self.settle(vec![]).await?;
         Ok(subsystem)
     }
 
     pub async fn remove_subsystem(&mut self, ss: usize) -> Result<(), BrokerError> {
         self.intern_tx
             .send(InternMessage::Subsystem(SubsystemAction::Remove(ss)))
-            .map_err(|_| BrokerError::SendQueue)
+            .map_err(|_| BrokerError::SendQueue)?;
+        self.settle(vec![]).await
     }
 
     pub async fn get_tap(&mut self) -> Result<(Receiver<T>, usize), BrokerError> {
@@ -139,15 +134,31 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
     }
 
     /// Emit a message to a given destination of other listeners.
+    /// The message will be processed asynchronously.
     pub async fn emit_msg_dest(&mut self, dst: Destination, msg: T) -> Result<(), BrokerError> {
         self.intern_tx
             .send(InternMessage::Message(dst, msg))
             .map_err(|_| BrokerError::SendQueue)
     }
 
-    /// Try to emit and process a message to other listeners.
+    /// Emit a message to other listeners.
+    /// The message will be processed asynchronously.
     pub async fn emit_msg(&mut self, msg: T) -> Result<(), BrokerError> {
         self.emit_msg_dest(Destination::All, msg).await
+    }
+
+    /// Emit a message to a given destination of other listeners and wait for all involved
+    /// brokers to settle.
+    pub async fn settle_msg_dest(&mut self, dst: Destination, msg: T) -> Result<(), BrokerError> {
+        self.intern_tx
+            .send(InternMessage::Message(dst, msg))
+            .map_err(|_| BrokerError::SendQueue)?;
+        self.settle(vec![]).await
+    }
+
+    /// Emit a message to other listeners and wait for all involved brokers to settle.
+    pub async fn settle_msg(&mut self, msg: T) -> Result<(), BrokerError> {
+        self.settle_msg_dest(Destination::All, msg).await
     }
 
     /// Connects to another broker. The message type of the other broker
@@ -160,9 +171,10 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
         mut broker: Broker<R>,
         link_rt: Translate<R, T>,
         link_tr: Translate<T, R>,
-    ) {
+    ) -> Result<(), BrokerError> {
         self.forward(broker.clone(), link_tr).await;
         broker.forward(self.clone(), link_rt).await;
+        Ok(())
     }
 
     /// Forwards all messages from this broker to another broker.
@@ -181,6 +193,19 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
         self.add_subsystem(Subsystem::Translator(Box::new(translator_tr)))
             .await
             .unwrap();
+    }
+
+    /// Waits for all messages in the queue to be forwarded / handled, before returning.
+    /// It also calls all brokers that are signed up as forwarding targets.
+    /// The caller argument is to be used when recursively settling, to avoid
+    /// endless loops.
+    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        self.intern_tx
+            .send(InternMessage::Settle(callers.clone(), tx))
+            .map_err(|_| BrokerError::SendQueue)?;
+        rx.recv().await;
+        Ok(())
     }
 
     #[cfg(feature = "nosend")]
@@ -215,17 +240,18 @@ impl<R: Async + Clone + fmt::Debug, S: 'static + Async + Clone + fmt::Debug> Sub
         let msg_res = (self.translate)(msg.clone());
         if let Some(msg_tr) = msg_res {
             log::trace!(
-                "Translated {} -> {}: {msg_tr:?}",
+                "Translated {} -> {}: {msg_tr:?}, sending to {}",
                 std::any::type_name::<R>(),
-                std::any::type_name::<S>()
+                std::any::type_name::<S>(),
+                self.broker.id,
             );
             self.broker
                 .emit_msg_dest(Destination::Forwarded(trail), msg_tr)
                 .await
                 .err()
                 .map(|e| {
-                    log::trace!(
-                        "{:p}: Translated message {} queued, but not processed: {e}",
+                    log::error!(
+                        "{:p}: Translated message {} couldn't be queued: {e}",
                         self,
                         std::any::type_name::<S>()
                     );
@@ -234,11 +260,19 @@ impl<R: Async + Clone + fmt::Debug, S: 'static + Async + Clone + fmt::Debug> Sub
         }
         false
     }
+
+    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
+        if !callers.contains(&self.broker.id) {
+            self.broker.settle(callers).await?;
+        }
+        Ok(())
+    }
 }
 
 enum InternMessage<T: Async + Clone + fmt::Debug> {
     Subsystem(SubsystemAction<T>),
     Message(Destination, T),
+    Settle(Vec<BrokerID>, mpsc::UnboundedSender<bool>),
 }
 
 struct Intern<T: Async + Clone + fmt::Debug> {
@@ -249,19 +283,31 @@ struct Intern<T: Async + Clone + fmt::Debug> {
 }
 
 impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
-    fn new() -> mpsc::UnboundedSender<InternMessage<T>> {
+    fn new(id: BrokerID) -> mpsc::UnboundedSender<InternMessage<T>> {
+        log::trace!("Creating Broker {} for {}", id, std::any::type_name::<T>());
         let (main_tx, main_rx) = mpsc::unbounded_channel::<InternMessage<T>>();
-        spawn_local(async {
+        spawn_local(async move {
             let mut intern = Self {
                 main_rx,
                 subsystems: HashMap::new(),
                 msg_queue: vec![],
-                id: U256::rnd(),
+                id,
             };
             loop {
-                match intern.process().await {
-                    Ok(nbr) => log::trace!("Processed {nbr} messages"),
-                    Err(e) => log::error!("Couldn't process: {e:?}"),
+                if !intern.get_msg().await {
+                    log::warn!(
+                        "{}: Closed Intern.main_rx for {}",
+                        intern.id,
+                        std::any::type_name::<T>()
+                    );
+                    return;
+                }
+
+                if intern.msg_queue.len() > 0 {
+                    match intern.process().await {
+                        Ok(nbr) => log::trace!("Processed {nbr} messages"),
+                        Err(e) => log::error!("Couldn't process: {e:?}"),
+                    }
                 }
             }
         });
@@ -274,10 +320,6 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
     // This means that it's possible if a subscription and a message are pending at the same
     // time, that you won't get what you expect.
     async fn process(&mut self) -> Result<usize, BrokerError> {
-        if !self.get_msg().await {
-            return Ok(0);
-        }
-
         let mut msg_count: usize = 0;
         loop {
             self.process_once().await?;
@@ -291,17 +333,41 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
 
     // Tries to get a new message from the channel.
     // This call blocks on purpose until a new message is available.
+    // If the return value is false, then the channel has been closed.
     async fn get_msg(&mut self) -> bool {
-        let msg = match self.main_rx.recv().await.unwrap() {
+        let msg_queue = match self.main_rx.recv().await {
+            Some(msg) => msg,
+            None => {
+                return false;
+            }
+        };
+        let msg = match msg_queue {
             InternMessage::Subsystem(ss) => {
                 log::trace!(
                     "{self:p}/{} subsystem action {ss:?}",
                     std::any::type_name::<T>()
                 );
                 self.subsystem_action(ss);
-                return false;
+                return true;
             }
             InternMessage::Message(dst, msg) => (dst, msg),
+            InternMessage::Settle(list, reply) => {
+                if !list.contains(&self.id) {
+                    let mut list = list.clone();
+                    list.push(self.id);
+                    for (_, ss) in self.subsystems.iter_mut() {
+                        ss.settle(list.clone())
+                            .await
+                            .err()
+                            .map(|e| log::error!("While settling: {e:?}"));
+                    }
+                }
+                reply
+                    .send(true)
+                    .err()
+                    .map(|e| log::error!("Couldn't send: {e:?}"));
+                return true;
+            }
         };
         self.msg_queue.push(msg);
 
@@ -325,9 +391,9 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
     // 2. Translate all messages, and remove the translated ones
     // 3. Send all messages to the handlers, and collect messages
     async fn process_once(&mut self) -> Result<(), BrokerError> {
-        self.send_tap().await?;
+        self.process_translate_messages().await;
 
-        self.process_translate_messages().await?;
+        self.send_tap().await?;
 
         let subsystems_error = self.process_handle_messages().await;
 
@@ -338,25 +404,9 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
         Ok(())
     }
 
-    // Sends the messages, except Destination::NoTap, to the taps.
-    async fn send_tap(&mut self) -> Result<(), BrokerError> {
-        let msgs: Vec<T> = self
-            .msg_queue
-            .iter()
-            .filter(|(dst, _)| dst != &Destination::NoTap)
-            .map(|(_, msg)| msg.clone())
-            .collect();
-
-        for (i, ss) in self.subsystems.iter_mut().filter(|(_, ss)| ss.is_tap()) {
-            ss.put_messages(*i, msgs.clone()).await?;
-        }
-
-        Ok(())
-    }
-
     // Then run translators on the messages. For each message, if it has been
     // translated by at least one translator, it will be deleted from the queue.
-    async fn process_translate_messages(&mut self) -> Result<(), BrokerError> {
+    async fn process_translate_messages(&mut self) {
         let mut i = 0;
         while i < self.msg_queue.len() {
             let (dst, msg) = &mut self.msg_queue[i];
@@ -367,6 +417,7 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
             }
             if trail.contains(&self.id) {
                 log::trace!("Endless forward-loop detected, aborting");
+                i += 1;
                 continue;
             }
             trail.push(self.id);
@@ -387,7 +438,6 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
                     _ => false,
                 } {
                     translated = true;
-                    break;
                 }
             }
             if translated {
@@ -396,8 +446,6 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
                 i += 1;
             }
         }
-
-        Ok(())
     }
 
     // Then send messages to all other subsystems, and collect
@@ -407,9 +455,9 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
             return vec![];
         }
         let mut ss_remove = vec![];
-        let mut msg_queue = vec![];
+        let mut new_msg_queue = vec![];
         for (index_ss, ss) in self.subsystems.iter_mut().filter(|(_, ss)| ss.is_handler()) {
-            let msgs = self
+            let msgs: Vec<T> = self
                 .msg_queue
                 .iter()
                 .filter(|nm| match nm.0 {
@@ -419,16 +467,35 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
                 .map(|nm| &nm.1)
                 .cloned()
                 .collect();
-            match ss.put_messages(*index_ss, msgs).await {
-                Ok(mut new_msgs) => msg_queue.append(&mut new_msgs),
+            match ss.put_messages(*index_ss, msgs.clone()).await {
+                Ok(mut new_msgs) => {
+                    new_msg_queue.append(&mut new_msgs);
+                }
                 Err(e) => {
                     ss_remove.push(*index_ss);
                     log::error!("While sending messages: {}", e);
                 }
             }
         }
+        self.msg_queue = new_msg_queue;
 
         ss_remove
+    }
+
+    // Sends the messages, except Destination::NoTap, to the taps.
+    async fn send_tap(&mut self) -> Result<(), BrokerError> {
+        let msgs: Vec<T> = self
+            .msg_queue
+            .iter()
+            .filter(|(dst, _)| dst != &Destination::NoTap)
+            .map(|(_, msg)| msg.clone())
+            .collect();
+
+        for (i, ss) in self.subsystems.iter_mut().filter(|(_, ss)| ss.is_tap()) {
+            ss.put_messages(*i, msgs.clone()).await?;
+        }
+
+        Ok(())
     }
 }
 
@@ -478,11 +545,19 @@ impl<T: Async + Clone + fmt::Debug> Subsystem<T> {
     }
 
     fn is_translator(&self) -> bool {
-        matches!(self, Self::Translator(_))
+        matches!(self, Self::Translator(_)) || matches!(self, Self::TranslatorCallback(_))
     }
 
     fn is_handler(&self) -> bool {
         matches!(self, Self::Handler(_)) || matches!(self, Self::Callback(_))
+    }
+
+    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
+        if let Self::Translator(tr) = self {
+            tr.settle(callers).await
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -508,6 +583,7 @@ pub trait SubsystemListener<T: Async> {
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 pub trait SubsystemTranslator<T: Async> {
     async fn translate(&mut self, trail: Vec<BrokerID>, from_broker: T) -> bool;
+    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError>;
 }
 
 #[cfg(feature = "nosend")]
@@ -523,7 +599,7 @@ type SubsystemTranslatorCallback<T> =
 
 #[cfg(test)]
 mod tests {
-    use flarch::start_logging;
+    use flarch::{start_logging, start_logging_filter_level};
 
     use super::*;
 
@@ -574,12 +650,12 @@ mod tests {
         broker.add_subsystem(Subsystem::Tap(tap_tx)).await?;
 
         // Shouldn't reply to a msg_b, so only 1 message.
-        broker.emit_msg(bm_b.clone()).await?;
+        broker.settle_msg(bm_b.clone()).await?;
         assert_eq!(tap.try_iter().count(), 1);
 
         // Should reply to msg_a, so the tap should have 2 messages - the original
         // and the reply.
-        broker.emit_msg(bm_a.clone()).await?;
+        broker.settle_msg(bm_a.clone()).await?;
         assert_eq!(tap.try_iter().count(), 2);
 
         // Add the same subsystem, now it should get 3 messages - the original
@@ -589,7 +665,7 @@ mod tests {
                 reply: vec![(bm_a.clone(), bm_b)],
             })))
             .await?;
-        broker.emit_msg(bm_a).await?;
+        broker.settle_msg(bm_a).await?;
         assert_eq!(tap.try_iter().count(), 3);
 
         Ok(())
@@ -633,7 +709,7 @@ mod tests {
 
     #[tokio::test]
     async fn link() -> Result<(), ConvertError> {
-        start_logging();
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
 
         let mut broker_a: Broker<MessageA> = Broker::new();
         let (tap_a_tx, tap_a_rx) = channel::<MessageA>();
@@ -648,27 +724,27 @@ mod tests {
                 Box::new(translate_ab),
                 Box::new(translate_ba),
             )
-            .await;
+            .await?;
 
-        broker_a.emit_msg(MessageA::Two).await?;
+        broker_a.settle_msg(MessageA::Two).await?;
         if let Ok(msg) = tap_b_rx.try_recv() {
             assert_eq!(MessageB::Deux, msg);
         } else {
             return Err(ConvertError::Conversion("A to B".to_string()));
         }
 
-        broker_b.emit_msg(MessageB::Un).await?;
+        broker_b.settle_msg(MessageB::Un).await?;
         if let Ok(msg) = tap_a_rx.try_recv() {
             assert_eq!(MessageA::One, msg);
         } else {
             return Err(ConvertError::Conversion("B to A".to_string()));
         }
 
-        broker_a.emit_msg(MessageA::Four).await?;
+        broker_a.settle_msg(MessageA::Four).await?;
         // Remove the untranslated message
         tap_a_rx.recv().unwrap();
         assert!(tap_b_rx.try_recv().is_err());
-        broker_b.emit_msg(MessageB::Trois).await?;
+        broker_b.settle_msg(MessageB::Trois).await?;
         // Remove the untranslated message
         tap_b_rx.recv().unwrap();
         assert!(tap_a_rx.try_recv().is_err());
@@ -679,7 +755,7 @@ mod tests {
     // Test that a forwarding-loop doesn't block the system.
     #[tokio::test]
     async fn link_infinite() -> Result<(), Box<dyn std::error::Error>> {
-        start_logging();
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
 
         let mut a = Broker::<MessageA>::new();
         let mut b = Broker::<MessageA>::new();
@@ -689,11 +765,11 @@ mod tests {
             Box::new(|msg| Some(msg)),
             Box::new(|msg| Some(msg)),
         )
-        .await;
+        .await?;
 
         let (tap_a, _) = a.get_tap().await?;
         let (tap_b, _) = b.get_tap().await?;
-        a.emit_msg(MessageA::One).await?;
+        a.settle_msg(MessageA::One).await?;
         assert!(tap_a.try_recv().is_ok());
         assert!(tap_b.try_recv().is_err());
 
@@ -710,15 +786,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_callback() -> Result<(), Box<dyn std::error::Error>> {
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+
         let mut b = Broker::new();
         b.add_subsystem(Subsystem::Callback(Box::new(|b_in| {
             Box::pin(do_something(b_in))
         })))
         .await?;
         let tap = b.get_tap().await?;
-        b.emit_msg(MessageA::One).await?;
-        // Ignore the MessageA::One
-        let _ = tap.0.recv();
+        b.settle_msg_dest(Destination::NoTap, MessageA::One).await?;
         assert_eq!(MessageA::Two, tap.0.recv()?);
         Ok(())
     }
@@ -729,16 +805,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_translator_callback() -> Result<(), Box<dyn std::error::Error>> {
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+
         let mut b = Broker::new();
         b.add_subsystem(Subsystem::TranslatorCallback(Box::new(|_, b_in| {
             Box::pin(test_translator_cb(b_in))
         })))
         .await?;
         let tap = b.get_tap().await?;
-        b.emit_msg(MessageA::One).await?;
-        assert_eq!(MessageA::One, tap.0.recv()?);
-        b.emit_msg(MessageA::Two).await?;
+        b.settle_msg(MessageA::One).await?;
         assert!(tap.0.try_recv().is_err());
+        b.settle_msg(MessageA::Two).await?;
+        assert_eq!(MessageA::Two, tap.0.recv()?);
         Ok(())
     }
 }

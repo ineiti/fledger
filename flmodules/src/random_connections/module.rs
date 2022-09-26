@@ -98,15 +98,14 @@ impl RandomConnections {
                 ])
             }
             RandomIn::NodeMessageFromNetwork((id, node_msg)) => self.network_msg(id, node_msg),
-            RandomIn::NodeMessageToNetwork((node, msg)) => {
-                if self.storage.connected.contains(&node) {
-                    // log::debug!("Outputting message {msg:?}");
+            RandomIn::NodeMessageToNetwork((dst, msg)) => {
+                if self.storage.connected.contains(&dst) {
                     vec![RandomOut::NodeMessageToNetwork((
-                        node,
+                        dst,
                         NodeMessage::Module(msg),
                     ))]
                 } else {
-                    log::warn!("{self:p} Dropping message to unconnected node {node}");
+                    log::warn!("{self:p} Dropping message to unconnected node {dst}");
                     vec![]
                 }
             }

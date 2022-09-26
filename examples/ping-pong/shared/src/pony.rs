@@ -26,7 +26,7 @@ impl PonyMessage {
                 Box::new(|msg| Some(PonyMessageBroker::Network(msg))),
                 Box::new(|msg| msg.to_net()),
             )
-            .await;
+            .await?;
 
         let pony = Broker::new();
         pony_broker
@@ -35,7 +35,7 @@ impl PonyMessage {
                 Box::new(|msg| Some(PonyMessageBroker::Pony(msg))),
                 Box::new(|msg| msg.to_pony()),
             )
-            .await;
+            .await?;
         pony_broker
             .add_subsystem(Subsystem::Handler(Box::new(Pony {})))
             .await?;

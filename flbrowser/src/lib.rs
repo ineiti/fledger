@@ -191,7 +191,7 @@ struct NodeDesc {
 impl FledgerState {
     fn new(node: &Node) -> Result<Self> {
         let info = node.node_config.info.clone();
-        let msgs = node.gossip.chat_events();
+        let msgs = node.gossip.as_ref().unwrap().chat_events();
         let nodes_info = node.nodes_info_all()?;
         Ok(Self {
             info,
@@ -203,8 +203,8 @@ impl FledgerState {
             msgs_system: 0,
             msgs_local: 0,
             mana: 0,
-            states: node.stat.states.clone(),
-            pings: node.ping.storage.clone(),
+            states: node.stat.as_ref().unwrap().states.clone(),
+            pings: node.ping.as_ref().unwrap().storage.clone(),
         })
     }
 

@@ -19,14 +19,20 @@ pub fn start_logging() {
 }
 
 pub fn start_logging_filter(filters: Vec<&str>) {
+    start_logging_filter_level(filters, log::LevelFilter::Debug);
+}
+
+pub fn start_logging_filter_level(filters: Vec<&str>, level: log::LevelFilter) {
     let mut logger = env_logger::Builder::new();
     if filters.len() == 0 {
-        logger.filter_level(log::LevelFilter::Debug);
+        logger.filter_level(level);
     } else {
         for filter in filters {
-            logger.filter_module(filter, log::LevelFilter::Debug);
+            logger.filter_module(filter, level);
         }
     }
     logger.parse_env("RUST_LOG");
-    logger.try_init().expect("Failed to initialize logger");
+    if logger.try_init().is_err(){
+        log::trace!("Logger probably already initialized");
+    }
 }

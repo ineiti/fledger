@@ -35,18 +35,18 @@ pub trait DataStorage {
 }
 
 /// A temporary DataStorage that keeps the data only during its lifetime.
-pub struct TempDS {
+pub struct DataStorageTemp {
     kvs: Arc<Mutex<HashMap<String, String>>>,
 }
 
-impl TempDS {
+impl DataStorageTemp {
     pub fn new(
-    ) -> Box<Self> {
-        Box::new(Self { kvs: Arc::new(Mutex::new(HashMap::new()))})
+    ) -> Self {
+        Self { kvs: Arc::new(Mutex::new(HashMap::new()))}
     }
 }
 
-impl DataStorage for TempDS {
+impl DataStorage for DataStorageTemp {
     fn get(&self, key: &str) -> Result<String, StorageError> {
         let mut kvs = self
             .kvs
@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn test_storage() -> Result<(), Box<dyn std::error::Error>>{
-        let mut ds = TempDS::new();
+        let mut ds = DataStorageTemp::new();
         ds.set("two", "three")?;
 
         let ds2 = ds.clone();
