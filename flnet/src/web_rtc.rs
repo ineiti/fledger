@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 
 use flmodules::{
     broker::{Broker, BrokerError, SubsystemListener, Translate},
-    nodeids::U256,
+    nodeids::{NodeID, U256},
 };
 
 use self::{
@@ -22,7 +24,7 @@ pub enum WebRTCConnMessage {
 
 pub struct WebRTCConn {
     web_rtc: WebRTCSpawner,
-    connections: Vec<U256>,
+    connections: HashMap<NodeID, Broker<NCMessage>>,
     broker: Broker<WebRTCConnMessage>,
 }
 
@@ -31,7 +33,7 @@ impl WebRTCConn {
         let mut br = Broker::new();
         br.add_subsystem(flmodules::broker::Subsystem::Handler(Box::new(Self {
             web_rtc,
-            connections: vec![],
+            connections: HashMap::new(),
             broker: br.clone(),
         })))
         .await?;
@@ -40,16 +42,11 @@ impl WebRTCConn {
 
     /// Ensures that a given connection exists.
     async fn ensure_connection(&mut self, id: &U256) -> Result<(), NCError> {
-        if !self.connections.contains(id) {
-            let nc = NodeConnection::new(&self.web_rtc).await?;
-            self.broker
-                .link_bi(
-                    nc.clone(),
-                    Self::from_nc(id.clone()),
-                    Self::to_nc(id.clone()),
-                )
-                .await?;
-            self.connections.push(*id);
+        if !self.connections.contains_key(id) {
+            let mut nc = NodeConnection::new(&self.web_rtc).await?;
+            nc.forward(self.broker.clone(), Self::from_nc(id.clone()))
+                .await;
+            self.connections.insert(*id, nc);
         }
 
         Ok(())
@@ -63,17 +60,6 @@ impl WebRTCConn {
             None
         })
     }
-
-    fn to_nc(id: U256) -> Translate<WebRTCConnMessage, NCMessage> {
-        Box::new(move |msg| {
-            if let WebRTCConnMessage::InputNC((dst, msg_nc)) = msg {
-                if id == dst {
-                    return Some(NCMessage::Input(msg_nc));
-                }
-            }
-            None
-        })
-    }
 }
 
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
@@ -82,12 +68,17 @@ impl SubsystemListener<WebRTCConnMessage> for WebRTCConn {
     async fn messages(&mut self, msgs: Vec<WebRTCConnMessage>) -> Vec<WebRTCConnMessage> {
         for msg in msgs {
             match msg {
-                WebRTCConnMessage::InputNC(msg_in) => {
-                    log::warn!(
-                        "Dropping message {:?} to unconnected node {}",
-                        msg_in.1,
-                        msg_in.0
-                    );
+                WebRTCConnMessage::InputNC((dst, msg_in)) => {
+                    if let Some(conn) = self.connections.get_mut(&dst) {
+                        conn.emit_msg(NCMessage::Input(msg_in.clone()))
+                            .await
+                            .err()
+                            .map(|e| {
+                                log::error!("When sending message {msg_in:?} to webrtc: {e:?}")
+                            });
+                    } else {
+                        log::warn!("Dropping message {:?} to unconnected node {}", msg_in, dst);
+                    }
                 }
                 WebRTCConnMessage::Connect(dst) => {
                     self.ensure_connection(&dst)

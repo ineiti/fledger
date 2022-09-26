@@ -1,6 +1,6 @@
 use flarch::{
     data_storage::{DataStorage, DataStorageTemp},
-    start_logging_filter, wait_ms,
+    start_logging_filter_level, wait_ms,
 };
 use flnet::{
     broker::BrokerError, network_start, signal::SignalServer, web_socket_server::WebSocketServer,
@@ -23,7 +23,7 @@ enum TestError {
 
 #[tokio::main]
 async fn main() -> Result<(), TestError> {
-    start_logging_filter(vec!["signal", "fl"]);
+    start_logging_filter_level(vec!["signal", "fl"], log::LevelFilter::Info);
  
     let wss = WebSocketServer::new(8765).await?;
     let mut signal_server = SignalServer::new(wss, 2).await?;
@@ -35,8 +35,8 @@ async fn main() -> Result<(), TestError> {
     let mut node2 = create_node().await?;
     log::info!("Node2: {}", node2.node_config.info.get_id());
 
-    for i in 0..10 {
-        log::info!("Running {i}");
+    for i in 0..5 {
+        log::info!("Running step {i}");
         node1.process().await?;
         log::info!("Node 1: {:?}", node1.ping.as_ref().unwrap().storage.stats);
 
@@ -44,11 +44,21 @@ async fn main() -> Result<(), TestError> {
         log::info!("Node 2: {:?}", node2.ping.as_ref().unwrap().storage.stats);
 
         for msg in msgs_signal.try_iter() {
-            log::info!("Signal: {msg:?}");
+            log::debug!("Signal: {msg:?}");
         }
 
         wait_ms(1000).await;
     }
+
+    let ping1 = node1.ping.as_ref().unwrap().storage.stats.get(&node2.node_config.info.get_id()).unwrap();
+    assert_eq!(1, ping1.tx);
+    assert_eq!(1, ping1.rx);
+
+    let ping2 = node2.ping.as_ref().unwrap().storage.stats.get(&node1.node_config.info.get_id()).unwrap();
+    assert_eq!(1, ping2.tx);
+    assert_eq!(1, ping2.rx);
+
+    log::info!("All seems well and ping messages have been passed");
 
     Ok(())
 }

@@ -38,7 +38,7 @@ impl PingStorage {
             .insert(id, PingStat{
                 lastping: 0,
                 rx: 0,
-                tx: 0,
+                tx: 1,
             });
         self.ping.push(id);
     }
