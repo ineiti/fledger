@@ -114,7 +114,6 @@ impl WebRTCConnectionSetup {
                             .emit_msg(WebRTCMessage::Output(WebRTCOutput::Setup(
                                 PeerMessage::IceCandidate(cand),
                             )))
-                            .await
                             .err()
                             .map(|e| log::error!("While sending ICE candidate: {:?}", e));
                     });
@@ -136,7 +135,6 @@ impl WebRTCConnectionSetup {
                 wasm_bindgen_futures::spawn_local(async move {
                     broker
                         .emit_msg(msg)
-                        .await
                         .err()
                         .map(|e| log::error!("While sending ICE candidate: {:?}", e));
                 });
@@ -298,7 +296,6 @@ impl WebRTCConnectionSetup {
                 rtc_data.lock().await.replace(dc_clone2.clone());
                 broker_clone
                     .emit_msg(WebRTCMessage::Output(WebRTCOutput::Connected))
-                    .await
                     .err()
                     .map(|e| log::error!("While sending connection: {:?}", e));
             });
@@ -310,7 +307,6 @@ impl WebRTCConnectionSetup {
                     wasm_bindgen_futures::spawn_local(async move {
                         broker
                             .emit_msg(WebRTCMessage::Output(WebRTCOutput::Text(message)))
-                            .await
                             .err()
                             .map(|e| log::error!("While sending message: {:?}", e));
                     });
@@ -328,7 +324,6 @@ impl WebRTCConnectionSetup {
                             "{:?}",
                             ev
                         ))))
-                        .await
                         .err()
                         .map(|e| log::error!("While sending message: {:?}", e));
                 });

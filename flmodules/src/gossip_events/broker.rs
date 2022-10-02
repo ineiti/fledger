@@ -59,8 +59,7 @@ impl GossipBroker {
     /// The new event will automatically be propagated to all connected nodes.
     pub async fn add_event(&mut self, event: Event) -> Result<(), BrokerError> {
         self.broker
-            .emit_msg(GossipMessage::Input(GossipIn::AddEvent(event)))
-            .await?;
+            .emit_msg(GossipMessage::Input(GossipIn::AddEvent(event)))?;
         Ok(())
     }
 

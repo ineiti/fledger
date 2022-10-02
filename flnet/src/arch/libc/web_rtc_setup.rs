@@ -116,7 +116,6 @@ impl WebRTCConnectionSetupLibc {
                             .emit_msg(WebRTCMessage::Output(WebRTCOutput::Setup(
                                 PeerMessage::IceCandidate(ice_str),
                             )))
-                            .await
                             .err()
                             .map(|e| log::warn!("Ice candidate queued but not processed: {:?}", e));
                     }
@@ -146,7 +145,6 @@ impl WebRTCConnectionSetupLibc {
                     };
                     broker_cl
                         .emit_msg(msg)
-                        .await
                         .err()
                         .map(|e| log::warn!("UpdateState queued but not processed: {:?}", e));
                 })
@@ -363,12 +361,10 @@ impl WebRTCConnectionSetupLibc {
                     log::trace!("DataChannel opened");
                     broker_cl
                         .emit_msg(WebRTCMessage::Output(WebRTCOutput::Connected))
-                        .await
                         .err()
                         .map(|e| log::warn!("Connected queued but not processed: {:?}", e));
                     broker_cl
                         .emit_msg(WebRTCMessage::Input(WebRTCInput::Flush))
-                        .await
                         .err()
                         .map(|e| log::warn!("Flush queued but not processed: {:?}", e));
                 })
@@ -385,7 +381,6 @@ impl WebRTCConnectionSetupLibc {
                 Box::pin(async move {
                     broker
                         .emit_msg(WebRTCMessage::Output(WebRTCOutput::Text(msg_str)))
-                        .await
                         .err()
                         .map(|e| log::warn!("Text queued but not processed: {:?}", e));
                 })

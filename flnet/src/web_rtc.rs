@@ -71,7 +71,6 @@ impl SubsystemListener<WebRTCConnMessage> for WebRTCConn {
                 WebRTCConnMessage::InputNC((dst, msg_in)) => {
                     if let Some(conn) = self.connections.get_mut(&dst) {
                         conn.emit_msg(NCMessage::Input(msg_in.clone()))
-                            .await
                             .err()
                             .map(|e| {
                                 log::error!("When sending message {msg_in:?} to webrtc: {e:?}")

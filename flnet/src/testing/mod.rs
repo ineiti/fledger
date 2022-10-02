@@ -30,8 +30,7 @@ impl NetworkBrokerSimul {
             )
             .await?;
         self.nsh_broker
-            .emit_msg(NSHubMessage::NewClient(nc.info.clone()))
-            .await?;
+            .emit_msg(NSHubMessage::NewClient(nc.info.clone()))?;
 
         Ok((nc, nm_broker))
     }

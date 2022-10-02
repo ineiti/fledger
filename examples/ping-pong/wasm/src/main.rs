@@ -4,10 +4,15 @@
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 use console_error_panic_hook::set_once as set_panic_hook;
-use flnet::{broker::Broker, config::NodeConfig};
-use shared::{PPMessage, PPMessageNode, PingPong};
 use ybc::TileCtx::{Ancestor, Child, Parent};
 use yew::prelude::*;
+
+use flarch::wait_ms;
+use flnet::{
+    broker::Broker,
+    config::{NodeConfig},
+};
+use shared::{common::{PPMessage, NodeList}, handler::PingPong};
 
 struct App {
     link: ComponentLink<Self>,
@@ -42,7 +47,7 @@ impl Component for App {
                 let config = self.config.clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     let id = config.info.get_id();
-                    let net = flnet::network_start(config, shared::URL)
+                    let net = flnet::network_start(config, shared::handler::URL)
                         .await
                         .expect("Couldn't start network");
 
@@ -55,43 +60,35 @@ impl Component for App {
             AppMessage::NewPingPong(mut pp) => {
                 log::info!("Starting pingpong");
                 let link = self.link.clone();
-                let our_id = self.config.info.get_id();
                 wasm_bindgen_futures::spawn_local(async move {
-                    let mut list = vec![];
+                    let mut list = NodeList::new(vec![]);
                     let (tap, _) = pp.get_tap().await.expect("Couldn't get tap");
                     loop {
                         for msg in tap.try_iter() {
                             match msg {
                                 PPMessage::FromNetwork(id, msg) => {
                                     link.send_message(AppMessage::NewMessage(format!(
-                                        "{}: {:?}",
-                                        id, msg
+                                        "Received {msg:?} from {}",
+                                        list.get_name(&id)
                                     )));
                                 }
-                                PPMessage::List(l) => {
-                                    list = l;
+                                PPMessage::ToNetwork(id, msg) => {
                                     link.send_message(AppMessage::NewMessage(format!(
-                                        "list: {:?}",
-                                        list.iter()
-                                            .map(|n| format!("{}", n))
-                                            .collect::<Vec<String>>()
+                                        "Sending {msg:?} to {}",
+                                        list.get_name(&id)
                                     )));
+                                }
+                                PPMessage::List(new_list) => {
+                                    if list.update(new_list) {
+                                        link.send_message(AppMessage::NewMessage(format!(
+                                            "list: {}", list.names()
+                                        )));
+                                    }
                                 }
                                 _ => {}
                             }
                         }
-
-                        flarch::tasks::wait_ms(1000).await;
-
-                        for node in &list {
-                            if node != &our_id {
-                                log::info!("Sending ping to {}", node);
-                                pp.emit_msg(PPMessage::ToNetwork(*node, PPMessageNode::Ping))
-                                    .await
-                                    .err()
-                                    .map(|e| log::error!("While sending ping: {:?}", e));
-                            }
-                        }
+                        wait_ms(1000).await;
                     }
                 })
             }
@@ -136,7 +133,7 @@ impl Component for App {
                             <ybc::Tile ctx=Parent>
                                 <ybc::Tile ctx=Child classes=classes!("content")>
                                 <h1>{"FLNet example"}</h1>
-                                <h2>{"Ping-pong logs"}</h2>
+                                <h2>{"Ping-pong logs for "}{&self.config.info.name}</h2>
                                 <pre>{logs}</pre>
                                 </ybc::Tile>
                             </ybc::Tile>

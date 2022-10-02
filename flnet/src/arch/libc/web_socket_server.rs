@@ -41,7 +41,6 @@ impl WebSocketServer {
                                 .emit_msg(WSServerMessage::Output(WSServerOutput::NewConnection(
                                     connection_id,
                                 )))
-                                .await
                                 .expect("Error sending connect message");
                         }
                         Err(e) => log::error!("Error while getting connection: {:?}", e),
@@ -132,7 +131,6 @@ impl WSConnection {
                     _ = (&mut rx) => {
                         broker
                         .emit_msg(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
-                        .await
                         .expect("While sending message to broker.");
                         return;
                     },
@@ -155,7 +153,6 @@ impl WSConnection {
                             } {
                                 broker
                                     .emit_msg(out.clone())
-                                    .await
                                     .expect("While sending message to broker.");
                                 if matches!(
                                     out,
@@ -202,11 +199,9 @@ mod tests {
     ) {
         client
             .emit_msg_dest(
-                10,
                 Destination::NoTap,
                 WSClientInput::Message(txt.clone()).into(),
             )
-            .await
             .unwrap();
         assert_eq!(
             server_tap.recv().unwrap(),
@@ -222,11 +217,9 @@ mod tests {
     ) {
         server
             .emit_msg_dest(
-                10,
                 Destination::NoTap,
                 WSServerInput::Message((ch_index, txt.clone())).into(),
             )
-            .await
             .unwrap();
         assert_eq!(
             client_tap.recv().unwrap(),

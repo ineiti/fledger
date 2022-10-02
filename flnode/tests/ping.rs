@@ -24,7 +24,7 @@ async fn ping_n(nbr_nodes: usize) -> Result<(), NetworkError> {
         node_timer.node.add_timer(timer.clone()).await;
     }
     net.process(5).await;
-    timer.emit_msg(TimerMessage::Second).await?;
+    timer.emit_msg(TimerMessage::Second)?;
 
     for node_timer in net.nodes.values_mut() {
         node_timer.node.update();

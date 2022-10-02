@@ -36,7 +36,6 @@ impl WebSocketClient {
                             if msg.is_text() {
                                 broker_cl
                                     .emit_msg(WSClientOutput::Message(msg.to_string()).into())
-                                    .await
                                     .expect("Failed to emit message");
                             }
                         }

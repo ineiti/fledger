@@ -16,7 +16,7 @@ use flmodules::{
     },
     nodeids::NodeID,
     ping::{broker::PingBroker, module::PingConfig},
-    timer::{BrokerTimer, TimerMessage},
+    timer::{TimerBroker, TimerMessage},
 };
 use flnet::{
     config::{ConfigError, NodeConfig, NodeInfo},
@@ -89,7 +89,7 @@ impl Node {
     ) -> Result<Self, NodeError> {
         let mut node =
             Self::start_some(storage, node_config, broker_net, Brokers::ENABLE_ALL).await?;
-        node.add_timer(BrokerTimer::start().await?).await;
+        node.add_timer(TimerBroker::start().await?).await;
         Ok(node)
     }
 
@@ -195,8 +195,7 @@ impl Node {
     /// Requests a list of all connected nodes
     pub async fn request_list(&mut self) -> Result<(), NodeError> {
         self.broker_net
-            .emit_msg(NetCall::SendWSUpdateListRequest.into())
-            .await?;
+            .emit_msg(NetCall::SendWSUpdateListRequest.into())?;
         Ok(())
     }
 
@@ -284,8 +283,7 @@ impl Node {
             .broker
             .emit_msg(GossipMessage::Input(GossipIn::SetStorage(
                 gossip.storage.clone(),
-            )))
-            .await?;
+            )))?;
         Ok(())
     }
 

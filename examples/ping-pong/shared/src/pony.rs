@@ -159,8 +159,7 @@ mod test {
         let (pp_tap, _) = ping_pong.get_tap().await?;
 
         ping_pong
-            .emit_msg_dest(Destination::NoTap, PonyMessage::NodeListRequest)
-            .await?;
+            .emit_msg_dest(Destination::NoTap, PonyMessage::NodeListRequest)?;
         assert!(pp_tap.try_recv().is_err());
         assert_eq!(
             NetworkMessage::Call(NetCall::SendWSUpdateListRequest),
@@ -174,8 +173,7 @@ mod test {
                 id,
                 serde_json::to_string(&PonyMessageNet::Ping).unwrap(),
             )),
-        )
-        .await?;
+        )?;
         assert_eq!(
             PonyMessage::FromNode(id, PonyMessageNet::Ping),
             pp_tap.recv().unwrap()

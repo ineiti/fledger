@@ -8,7 +8,7 @@ use bimap::BiMap;
 use flmodules::{
     broker::{Broker, BrokerError, Subsystem, SubsystemListener},
     nodeids::U256,
-    timer::{BrokerTimer, TimerMessage},
+    timer::{TimerBroker, TimerMessage},
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
@@ -75,7 +75,7 @@ impl SignalServer {
                 Box::new(Self::link_ss_wss),
             )
             .await?;
-        BrokerTimer::start().await?
+        TimerBroker::start().await?
             .forward(
                 broker.clone(),
                 Box::new(|msg| {
