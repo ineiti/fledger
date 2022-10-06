@@ -1,21 +1,41 @@
+use clap::{Parser, ValueEnum};
+
 use flarch::start_logging_filter;
 use flnet::NetworkSetupError;
 
 use shared::{
     common::NodeList,
-    handler::{PingPong, URL},
+    event_loop,
+    handler::{self, URL},
 };
+
+#[derive(Parser, Debug)]
+struct Args {
+    /// Which shared code to run
+    #[arg(value_enum, short, long, default_value_t = Code::Handler)]
+    code: Code,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+enum Code {
+    Handler,
+    EventLoop,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), NetworkSetupError> {
     start_logging_filter(vec!["fl", "libc"]);
+    let args = Args::parse();
 
     let nc = flnet::config::NodeConfig::new();
     let name = nc.info.name.clone();
     let net = flnet::network_start(nc.clone(), URL).await?;
     let mut list = NodeList::new(vec![]);
 
-    let mut pp = PingPong::new(nc.info.get_id(), net).await?;
+    let mut pp = match args.code {
+        Code::Handler => handler::PingPong::new(nc.info.get_id(), net).await?,
+        Code::EventLoop => event_loop::start(nc.info.get_id(), net).await?,
+    };
     let (pp_rx, _) = pp.get_tap().await?;
     for msg in pp_rx {
         match msg {

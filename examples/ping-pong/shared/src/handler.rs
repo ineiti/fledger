@@ -169,17 +169,14 @@ mod test {
         let dst_id = nc_dst.info.get_id();
 
         // Send a Ping message from src to dst
-        log::info!("1");
         pp.emit_msg_dest(
             Destination::NoTap,
             PPMessage::ToNetwork(dst_id.clone(), PPMessageNode::Ping),
         )?;
-        log::info!("2");
         assert_eq!(
             node_msg(&dst_id, &PPMessageNode::Ping),
             net_tap.recv().unwrap()
         );
-        log::info!("3");
 
         // Receive a ping message through the network
         net.emit_msg_dest(
@@ -242,7 +239,6 @@ mod test {
             }
 
             sleep(Duration::from_millis(1000)).await;
-            log::info!("");
 
             pp1.emit_msg(PPMessage::ToNetwork(nc2.info.get_id(), PPMessageNode::Ping))?;
             pp2.emit_msg(PPMessage::ToNetwork(nc1.info.get_id(), PPMessageNode::Ping))?;

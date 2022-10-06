@@ -7,17 +7,19 @@ use console_error_panic_hook::set_once as set_panic_hook;
 use ybc::TileCtx::{Ancestor, Child, Parent};
 use yew::prelude::*;
 
-use flarch::wait_ms;
-use flnet::{
-    broker::Broker,
-    config::{NodeConfig},
+use flarch::now;
+use flnet::{broker::Broker, config::NodeConfig};
+
+use shared::{
+    common::{NodeList, PPMessage},
+    handler::PingPong,
 };
-use shared::{common::{PPMessage, NodeList}, handler::PingPong};
 
 struct App {
     link: ComponentLink<Self>,
     logs: Vec<String>,
     config: NodeConfig,
+    pp_imp: bool,
 }
 
 enum AppMessage {
@@ -36,24 +38,32 @@ impl Component for App {
             link,
             logs: vec![],
             config: flnet::config::NodeConfig::new(),
+            pp_imp: (now() / 1000.).fract() >= 0.5,
         }
     }
 
-    fn update(&mut self, msg: Self::Message) -> bool {
-        match msg {
+    fn update(&mut self, app_msg: Self::Message) -> bool {
+        match app_msg {
             AppMessage::Init => {
                 log::info!("Initializing pingpong");
                 let link = self.link.clone();
                 let config = self.config.clone();
+                let pp_imp = self.pp_imp;
                 wasm_bindgen_futures::spawn_local(async move {
                     let id = config.info.get_id();
                     let net = flnet::network_start(config, shared::handler::URL)
                         .await
                         .expect("Couldn't start network");
 
-                    let pp = PingPong::new(id, net)
-                        .await
-                        .expect("Couldn't start pingpong");
+                    let pp = match pp_imp {
+                        true => PingPong::new(id, net)
+                            .await
+                            .expect("Couldn't start handler pingpong"),
+                        false => shared::event_loop::start(id, net)
+                            .await
+                            .expect("Couldn't start event_loop PingPong"),
+                    };
+
                     link.send_message(AppMessage::NewPingPong(pp));
                 })
             }
@@ -62,33 +72,31 @@ impl Component for App {
                 let link = self.link.clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     let mut list = NodeList::new(vec![]);
-                    let (tap, _) = pp.get_tap().await.expect("Couldn't get tap");
+                    let (mut tap, _) = pp.get_tap_async().await.expect("Couldn't get tap");
                     loop {
-                        for msg in tap.try_iter() {
-                            match msg {
-                                PPMessage::FromNetwork(id, msg) => {
-                                    link.send_message(AppMessage::NewMessage(format!(
-                                        "Received {msg:?} from {}",
-                                        list.get_name(&id)
-                                    )));
-                                }
-                                PPMessage::ToNetwork(id, msg) => {
-                                    link.send_message(AppMessage::NewMessage(format!(
-                                        "Sending {msg:?} to {}",
-                                        list.get_name(&id)
-                                    )));
-                                }
-                                PPMessage::List(new_list) => {
-                                    if list.update(new_list) {
-                                        link.send_message(AppMessage::NewMessage(format!(
-                                            "list: {}", list.names()
-                                        )));
-                                    }
-                                }
-                                _ => {}
+                        match tap.recv().await.expect("Tap has been closed") {
+                            PPMessage::FromNetwork(id, ppmsg) => {
+                                link.send_message(AppMessage::NewMessage(format!(
+                                    "Received {ppmsg:?} from {}",
+                                    list.get_name(&id)
+                                )));
                             }
+                            PPMessage::ToNetwork(id, ppmsg) => {
+                                link.send_message(AppMessage::NewMessage(format!(
+                                    "Sending {ppmsg:?} to {}",
+                                    list.get_name(&id)
+                                )));
+                            }
+                            PPMessage::List(new_list) => {
+                                if list.update(new_list) {
+                                    link.send_message(AppMessage::NewMessage(format!(
+                                        "list: {}",
+                                        list.names()
+                                    )));
+                                }
+                            }
+                            _ => {}
                         }
-                        wait_ms(1000).await;
                     }
                 })
             }
@@ -109,6 +117,10 @@ impl Component for App {
 
     fn view(&self) -> Html {
         let logs = self.logs.join("\n");
+        let pp_imp = match self.pp_imp{
+            true => "Handler",
+            false => "Event Loop",
+        };
         html! {
             <>
             <ybc::Navbar
@@ -133,6 +145,7 @@ impl Component for App {
                             <ybc::Tile ctx=Parent>
                                 <ybc::Tile ctx=Child classes=classes!("content")>
                                 <h1>{"FLNet example"}</h1>
+                                <h2>{"Running "}{pp_imp}</h2>
                                 <h2>{"Ping-pong logs for "}{&self.config.info.name}</h2>
                                 <pre>{logs}</pre>
                                 </ybc::Tile>
