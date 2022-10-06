@@ -58,16 +58,14 @@ async fn run_app() -> Result<(), StartError> {
                                     other.get(0).unwrap().get_id(),
                                     "Hello from Rust wasm".to_string(),
                                 ).into()
-                            )
-                            .await?;
+                            )?;
                         }
                     }
                     _ => log::debug!("Got other message: {:?}", reply),
                 }
             }
         }
-        net.emit_msg(NetworkMessage::Call(NetCall::SendWSStats(vec![])))
-            .await?;
+        net.emit_msg(NetworkMessage::Call(NetCall::SendWSStats(vec![])))?;
         wait_ms(1000).await;
     }
 }

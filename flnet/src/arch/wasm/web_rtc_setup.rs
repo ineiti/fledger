@@ -67,7 +67,7 @@ impl WebRTCConnectionSetup {
             },
         ];
         let servers =
-            JsValue::from_serde(&servers_obj).map_err(|e| SetupError::SetupFail(e.to_string()))?;
+            serde_wasm_bindgen::to_value(&servers_obj).map_err(|e| SetupError::SetupFail(e.to_string()))?;
         config.ice_servers(&servers);
         RtcPeerConnection::new_with_configuration(&config)
             .map_err(|e| SetupError::SetupFail(format!("PeerConnection error: {:?}", e)))

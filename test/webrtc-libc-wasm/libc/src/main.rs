@@ -74,7 +74,6 @@ async fn send(src: &mut Broker<NetworkMessage>, id: U256, msg: &str) {
     src.emit_msg(
         NetworkMessage::Call(NetCall::SendNodeMessage(id, msg.into()))
     )
-    .await
     .expect("Sending to node");
 }
 
@@ -83,7 +82,7 @@ mod tests {
     use super::*;
     use std::sync::mpsc::Receiver;
 
-    use flarch::arch::wait_ms;
+    use flarch::wait_ms;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_two_nodes() -> Result<(), MainError> {
@@ -100,10 +99,10 @@ mod tests {
         let (tap1, _) = broker1.get_tap().await.expect("Failed to get tap");
         for _ in 1..=2 {
             log::debug!("Sending first message");
-            send(&mut broker1, nc2.our_node.get_id(), "Message 1").await;
+            send(&mut broker1, nc2.info.get_id(), "Message 1").await;
             wait_msg(&tap2, "Message 1").await;
             log::debug!("Sending second message");
-            send(&mut broker2, nc1.our_node.get_id(), "Message 2").await;
+            send(&mut broker2, nc1.info.get_id(), "Message 2").await;
             wait_msg(&tap1, "Message 2").await;
         }
         Ok(())
@@ -111,8 +110,8 @@ mod tests {
 
     async fn wait_msg(tap: &Receiver<NetworkMessage>, msg: &str) {
         for msg_net in tap {
-            if let NetworkMessage::Reply(NetReply::RcvNodeMessage(nm)) = &msg_net {
-                if nm.msg == msg {
+            if let NetworkMessage::Reply(NetReply::RcvNodeMessage(_, nm)) = &msg_net {
+                if nm == msg {
                     break;
                 }
             }

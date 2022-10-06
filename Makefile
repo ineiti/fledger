@@ -1,11 +1,17 @@
 CARGOS := cli/{fledger,flsignal} flarch flbrowser \
-			flmodules flnet flnode test/{fledger_node,webrtc-libc-wasm/{libc,wasm}} \
+			flmodules flnet flnode test/{fledger-node,signal-fledger,webrtc-libc-wasm/{libc,wasm}} \
 			examples/ping-pong/{wasm,shared,libc}
 
 check:
 	for c in ${CARGOS}; do \
 	  echo Checking $$c; \
-	  ( cd $$c && cargo check ); \
+	  ( cd $$c && cargo check --tests ); \
+	done
+
+update:
+	for c in ${CARGOS}; do \
+		echo Updating $$c; \
+		(cd $$c && cargo update ); \
 	done
 
 update_version:
@@ -62,5 +68,6 @@ docker_dev:
 
 clean:
 	for c in ${CARGOS}; do \
+		echo "Cleaning $$c"; \
 		( cd $$c && cargo clean ) ; \
 	done

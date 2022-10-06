@@ -28,7 +28,7 @@ toml = "0.5"
 
 # The "js" is to make sure it also works for the flnode and web crates
 getrandom = { version = "0.2", features = ["js"] }
-names = "0.13"
+names = "0.14"
 thiserror = "1"
 futures = "0.3"
 log = "0.4"
