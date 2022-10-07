@@ -257,6 +257,7 @@ dependencies = [
  "log",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-timer",
@@ -280,7 +281,9 @@ dependencies = [
  "sha2",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "wasm-bindgen-futures",
+ "wasm-timer",
 ]
 
 [[package]]

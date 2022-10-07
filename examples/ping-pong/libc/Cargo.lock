@@ -832,6 +832,7 @@ dependencies = [
  "log",
  "thiserror",
  "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -851,6 +852,8 @@ dependencies = [
  "sha2 0.10.6",
  "thiserror",
  "tokio",
+ "tokio-stream",
+ "wasm-timer",
 ]
 
 [[package]]

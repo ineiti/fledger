@@ -26,7 +26,7 @@ build_local_web:
 	make -C flbrowser build_local 
 
 build_local_cli:
-	cd cli && cargo build
+	cd cli && cargo build -p fledger && cargo build -p flsignal
 
 build_local: build_local_web build_local_cli
 

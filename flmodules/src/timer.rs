@@ -1,6 +1,10 @@
-use crate::broker::{Broker, BrokerError, Subsystem, SubsystemListener};
 use async_trait::async_trait;
-use flarch::{block_on, tasks::schedule_repeating};
+use std::time::Duration;
+use tokio_stream::StreamExt;
+
+use flarch::spawn_local;
+
+use crate::broker::{Broker, BrokerError, Subsystem, SubsystemListener};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TimerMessage {
@@ -21,14 +25,15 @@ impl TimerBroker {
         broker
             .add_subsystem(Subsystem::Handler(Box::new(timer_struct)))
             .await?;
-        let broker_cl = broker.clone();
-        schedule_repeating(move || {
-            let mut broker_cl = broker_cl.clone();
-            block_on(async move {
+        let mut broker_cl = broker.clone();
+        spawn_local(async move {
+            let mut interval = wasm_timer::Interval::new(Duration::from_millis(1000));
+            loop {
+                interval.next().await;
                 if let Err(e) = broker_cl.emit_msg(TimerMessage::Second) {
                     log::error!("While emitting timer: {e:?}");
                 }
-            });
+            }
         });
         Ok(broker)
     }

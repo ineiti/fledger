@@ -26,6 +26,7 @@ js-sys = {version = "0.3", optional = true}
 wasm-bindgen = {version = "0.2", features = ["serde-serialize"], optional = true}
 wasm-bindgen-futures = {version = "0.4", optional = true}
 wasm-timer = {version = "0.2", optional = true}
+tokio-stream = "0.1"
 
 [dev-dependencies]
 flexi_logger = "0.24"

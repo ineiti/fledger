@@ -337,6 +337,7 @@ dependencies = [
  "log",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-timer",
@@ -360,7 +361,9 @@ dependencies = [
  "sha2",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "wasm-bindgen-futures",
+ "wasm-timer",
 ]
 
 [[package]]
@@ -824,6 +827,25 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "ping-pong-web"
+version = "0.7.0"
+dependencies = [
+ "console_error_panic_hook",
+ "flarch",
+ "flnet",
+ "js-sys",
+ "log",
+ "shared",
+ "tokio",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-logger",
+ "wee_alloc",
+ "ybc",
+ "yew",
+]
 
 [[package]]
 name = "ppv-lite86"
@@ -1413,25 +1435,6 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "yew-macro",
-]
-
-[[package]]
-name = "yew-example"
-version = "0.7.0"
-dependencies = [
- "console_error_panic_hook",
- "flarch",
- "flnet",
- "js-sys",
- "log",
- "shared",
- "tokio",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-logger",
- "wee_alloc",
- "ybc",
- "yew",
 ]
 
 [[package]]
