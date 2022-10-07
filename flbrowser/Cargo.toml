@@ -1,14 +1,11 @@
 [package]
-name = "fledger-web"
+name = "flbrowser"
 version = "0.7.0"
 authors = ["Linus Gasser <ineiti@gasser.blue>"]
 edition = "2021"
 description = "Web interface for fledger"
 repository = "https://github.com/ineiti/fledger"
 license = "AGPLv3"
-
-[lib]
-crate-type = ["cdylib"]
 
 [features]
 local = []
@@ -29,12 +26,19 @@ console_error_panic_hook = "0.1"
 wasm-bindgen-futures = "0.4"
 wasm-logger = "0.2"
 urlencoding = "2"
+tokio = "1"
 
 [dependencies.web-sys]
 version = "0.3"
 features = [
+  'Document',
+  'Element',
+  'HtmlElement',
+  'HtmlTextAreaElement',
+  'Node',
   'Window',
-  'Location'
+  'Location',
+  'DomTokenList',
 ]
 
 [dev-dependencies]

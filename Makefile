@@ -20,10 +20,10 @@ update_version:
 kill_bg:
 	pkill -f flsignal &
 	pkill -f fledger &
-	pkill -f "npm run start" &
+	pkill -f "trunk serve" &
 
 build_local_web:
-	make -C flbrowser build_local 
+	cd flbrowser && trunk build --features local
 
 build_local_cli:
 	cd cli && cargo build -p fledger && cargo build -p flsignal
@@ -36,12 +36,8 @@ serve_two: kill_bg build_local_cli
 	( cd cli && ( cargo run --bin fledger -- --config fledger/flnode -vv -s ws://localhost:8765 & \
 		cargo run --bin fledger -- --config fledger/flnode2 -vv -s ws://localhost:8765 & ) )
 
-serve_local: kill_bg build_local
-	( cd cli/flsignal && cargo run -- -vv ) &
-	sleep 4
-	make -C flbrowser serve_local &
-	( cd cli/fledger && ( cargo run -- -vv -s ws://localhost:8765 & \
-		cargo run -- --config ./flnode2 -vv -s ws://localhost:8765 & ) )
+serve_local: kill_bg build_local_web serve_two
+	cd flbrowser && trunk serve --features local &
 	sleep 2
 	open http://localhost:8080
 
