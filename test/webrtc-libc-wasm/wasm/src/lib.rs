@@ -1,19 +1,18 @@
-use std::sync::mpsc::channel;
+use std::sync::mpsc::RecvError;
 
+use flmodules::broker::Destination;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
+use flarch::tasks::wait_ms;
 use flnet::{
-    network::{NetCall,NetworkError},
-    network_start,
-    NetworkSetupError,
     config::{NodeConfig, NodeInfo},
+    network::{NetCall, NetworkError},
     network::{NetReply, NetworkMessage},
+    network_start, NetworkSetupError,
 };
-use flarch::{tasks::wait_ms};
-use flmodules::{broker::Subsystem};
 
-const URL: &str = "ws://localhost:8765";
+const URL: &str = "ws://127.0.0.1:8765";
 
 #[derive(Debug, Error)]
 enum StartError {
@@ -23,6 +22,8 @@ enum StartError {
     Network(#[from] NetworkError),
     #[error(transparent)]
     Broker(#[from] flmodules::broker::BrokerError),
+    #[error(transparent)]
+    Receive(#[from] RecvError),
 }
 
 async fn run_app() -> Result<(), StartError> {
@@ -30,8 +31,7 @@ async fn run_app() -> Result<(), StartError> {
 
     let nc = NodeConfig::new();
     let mut net = network_start(nc.clone(), URL).await?;
-    let (tx, rx) = channel();
-    net.add_subsystem(Subsystem::Tap(tx)).await?;
+    let (rx, tap_indx) = net.get_tap().await?;
     let mut i: i32 = 0;
     loop {
         i += 1;
@@ -43,7 +43,9 @@ async fn run_app() -> Result<(), StartError> {
             if let NetworkMessage::Reply(reply) = msg {
                 match reply {
                     NetReply::RcvNodeMessage(id, msg_net) => {
-                        log::info!("Got node message: {} / {:?}", id, msg_net)
+                        log::info!("Got node message: {} / {:?}", id, msg_net);
+                        net.remove_subsystem(tap_indx).await?;
+                        return Ok(());
                     }
                     NetReply::RcvWSUpdateList(list) => {
                         let other: Vec<NodeInfo> = list
@@ -53,11 +55,13 @@ async fn run_app() -> Result<(), StartError> {
                             .collect();
                         log::info!("Got list: {:?}", other);
                         if other.len() > 0 {
-                            net.emit_msg(
-                                NetReply::RcvNodeMessage(
+                            net.emit_msg_dest(
+                                Destination::NoTap,
+                                NetCall::SendNodeMessage(
                                     other.get(0).unwrap().get_id(),
                                     "Hello from Rust wasm".to_string(),
-                                ).into()
+                                )
+                                .into(),
                             )?;
                         }
                     }
@@ -65,7 +69,7 @@ async fn run_app() -> Result<(), StartError> {
                 }
             }
         }
-        net.emit_msg(NetworkMessage::Call(NetCall::SendWSStats(vec![])))?;
+        net.emit_msg(NetworkMessage::Call(NetCall::SendWSUpdateListRequest))?;
         wait_ms(1000).await;
     }
 }
@@ -79,4 +83,6 @@ pub async fn main() {
     if let Err(e) = run_app().await {
         log::error!("Error: {:?}", e);
     }
+
+    log::info!("Done with node");
 }

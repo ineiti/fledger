@@ -85,7 +85,7 @@ impl SubsystemListener<WSClientMessage> for WebSocketClient {
                     match msg_in {
                         WSClientInput::Message(msg) => {
                             if ws.ready_state() != WebSocket::OPEN {
-                                log::error!("WebSocket is not open");
+                                log::error!("WebSocket is not open for {msg:?}");
                                 return vec![];
                             }
                             ws.send_with_str(&msg)

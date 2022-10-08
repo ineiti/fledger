@@ -41,7 +41,7 @@ pub enum SignalOutput {
     WebSocket((U256, WSSignalMessageFromNode)),
     NodeStats(Vec<NodeStat>),
     NewNode(U256),
-    Stopped
+    Stopped,
 }
 
 pub struct SignalServer {
@@ -55,6 +55,8 @@ pub const SIGNAL_VERSION: u64 = 3;
 
 impl SignalServer {
     /// Creates a new SignalServer.
+    /// ttl_minutes is the minimum time an idle node will be
+    /// kept in the list.
     pub async fn new(
         ws_server: Broker<WSServerMessage>,
         ttl_minutes: u64,
@@ -65,7 +67,9 @@ impl SignalServer {
                 connection_ids: BiMap::new(),
                 info: HashMap::new(),
                 ttl: HashMap::new(),
-                ttl_minutes,
+                // Add 2 to the ttl_minutes to make sure that nodes are kept at least
+                // 1 minute in the list.
+                ttl_minutes: ttl_minutes + 2,
             })))
             .await?;
         broker
@@ -75,7 +79,8 @@ impl SignalServer {
                 Box::new(Self::link_ss_wss),
             )
             .await?;
-        TimerBroker::start().await?
+        TimerBroker::start()
+            .await?
             .forward(
                 broker.clone(),
                 Box::new(|msg| {
@@ -133,6 +138,7 @@ impl SignalServer {
         for (index, ttl) in self.ttl.iter_mut() {
             *ttl -= 1;
             if *ttl == 0 {
+                log::debug!("Removing idle node {index}");
                 to_remove.push(*index);
             }
         }
@@ -185,7 +191,7 @@ impl SignalServer {
     }
 
     fn ws_list_ids(&mut self, id: usize) -> Vec<SignalMessage> {
-	log::info!("Current list is: {:?}", self.info.values());
+        log::info!("Current list is: {:?}", self.info.values());
         self.send_msg_node(
             id,
             WSSignalMessageToNode::ListIDsReply(self.info.values().cloned().collect()),
@@ -235,10 +241,7 @@ impl SignalServer {
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
 impl SubsystemListener<SignalMessage> for SignalServer {
-    async fn messages(
-        &mut self,
-        from_broker: Vec<SignalMessage>,
-    ) -> Vec<SignalMessage> {
+    async fn messages(&mut self, from_broker: Vec<SignalMessage>) -> Vec<SignalMessage> {
         let mut out = vec![];
         for msg in from_broker {
             match msg {

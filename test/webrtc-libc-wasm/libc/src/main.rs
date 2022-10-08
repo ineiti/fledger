@@ -1,17 +1,17 @@
 use thiserror::Error;
 
+use flarch::start_logging_filter;
+use flmodules::{broker::Broker, nodeids::U256};
 use flnet::{
-    network_start,
-    NetworkSetupError,
     config::NodeConfig,
-    network::{NetReply, NetworkMessage, NetCall},
+    network::{NetCall, NetReply, NetworkMessage},
+    network_start,
     signal::SignalServer,
     web_socket_server::WebSocketServer,
+    NetworkSetupError,
 };
-use flmodules::{broker::Broker, nodeids::U256};
-use flarch::{start_logging_filter};
 
-const URL: &str = "ws://localhost:8765";
+const URL: &str = "ws://127.0.0.1:8765";
 
 #[derive(Debug, Error)]
 enum MainError {
@@ -23,25 +23,29 @@ enum MainError {
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
-    start_logging_filter(vec!["libc", "broker", "flnet"]);
+    start_logging_filter(vec!["fl"]);
 
     log::info!("Starting signalling server");
     start_signal_server().await;
 
-    log::debug!("Starting node 1");
-    let (_nc1, mut broker1) = spawn_node().await?;
+    let (nc, mut broker) = spawn_node().await?;
+    log::info!("Starting node: {} / {}", nc.info.name, nc.info.get_id());
 
-    let (tap1, _) = broker1.get_tap().await.expect("Failed to get tap");
+    let (mut tap, _) = broker.get_tap_async().await.expect("Failed to get tap");
+    let mut msgs_rcv = 0;
 
-    for msg in tap1 {
-        log::debug!("Node 1: {msg:?}");
+    loop {
+        let msg = tap.recv().await.expect("expected message");
         if let NetworkMessage::Reply(NetReply::RcvNodeMessage(id, msg_net)) = msg {
             log::info!("Got message from other node: {}", msg_net);
-            send(&mut broker1, id, "Reply from libc").await;
+            if msgs_rcv == 0 {
+                msgs_rcv += 1;
+                send(&mut broker, id, "Reply from libc").await;
+            } else {
+                return Ok(());
+            }
         }
     }
-
-    Ok(())
 }
 
 async fn start_signal_server() {
@@ -49,7 +53,7 @@ async fn start_signal_server() {
         .await
         .expect("Failed to start signalling server");
     log::debug!("Starting signalling server");
-    SignalServer::new(wss, 0)
+    SignalServer::new(wss, 1)
         .await
         .expect("Failed to start signalling server");
 }
@@ -57,23 +61,20 @@ async fn start_signal_server() {
 async fn spawn_node() -> Result<(NodeConfig, Broker<NetworkMessage>), MainError> {
     let nc = NodeConfig::new();
 
-    log::info!(
-        "Starting node {}: {}",
-        nc.info.get_id(),
-        nc.info.name
-    );
+    log::info!("Starting node {}: {}", nc.info.get_id(), nc.info.name);
     log::debug!("Connecting to websocket at {URL}");
     let net = network_start(nc.clone(), URL)
-    .await
-    .expect("Starting node failed");
+        .await
+        .expect("Starting node failed");
 
     Ok((nc, net))
 }
 
 async fn send(src: &mut Broker<NetworkMessage>, id: U256, msg: &str) {
-    src.emit_msg(
-        NetworkMessage::Call(NetCall::SendNodeMessage(id, msg.into()))
-    )
+    src.emit_msg(NetworkMessage::Call(NetCall::SendNodeMessage(
+        id,
+        msg.into(),
+    )))
     .expect("Sending to node");
 }
 
@@ -84,9 +85,10 @@ mod tests {
 
     use flarch::wait_ms;
 
-    #[tokio::test(flavor = "multi_thread")]
+    // #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
     async fn test_two_nodes() -> Result<(), MainError> {
-        start_logging_filter(vec!["libc", "broker", "flnet"]);
+        start_logging_filter(vec!["fl"]);
 
         log::info!("Starting signalling server");
         start_signal_server().await;
@@ -94,9 +96,9 @@ mod tests {
         let (nc1, mut broker1) = spawn_node().await?;
         log::debug!("Starting node 2");
         let (nc2, mut broker2) = spawn_node().await?;
-        wait_ms(1000).await;
         let (tap2, _) = broker2.get_tap().await.expect("Failed to get tap");
         let (tap1, _) = broker1.get_tap().await.expect("Failed to get tap");
+        wait_ms(1000).await;
         for _ in 1..=2 {
             log::debug!("Sending first message");
             send(&mut broker1, nc2.info.get_id(), "Message 1").await;

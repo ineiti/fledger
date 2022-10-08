@@ -333,7 +333,7 @@ mod tests {
         let event = Event {
             category: Category::TextMessage,
             src: nc.info.get_id(),
-            created: 0.,
+            created: 0,
             msg: "something".into(),
         };
         nd.gossip

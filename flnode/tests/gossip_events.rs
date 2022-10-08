@@ -75,7 +75,7 @@ async fn add_chat_message(net: &mut Network, id: &U256, step: i32) {
     let msg = events::Event {
         category: events::Category::TextMessage,
         src: U256::rnd(),
-        created: step as f64,
+        created: step as i64,
         msg: "msg".into(),
     };
     let node_timer = net.nodes.get_mut(id).expect("getting node");

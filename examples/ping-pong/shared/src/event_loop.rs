@@ -2,7 +2,7 @@ use std::time::Duration;
 use tokio::select;
 use tokio_stream::StreamExt;
 
-use flarch::spawn_local;
+use flarch::{spawn_local, Interval};
 use flmodules::{
     broker::{Broker, BrokerError},
     nodeids::NodeID,
@@ -43,14 +43,14 @@ async fn event_loop(
 ) -> Result<(), BrokerError> {
     let (mut tap, _) = net.get_tap_async().await?;
     let mut nodes: Vec<NodeInfo> = vec![];
-    let mut interval_sec = wasm_timer::Interval::new(Duration::from_secs(1));
+    let mut interval_sec = Interval::new_interval(Duration::from_secs(1));
 
     loop {
         select! {
-        _ = interval_sec.next() => update_list(id, &mut net, &nodes)?,
             msg = tap.recv() => if let Some(list) = new_msg(&mut net, &mut ret, msg)?{
                 nodes = list;
             },
+            _ = interval_sec.next() => update_list(id, &mut net, &nodes)?,
         }
     }
 }

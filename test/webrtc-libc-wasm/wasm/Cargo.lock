@@ -267,10 +267,9 @@ dependencies = [
  "log",
  "thiserror",
  "tokio",
- "tokio-stream",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-timer",
+ "wasm-bindgen-test",
  "web-sys",
 ]
 
@@ -293,7 +292,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "wasm-bindgen-futures",
- "wasm-timer",
 ]
 
 [[package]]
@@ -323,7 +321,6 @@ dependencies = [
  "toml",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-timer",
  "web-sys",
 ]
 
@@ -846,6 +843,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4501abdff3ae82a1c1b477a17252eb69cee9e66eb915c1abaa4f44d873df9f09"
 
 [[package]]
+name = "scoped-tls"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea6a9290e3c9cf0f18145ef7ffa62d68ee0bf5fcd651017e586dc7fd5da448c2"
+
+[[package]]
 name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1166,6 +1169,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c38c045535d93ec4f0b4defec448e4291638ee608530863b1e2ba115d4fff7f"
 
 [[package]]
+name = "wasm-bindgen-test"
+version = "0.3.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09d2fff962180c3fadf677438054b1db62bee4aa32af26a45388af07d1287e1d"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "scoped-tls",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test-macro",
+]
+
+[[package]]
+name = "wasm-bindgen-test-macro"
+version = "0.3.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4683da3dfc016f704c9f82cf401520c4f1cb3ee440f7f52b3d6ac29506a49ca7"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
 name = "wasm-logger"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1173,21 +1200,6 @@ checksum = "074649a66bb306c8f2068c9016395fa65d8e08d2affcbf95acf3c24c3ab19718"
 dependencies = [
  "log",
  "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "wasm-timer"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be0ecb0db480561e9a7642b5d3e4187c128914e58aa84330b9493e3eb68c5e7f"
-dependencies = [
- "futures",
- "js-sys",
- "parking_lot",
- "pin-utils",
- "wasm-bindgen",
- "wasm-bindgen-futures",
  "web-sys",
 ]
 

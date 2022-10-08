@@ -20,7 +20,7 @@
   "main": "wasm.js",
   "types": "wasm.d.ts",
   "dependencies": {
-    "@mapbox/node-pre-gyp": "^1.0.9",
+    "@mapbox/node-pre-gyp": "^1.0.10",
     "wrtc": "^0.4.7",
     "ws": "^7.4.3"
   }

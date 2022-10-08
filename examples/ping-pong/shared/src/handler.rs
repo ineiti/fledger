@@ -6,7 +6,8 @@ use flmodules::{
 };
 use flnet::{
     broker::{Broker, BrokerError, Subsystem, SubsystemListener},
-    network::{NetCall, NetworkMessage}, config::NodeInfo,
+    config::NodeInfo,
+    network::{NetCall, NetworkMessage},
 };
 
 use crate::common::{PPMessage, PPMessageNode};
@@ -73,9 +74,7 @@ impl PingPong {
                         .ok()
                         .map(|ppm| PPMessage::FromNetwork(from, ppm))
                 }
-                flnet::network::NetReply::RcvWSUpdateList(nodes) => {
-                    Some(PPMessage::List(nodes))
-                }
+                flnet::network::NetReply::RcvWSUpdateList(nodes) => Some(PPMessage::List(nodes)),
                 _ => None,
             }
         } else {
@@ -146,7 +145,7 @@ impl SubsystemListener<PPMessage> for PingPong {
 mod test {
     use std::time::Duration;
 
-    use flarch::{start_logging, start_logging_filter_level};
+    use flarch::start_logging;
     use flmodules::broker::Destination;
     use flnet::{config::NodeConfig, network::NetReply, NetworkSetupError};
 
@@ -155,9 +154,9 @@ mod test {
     // Tests single messages going into the structure doing the correct thing:
     // - receive 'ping' from the user, send a 'ping' to the network
     // - receive 'ping' from the network replies 'pong' and requests a new list
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_ping() -> Result<(), NetworkSetupError> {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging();
 
         let nc_src = NodeConfig::new();
         let mut net = Broker::new();
@@ -186,6 +185,8 @@ mod test {
                 serde_json::to_string(&PPMessageNode::Ping).unwrap(),
             )),
         )?;
+        // Remove the "Tick"
+        pp_tap.recv().unwrap();
         assert_eq!(
             PPMessage::FromNetwork(dst_id.clone(), PPMessageNode::Ping),
             pp_tap.recv().unwrap()

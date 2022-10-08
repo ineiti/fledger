@@ -38,7 +38,7 @@ impl Component for App {
             link,
             logs: vec![],
             config: flnet::config::NodeConfig::new(),
-            pp_imp: (now() / 1000.).fract() >= 0.5,
+            pp_imp: now() % 1000 >= 500,
         }
     }
 

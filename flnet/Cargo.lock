@@ -397,6 +397,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -795,7 +805,7 @@ dependencies = [
  "log",
  "thiserror",
  "tokio",
- "tokio-stream",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -816,7 +826,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "wasm-timer",
 ]
 
 [[package]]
@@ -851,7 +860,6 @@ dependencies = [
  "toml",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-timer",
  "web-sys",
  "webrtc",
 ]
@@ -1856,6 +1864,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "scoped-tls"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea6a9290e3c9cf0f18145ef7ffa62d68ee0bf5fcd651017e586dc7fd5da448c2"
+
+[[package]]
 name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2559,18 +2573,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c38c045535d93ec4f0b4defec448e4291638ee608530863b1e2ba115d4fff7f"
 
 [[package]]
-name = "wasm-timer"
-version = "0.2.5"
+name = "wasm-bindgen-test"
+version = "0.3.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be0ecb0db480561e9a7642b5d3e4187c128914e58aa84330b9493e3eb68c5e7f"
+checksum = "09d2fff962180c3fadf677438054b1db62bee4aa32af26a45388af07d1287e1d"
 dependencies = [
- "futures",
+ "console_error_panic_hook",
  "js-sys",
- "parking_lot 0.11.2",
- "pin-utils",
+ "scoped-tls",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "web-sys",
+ "wasm-bindgen-test-macro",
+]
+
+[[package]]
+name = "wasm-bindgen-test-macro"
+version = "0.3.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4683da3dfc016f704c9f82cf401520c4f1cb3ee440f7f52b3d6ac29506a49ca7"
+dependencies = [
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]

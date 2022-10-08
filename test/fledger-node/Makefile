@@ -1,4 +1,4 @@
-src := $(shell find src ../../shared ../../arch/flnet-wasm -name "*.rs") Cargo.toml
+src := $(shell find src ../../fl* -name "*.rs") Cargo.toml
 wasm := static/wasm_bg.wasm
 TARGET := --release
 build = wasm-pack build ${TARGET} --target nodejs --out-name wasm \

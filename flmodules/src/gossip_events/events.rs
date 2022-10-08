@@ -82,7 +82,7 @@ impl EventsStorage {
     }
 
     pub fn get(&self) -> Result<String, serde_yaml::Error> {
-        serde_yaml::to_string(&EventsStorageSave::V2(self.clone()))
+        serde_yaml::to_string(&EventsStorageSave::V3(self.clone()))
     }
 
     pub fn set(&mut self, data: &str) -> Result<(), serde_yaml::Error> {
@@ -94,7 +94,8 @@ impl EventsStorage {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 enum EventsStorageSave {
     V1(EventsStorageV1),
-    V2(EventsStorage),
+    V2(EventsStorageV2),
+    V3(EventsStorage),
 }
 
 impl EventsStorageSave {
@@ -108,66 +109,10 @@ impl EventsStorageSave {
     fn to_latest(self) -> EventsStorage {
         match self {
             EventsStorageSave::V1(es) => es.to_latest(),
-            EventsStorageSave::V2(es) => es,
+            EventsStorageSave::V2(es) => es.to_latest(),
+            EventsStorageSave::V3(es) => es,
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-struct EventsStorageV1 {
-    storage: HashMap<Category, EventsV1>,
-}
-
-impl EventsStorageV1 {
-    fn to_latest(self) -> EventsStorage {
-        EventsStorage {
-            storage: self
-                .storage
-                .into_iter()
-                .map(|(k, v)| (k, v.to_latest()))
-                .collect(),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
-struct U256V1([u8; 32]);
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-struct EventsV1 {
-    config: CategoryConfig,
-    events: HashMap<U256V1, EventV1>,
-}
-
-impl EventsV1 {
-    fn to_latest(self) -> Events {
-        Events {
-            config: self.config,
-            events: self
-                .events
-                .into_iter()
-                .map(|(k, v)| {
-                    (
-                        k.0.into(),
-                        Event {
-                            category: v.category,
-                            src: v.src.0.into(),
-                            created: v.created,
-                            msg: v.msg,
-                        },
-                    )
-                })
-                .collect(),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-struct EventV1 {
-    pub category: Category,
-    pub src: U256V1,
-    pub created: f64,
-    pub msg: String,
 }
 
 impl Default for EventsStorage {
@@ -278,7 +223,7 @@ pub struct CategoryConfig {
 pub struct Event {
     pub category: Category,
     pub src: U256,
-    pub created: f64,
+    pub created: i64,
     pub msg: String,
 }
 
@@ -292,6 +237,121 @@ impl Event {
         id.finalize().into()
     }
 }
+
+// Migration events.
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+struct EventsStorageV1 {
+    storage: HashMap<Category, EventsV1>,
+}
+
+impl EventsStorageV1 {
+    fn to_latest(self) -> EventsStorage {
+        EventsStorageV2 {
+            storage: self
+                .storage
+                .into_iter()
+                .map(|(k, v)| (k, v.to_latest()))
+                .collect(),
+        }.to_latest()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+struct U256V1([u8; 32]);
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+struct EventsV1 {
+    config: CategoryConfig,
+    events: HashMap<U256V1, EventV1>,
+}
+
+impl EventsV1 {
+    fn to_latest(self) -> EventsV2 {
+        EventsV2 {
+            config: self.config,
+            events: self
+                .events
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        k.0.into(),
+                        EventV2 {
+                            category: v.category,
+                            src: v.src.0.into(),
+                            created: v.created as f64,
+                            msg: v.msg,
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+struct EventV1 {
+    pub category: Category,
+    pub src: U256V1,
+    pub created: i64,
+    pub msg: String,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct EventsStorageV2 {
+    storage: HashMap<Category, EventsV2>,
+}
+
+impl EventsStorageV2 {
+    fn to_latest(self) -> EventsStorage {
+        EventsStorage {
+            storage: self
+                .storage
+                .into_iter()
+                .map(|(k, v)| (k, v.to_latest()))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct EventsV2 {
+    config: CategoryConfig,
+    events: HashMap<U256, EventV2>,
+}
+
+impl EventsV2 {
+    fn to_latest(self) -> Events {
+        Events {
+            config: self.config,
+            events: self
+                .events
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        k,
+                        Event {
+                            category: v.category,
+                            src: v.src,
+                            created: v.created as i64,
+                            msg: v.msg,
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct EventV2 {
+    pub category: Category,
+    pub src: U256,
+    pub created: f64,
+    pub msg: String,
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -314,13 +374,13 @@ mod tests {
         let e1 = Event {
             category: Category::NodeInfo,
             src: U256::rnd(),
-            created: 1.,
+            created: 1,
             msg: "foo".into(),
         };
         let e2 = Event {
             category: Category::NodeInfo,
             src: e1.src,
-            created: 2.,
+            created: 2,
             msg: "bar".into(),
         };
 
@@ -347,13 +407,13 @@ mod tests {
         let e1 = Event {
             category: Category::NodeInfo,
             src: U256::rnd(),
-            created: 1.,
+            created: 1,
             msg: "foo".into(),
         };
         let e2 = Event {
             category: Category::NodeInfo,
             src: e1.src,
-            created: 2.,
+            created: 2,
             msg: "bar".into(),
         };
 

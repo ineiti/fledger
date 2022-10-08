@@ -32,12 +32,6 @@ jobs:
       with:
         version: 'latest'
 
-    - name: Run flnet-wasm test
-      run: |
-        (cd cli/flsignal && cargo build && (cargo run &))
-        cd arch/flnet-wasm
-        make test
-
     - name: Run inter-arch test
       run: |
         cd test/webrtc-libc-wasm
@@ -62,18 +56,6 @@ jobs:
           ${{ runner.os }}-cargo-test-
           ${{ runner.os }}-cargo-build-
 
-    - uses: jetli/wasm-pack-action@v0.3.0
-      with:
-        version: 'latest'
-
-    - name: Update build tag
-      run: make update_version
-
-    - name: Build all
+    - name: Build and test all
       run: |
-        ( cd shared && cargo build )
-        make -C flbrowser build_local
-        ( cd cli && cargo build )
-        cd test
-        (cd fledger-node && cargo build)
-        (cd webrtc-libc-wasm && make all)
+        make test_all

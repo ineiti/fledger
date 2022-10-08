@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
-use flarch::spawn_local;
+use flarch::{spawn_local, Interval};
 
 use crate::broker::{Broker, BrokerError, Subsystem, SubsystemListener};
 
@@ -27,7 +27,7 @@ impl TimerBroker {
             .await?;
         let mut broker_cl = broker.clone();
         spawn_local(async move {
-            let mut interval = wasm_timer::Interval::new(Duration::from_millis(1000));
+            let mut interval = Interval::new_interval(Duration::from_millis(1000));
             loop {
                 interval.next().await;
                 if let Err(e) = broker_cl.emit_msg(TimerMessage::Second) {

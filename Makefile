@@ -1,23 +1,41 @@
 CARGOS := cli/{fledger,flsignal} flarch flbrowser \
 			flmodules flnet flnode test/{fledger-node,signal-fledger,webrtc-libc-wasm/{libc,wasm}} \
 			examples/ping-pong/{wasm,shared,libc}
+MAKE_TESTS := test/webrtc-libc-wasm
 
-check:
+cargo_check:
 	for c in ${CARGOS}; do \
 	  echo Checking $$c; \
 	  ( cd $$c && cargo check --tests ); \
 	done
 
-update:
+cargo_test:
+	for c in ${CARGOS}; do \
+	  echo Checking $$c; \
+	  ( cd $$c && cargo test ); \
+	done
+
+make_test:
+	for c in ${MAKE_TESTS}; do \
+	  ( cd $$c && make test ); \
+	done
+
+cargo_update:
 	for c in ${CARGOS}; do \
 		echo Updating $$c; \
 		(cd $$c && cargo update ); \
 	done
 
+cargo_unused:
+	for cargo in $$( find . -name Cargo.toml ); do \
+		echo Checking for unused crates in $$cargo; \
+		(cd $$(dirname $$cargo) && cargo +nightly udeps -q ); \
+	done
+
 update_version:
 	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > shared/flnode/src/version.rs
 
-kill_bg:
+kill:
 	pkill -f flsignal &
 	pkill -f fledger &
 	pkill -f "trunk serve" &
@@ -30,27 +48,16 @@ build_local_cli:
 
 build_local: build_local_web build_local_cli
 
-serve_two: kill_bg build_local_cli
+serve_two: kill build_local_cli
 	( cd cli && cargo run --bin flsignal -- -vv ) &
 	sleep 4
 	( cd cli && ( cargo run --bin fledger -- --config fledger/flnode -vv -s ws://localhost:8765 & \
 		cargo run --bin fledger -- --config fledger/flnode2 -vv -s ws://localhost:8765 & ) )
 
-serve_local: kill_bg build_local_web serve_two
+serve_local: kill build_local_web serve_two
 	cd flbrowser && trunk serve --features local &
 	sleep 2
 	open http://localhost:8080
-
-update_crates:
-	for cargo in $$( find . -name Cargo.toml ); do \
-		echo $$cargo; \
-		(cd $$(dirname $$cargo) && cargo update); \
-	done
-
-unused_crates:
-	for cargo in $$( find . -name Cargo.toml ); do \
-		(cd $$(dirname $$cargo) && cargo +nightly udeps -q ); \
-	done
 
 docker_dev:
 	rustup target add x86_64-unknown-linux-gnu
@@ -59,7 +66,7 @@ docker_dev:
 		rust:latest /mnt/fledger/run_docker.sh
 	for cli in fledger flsignal; do \
 		docker build cli/target/debug-x86 -f Dockerfile.$$cli -t fledgre/$$cli:dev && \
-		docker push fledgre/$$cli:dev; \
+		# docker push fledgre/$$cli:dev; \
 	done
 
 clean:

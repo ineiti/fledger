@@ -434,6 +434,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -832,7 +842,7 @@ dependencies = [
  "log",
  "thiserror",
  "tokio",
- "tokio-stream",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -853,7 +863,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "wasm-timer",
 ]
 
 [[package]]
@@ -1548,37 +1557,12 @@ dependencies = [
 
 [[package]]
 name = "parking_lot"
-version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d17b78036a60663b797adeaee46f5c9dfebb86948d1255007a1d6be0271ff99"
-dependencies = [
- "instant",
- "lock_api",
- "parking_lot_core 0.8.5",
-]
-
-[[package]]
-name = "parking_lot"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3742b2c103b9f06bc9fff0a37ff4912935851bee6d36f3c02bcc755bcfec228f"
 dependencies = [
  "lock_api",
- "parking_lot_core 0.9.3",
-]
-
-[[package]]
-name = "parking_lot_core"
-version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d76e8e1493bcac0d2766c42737f34458f1c8c50c0d23bcb24ea953affb273216"
-dependencies = [
- "cfg-if",
- "instant",
- "libc 0.2.134",
- "redox_syscall",
- "smallvec",
- "winapi",
+ "parking_lot_core",
 ]
 
 [[package]]
@@ -1893,6 +1877,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "scoped-tls"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea6a9290e3c9cf0f18145ef7ffa62d68ee0bf5fcd651017e586dc7fd5da448c2"
+
+[[package]]
 name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2086,7 +2076,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
- "wasm-timer",
 ]
 
 [[package]]
@@ -2317,7 +2306,7 @@ dependencies = [
  "memchr",
  "mio",
  "num_cpus",
- "parking_lot 0.12.1",
+ "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",
@@ -2599,18 +2588,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c38c045535d93ec4f0b4defec448e4291638ee608530863b1e2ba115d4fff7f"
 
 [[package]]
-name = "wasm-timer"
-version = "0.2.5"
+name = "wasm-bindgen-test"
+version = "0.3.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be0ecb0db480561e9a7642b5d3e4187c128914e58aa84330b9493e3eb68c5e7f"
+checksum = "09d2fff962180c3fadf677438054b1db62bee4aa32af26a45388af07d1287e1d"
 dependencies = [
- "futures",
+ "console_error_panic_hook",
  "js-sys",
- "parking_lot 0.11.2",
- "pin-utils",
+ "scoped-tls",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "web-sys",
+ "wasm-bindgen-test-macro",
+]
+
+[[package]]
+name = "wasm-bindgen-test-macro"
+version = "0.3.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4683da3dfc016f704c9f82cf401520c4f1cb3ee440f7f52b3d6ac29506a49ca7"
+dependencies = [
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]
@@ -2836,7 +2834,7 @@ dependencies = [
  "libc 0.2.134",
  "log",
  "nix",
- "parking_lot 0.12.1",
+ "parking_lot",
  "rand",
  "thiserror",
  "tokio",

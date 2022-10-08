@@ -17,8 +17,8 @@ use flarch::spawn_local;
 
 #[derive(Debug, Error)]
 pub enum BrokerError {
-    #[error("While sending to tap")]
-    SendQueue,
+    #[error("While sending to {0}")]
+    SendQueue(String),
     #[error("Internal structure is locked")]
     Locked,
 }
@@ -115,14 +115,14 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
             .send(InternMessage::Subsystem(SubsystemAction::Add(
                 subsystem, ss,
             )))
-            .map_err(|_| BrokerError::SendQueue)?;
+            .map_err(|_| BrokerError::SendQueue("add_subsystem".into()))?;
         Ok(subsystem)
     }
 
     pub async fn remove_subsystem(&mut self, ss: usize) -> Result<(), BrokerError> {
         self.intern_tx
             .send(InternMessage::Subsystem(SubsystemAction::Remove(ss)))
-            .map_err(|_| BrokerError::SendQueue)?;
+            .map_err(|_| BrokerError::SendQueue("remove_subsystem".into()))?;
         self.settle(vec![]).await
     }
 
@@ -143,7 +143,7 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
     pub fn emit_msg_dest(&mut self, dst: Destination, msg: T) -> Result<(), BrokerError> {
         self.intern_tx
             .send(InternMessage::Message(dst, msg))
-            .map_err(|_| BrokerError::SendQueue)
+            .map_err(|_| BrokerError::SendQueue("emit_msg_dest".into()))
     }
 
     /// Emit a message to other listeners.
@@ -157,7 +157,7 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
     pub async fn settle_msg_dest(&mut self, dst: Destination, msg: T) -> Result<(), BrokerError> {
         self.intern_tx
             .send(InternMessage::Message(dst, msg))
-            .map_err(|_| BrokerError::SendQueue)?;
+            .map_err(|_| BrokerError::SendQueue("settle_msg_dest".into()))?;
         self.settle(vec![]).await
     }
 
@@ -208,7 +208,7 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
         let (tx, mut rx) = unbounded_channel();
         self.intern_tx
             .send(InternMessage::Settle(callers.clone(), tx))
-            .map_err(|_| BrokerError::SendQueue)?;
+            .map_err(|_| BrokerError::SendQueue("settle".into()))?;
         rx.recv().await;
         Ok(())
     }
@@ -243,8 +243,9 @@ impl<R: Async + Clone + fmt::Debug, S: 'static + Async + Clone + fmt::Debug> Sub
                 .err()
                 .map(|e| {
                     log::error!(
-                        "{:p}: Translated message {} couldn't be queued: {e}",
+                        "{:p}: Translated message {} -> {} couldn't be queued: {e}",
                         self,
+                        std::any::type_name::<R>(),
                         std::any::type_name::<S>()
                     );
                 });
@@ -535,13 +536,13 @@ impl<T: Async + Clone + fmt::Debug> Subsystem<T> {
         Ok(match self {
             Self::Tap(s) => {
                 for msg in msgs {
-                    s.send(msg.clone()).map_err(|_| BrokerError::SendQueue)?;
+                    s.send(msg.clone()).map_err(|_| BrokerError::SendQueue("send_tap".into()))?;
                 }
                 vec![]
             }
             Self::TapAsync(s) => {
                 for msg in msgs {
-                    s.send(msg.clone()).map_err(|_| BrokerError::SendQueue)?;
+                    s.send(msg.clone()).map_err(|_| BrokerError::SendQueue("send_tap_async".into()))?;
                 }
                 vec![]
             }

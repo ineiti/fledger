@@ -40,7 +40,7 @@ jobs:
       run: cd cli && cargo build --release -p fledger
 
     - name: Build web server
-      run: cd flbrowser && make build
+      run: cd flbrowser && trunk build
 
     - name: Docker build signal
       uses: mr-smithers-excellent/docker-build-push@v5
