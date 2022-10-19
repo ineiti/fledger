@@ -370,7 +370,7 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
         true
     }
 
-    /// Adds a SubsystemInit
+    /// Adds a SubsystemInit 
     fn subsystem_action(&mut self, ssa: SubsystemAction<T>) {
         match ssa {
             SubsystemAction::Add(pos, s) => {

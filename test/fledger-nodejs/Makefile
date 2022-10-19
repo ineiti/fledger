@@ -34,6 +34,9 @@ run/node_modules:
 ${wasm}: ${src}
 	${build}
 
+kill:
+	-pkill -f "node ../"
+
 build_local: FEATURES=--features local
 build_local: TARGET=--debug
 build_local: build run/node_modules

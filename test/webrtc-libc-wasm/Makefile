@@ -26,4 +26,5 @@ test:
 	$(MAKE) build
 	(sleep 5 ; $(MAKE) wasm) &
 	$(MAKE) libc
+	sleep 5
 	$(MAKE) kill

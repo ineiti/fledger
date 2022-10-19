@@ -1,7 +1,8 @@
 CARGOS := cli/{fledger,flsignal} flarch flbrowser \
-			flmodules flnet flnode test/{fledger-node,signal-fledger,webrtc-libc-wasm/{libc,wasm}} \
+			flmodules flnet flnode test/{fledger-nodejs,signal-fledger,webrtc-libc-wasm/{libc,wasm}} \
 			examples/ping-pong/{wasm,shared,libc}
-MAKE_TESTS := test/webrtc-libc-wasm
+MAKE_TESTS := test/{webrtc-libc-wasm,signal-fledger} examples/ping-pong
+SHELL := /bin/bash
 
 cargo_check:
 	for c in ${CARGOS}; do \
@@ -26,6 +27,18 @@ cargo_update:
 		(cd $$c && cargo update ); \
 	done
 
+cargo_clean:
+	for c in ${CARGOS}; do \
+		echo Cleaning $$c; \
+		(cd $$c && cargo clean ); \
+	done
+
+cargo_build:
+	for c in ${CARGOS}; do \
+		echo Building $$c; \
+		(cd $$c && cargo build ); \
+	done
+
 cargo_unused:
 	for cargo in $$( find . -name Cargo.toml ); do \
 		echo Checking for unused crates in $$cargo; \
@@ -33,7 +46,7 @@ cargo_unused:
 	done
 
 update_version:
-	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > shared/flnode/src/version.rs
+	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > flnode/src/version.rs
 
 kill:
 	pkill -f flsignal &

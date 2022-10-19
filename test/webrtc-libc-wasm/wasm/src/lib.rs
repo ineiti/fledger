@@ -83,6 +83,4 @@ pub async fn main() {
     if let Err(e) = run_app().await {
         log::error!("Error: {:?}", e);
     }
-
-    log::info!("Done with node");
 }
