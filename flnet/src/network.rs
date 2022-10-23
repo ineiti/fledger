@@ -14,7 +14,7 @@ pub struct Network {
 
 impl Network {
     pub async fn start(mut broker_net: Broker<NetworkMessage>) -> Result<Self, NetworkError> {
-        let (mut tap, _) = broker_net.get_tap_async().await?;
+        let (mut tap, _) = broker_net.get_tap().await?;
         let mut timeout = Interval::new_interval(Duration::from_secs(10));
         timeout.next().await;
         loop {

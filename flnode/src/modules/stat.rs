@@ -14,7 +14,7 @@ pub struct StatBroker {
 
 impl StatBroker {
     pub async fn start(mut broker_net: Broker<NetworkMessage>) -> Result<Self, BrokerError> {
-        let (tap, _) = broker_net.get_tap().await?;
+        let (tap, _) = broker_net.get_tap_sync().await?;
         Ok(Self {
             states: HashMap::new(),
             tap,

@@ -31,7 +31,7 @@ async fn main() -> Result<(), MainError> {
     let (nc, mut broker) = spawn_node().await?;
     log::info!("Starting node: {} / {}", nc.info.name, nc.info.get_id());
 
-    let (mut tap, _) = broker.get_tap_async().await.expect("Failed to get tap");
+    let (mut tap, _) = broker.get_tap().await.expect("Failed to get tap");
     let mut msgs_rcv = 0;
 
     loop {
@@ -96,8 +96,8 @@ mod tests {
         let (nc1, mut broker1) = spawn_node().await?;
         log::debug!("Starting node 2");
         let (nc2, mut broker2) = spawn_node().await?;
-        let (tap2, _) = broker2.get_tap().await.expect("Failed to get tap");
-        let (tap1, _) = broker1.get_tap().await.expect("Failed to get tap");
+        let (tap2, _) = broker2.get_tap_sync().await.expect("Failed to get tap");
+        let (tap1, _) = broker1.get_tap_sync().await.expect("Failed to get tap");
         wait_ms(1000).await;
         for _ in 1..=2 {
             log::debug!("Sending first message");

@@ -72,7 +72,7 @@ impl Component for App {
                 let link = self.link.clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     let mut list = NodeList::new(vec![]);
-                    let (mut tap, _) = pp.get_tap_async().await.expect("Couldn't get tap");
+                    let (mut tap, _) = pp.get_tap().await.expect("Couldn't get tap");
                     loop {
                         match tap.recv().await.expect("Tap has been closed") {
                             PPMessage::FromNetwork(id, ppmsg) => {

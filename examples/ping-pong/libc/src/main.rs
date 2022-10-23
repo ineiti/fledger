@@ -36,7 +36,7 @@ async fn main() -> Result<(), NetworkSetupError> {
         Code::Handler => handler::PingPong::new(nc.info.get_id(), net).await?,
         Code::EventLoop => event_loop::start(nc.info.get_id(), net).await?,
     };
-    let (pp_rx, _) = pp.get_tap().await?;
+    let (pp_rx, _) = pp.get_tap_sync().await?;
     for msg in pp_rx {
         match msg {
             shared::common::PPMessage::ToNetwork(to, ppmsg) => {

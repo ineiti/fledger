@@ -160,9 +160,9 @@ mod test {
 
         let nc_src = NodeConfig::new();
         let mut net = Broker::new();
-        let (net_tap, _) = net.get_tap().await?;
+        let (net_tap, _) = net.get_tap_sync().await?;
         let mut pp = PingPong::new(nc_src.info.get_id(), net.clone()).await?;
-        let (pp_tap, _) = pp.get_tap().await?;
+        let (pp_tap, _) = pp.get_tap_sync().await?;
 
         let nc_dst = NodeConfig::new();
         let dst_id = nc_dst.info.get_id();
@@ -223,12 +223,12 @@ mod test {
 
         let (nc1, net1) = simul.new_node().await?;
         let mut pp1 = PingPong::new(nc1.info.get_id(), net1).await?;
-        let (pp1_tap, _) = pp1.get_tap().await?;
+        let (pp1_tap, _) = pp1.get_tap_sync().await?;
         log::info!("PingPong1 is: {}", nc1.info.get_id());
 
         let (nc2, net2) = simul.new_node().await?;
         let mut pp2 = PingPong::new(nc2.info.get_id(), net2).await?;
-        let (pp2_tap, _) = pp2.get_tap().await?;
+        let (pp2_tap, _) = pp2.get_tap_sync().await?;
         log::info!("PingPong2 is: {}", nc2.info.get_id());
 
         for _ in 0..3 {

@@ -231,18 +231,18 @@ mod tests {
     async fn test_server() {
         start_logging();
         let mut server = WebSocketServer::new(8080).await.unwrap();
-        let (server_tap, _) = server.get_tap().await.unwrap();
+        let (server_tap, _) = server.get_tap_sync().await.unwrap();
 
         let mut client1 = WebSocketClient::connect("ws://localhost:8080")
             .await
             .unwrap();
-        let (client1_tap, _) = client1.get_tap().await.unwrap();
+        let (client1_tap, _) = client1.get_tap_sync().await.unwrap();
         log::debug!("Server reply from client 1: {:?}", server_tap.recv());
 
         let mut client2 = WebSocketClient::connect("ws://localhost:8080")
             .await
             .unwrap();
-        let (client2_tap, _) = client2.get_tap().await.unwrap();
+        let (client2_tap, _) = client2.get_tap_sync().await.unwrap();
         log::debug!("Server reply from client 2: {:?}", server_tap.recv());
 
         for _ in 1..=2 {

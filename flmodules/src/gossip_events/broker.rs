@@ -207,7 +207,7 @@ mod tests {
         let mut gossip = GossipBroker::start(id, broker_rnd.clone()).await?;
 
         let id2 = NodeID::rnd();
-        let (tap_rnd, _) = broker_rnd.get_tap().await?;
+        let (tap_rnd, _) = broker_rnd.get_tap_sync().await?;
         broker_rnd
             .settle_msg(RandomMessage::Output(RandomOut::ListUpdate(
                 vec![id2].into(),

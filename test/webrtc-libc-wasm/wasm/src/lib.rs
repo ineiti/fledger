@@ -31,7 +31,7 @@ async fn run_app() -> Result<(), StartError> {
 
     let nc = NodeConfig::new();
     let mut net = network_broker_start(nc.clone(), URL).await?;
-    let (rx, tap_indx) = net.get_tap().await?;
+    let (rx, tap_indx) = net.get_tap_sync().await?;
     let mut i: i32 = 0;
     loop {
         i += 1;

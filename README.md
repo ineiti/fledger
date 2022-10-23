@@ -119,7 +119,10 @@ access the node in the browser.
 
 ```
 - 0.7.0 - 2022-10-??
-  - Re-arranging crates 
+  - Re-arranging crates and publish
+  - Adding examples
+  - Moving stuff around to make it easier to understand
+  - Add background processing of broker messages
 - 0.6.0 - 2022-05-??
   - Rewrite of networking layer
   - Use real gossiped decentralized message passing

@@ -119,6 +119,7 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
         Ok(subsystem)
     }
 
+    /// Removes a subsystem from the list that will be applied to new messages.
     pub async fn remove_subsystem(&mut self, ss: usize) -> Result<(), BrokerError> {
         self.intern_tx
             .send(InternMessage::Subsystem(SubsystemAction::Remove(ss)))
@@ -126,15 +127,20 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
         self.settle(vec![]).await
     }
 
-    pub async fn get_tap(&mut self) -> Result<(Receiver<T>, usize), BrokerError> {
-        let (tx, rx) = channel();
-        let pos = self.add_subsystem(Subsystem::Tap(tx)).await?;
+    /// Returns an async tap that can be used to listen to messages.
+    pub async fn get_tap(&mut self) -> Result<(UnboundedReceiver<T>, usize), BrokerError> {
+        let (tx, rx) = unbounded_channel();
+        let pos = self.add_subsystem(Subsystem::TapAsync(tx)).await?;
         Ok((rx, pos))
     }
 
-    pub async fn get_tap_async(&mut self) -> Result<(UnboundedReceiver<T>, usize), BrokerError> {
-        let (tx, rx) = unbounded_channel();
-        let pos = self.add_subsystem(Subsystem::TapAsync(tx)).await?;
+    /// Returns a synchronous tap that can be used to listen to messages.
+    /// Care must be taken that the async handling will still continue while
+    /// waiting for a message!
+    /// For this reason it is better to use the `get_tap` method.
+    pub async fn get_tap_sync(&mut self) -> Result<(Receiver<T>, usize), BrokerError> {
+        let (tx, rx) = channel();
+        let pos = self.add_subsystem(Subsystem::Tap(tx)).await?;
         Ok((rx, pos))
     }
 
@@ -785,8 +791,8 @@ mod tests {
         )
         .await?;
 
-        let (tap_a, _) = a.get_tap().await?;
-        let (tap_b, _) = b.get_tap().await?;
+        let (tap_a, _) = a.get_tap_sync().await?;
+        let (tap_b, _) = b.get_tap_sync().await?;
         a.settle_msg(MessageA::One).await?;
         assert!(tap_a.try_recv().is_ok());
         assert!(tap_b.try_recv().is_err());
@@ -811,7 +817,7 @@ mod tests {
             Box::pin(do_something(b_in))
         })))
         .await?;
-        let tap = b.get_tap().await?;
+        let tap = b.get_tap_sync().await?;
         b.settle_msg_dest(Destination::NoTap, MessageA::One).await?;
         assert_eq!(MessageA::Two, tap.0.recv()?);
         Ok(())
@@ -830,7 +836,7 @@ mod tests {
             Box::pin(test_translator_cb(b_in))
         })))
         .await?;
-        let tap = b.get_tap().await?;
+        let tap = b.get_tap_sync().await?;
         b.settle_msg(MessageA::One).await?;
         assert!(tap.0.try_recv().is_err());
         b.settle_msg(MessageA::Two).await?;

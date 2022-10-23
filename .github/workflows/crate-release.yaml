@@ -1,0 +1,39 @@
+name: Crate release
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - uses: katyo/publish-crates@v1
+      with:
+        path: "./flarch"
+        registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        ignore-unpublished-changes: true
+
+    - uses: katyo/publish-crates@v1
+      with:
+        path: "./flmodules"
+        registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        ignore-unpublished-changes: true
+
+    - uses: katyo/publish-crates@v1
+      with:
+        path: "./flnet"
+        registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        ignore-unpublished-changes: true
+
+    - uses: katyo/publish-crates@v1
+      with:
+        path: "./flnode"
+        registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        ignore-unpublished-changes: true

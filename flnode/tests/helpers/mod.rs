@@ -76,7 +76,7 @@ impl NetworkSimul {
         let mut broker = Broker::new();
         let node_timer = NodeTimer::new(broker.clone(), self.nodes.len() as u32, brokers).await?;
         let id = node_timer.node.node_config.info.get_id();
-        let (tap, _) = broker.get_tap().await?;
+        let (tap, _) = broker.get_tap_sync().await?;
         self.node_taps.insert(id, tap);
         self.node_brokers.insert(id, broker);
         self.nodes.insert(id, node_timer);

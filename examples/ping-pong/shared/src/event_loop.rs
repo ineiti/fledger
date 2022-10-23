@@ -41,7 +41,7 @@ async fn event_loop(
     mut net: Broker<NetworkMessage>,
     mut ret: Broker<PPMessage>,
 ) -> Result<(), BrokerError> {
-    let (mut tap, _) = net.get_tap_async().await?;
+    let (mut tap, _) = net.get_tap().await?;
     let mut nodes: Vec<NodeInfo> = vec![];
     let mut interval_sec = Interval::new_interval(Duration::from_secs(1));
 

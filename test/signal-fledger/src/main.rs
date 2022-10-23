@@ -27,7 +27,7 @@ async fn main() -> Result<(), TestError> {
  
     let wss = WebSocketServer::new(8765).await?;
     let mut signal_server = SignalServer::new(wss, 2).await?;
-    let (msgs_signal, _) = signal_server.get_tap().await?;
+    let (msgs_signal, _) = signal_server.get_tap_sync().await?;
     log::info!("Started listening on port 8765");
 
     let mut node1 = create_node().await?;
