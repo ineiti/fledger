@@ -9,7 +9,7 @@ use flmodules::{
 };
 use flnet::{
     config::NodeInfo,
-    network::{NetCall, NetworkMessage},
+    network_broker::{NetCall, NetworkMessage, NetReply},
 };
 
 use crate::common::{PPMessage, PPMessageNode};
@@ -81,7 +81,7 @@ fn new_msg(
 ) -> Result<Option<Vec<NodeInfo>>, BrokerError> {
     if let Some(NetworkMessage::Reply(msg_tap)) = msg {
         match msg_tap {
-            flnet::network::NetReply::RcvNodeMessage(from, msg_net) => {
+            NetReply::RcvNodeMessage(from, msg_net) => {
                 if let Ok(msg) = serde_json::from_str::<PPMessageNode>(&msg_net) {
                     ret.emit_msg(PPMessage::FromNetwork(from, msg.clone()))?;
                     if msg == PPMessageNode::Ping {
@@ -92,7 +92,7 @@ fn new_msg(
                     }
                 }
             }
-            flnet::network::NetReply::RcvWSUpdateList(list) => {
+            NetReply::RcvWSUpdateList(list) => {
                 ret.emit_msg(PPMessage::List(list.clone()))?;
                 return Ok(Some(list));
             }

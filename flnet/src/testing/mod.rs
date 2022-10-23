@@ -1,6 +1,6 @@
 use crate::{
     config::{NodeConfig, NodeInfo},
-    network::{NetReply, NetworkMessage},
+    network_broker::{NetReply, NetworkMessage},
 };
 use flmodules::{
     broker::{Broker, BrokerError, Subsystem, SubsystemListener, Translate},
@@ -73,13 +73,13 @@ impl NSHub {
     fn net_msg(&self, id: U256, net_msg: NetworkMessage) -> Vec<NSHubMessage> {
         if let NetworkMessage::Call(msg) = net_msg {
             match msg {
-                crate::network::NetCall::SendNodeMessage(id_dst, msg_node) => {
+                crate::network_broker::NetCall::SendNodeMessage(id_dst, msg_node) => {
                     vec![NSHubMessage::ToClient(
                         id_dst,
                         NetworkMessage::Reply(NetReply::RcvNodeMessage(id, msg_node)),
                     )]
                 }
-                crate::network::NetCall::SendWSUpdateListRequest => {
+                crate::network_broker::NetCall::SendWSUpdateListRequest => {
                     vec![NSHubMessage::ToClient(
                         id,
                         NetworkMessage::Reply(NetReply::RcvWSUpdateList(self.nodes.clone())),

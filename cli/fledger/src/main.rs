@@ -5,7 +5,7 @@ use flarch::{
     tasks::wait_ms,
 };
 use flnet::signal::SIGNAL_VERSION;
-use flnet::network_start;
+use flnet::network_broker_start;
 use flnode::{node::Node, version::VERSION_STRING};
 
 /// Fledger node CLI binary
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     log::debug!("Connecting to websocket at {}", args.signal_url);
-    let network = network_start(node_config.clone(), &args.signal_url).await?;
+    let network = network_broker_start(node_config.clone(), &args.signal_url).await?;
     let mut node = Node::start(Box::new(storage), node_config, network).await?;
     let nc = &node.node_config.info;
     log::info!("Starting node {}: {}", nc.get_id(), nc.name);

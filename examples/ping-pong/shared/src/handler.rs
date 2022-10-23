@@ -7,7 +7,7 @@ use flmodules::{
 use flnet::{
     broker::{Broker, BrokerError, Subsystem, SubsystemListener},
     config::NodeInfo,
-    network::{NetCall, NetworkMessage},
+    network_broker::{NetCall, NetworkMessage},
 };
 
 use crate::common::{PPMessage, PPMessageNode};
@@ -69,12 +69,12 @@ impl PingPong {
     fn net_to_pp(msg: NetworkMessage) -> Option<PPMessage> {
         if let NetworkMessage::Reply(rep) = msg {
             match rep {
-                flnet::network::NetReply::RcvNodeMessage(from, node_msg) => {
+                flnet::network_broker::NetReply::RcvNodeMessage(from, node_msg) => {
                     serde_json::from_str::<PPMessageNode>(&node_msg)
                         .ok()
                         .map(|ppm| PPMessage::FromNetwork(from, ppm))
                 }
-                flnet::network::NetReply::RcvWSUpdateList(nodes) => Some(PPMessage::List(nodes)),
+                flnet::network_broker::NetReply::RcvWSUpdateList(nodes) => Some(PPMessage::List(nodes)),
                 _ => None,
             }
         } else {
@@ -147,7 +147,7 @@ mod test {
 
     use flarch::start_logging;
     use flmodules::broker::Destination;
-    use flnet::{config::NodeConfig, network::NetReply, NetworkSetupError};
+    use flnet::{config::NodeConfig, network_broker::NetReply, NetworkSetupError};
 
     use super::*;
 

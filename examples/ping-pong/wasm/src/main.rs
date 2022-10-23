@@ -51,7 +51,7 @@ impl Component for App {
                 let pp_imp = self.pp_imp;
                 wasm_bindgen_futures::spawn_local(async move {
                     let id = config.info.get_id();
-                    let net = flnet::network_start(config, shared::handler::URL)
+                    let net = flnet::network_broker_start(config, shared::handler::URL)
                         .await
                         .expect("Couldn't start network");
 

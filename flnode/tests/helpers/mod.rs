@@ -8,7 +8,7 @@ use flmodules::{
 };
 use flnet::{
     config::{NodeConfig, NodeInfo},
-    network::{NetCall, NetReply, NetworkMessage},
+    network_broker::{NetCall, NetReply, NetworkMessage},
     web_rtc::{node_connection::NCInput, WebRTCConnMessage},
 };
 
@@ -23,14 +23,14 @@ pub enum NetworkError {
     NodeData(#[from] NodeError),
 }
 
-pub struct Network {
+pub struct NetworkSimul {
     pub nodes: HashMap<U256, NodeTimer>,
     pub messages: u64,
     node_brokers: HashMap<U256, Broker<NetworkMessage>>,
     node_taps: HashMap<U256, Receiver<NetworkMessage>>,
 }
 
-impl Network {
+impl NetworkSimul {
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),

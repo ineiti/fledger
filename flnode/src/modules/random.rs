@@ -10,7 +10,7 @@ use flmodules::{
     broker::{self, Broker, BrokerError, SubsystemListener},
     nodeids::U256,
 };
-use flnet::network::{NetCall, NetworkMessage};
+use flnet::network_broker::{NetCall, NetworkMessage};
 
 pub struct RandomBroker {
     pub storage: RandomStorage,
@@ -79,12 +79,12 @@ impl Translate {
         Box::new(move |msg: NetworkMessage| {
             if let NetworkMessage::Reply(msg_net) = msg {
                 match msg_net {
-                    flnet::network::NetReply::RcvNodeMessage(id, msg_str) => {
+                    flnet::network_broker::NetReply::RcvNodeMessage(id, msg_str) => {
                         if let Ok(msg_rnd) = serde_yaml::from_str::<NodeMessage>(&msg_str) {
                             return Some(RandomIn::NodeMessageFromNetwork((id, msg_rnd)).into());
                         }
                     }
-                    flnet::network::NetReply::RcvWSUpdateList(list) => {
+                    flnet::network_broker::NetReply::RcvWSUpdateList(list) => {
                         return Some(
                             RandomIn::NodeList(
                                 list.iter()
@@ -96,10 +96,10 @@ impl Translate {
                             .into(),
                         )
                     }
-                    flnet::network::NetReply::Connected(id) => {
+                    flnet::network_broker::NetReply::Connected(id) => {
                         return Some(RandomIn::NodeConnected(id).into())
                     }
-                    flnet::network::NetReply::Disconnected(id) => {
+                    flnet::network_broker::NetReply::Disconnected(id) => {
                         return Some(RandomIn::NodeDisconnected(id).into())
                     }
                     _ => {}

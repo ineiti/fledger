@@ -7,9 +7,9 @@ use wasm_bindgen::prelude::*;
 use flarch::tasks::wait_ms;
 use flnet::{
     config::{NodeConfig, NodeInfo},
-    network::{NetCall, NetworkError},
-    network::{NetReply, NetworkMessage},
-    network_start, NetworkSetupError,
+    network_broker::{NetCall, NetworkError},
+    network_broker::{NetReply, NetworkMessage},
+    network_broker_start, NetworkSetupError,
 };
 
 const URL: &str = "ws://127.0.0.1:8765";
@@ -30,7 +30,7 @@ async fn run_app() -> Result<(), StartError> {
     log::info!("Starting app");
 
     let nc = NodeConfig::new();
-    let mut net = network_start(nc.clone(), URL).await?;
+    let mut net = network_broker_start(nc.clone(), URL).await?;
     let (rx, tap_indx) = net.get_tap().await?;
     let mut i: i32 = 0;
     loop {

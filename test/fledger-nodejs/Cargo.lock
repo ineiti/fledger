@@ -370,6 +370,8 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "thiserror",
+ "tokio",
+ "tokio-stream",
  "toml",
  "wasm-bindgen",
  "wasm-bindgen-futures",

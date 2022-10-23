@@ -1,0 +1,16 @@
+[package]
+edition = "2021"
+name = "ping"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+flarch = {path = "../../flarch", version = "0.7"}
+flmodules = {path = "../../flmodules", version = "0.7"}
+flnet = {path = "../../flnet", version = "0.7", features = ["libc"]}
+
+clap = {version = "4", features = ["derive"]}
+log = "0.4"
+tokio = "1"
+tokio-stream = "0.1"

@@ -14,7 +14,7 @@ async fn connect_nodes() -> Result<(), NetworkError> {
 }
 
 async fn connect_nodes_n(nbr_nodes: usize) -> Result<(), NetworkError> {
-    let mut net = Network::new();
+    let mut net = NetworkSimul::new();
     log::info!("Creating {nbr_nodes} nodes");
     net.add_nodes(Brokers::ENABLE_RAND, nbr_nodes).await?;
     net.process(5).await;

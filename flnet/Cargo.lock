@@ -856,6 +856,7 @@ dependencies = [
  "sha2 0.10.6",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "tokio-tungstenite",
  "toml",
  "wasm-bindgen",

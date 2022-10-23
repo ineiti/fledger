@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use flmodules::{broker::Broker, nodeids::U256};
 
-use crate::network::NetCall;
+use crate::network_broker::NetCall;
 
 use super::node_connection::Direction;
 

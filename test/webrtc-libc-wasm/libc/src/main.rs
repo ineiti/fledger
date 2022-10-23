@@ -4,8 +4,8 @@ use flarch::start_logging_filter;
 use flmodules::{broker::Broker, nodeids::U256};
 use flnet::{
     config::NodeConfig,
-    network::{NetCall, NetReply, NetworkMessage},
-    network_start,
+    network_broker::{NetCall, NetReply, NetworkMessage},
+    network_broker_start,
     signal::SignalServer,
     web_socket_server::WebSocketServer,
     NetworkSetupError,
@@ -63,7 +63,7 @@ async fn spawn_node() -> Result<(NodeConfig, Broker<NetworkMessage>), MainError>
 
     log::info!("Starting node {}: {}", nc.info.get_id(), nc.info.name);
     log::debug!("Connecting to websocket at {URL}");
-    let net = network_start(nc.clone(), URL)
+    let net = network_broker_start(nc.clone(), URL)
         .await
         .expect("Starting node failed");
 

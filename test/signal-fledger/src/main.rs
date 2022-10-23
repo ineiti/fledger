@@ -3,7 +3,7 @@ use flarch::{
     start_logging_filter_level, wait_ms,
 };
 use flnet::{
-    broker::BrokerError, network_start, signal::SignalServer, web_socket_server::WebSocketServer,
+    broker::BrokerError, network_broker_start, signal::SignalServer, web_socket_server::WebSocketServer,
     websocket::WSSError, NetworkSetupError,
 };
 use flnode::node::{Node, NodeError};
@@ -66,7 +66,7 @@ async fn main() -> Result<(), TestError> {
 async fn create_node() -> Result<Node, TestError> {
     let storage = DataStorageTemp::new();
     let node_config = Node::get_config(storage.clone())?;
-    let network = network_start(node_config.clone(), "ws://localhost:8765").await?;
+    let network = network_broker_start(node_config.clone(), "ws://localhost:8765").await?;
     Node::start(Box::new(storage), node_config, network)
         .await
         .map_err(|e| e.into())

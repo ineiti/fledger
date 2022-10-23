@@ -1,4 +1,4 @@
-use flnet::{network_start};
+use flnet::{network_broker_start};
 use flnode::{node::Node};
 use flarch::{data_storage::{DataStorage, DataStorageNode}, wait_ms};
 use wasm_bindgen::{prelude::*};
@@ -29,7 +29,7 @@ async fn runit()  -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Starting app with version {}", VERSION_STRING);
 
     log::debug!("Connecting to websocket at {URL}");
-    let network = network_start(node_config.clone(), URL).await?;
+    let network = network_broker_start(node_config.clone(), URL).await?;
 
     let mut node = Node::start(Box::new(storage), node_config, network).await?;
     let nc = &node.node_config.info;

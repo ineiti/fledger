@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use flmodules::ping::storage::{PingStat, PingStorage};
-use flnet::network_start;
+use flnet::network_broker_start;
 use flnode::{node::Node, version::VERSION_STRING};
 use regex::Regex;
 use std::{
@@ -14,7 +14,7 @@ use web_sys::{window, Document, Event, HtmlTextAreaElement};
 
 use flarch::{data_storage::DataStorageLocal, spawn_local, wait_ms};
 use flmodules::nodeids::U256;
-use flnet::{config::NodeInfo, network::NetworkConnectionState};
+use flnet::{config::NodeInfo, network_broker::NetworkConnectionState};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -183,7 +183,7 @@ impl FledgerWeb {
         let my_storage = DataStorageLocal::new("fledger");
         if let Ok(mut node) = node_mutex.try_lock() {
             let node_config = Node::get_config(my_storage.clone())?;
-            let network = network_start(node_config.clone(), URL).await?;
+            let network = network_broker_start(node_config.clone(), URL).await?;
             *node = Some(
                 Node::start(my_storage, node_config, network)
                     .await

@@ -6,7 +6,7 @@ use flmodules::{
 use thiserror::Error;
 
 use crate::{
-    network::NetworkMessage,
+    network_broker::NetworkMessage,
     web_rtc::messages::{
         ConnectionStateMap, DataChannelState, PeerMessage, WebRTCInput, WebRTCMessage,
         WebRTCOutput, WebRTCSpawner,

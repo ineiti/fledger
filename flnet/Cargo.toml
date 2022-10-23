@@ -13,7 +13,7 @@ version = "0.7.0"
 
 [features]
 testing = []
-libc = ["native-tls", "rand", "tokio", "tokio-tungstenite", "webrtc"]
+libc = ["native-tls", "rand", "tokio-tungstenite", "webrtc"]
 nosend = []
 wasm = [
   "nosend",
@@ -47,11 +47,12 @@ serde_yaml = "0.8"
 sha2 = "0.10"
 thiserror = "1"
 toml = "0.5"
+tokio = "1"
+tokio-stream = "0.1"
 
 # For libc
 native-tls = {version = "0.2", optional = true}
 rand = {version = "0.8", optional = true}
-tokio = {version = "1", optional = true}
 tokio-tungstenite = {version = "0.17", features = ["native-tls"], optional = true}
 webrtc = {version = "0.5", optional = true}
 
@@ -101,4 +102,3 @@ version = "0.3"
 
 [dev-dependencies]
 env_logger = "0.9"
-tokio = "1"

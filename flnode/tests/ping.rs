@@ -15,7 +15,7 @@ async fn ping() -> Result<(), NetworkError> {
 }
 
 async fn ping_n(nbr_nodes: usize) -> Result<(), NetworkError> {
-    let mut net = Network::new();
+    let mut net = NetworkSimul::new();
     log::info!("Creating {nbr_nodes} nodes");
     let mut timer = Broker::new();
     net.add_nodes(Brokers::ENABLE_RAND | Brokers::ENABLE_PING, nbr_nodes)

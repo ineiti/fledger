@@ -29,7 +29,7 @@ async fn main() -> Result<(), NetworkSetupError> {
 
     let nc = flnet::config::NodeConfig::new();
     let name = nc.info.name.clone();
-    let net = flnet::network_start(nc.clone(), URL).await?;
+    let net = flnet::network_broker_start(nc.clone(), URL).await?;
     let mut list = NodeList::new(vec![]);
 
     let mut pp = match args.code {

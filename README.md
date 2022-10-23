@@ -55,6 +55,7 @@ of the network code:
   implementation of the networking logic
 - [flnode](./flnode) - a generic implementation of a fledger-node, mostly connecting all
   _flmodules_ together and with the network
+- [flarch](./flarch) - architecture dependant implementations for some async tools
 
 ### Binaries
 
@@ -68,7 +69,6 @@ Currently the following components are available that are used to create the fle
 
 These are the actual implementations of the WebRTC and Websocket for wasm and libc:
 - [WebRTC and Websocket implementations](./flnet) - wasm and libc implementations for WebRTC and Websockets
-- [Architecture-dependant](./flarch) - some arch-dependant implementations
 - [Test directory](./test) - several implementations for testing
 - [Example directory](./example) - example for how to use flnet
 
@@ -118,6 +118,8 @@ access the node in the browser.
 # Changelog
 
 ```
+- 0.7.0 - 2022-10-??
+  - Re-arranging crates 
 - 0.6.0 - 2022-05-??
   - Rewrite of networking layer
   - Use real gossiped decentralized message passing

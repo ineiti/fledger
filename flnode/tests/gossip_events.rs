@@ -20,7 +20,7 @@ async fn gossip_30() -> Result<(), NetworkError> {
 async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
     start_logging_filter_level(vec![], log::LevelFilter::Debug);
 
-    let mut net = Network::new();
+    let mut net = NetworkSimul::new();
     log::info!("Creating {nbr_nodes} nodes");
     net.add_nodes(Brokers::ENABLE_ALL, nbr_nodes).await?;
     let id = &net.nodes.keys().next().unwrap().clone();
@@ -71,7 +71,7 @@ async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
     Ok(())
 }
 
-async fn add_chat_message(net: &mut Network, id: &U256, step: i32) {
+async fn add_chat_message(net: &mut NetworkSimul, id: &U256, step: i32) {
     let msg = events::Event {
         category: events::Category::TextMessage,
         src: U256::rnd(),
