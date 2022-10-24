@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use flmodules::broker::{Broker, Subsystem, SubsystemListener};
+use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
 use futures::lock::Mutex;
 use webrtc::{
     api::{
@@ -14,6 +14,7 @@ use webrtc::{
     ice_transport::{
         ice_candidate::{RTCIceCandidate, RTCIceCandidateInit},
         ice_connection_state::RTCIceConnectionState,
+        ice_credential_type::RTCIceCredentialType,
         ice_server::RTCIceServer,
     },
     interceptor::registry::Registry,
@@ -25,13 +26,30 @@ use webrtc::{
     },
 };
 
-use crate::web_rtc::{
-    messages::{
-        ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError, SignalingState,
-        WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner,
+use crate::{
+    config::{ConnectionConfig, HostLogin},
+    web_rtc::{
+        messages::{
+            ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError,
+            SignalingState, WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner,
+        },
+        node_connection::Direction,
     },
-    node_connection::Direction,
 };
+
+fn get_ice_server(host: HostLogin) -> RTCIceServer {
+    let mut server = RTCIceServer {
+        urls: vec![host.url],
+        ..Default::default()
+    };
+    if let Some(login) = host.login {
+        server.username = login.user;
+        server.credential = login.pass;
+        server.credential_type = RTCIceCredentialType::Password;
+    }
+
+    server
+}
 
 pub struct WebRTCConnectionSetupLibc {
     connection: RTCPeerConnection,
@@ -41,17 +59,21 @@ pub struct WebRTCConnectionSetupLibc {
     queue: Vec<String>,
     direction: Option<Direction>,
     resets: Arc<AtomicU32>,
+    connection_cfg: ConnectionConfig,
 }
 
 impl WebRTCConnectionSetupLibc {
-    pub async fn new_box() -> Result<Broker<WebRTCMessage>, SetupError> {
+    pub async fn new_box(
+        connection_cfg: ConnectionConfig,
+    ) -> Result<Broker<WebRTCMessage>, SetupError> {
         let mut web_rtc = Box::new(WebRTCConnectionSetupLibc {
-            connection: Self::make_connection().await?,
+            connection: Self::make_connection(connection_cfg.clone()).await?,
             rtc_data: Arc::new(Mutex::new(None)),
             broker: Broker::new(),
             queue: vec![],
             direction: None,
             resets: Arc::new(AtomicU32::new(0)),
+            connection_cfg,
         });
 
         web_rtc.setup_connection().await?;
@@ -62,7 +84,9 @@ impl WebRTCConnectionSetupLibc {
         Ok(broker)
     }
 
-    async fn make_connection() -> Result<RTCPeerConnection, SetupError> {
+    async fn make_connection(
+        connection_cfg: ConnectionConfig,
+    ) -> Result<RTCPeerConnection, SetupError> {
         // Create a MediaEngine object to configure the supported codec
         let mut m = MediaEngine::default();
 
@@ -85,11 +109,12 @@ impl WebRTCConnectionSetupLibc {
             .build();
 
         // Prepare the configuration
+        let mut ice_servers = vec![get_ice_server(connection_cfg.stun())];
+        if let Some(turn) = connection_cfg.turn() {
+            ice_servers.push(get_ice_server(turn));
+        }
         let config = RTCConfiguration {
-            ice_servers: vec![RTCIceServer {
-                urls: vec!["stun:stun.l.google.com:19302".to_owned()],
-                ..Default::default()
-            }],
+            ice_servers,
             ..Default::default()
         };
 
@@ -419,7 +444,7 @@ impl WebRTCConnectionSetupLibc {
             *rd = None;
         }
 
-        self.connection = Self::make_connection().await?;
+        self.connection = Self::make_connection(self.connection_cfg.clone()).await?;
         self.setup_connection().await?;
         self.direction = None;
         Ok(())
@@ -427,7 +452,7 @@ impl WebRTCConnectionSetupLibc {
 }
 
 #[async_trait]
-impl SubsystemListener<WebRTCMessage> for WebRTCConnectionSetupLibc {
+impl SubsystemHandler<WebRTCMessage> for WebRTCConnectionSetupLibc {
     async fn messages(&mut self, msgs: Vec<WebRTCMessage>) -> Vec<WebRTCMessage> {
         let mut out = vec![];
         for msg in msgs {
@@ -449,6 +474,6 @@ fn to_error(e: webrtc::error::Error) -> SetupError {
     SetupError::SetupFail(e.to_string())
 }
 
-pub fn web_rtc_spawner() -> WebRTCSpawner {
-    Box::new(|| Box::new(Box::pin(WebRTCConnectionSetupLibc::new_box())))
+pub fn web_rtc_spawner(config: ConnectionConfig) -> WebRTCSpawner {
+    Box::new(move || Box::new(Box::pin(WebRTCConnectionSetupLibc::new_box(config.clone()))))
 }

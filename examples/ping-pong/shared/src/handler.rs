@@ -5,9 +5,9 @@ use flmodules::{
     timer::{TimerBroker, TimerMessage},
 };
 use flnet::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     config::NodeInfo,
-    network_broker::{NetCall, NetworkMessage},
+    network::{NetCall, NetworkMessage},
 };
 
 use crate::common::{PPMessage, PPMessageNode};
@@ -69,12 +69,12 @@ impl PingPong {
     fn net_to_pp(msg: NetworkMessage) -> Option<PPMessage> {
         if let NetworkMessage::Reply(rep) = msg {
             match rep {
-                flnet::network_broker::NetReply::RcvNodeMessage(from, node_msg) => {
+                flnet::network::NetReply::RcvNodeMessage(from, node_msg) => {
                     serde_json::from_str::<PPMessageNode>(&node_msg)
                         .ok()
                         .map(|ppm| PPMessage::FromNetwork(from, ppm))
                 }
-                flnet::network_broker::NetReply::RcvWSUpdateList(nodes) => Some(PPMessage::List(nodes)),
+                flnet::network::NetReply::RcvWSUpdateList(nodes) => Some(PPMessage::List(nodes)),
                 _ => None,
             }
         } else {
@@ -107,7 +107,7 @@ impl PingPong {
 // the signalling server.
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
-impl SubsystemListener<PPMessage> for PingPong {
+impl SubsystemHandler<PPMessage> for PingPong {
     async fn messages(&mut self, msgs: Vec<PPMessage>) -> Vec<PPMessage> {
         for msg in msgs {
             log::trace!("{}: got message {:?}", self.id, msg);
@@ -147,7 +147,7 @@ mod test {
 
     use flarch::start_logging;
     use flmodules::broker::Destination;
-    use flnet::{config::NodeConfig, network_broker::NetReply, NetworkSetupError};
+    use flnet::{config::NodeConfig, network::NetReply, NetworkSetupError};
 
     use super::*;
 

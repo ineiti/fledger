@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},
     random_connections::module::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
     timer::TimerMessage,
@@ -169,7 +169,7 @@ impl Translate {
 
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
-impl SubsystemListener<GossipMessage> for Translate {
+impl SubsystemHandler<GossipMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<GossipMessage>) -> Vec<GossipMessage> {
         let mut out = vec![];
         for msg in msgs {

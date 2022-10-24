@@ -1,3 +1,36 @@
+//! # Broker is an actor implementation for wasm and libc
+//!
+//! Using the `Broker` structure, it is possible to link several modules
+//! which exchange messages and rely themselves on asynchronous messages.
+//! Handling asynchronous messages between different modules is not easy,
+//! as you need to know which modules need to be notified in case a new
+//! message comes in.
+//! If you want to have modularity, and the possibility to add and remove
+//! modules, an actor base system comes in handy.
+//!
+//! # Subsystems
+//!
+//! Every broker has a certain number of subsystems.
+//! A handler is a step in the passage of a message through the broker.
+//! The following subsystems exist:
+//!
+//!
+//!
+//! # Example
+//!
+//! In the simplest example, a `Broker` can be used as a channel:
+//!
+//! ```rust
+//! // TODO: add simple example
+//! ```
+//!
+//! But to use it's full potential, a `Broker` has to 'consume' a structure
+//! by adding it as a `Handler`:
+//!
+//! ```rust
+//! // TODO: add handler example
+//! ```
+
 use core::fmt;
 use std::{
     collections::HashMap,
@@ -16,21 +49,28 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use flarch::spawn_local;
 
 #[derive(Debug, Error)]
+/// The only error that can happen is that sending to another broker fails.
+/// This is mostly due to the fact that the other broker doesn't exist anymore.
 pub enum BrokerError {
     #[error("While sending to {0}")]
+    /// Couldn't send to this queue.
     SendQueue(String),
-    #[error("Internal structure is locked")]
-    Locked,
 }
 
+/// Identifies a broker for loop detection.
 pub type BrokerID = U256;
 
-/// The Destination of the message
+/// The Destination of the message, and also handles forwarded messages
+/// to make sure no loop is created.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Destination {
+    /// To all handlers in this broker
     All,
+    /// Only to handlers which represent no tap - useful for tests
     NoTap,
+    /// A forwarded message, with the IDs of the brokers which already handled that message
     Forwarded(Vec<BrokerID>),
+    /// Tags a message as coming from this handler, to avoid putting it back into the same handler
     Handled(usize),
 }
 
@@ -58,7 +98,7 @@ mod asy {
     pub trait Async: Sync + Send {}
     impl<T: Sync + Send> Async for T {}
 }
-pub use asy::*;
+use asy::*;
 
 use crate::nodeids::U256;
 
@@ -94,6 +134,7 @@ impl<T: Async + Clone + fmt::Debug> Clone for Broker<T> {
 }
 
 impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
+    /// Creates a new broker of type <T> and initializes it without any subsystems.
     pub fn new() -> Self {
         let id = BrokerID::rnd();
         let intern_tx = Intern::new(id);
@@ -127,20 +168,22 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
         self.settle(vec![]).await
     }
 
-    /// Returns an async tap that can be used to listen to messages.
+    /// Adds an async tap to the subsystems that can be used to listen to messages.
+    /// The async tap is returned.
     pub async fn get_tap(&mut self) -> Result<(UnboundedReceiver<T>, usize), BrokerError> {
         let (tx, rx) = unbounded_channel();
-        let pos = self.add_subsystem(Subsystem::TapAsync(tx)).await?;
+        let pos = self.add_subsystem(Subsystem::Tap(tx)).await?;
         Ok((rx, pos))
     }
 
-    /// Returns a synchronous tap that can be used to listen to messages.
+    /// Adds a synchronous tap that can be used to listen to messages.
     /// Care must be taken that the async handling will still continue while
     /// waiting for a message!
     /// For this reason it is better to use the `get_tap` method.
+    /// Returns the synchronous tap.
     pub async fn get_tap_sync(&mut self) -> Result<(Receiver<T>, usize), BrokerError> {
         let (tx, rx) = channel();
-        let pos = self.add_subsystem(Subsystem::Tap(tx)).await?;
+        let pos = self.add_subsystem(Subsystem::TapSync(tx)).await?;
         Ok((rx, pos))
     }
 
@@ -221,8 +264,12 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
 }
 
 #[cfg(not(feature = "nosend"))]
+/// Defines a method that translates from message type <R> to message
+/// type <T>.
 pub type Translate<R, T> = Box<dyn Fn(R) -> Option<T> + Send + 'static>;
 #[cfg(feature = "nosend")]
+/// Defines a method that translates from message type <R> to message
+/// type <T>.
 pub type Translate<R, T> = Box<dyn Fn(R) -> Option<T> + 'static>;
 
 struct Translator<R: Clone, S: Async + Clone + fmt::Debug> {
@@ -344,10 +391,7 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
         };
         let msg = match msg_queue {
             InternMessage::Subsystem(ss) => {
-                log::trace!(
-                    "{self:p}/{} subsystem action {ss:?}",
-                    self.type_id()
-                );
+                log::trace!("{self:p}/{} subsystem action {ss:?}", self.type_id());
                 self.subsystem_action(ss);
                 return true;
             }
@@ -376,7 +420,7 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
         true
     }
 
-    /// Adds a SubsystemInit 
+    /// Adds a SubsystemInit
     fn subsystem_action(&mut self, ssa: SubsystemAction<T>) {
         match ssa {
             SubsystemAction::Add(pos, s) => {
@@ -418,7 +462,10 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
                 trail.extend(t);
             }
             if trail.contains(&self.id) {
-                log::trace!("{}: Endless forward-loop detected, aborting", self.type_id());
+                log::trace!(
+                    "{}: Endless forward-loop detected, aborting",
+                    self.type_id()
+                );
                 i += 1;
                 continue;
             }
@@ -515,19 +562,23 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
 }
 
 #[cfg(feature = "nosend")]
+/// Subsystems available in a broker.
+/// Every subsystem can be added zero, one, or more times.
 pub enum Subsystem<T> {
-    Tap(Sender<T>),
-    TapAsync(UnboundedSender<T>),
-    Handler(Box<dyn SubsystemListener<T>>),
+    Tap(UnboundedSender<T>),
+    TapSync(Sender<T>),
+    Handler(Box<dyn SubsystemHandler<T>>),
     Translator(Box<dyn SubsystemTranslator<T>>),
     Callback(SubsystemCallback<T>),
     TranslatorCallback(SubsystemTranslatorCallback<T>),
 }
 #[cfg(not(feature = "nosend"))]
+/// Subsystems available in a broker.
+/// Every subsystem can be added zero, one, or more times.
 pub enum Subsystem<T> {
-    Tap(Sender<T>),
-    TapAsync(UnboundedSender<T>),
-    Handler(Box<dyn SubsystemListener<T> + Send>),
+    Tap(UnboundedSender<T>),
+    TapSync(Sender<T>),
+    Handler(Box<dyn SubsystemHandler<T> + Send>),
     Translator(Box<dyn SubsystemTranslator<T> + Send>),
     Callback(SubsystemCallback<T>),
     TranslatorCallback(SubsystemTranslatorCallback<T>),
@@ -540,15 +591,17 @@ impl<T: Async + Clone + fmt::Debug> Subsystem<T> {
         msgs: Vec<T>,
     ) -> Result<Vec<(Destination, T)>, BrokerError> {
         Ok(match self {
-            Self::Tap(s) => {
+            Self::TapSync(s) => {
                 for msg in msgs {
-                    s.send(msg.clone()).map_err(|_| BrokerError::SendQueue("send_tap".into()))?;
+                    s.send(msg.clone())
+                        .map_err(|_| BrokerError::SendQueue("send_tap".into()))?;
                 }
                 vec![]
             }
-            Self::TapAsync(s) => {
+            Self::Tap(s) => {
                 for msg in msgs {
-                    s.send(msg.clone()).map_err(|_| BrokerError::SendQueue("send_tap_async".into()))?;
+                    s.send(msg.clone())
+                        .map_err(|_| BrokerError::SendQueue("send_tap_async".into()))?;
                 }
                 vec![]
             }
@@ -564,7 +617,7 @@ impl<T: Async + Clone + fmt::Debug> Subsystem<T> {
     }
 
     fn is_tap(&self) -> bool {
-        matches!(self, Self::Tap(_)) || matches!(self, Self::TapAsync(_))
+        matches!(self, Self::TapSync(_)) || matches!(self, Self::Tap(_))
     }
 
     fn is_translator(&self) -> bool {
@@ -587,8 +640,8 @@ impl<T: Async + Clone + fmt::Debug> Subsystem<T> {
 impl<T> fmt::Debug for Subsystem<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Tap(_) => write!(f, "Tap"),
-            Self::TapAsync(_) => write!(f, "TapAsync"),
+            Self::TapSync(_) => write!(f, "Tap"),
+            Self::Tap(_) => write!(f, "TapAsync"),
             Self::Handler(_) => write!(f, "Handler"),
             Self::Translator(_) => write!(f, "Translator"),
             Self::TranslatorCallback(_) => write!(f, "TranslatorCallback"),
@@ -599,7 +652,7 @@ impl<T> fmt::Debug for Subsystem<T> {
 
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
-pub trait SubsystemListener<T: Async> {
+pub trait SubsystemHandler<T: Async> {
     async fn messages(&mut self, from_broker: Vec<T>) -> Vec<T>;
 }
 
@@ -639,7 +692,7 @@ mod tests {
 
     #[cfg_attr(feature = "nosend", async_trait(?Send))]
     #[cfg_attr(not(feature = "nosend"), async_trait)]
-    impl SubsystemListener<BrokerTest> for Tps {
+    impl SubsystemHandler<BrokerTest> for Tps {
         async fn messages(&mut self, msgs: Vec<BrokerTest>) -> Vec<BrokerTest> {
             let mut output = vec![];
             log::debug!("Msgs are: {:?} - Replies are: {:?}", msgs, self.reply);
@@ -671,7 +724,7 @@ mod tests {
             })))
             .await?;
         let (tap_tx, tap) = channel::<BrokerTest>();
-        broker.add_subsystem(Subsystem::Tap(tap_tx)).await?;
+        broker.add_subsystem(Subsystem::TapSync(tap_tx)).await?;
 
         // Shouldn't reply to a msg_b, so only 1 message.
         broker.settle_msg(bm_b.clone()).await?;
@@ -737,10 +790,10 @@ mod tests {
 
         let mut broker_a: Broker<MessageA> = Broker::new();
         let (tap_a_tx, tap_a_rx) = channel::<MessageA>();
-        broker_a.add_subsystem(Subsystem::Tap(tap_a_tx)).await?;
+        broker_a.add_subsystem(Subsystem::TapSync(tap_a_tx)).await?;
         let mut broker_b: Broker<MessageB> = Broker::new();
         let (tap_b_tx, tap_b_rx) = channel::<MessageB>();
-        broker_b.add_subsystem(Subsystem::Tap(tap_b_tx)).await?;
+        broker_b.add_subsystem(Subsystem::TapSync(tap_b_tx)).await?;
 
         broker_b
             .link_bi(

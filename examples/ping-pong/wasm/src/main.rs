@@ -8,7 +8,7 @@ use ybc::TileCtx::{Ancestor, Child, Parent};
 use yew::prelude::*;
 
 use flarch::now;
-use flnet::{broker::Broker, config::NodeConfig};
+use flnet::{broker::Broker, config::{NodeConfig, ConnectionConfig}};
 
 use shared::{
     common::{NodeList, PPMessage},
@@ -51,9 +51,12 @@ impl Component for App {
                 let pp_imp = self.pp_imp;
                 wasm_bindgen_futures::spawn_local(async move {
                     let id = config.info.get_id();
-                    let net = flnet::network_broker_start(config, shared::handler::URL)
-                        .await
-                        .expect("Couldn't start network");
+                    let net = flnet::network_broker_start(
+                        config,
+                        ConnectionConfig::from_signal(shared::handler::URL),
+                    )
+                    .await
+                    .expect("Couldn't start network");
 
                     let pp = match pp_imp {
                         true => PingPong::new(id, net)
@@ -117,7 +120,7 @@ impl Component for App {
 
     fn view(&self) -> Html {
         let logs = self.logs.join("\n");
-        let pp_imp = match self.pp_imp{
+        let pp_imp = match self.pp_imp {
             true => "Handler",
             false => "Event Loop",
         };

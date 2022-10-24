@@ -9,7 +9,7 @@ use flmodules::{
 };
 use flnet::{
     config::NodeInfo,
-    network_broker::{NetCall, NetworkMessage, NetReply},
+    network::{NetCall, NetworkMessage, NetReply},
 };
 
 use crate::common::{PPMessage, PPMessageNode};

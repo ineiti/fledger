@@ -6,7 +6,7 @@ use std::{
 use async_trait::async_trait;
 use bimap::BiMap;
 use flmodules::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemListener},
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::U256,
     timer::{TimerBroker, TimerMessage},
 };
@@ -240,7 +240,7 @@ impl SignalServer {
 
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
-impl SubsystemListener<SignalMessage> for SignalServer {
+impl SubsystemHandler<SignalMessage> for SignalServer {
     async fn messages(&mut self, from_broker: Vec<SignalMessage>) -> Vec<SignalMessage> {
         let mut out = vec![];
         for msg in from_broker {

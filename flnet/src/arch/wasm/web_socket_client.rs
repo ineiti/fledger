@@ -4,8 +4,9 @@ use std::sync::Arc;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{ErrorEvent, MessageEvent, WebSocket};
 
+use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
+
 use crate::websocket::{WSClientError, WSClientInput, WSClientMessage, WSClientOutput};
-use flmodules::broker::{Broker, Subsystem, SubsystemListener};
 
 pub struct WebSocketClient {
     ws: Arc<Mutex<WebSocket>>,
@@ -77,7 +78,7 @@ impl WebSocketClient {
 }
 
 #[async_trait(?Send)]
-impl SubsystemListener<WSClientMessage> for WebSocketClient {
+impl SubsystemHandler<WSClientMessage> for WebSocketClient {
     async fn messages(&mut self, msgs: Vec<WSClientMessage>) -> Vec<WSClientMessage> {
         if let Some(ws) = self.ws.try_lock() {
             for msg in msgs {

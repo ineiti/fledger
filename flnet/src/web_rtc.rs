@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 
 use flmodules::{
-    broker::{Broker, BrokerError, SubsystemListener, Translate},
+    broker::{Broker, BrokerError, SubsystemHandler, Translate},
     nodeids::{NodeID, U256},
 };
 
@@ -64,7 +64,7 @@ impl WebRTCConn {
 
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
-impl SubsystemListener<WebRTCConnMessage> for WebRTCConn {
+impl SubsystemHandler<WebRTCConnMessage> for WebRTCConn {
     async fn messages(&mut self, msgs: Vec<WebRTCConnMessage>) -> Vec<WebRTCConnMessage> {
         for msg in msgs {
             match msg {

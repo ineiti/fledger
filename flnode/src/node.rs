@@ -20,7 +20,7 @@ use flmodules::{
 };
 use flnet::{
     config::{ConfigError, NodeConfig, NodeInfo},
-    network_broker::{NetCall, NetworkError, NetworkMessage},
+    network::{NetCall, NetworkError, NetworkMessage},
 };
 
 use crate::modules::{random::RandomBroker, stat::StatBroker};

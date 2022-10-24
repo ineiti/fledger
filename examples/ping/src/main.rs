@@ -5,7 +5,7 @@ use tokio_stream::StreamExt;
 
 use flarch::{start_logging_filter, wait_ms, Interval};
 use flmodules::nodeids::U256;
-use flnet::{broker::BrokerError, network_broker::NetReply};
+use flnet::{broker::BrokerError, config::ConnectionConfig, network::NetReply};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -41,9 +41,12 @@ async fn ping() -> Result<(), BrokerError> {
     let nc = flnet::config::NodeConfig::new();
     log::info!("Our node-ID is {:?}", nc.info.get_id());
     // Connect to the signalling server and wait for connection requests.
-    let mut net = flnet::network_start(nc.clone(), "ws://localhost:8765")
-        .await
-        .expect("Setting up network");
+    let mut net = flnet::network_start(
+        nc.clone(),
+        ConnectionConfig::from_signal("ws://localhost:8765"),
+    )
+    .await
+    .expect("Setting up network");
     // Create a timer that fires every second
     let mut interval_sec = Interval::new_interval(Duration::from_secs(5));
 
@@ -73,9 +76,12 @@ async fn server() -> Result<(), BrokerError> {
     // Create a random node-configuration. It uses serde for easy serialization.
     let nc = flnet::config::NodeConfig::new();
     // Connect to the signalling server and wait for connection requests.
-    let mut net = flnet::network_start(nc.clone(), "ws://localhost:8765")
-        .await
-        .expect("Starting network");
+    let mut net = flnet::network_start(
+        nc.clone(),
+        ConnectionConfig::from_signal("ws://localhost:8765"),
+    )
+    .await
+    .expect("Starting network");
 
     // Print our ID so it can be copied to the server
     log::info!("Our ID is: {:?}", nc.info.get_id());
@@ -89,9 +95,12 @@ async fn client(server_id: &str) -> Result<(), BrokerError> {
     // Create a random node-configuration. It uses serde for easy serialization.
     let nc = flnet::config::NodeConfig::new();
     // Connect to the signalling server and wait for connection requests.
-    let mut net = flnet::network_start(nc.clone(), "ws://localhost:8765")
-        .await
-        .expect("Starting network");
+    let mut net = flnet::network_start(
+        nc.clone(),
+        ConnectionConfig::from_signal("ws://localhost:8765"),
+    )
+    .await
+    .expect("Starting network");
 
     // Need to get the client-id from the message in client()
     let server_id = U256::from_str(server_id).expect("get client id");

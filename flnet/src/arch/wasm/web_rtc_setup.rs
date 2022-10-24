@@ -13,15 +13,18 @@ use web_sys::{
     RtcSessionDescriptionInit, RtcSignalingState,
 };
 
-use crate::web_rtc::{
-    messages::{
-        ConnType, ConnectionStateMap, DataChannelState, IceConnectionState, IceGatheringState,
-        PeerMessage, SetupError, SignalingState, WebRTCInput, WebRTCMessage, WebRTCOutput,
-        WebRTCSpawner,
+use crate::{
+    config::{ConnectionConfig, HostLogin},
+    web_rtc::{
+        messages::{
+            ConnType, ConnectionStateMap, DataChannelState, IceConnectionState, IceGatheringState,
+            PeerMessage, SetupError, SignalingState, WebRTCInput, WebRTCMessage, WebRTCOutput,
+            WebRTCSpawner,
+        },
+        node_connection::Direction,
     },
-    node_connection::Direction,
 };
-use flmodules::broker::{Broker, Subsystem, SubsystemListener};
+use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
 
 pub struct WebRTCConnectionSetup {
     pub rp_conn: RtcPeerConnection,
@@ -30,44 +33,53 @@ pub struct WebRTCConnectionSetup {
     // While the connection is not up, queue up messages in here.
     queue: Vec<String>,
     direction: Option<Direction>,
+    config: ConnectionConfig,
 }
 
 #[derive(Serialize, Deserialize)]
-struct IceServer<'a> {
-    urls: &'a str,
-    username: Option<&'a str>,
-    credential: Option<&'a str>,
+struct IceServer {
+    urls: String,
+    username: Option<String>,
+    credential: Option<String>,
+}
+
+fn get_ice_server(host: HostLogin) -> IceServer {
+    let username = host.login.clone().map(|l| l.user);
+    let credential = host.login.clone().map(|l| l.pass);
+    IceServer {
+        urls: host.url,
+        username,
+        credential,
+    }
 }
 
 impl WebRTCConnectionSetup {
-    pub async fn new(broker: Broker<WebRTCMessage>) -> Result<WebRTCConnectionSetup, SetupError> {
+    pub async fn new(
+        broker: Broker<WebRTCMessage>,
+        config: ConnectionConfig,
+    ) -> Result<WebRTCConnectionSetup, SetupError> {
         Ok(WebRTCConnectionSetup {
-            rp_conn: Self::create_rp_conn()?,
+            rp_conn: Self::create_rp_conn(config.clone())?,
             rtc_data: Arc::new(Mutex::new(None)),
             broker,
             queue: vec![],
             direction: None,
+            config,
         })
     }
 
-    pub fn create_rp_conn() -> Result<RtcPeerConnection, SetupError> {
+    pub fn create_rp_conn(
+        connection_cfg: ConnectionConfig,
+    ) -> Result<RtcPeerConnection, SetupError> {
         // If no stun server is configured, only local IPs will be sent in the browser.
         // At least the node webrtc does the correct thing...
         let mut config = RtcConfiguration::new();
-        let servers_obj = vec![
-            IceServer {
-                urls: "stun:stun.l.google.com:19302",
-                username: None,
-                credential: None,
-            },
-            IceServer {
-                urls: "turn:web.fledg.re:3478",
-                username: Some("something"),
-                credential: Some("something"),
-            },
-        ];
-        let servers =
-            serde_wasm_bindgen::to_value(&servers_obj).map_err(|e| SetupError::SetupFail(e.to_string()))?;
+        let mut servers_obj = vec![get_ice_server(connection_cfg.stun())];
+        if let Some(turn) = connection_cfg.turn() {
+            servers_obj.push(get_ice_server(turn));
+        }
+        let servers = serde_wasm_bindgen::to_value(&servers_obj)
+            .map_err(|e| SetupError::SetupFail(e.to_string()))?;
         config.ice_servers(&servers);
         RtcPeerConnection::new_with_configuration(&config)
             .map_err(|e| SetupError::SetupFail(format!("PeerConnection error: {:?}", e)))
@@ -92,7 +104,7 @@ impl WebRTCConnectionSetup {
         empty_callback.forget();
 
         self.rp_conn.close();
-        self.rp_conn = Self::create_rp_conn()?;
+        self.rp_conn = Self::create_rp_conn(self.config.clone())?;
         WebRTCConnectionSetup::ice_start(&self.rp_conn, self.broker.clone());
         self.direction = None;
         if let Some(mut rd) = self.rtc_data.try_lock() {
@@ -425,10 +437,10 @@ pub struct WebRTCConnection {
 }
 
 impl WebRTCConnection {
-    pub async fn new_box() -> Result<Broker<WebRTCMessage>, SetupError> {
+    pub async fn new_box(config: ConnectionConfig) -> Result<Broker<WebRTCMessage>, SetupError> {
         let broker = Broker::new();
         let rn = WebRTCConnection {
-            setup: WebRTCConnectionSetup::new(broker.clone()).await?,
+            setup: WebRTCConnectionSetup::new(broker.clone(), config).await?,
         };
         let rp_conn = rn.setup.rp_conn.clone();
 
@@ -478,7 +490,7 @@ impl WebRTCConnection {
 }
 
 #[async_trait(?Send)]
-impl SubsystemListener<WebRTCMessage> for WebRTCConnection {
+impl SubsystemHandler<WebRTCMessage> for WebRTCConnection {
     async fn messages(&mut self, msgs: Vec<WebRTCMessage>) -> Vec<WebRTCMessage> {
         let mut out = vec![];
         for msg in msgs {
@@ -496,6 +508,6 @@ impl SubsystemListener<WebRTCMessage> for WebRTCConnection {
     }
 }
 
-pub fn web_rtc_spawner() -> WebRTCSpawner {
-    Box::new(|| Box::new(Box::pin(WebRTCConnection::new_box())))
+pub fn web_rtc_spawner(config: ConnectionConfig) -> WebRTCSpawner {
+    Box::new(move || Box::new(Box::pin(WebRTCConnection::new_box(config.clone()))))
 }

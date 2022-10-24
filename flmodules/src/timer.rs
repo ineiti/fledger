@@ -4,7 +4,7 @@ use tokio_stream::StreamExt;
 
 use flarch::{spawn_local, Interval};
 
-use crate::broker::{Broker, BrokerError, Subsystem, SubsystemListener};
+use crate::broker::{Broker, BrokerError, Subsystem, SubsystemHandler};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TimerMessage {
@@ -41,7 +41,7 @@ impl TimerBroker {
 
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
-impl SubsystemListener<TimerMessage> for TimerBroker {
+impl SubsystemHandler<TimerMessage> for TimerBroker {
     async fn messages(&mut self, _: Vec<TimerMessage>) -> Vec<TimerMessage> {
         if self.seconds == 0 {
             self.seconds = 59;

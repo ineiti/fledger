@@ -14,7 +14,7 @@ use tokio::{
 use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
 
 use crate::websocket::{WSError, WSSError, WSServerInput, WSServerMessage, WSServerOutput};
-use flmodules::broker::{Broker, Subsystem, SubsystemListener};
+use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
 
 pub struct WebSocketServer {
     connections: Arc<Mutex<Vec<WSConnection>>>,
@@ -62,7 +62,7 @@ impl WebSocketServer {
 }
 
 #[async_trait]
-impl SubsystemListener<WSServerMessage> for WebSocketServer {
+impl SubsystemHandler<WSServerMessage> for WebSocketServer {
     async fn messages(&mut self, from_broker: Vec<WSServerMessage>) -> Vec<WSServerMessage> {
         for msg in from_broker {
             if let WSServerMessage::Input(msg_in) = msg {

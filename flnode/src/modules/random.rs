@@ -7,10 +7,10 @@ use flmodules::{
         storage::RandomStorage,
     },
     timer::TimerMessage,
-    broker::{self, Broker, BrokerError, SubsystemListener},
+    broker::{self, Broker, BrokerError, SubsystemHandler},
     nodeids::U256,
 };
-use flnet::network_broker::{NetCall, NetworkMessage};
+use flnet::network::{NetCall, NetworkMessage};
 
 pub struct RandomBroker {
     pub storage: RandomStorage,
@@ -79,12 +79,12 @@ impl Translate {
         Box::new(move |msg: NetworkMessage| {
             if let NetworkMessage::Reply(msg_net) = msg {
                 match msg_net {
-                    flnet::network_broker::NetReply::RcvNodeMessage(id, msg_str) => {
+                    flnet::network::NetReply::RcvNodeMessage(id, msg_str) => {
                         if let Ok(msg_rnd) = serde_yaml::from_str::<NodeMessage>(&msg_str) {
                             return Some(RandomIn::NodeMessageFromNetwork((id, msg_rnd)).into());
                         }
                     }
-                    flnet::network_broker::NetReply::RcvWSUpdateList(list) => {
+                    flnet::network::NetReply::RcvWSUpdateList(list) => {
                         return Some(
                             RandomIn::NodeList(
                                 list.iter()
@@ -96,10 +96,10 @@ impl Translate {
                             .into(),
                         )
                     }
-                    flnet::network_broker::NetReply::Connected(id) => {
+                    flnet::network::NetReply::Connected(id) => {
                         return Some(RandomIn::NodeConnected(id).into())
                     }
-                    flnet::network_broker::NetReply::Disconnected(id) => {
+                    flnet::network::NetReply::Disconnected(id) => {
                         return Some(RandomIn::NodeDisconnected(id).into())
                     }
                     _ => {}
@@ -136,7 +136,7 @@ impl Translate {
 
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
-impl SubsystemListener<RandomMessage> for Translate {
+impl SubsystemHandler<RandomMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<RandomMessage>) -> Vec<RandomMessage> {
         let mut out = vec![];
         for msg in msgs {

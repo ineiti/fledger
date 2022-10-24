@@ -1,16 +1,16 @@
 use std::sync::mpsc::RecvError;
 
-use flmodules::broker::Destination;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
 use flarch::tasks::wait_ms;
 use flnet::{
-    config::{NodeConfig, NodeInfo},
-    network_broker::{NetCall, NetworkError},
-    network_broker::{NetReply, NetworkMessage},
+    config::{NodeConfig, NodeInfo, ConnectionConfig},
+    network::{NetCall, NetworkError},
+    network::{NetReply, NetworkMessage},
     network_broker_start, NetworkSetupError,
 };
+use flmodules::broker::Destination;
 
 const URL: &str = "ws://127.0.0.1:8765";
 
@@ -30,7 +30,7 @@ async fn run_app() -> Result<(), StartError> {
     log::info!("Starting app");
 
     let nc = NodeConfig::new();
-    let mut net = network_broker_start(nc.clone(), URL).await?;
+    let mut net = network_broker_start(nc.clone(), ConnectionConfig::from_signal(URL)).await?;
     let (rx, tap_indx) = net.get_tap_sync().await?;
     let mut i: i32 = 0;
     loop {

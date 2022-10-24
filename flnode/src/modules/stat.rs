@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::mpsc::Receiver};
 
-use flnet::network_broker::{NetReply, NetworkConnectionState, NetworkMessage};
+use flnet::network::{NetReply, NetworkConnectionState, NetworkMessage};
 use flmodules::{
     broker::{Broker, BrokerError},
     nodeids::U256,

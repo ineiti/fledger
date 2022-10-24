@@ -1,7 +1,10 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use flmodules::ping::storage::{PingStat, PingStorage};
-use flnet::network_broker_start;
+use flnet::{
+    config::{ConnectionConfig, HostLogin, Login},
+    network_broker_start,
+};
 use flnode::{node::Node, version::VERSION_STRING};
 use regex::Regex;
 use std::{
@@ -14,7 +17,7 @@ use web_sys::{window, Document, Event, HtmlTextAreaElement};
 
 use flarch::{data_storage::DataStorageLocal, spawn_local, wait_ms};
 use flmodules::nodeids::U256;
-use flnet::{config::NodeInfo, network_broker::NetworkConnectionState};
+use flnet::{config::NodeInfo, network::NetworkConnectionState};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -48,7 +51,7 @@ fn main() {
         loop {
             if let Ok(_) = rx.try_recv() {
                 let msg = your_message.value();
-                if msg != ""{
+                if msg != "" {
                     web.send_msg(msg);
                     your_message.set_value("");
                 }
@@ -183,7 +186,20 @@ impl FledgerWeb {
         let my_storage = DataStorageLocal::new("fledger");
         if let Ok(mut node) = node_mutex.try_lock() {
             let node_config = Node::get_config(my_storage.clone())?;
-            let network = network_broker_start(node_config.clone(), URL).await?;
+            let config = ConnectionConfig::new(
+                Some(URL.into()),
+                None,
+                Some(HostLogin {
+                    url: "turn:web.fledg.re:3478".into(),
+                    login: Some(Login {
+                        user: "something".into(),
+                        pass: "something".into(),
+                    }),
+                }),
+            );
+            let network =
+                network_broker_start(node_config.clone(), config)
+                    .await?;
             *node = Some(
                 Node::start(my_storage, node_config, network)
                     .await

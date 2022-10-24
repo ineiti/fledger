@@ -3,8 +3,8 @@ use flarch::{
     start_logging_filter_level, wait_ms,
 };
 use flnet::{
-    broker::BrokerError, network_broker_start, signal::SignalServer, web_socket_server::WebSocketServer,
-    websocket::WSSError, NetworkSetupError,
+    broker::BrokerError, network_broker_start, signal::SignalServer,
+    web_socket_server::WebSocketServer, websocket::WSSError, NetworkSetupError, config::ConnectionConfig,
 };
 use flnode::node::{Node, NodeError};
 use thiserror::Error;
@@ -24,7 +24,7 @@ enum TestError {
 #[tokio::main]
 async fn main() -> Result<(), TestError> {
     start_logging_filter_level(vec!["signal", "fl"], log::LevelFilter::Info);
- 
+
     let wss = WebSocketServer::new(8765).await?;
     let mut signal_server = SignalServer::new(wss, 2).await?;
     let (msgs_signal, _) = signal_server.get_tap_sync().await?;
@@ -50,11 +50,25 @@ async fn main() -> Result<(), TestError> {
         wait_ms(1000).await;
     }
 
-    let ping1 = node1.ping.as_ref().unwrap().storage.stats.get(&node2.node_config.info.get_id()).unwrap();
+    let ping1 = node1
+        .ping
+        .as_ref()
+        .unwrap()
+        .storage
+        .stats
+        .get(&node2.node_config.info.get_id())
+        .unwrap();
     assert_eq!(1, ping1.tx);
     assert_eq!(1, ping1.rx);
 
-    let ping2 = node2.ping.as_ref().unwrap().storage.stats.get(&node1.node_config.info.get_id()).unwrap();
+    let ping2 = node2
+        .ping
+        .as_ref()
+        .unwrap()
+        .storage
+        .stats
+        .get(&node1.node_config.info.get_id())
+        .unwrap();
     assert_eq!(1, ping2.tx);
     assert_eq!(1, ping2.rx);
 
@@ -66,7 +80,11 @@ async fn main() -> Result<(), TestError> {
 async fn create_node() -> Result<Node, TestError> {
     let storage = DataStorageTemp::new();
     let node_config = Node::get_config(storage.clone())?;
-    let network = network_broker_start(node_config.clone(), "ws://localhost:8765").await?;
+    let network = network_broker_start(
+        node_config.clone(),
+        ConnectionConfig::from_signal("ws://localhost:8765"),
+    )
+    .await?;
     Node::start(Box::new(storage), node_config, network)
         .await
         .map_err(|e| e.into())

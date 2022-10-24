@@ -1,9 +1,9 @@
 use crate::{
     config::{NodeConfig, NodeInfo},
-    network_broker::{NetReply, NetworkMessage},
+    network::{NetReply, NetworkMessage},
 };
 use flmodules::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemListener, Translate},
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate},
     nodeids::U256,
 };
 
@@ -73,13 +73,13 @@ impl NSHub {
     fn net_msg(&self, id: U256, net_msg: NetworkMessage) -> Vec<NSHubMessage> {
         if let NetworkMessage::Call(msg) = net_msg {
             match msg {
-                crate::network_broker::NetCall::SendNodeMessage(id_dst, msg_node) => {
+                crate::network::NetCall::SendNodeMessage(id_dst, msg_node) => {
                     vec![NSHubMessage::ToClient(
                         id_dst,
                         NetworkMessage::Reply(NetReply::RcvNodeMessage(id, msg_node)),
                     )]
                 }
-                crate::network_broker::NetCall::SendWSUpdateListRequest => {
+                crate::network::NetCall::SendWSUpdateListRequest => {
                     vec![NSHubMessage::ToClient(
                         id,
                         NetworkMessage::Reply(NetReply::RcvWSUpdateList(self.nodes.clone())),
@@ -97,7 +97,7 @@ impl NSHub {
 
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait::async_trait)]
-impl SubsystemListener<NSHubMessage> for NSHub {
+impl SubsystemHandler<NSHubMessage> for NSHub {
     async fn messages(&mut self, msgs: Vec<NSHubMessage>) -> Vec<NSHubMessage> {
         let mut out = vec![];
 

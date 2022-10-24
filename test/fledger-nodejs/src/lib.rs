@@ -1,7 +1,10 @@
-use flnet::{network_broker_start};
-use flnode::{node::Node};
-use flarch::{data_storage::{DataStorage, DataStorageNode}, wait_ms};
-use wasm_bindgen::{prelude::*};
+use flarch::{
+    data_storage::{DataStorage, DataStorageNode},
+    wait_ms,
+};
+use flnet::{config::ConnectionConfig, network_broker_start};
+use flnode::node::Node;
+use wasm_bindgen::prelude::*;
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -19,17 +22,21 @@ pub async fn main() {
 
     log::info!("Starting app with version {}", VERSION_STRING);
 
-    runit().await.err().map(|e| log::error!("While running main: {e:?}"));
+    runit()
+        .await
+        .err()
+        .map(|e| log::error!("While running main: {e:?}"));
 }
 
-async fn runit()  -> Result<(), Box<dyn std::error::Error>> {
+async fn runit() -> Result<(), Box<dyn std::error::Error>> {
     let storage = DataStorageNode::new("fledger".into());
     let node_config = Node::get_config(storage.clone())?;
 
     log::info!("Starting app with version {}", VERSION_STRING);
 
     log::debug!("Connecting to websocket at {URL}");
-    let network = network_broker_start(node_config.clone(), URL).await?;
+    let network =
+        network_broker_start(node_config.clone(), ConnectionConfig::from_signal(URL)).await?;
 
     let mut node = Node::start(Box::new(storage), node_config, network).await?;
     let nc = &node.node_config.info;
@@ -48,7 +55,10 @@ async fn runit()  -> Result<(), Box<dyn std::error::Error>> {
             log::info!("Nodes are: {:?}", node.nodes_online()?);
             let ping = node.ping.as_ref().unwrap().storage.clone();
             log::info!("Nodes countdowns are: {:?}", ping.stats);
-            log::debug!("Chat messages are: {:?}", node.gossip.as_ref().unwrap().chat_events());
+            log::debug!(
+                "Chat messages are: {:?}",
+                node.gossip.as_ref().unwrap().chat_events()
+            );
         }
         wait_ms(1000).await;
     }

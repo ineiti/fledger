@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use flmodules::{
-    broker::{Broker, Subsystem, SubsystemListener},
+    broker::{Broker, Subsystem, SubsystemHandler},
     nodeids::NodeID,
 };
 use thiserror::Error;
 
 use crate::{
-    network_broker::NetworkMessage,
+    network::NetworkMessage,
     web_rtc::messages::{
         ConnectionStateMap, DataChannelState, PeerMessage, WebRTCInput, WebRTCMessage,
         WebRTCOutput, WebRTCSpawner,
@@ -243,7 +243,7 @@ impl NodeConnection {
 
 #[cfg_attr(feature = "nosend", async_trait(?Send))]
 #[cfg_attr(not(feature = "nosend"), async_trait)]
-impl SubsystemListener<NCMessage> for NodeConnection {
+impl SubsystemHandler<NCMessage> for NodeConnection {
     async fn messages(&mut self, msgs: Vec<NCMessage>) -> Vec<NCMessage> {
         let mut out = vec![];
         for msg in msgs {

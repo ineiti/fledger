@@ -1,15 +1,13 @@
 use async_trait::async_trait;
 use flarch::tasks::wait_ms;
-use flmodules::broker::{Broker, Subsystem, SubsystemListener};
+use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
 use tokio::net::TcpStream;
 
 use futures::{stream::SplitSink, Sink, SinkExt, StreamExt};
 use std::pin::Pin;
 use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 
-use crate::websocket::{WSClientInput, WSClientMessage, WSClientOutput, WSError};
-
-use crate::websocket::WSSError;
+use crate::websocket::{WSClientInput, WSClientMessage, WSClientOutput, WSError, WSSError};
 
 pub struct WebSocketClient {
     write: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>,
@@ -52,11 +50,8 @@ impl WebSocketClient {
 }
 
 #[async_trait]
-impl SubsystemListener<WSClientMessage> for WebSocketClient {
-    async fn messages(
-        &mut self,
-        msgs: Vec<WSClientMessage>,
-    ) -> Vec<WSClientMessage> {
+impl SubsystemHandler<WSClientMessage> for WebSocketClient {
+    async fn messages(&mut self, msgs: Vec<WSClientMessage>) -> Vec<WSClientMessage> {
         for msg in msgs {
             if let WSClientMessage::Input(msg_in) = msg {
                 match msg_in {
@@ -73,7 +68,7 @@ impl SubsystemListener<WSClientMessage> for WebSocketClient {
                     }
                     WSClientInput::Disconnect => {
                         self.write.close().await.unwrap();
-                        return vec![ WSClientOutput::Disconnect.into()];
+                        return vec![WSClientOutput::Disconnect.into()];
                     }
                 }
             }

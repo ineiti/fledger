@@ -1,0 +1,28 @@
+version: "3.0"
+
+services:
+  node1:
+    image: fledgre/fledger:latest
+    network_mode: "host"
+    command: --config flnode
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "4"
+    restart: unless-stopped
+    volumes:
+      - ./data/node1:/fledger/flnode
+
+  node2:
+    image: fledgre/fledger:latest
+    network_mode: "host"
+    command: --config flnode
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "4"
+    restart: unless-stopped
+    volumes:
+      - ./data/node2:/fledger/flnode

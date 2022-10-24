@@ -1,0 +1,67 @@
+version: "3.0"
+
+services:
+  signal:
+    image: fledgre/flsignal:latest
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "4"
+    restart: unless-stopped
+    volumes:
+      - ./stats/csv:/stats
+    command: -v
+    labels:
+      - "traefik.enable=true"
+      # TODO: change URL
+      - "traefik.http.routers.signal.rule=Host(`signal.example.com`)"
+      - "traefik.http.routers.signal.entrypoints=websecure"
+      - "traefik.http.routers.signal.tls.certresolver=myresolver"
+      - "traefik.http.services.signal.loadbalancer.server.port=8765"
+      - "traefik.docker.network=traefik_traefik"
+      - "traefik.http.routers.signal.service=signal"
+    networks:
+      - traefik
+
+  coturn:
+    image: coturn/coturn
+    network_mode: "host"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "4"
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf
+
+  traefik:
+    image: "traefik:v2.2"
+    container_name: "traefik"
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.address=:80"
+      - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entryPoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      # TODO: change email
+      - "--certificatesresolvers.myresolver.acme.email=admin@example.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./data/letsencrypt:/letsencrypt"
+    networks:
+      - traefik
+    restart: unless-stopped
+
+networks:
+  traefik:
+    external:
+      name: traefik_traefik

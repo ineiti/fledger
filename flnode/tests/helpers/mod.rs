@@ -8,7 +8,7 @@ use flmodules::{
 };
 use flnet::{
     config::{NodeConfig, NodeInfo},
-    network_broker::{NetCall, NetReply, NetworkMessage},
+    network::{NetCall, NetReply, NetworkMessage},
     web_rtc::{node_connection::NCInput, WebRTCConnMessage},
 };
 
