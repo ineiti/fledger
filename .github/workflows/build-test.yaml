@@ -1,0 +1,108 @@
+name: Testing web_rtc
+on:
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout branch
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: "fledger"
+        workspaces: |
+          flnet
+          test/signal-fledger
+          test/fledger-nodejs
+          test/webrtc-libc-wasm/libc
+          test/webrtc-libc-wasm/wasm
+          flnode
+          flarch
+          cli
+          flbrowser
+          examples/ping-pong/libc
+          examples/ping-pong/wasm
+          examples/ping-pong/shared
+          flmodules
+
+    - name: Run cargo_build
+      shell: bash
+      run: |
+        make cargo_build
+
+  cargo_test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Checkout branch
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: "fledger"
+        workspaces: |
+          flnet
+          test/signal-fledger
+          test/fledger-nodejs
+          test/webrtc-libc-wasm/libc
+          test/webrtc-libc-wasm/wasm
+          flnode
+          flarch
+          cli
+          flbrowser
+          examples/ping-pong/libc
+          examples/ping-pong/wasm
+          examples/ping-pong/shared
+          flmodules
+
+    - name: Run cargo_test
+      shell: bash
+      run: |
+        make cargo_test
+
+  make_test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Checkout branch
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: "fledger"
+        workspaces: |
+          flnet
+          test/signal-fledger
+          test/fledger-nodejs
+          test/webrtc-libc-wasm/libc
+          test/webrtc-libc-wasm/wasm
+          flnode
+          flarch
+          cli
+          flbrowser
+          examples/ping-pong/libc
+          examples/ping-pong/wasm
+          examples/ping-pong/shared
+          flmodules
+
+    - name: Install trunk
+      run: cargo install --locked trunk
+
+    - uses: jetli/wasm-pack-action@v0.3.0
+      with:
+        version: 'latest'
+
+    - name: Run make_test
+      shell: bash
+      run: |
+        make make_test

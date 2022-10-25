@@ -1,6 +1,6 @@
 use clap::Parser;
-use flnet::signal::{SignalMessage, SignalOutput, SignalServer};
-use flnet_libc::web_socket_server::WebSocketServer;
+use flnet::signal::{SignalServer, SignalMessage, SignalOutput};
+use flnet::web_socket_server::WebSocketServer;
 
 /// Fledger signalling server
 #[derive(Parser, Debug)]
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let wss = WebSocketServer::new(8765).await?;
     let mut signal_server = SignalServer::new(wss, 2).await?;
-    let (msgs, _) = signal_server.get_tap().await?;
+    let (msgs, _) = signal_server.get_tap_sync().await?;
 
     log::info!("Started listening on port 8765");
     for msg in msgs {

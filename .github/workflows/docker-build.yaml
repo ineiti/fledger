@@ -10,25 +10,33 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - uses: actions/cache@v2
+    - uses: Swatinem/rust-cache@v2
       with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          ~/.npm
-          **/target/
-          flbrowser/www/node_modules
-        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-build-
-          ${{ runner.os }}-cargo-test-
-          ${{ runner.os }}-cargo-test-build-
+        shared-key: "fledger"
+        workspaces: |
+          flnet
+          test/signal-fledger
+          test/fledger-nodejs
+          test/webrtc-libc-wasm/libc
+          test/webrtc-libc-wasm/wasm
+          flnode
+          flarch
+          cli
+          flbrowser
+          examples/ping-pong/libc
+          examples/ping-pong/wasm
+          examples/ping-pong/shared
+          flmodules
 
     - uses: jetli/wasm-pack-action@v0.3.0
       with:
         version: 'latest'
+
+    - name: Install trunk
+      run: cargo install --locked trunk
+
+    - name: Add wasm target
+      run: rustup target add wasm32-unknown-unknown
 
     - name: Update build tag
       run: make update_version
@@ -40,7 +48,7 @@ jobs:
       run: cd cli && cargo build --release -p fledger
 
     - name: Build web server
-      run: cd flbrowser && make build
+      run: cd flbrowser && trunk build
 
     - name: Docker build signal
       uses: mr-smithers-excellent/docker-build-push@v5

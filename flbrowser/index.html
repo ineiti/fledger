@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <link data-trunk rel="scss" href="main.css">
+  <title>Fledger web3</title>
+  <link data-trunk href="bootstrap.min.css" rel="scss">
+  <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous"> -->
+</head>
+
+<body>
+  <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
+
+  <div class="main">
+    <h2><i id="node_info">Starting up</i></h2>
+
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="shareit-tab" data-bs-toggle="tab" data-bs-target="#shareit" type="button"
+          role="tab" aria-controls="shareit" aria-selected="true">ShareIt</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="status-tab" data-bs-toggle="tab" data-bs-target="#status" type="button" role="tab"
+          aria-controls="status" aria-selected="false">Status</button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="myTabContent">
+      <div class="tab-pane fade show active" id="shareit" role="tabpanel" aria-labelledby="home-tab">
+        <p>This is a decentralized chatting app. Instead of having a central server that stores all
+          messages, every visitor joining the system stores the last 20 messages. So even if the
+          central server goes down or censors messages, the clients can still communicate.
+        </p>
+        <p>You can find the code on github: <a href="https://github.com/ineiti/fledger">ineiti/fledger</a></p>
+        <br>
+        <h3>Your Message</h3>
+        <textarea class="form-control" id="your_message" rows="3"></textarea>
+        <button id="send_msg" type="button" class="btn btn-primary" style="float: right;">Send</button>
+
+        <br>
+        <h3>Statistics</h3>
+        <ul>
+          <li>Nodes connected: <span id="nodes_connected"></span></li>
+          <li>Nodes online: <span id="nodes_online"></span></li>
+          <li>Nodes known: <span id="nodes_known"></span></li>
+          <!-- <li>Messages stored total: <span id="msgs_system"></span></li>
+          <li>Messages stored locally: <span id="msgs_local"></span></li>
+          <li>Mana: <span id="mana"></span></li> -->
+        </ul>
+
+        <br>
+        <h3>Messages</h3>
+        <div id="messages"></div>
+
+      </div>
+      <div class="tab-pane fade" id="status" role="tabpanel" aria-labelledby="profile-tab">
+        <p>The goal of Fledger is to have a full node running in the web browser.
+          Instead of having to invest in big hardware, fledger will be light enough
+          that you can participate using a browser.
+          You will mine Mana can be used to run smart contracts, store data, or use the
+          re-encryption service.</p>
+        <p>The state of the project is</p>
+        <ul>
+          <li>Networking</li>
+          <ul>
+            <li>Done: learning Rust and making WebRTC work reliably</li>
+            <li>Done: setting up of TURN server</li>
+            <li>Done: rewrite of networking backend without reason</li>
+            <li>Done: simple gossiping of content</li>
+          </ul>
+          <li>Coming up: decentralized sharing with incentives</li>
+          <li>Coming up: setting up chains for sharing tracking</li>
+        </ul>
+        <p>For more information, see the documentation:
+          <a href="https://fledg.re/doc/index.html" target="other">Fledger - the blockchain that could</a>
+        </p>
+        <p>Or find the code on github: <a href="https://github.com/ineiti/fledger">ineiti/fledger</a></p>
+        <div id="fetching">Fetching node list</div>
+        <table class="styled-table table" id="table_stats" class="hidden">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Ping Count</th>
+              <th>Last ping</th>
+              <th>Conn. Type</th>
+            </tr>
+          </thead>
+          <tbody id="node_stats">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+    <br />
+    <div style="float: right;" id="version"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+    crossorigin="anonymous"></script>
+</body>
+
+</html>

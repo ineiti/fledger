@@ -1,45 +1,37 @@
-use flnet::network::{NetCall,NetworkError};
-use flnet_wasm::{web_rtc::WebRTCConnection,web_socket_client::{WSClientError,WebSocketClient}};
-use std::sync::mpsc::channel;
+use std::sync::mpsc::RecvError;
 
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
+use flarch::tasks::wait_ms;
 use flnet::{
-    config::{NodeConfig, NodeInfo},
-    network::{NetReply, Network, NetworkMessage},
-    signal::websocket::WSError,
+    config::{NodeConfig, NodeInfo, ConnectionConfig},
+    network::{NetCall, NetworkError},
+    network::{NetReply, NetworkMessage},
+    network_broker_start, NetworkSetupError,
 };
-use flarch::{tasks::wait_ms};
-use flmodules::{broker::Subsystem};
+use flmodules::broker::Destination;
 
-const URL: &str = "ws://localhost:8765";
+const URL: &str = "ws://127.0.0.1:8765";
 
 #[derive(Debug, Error)]
 enum StartError {
     #[error(transparent)]
-    WS(#[from] WSError),
+    NetworkSetup(#[from] NetworkSetupError),
     #[error(transparent)]
     Network(#[from] NetworkError),
     #[error(transparent)]
     Broker(#[from] flmodules::broker::BrokerError),
     #[error(transparent)]
-    Client(#[from] WSClientError),
+    Receive(#[from] RecvError),
 }
 
 async fn run_app() -> Result<(), StartError> {
     log::info!("Starting app");
 
     let nc = NodeConfig::new();
-    let ws = WebSocketClient::connect(URL).await?;
-    let mut net = Network::start(
-        nc.clone(),
-        ws,
-        Box::new(|| Box::new(Box::pin(WebRTCConnection::new_box()))),
-    )
-    .await?;
-    let (tx, rx) = channel();
-    net.add_subsystem(Subsystem::Tap(tx)).await?;
+    let mut net = network_broker_start(nc.clone(), ConnectionConfig::from_signal(URL)).await?;
+    let (rx, tap_indx) = net.get_tap_sync().await?;
     let mut i: i32 = 0;
     loop {
         i += 1;
@@ -50,32 +42,34 @@ async fn run_app() -> Result<(), StartError> {
         while let Ok(msg) = rx.try_recv() {
             if let NetworkMessage::Reply(reply) = msg {
                 match reply {
-                    NetReply::RcvNodeMessage(node) => {
-                        log::info!("Got node message: {:?}", node)
+                    NetReply::RcvNodeMessage(id, msg_net) => {
+                        log::info!("Got node message: {} / {:?}", id, msg_net);
+                        net.remove_subsystem(tap_indx).await?;
+                        return Ok(());
                     }
                     NetReply::RcvWSUpdateList(list) => {
                         let other: Vec<NodeInfo> = list
                             .iter()
-                            .filter(|n| n.get_id() != nc.our_node.get_id())
+                            .filter(|n| n.get_id() != nc.info.get_id())
                             .cloned()
                             .collect();
                         log::info!("Got list: {:?}", other);
                         if other.len() > 0 {
-                            net.emit_msg(
-                                NetReply::RcvNodeMessage((
+                            net.emit_msg_dest(
+                                Destination::NoTap,
+                                NetCall::SendNodeMessage(
                                     other.get(0).unwrap().get_id(),
                                     "Hello from Rust wasm".to_string(),
-                                )).into()
-                            )
-                            .await?;
+                                )
+                                .into(),
+                            )?;
                         }
                     }
                     _ => log::debug!("Got other message: {:?}", reply),
                 }
             }
         }
-        net.emit_msg(NetworkMessage::Call(NetCall::SendWSStats(vec![])))
-            .await?;
+        net.emit_msg(NetworkMessage::Call(NetCall::SendWSUpdateListRequest))?;
         wait_ms(1000).await;
     }
 }
