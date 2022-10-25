@@ -1,10 +1,27 @@
+//! # WebRTC connection setup
+//!
+//! The WebRTC connections need a lot of detail to be set up correctly.
+//! Moreover, while the WebRTC protocol is very clear about how to set up
+//! a connection, it doesn't describe how the nodes need to communicate to
+//! set up the connection.
+//! The messages for setting up the connection are described in the [`crate::signal::SignalServer`].
+//! 
+//! # Bidirectional connections
+//! 
+//! Every WebRTC connection has one or two connections inside:
+//! - _outgoing_ is the connection initiated by this node
+//! - _incoming_ is the connection initiated by the other node
+//! 
+//! This is necessary, as it is always possible that two nodes want to start
+//! connecting to each other concurrently.
+
 use std::collections::HashMap;
 
 use async_trait::async_trait;
 
 use flmodules::{
     broker::{Broker, BrokerError, SubsystemHandler, Translate},
-    nodeids::{NodeID, U256},
+    nodeids::NodeID,
 };
 
 use self::{
@@ -16,12 +33,17 @@ pub mod messages;
 pub mod node_connection;
 
 #[derive(Debug, Clone, PartialEq)]
+/// All messages for the [`WebRTCConn`] broker.
 pub enum WebRTCConnMessage {
-    InputNC((U256, NCInput)),
-    OutputNC((U256, NCOutput)),
-    Connect(U256),
+    /// Messages coming from the [`crate::network::NetworkBroker`]
+    InputNC((NodeID, NCInput)),
+    /// Messages going to the [`crate::network::NetworkBroker`]
+    OutputNC((NodeID, NCOutput)),
+    /// Connection request
+    Connect(NodeID),
 }
 
+/// The actual implementation of the WebRTC connection setup.
 pub struct WebRTCConn {
     web_rtc: WebRTCSpawner,
     connections: HashMap<NodeID, Broker<NCMessage>>,
@@ -29,6 +51,8 @@ pub struct WebRTCConn {
 }
 
 impl WebRTCConn {
+    /// Creates a new [`Broker<WebRTCConnMessage>`] that will accept incoming connections and set up 
+    /// new outgoing connections.
     pub async fn new(web_rtc: WebRTCSpawner) -> Result<Broker<WebRTCConnMessage>, BrokerError> {
         let mut br = Broker::new();
         br.add_subsystem(flmodules::broker::Subsystem::Handler(Box::new(Self {
@@ -41,7 +65,7 @@ impl WebRTCConn {
     }
 
     /// Ensures that a given connection exists.
-    async fn ensure_connection(&mut self, id: &U256) -> Result<(), NCError> {
+    async fn ensure_connection(&mut self, id: &NodeID) -> Result<(), NCError> {
         if !self.connections.contains_key(id) {
             let mut nc = NodeConnection::new(&self.web_rtc).await?;
             nc.forward(self.broker.clone(), Self::from_nc(id.clone()))
@@ -52,7 +76,7 @@ impl WebRTCConn {
         Ok(())
     }
 
-    fn from_nc(id: U256) -> Translate<NCMessage, WebRTCConnMessage> {
+    fn from_nc(id: NodeID) -> Translate<NCMessage, WebRTCConnMessage> {
         Box::new(move |msg| {
             if let NCMessage::Output(ncmsg) = msg {
                 return Some(WebRTCConnMessage::OutputNC((id, ncmsg)));

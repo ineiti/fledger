@@ -21,14 +21,14 @@
 //! In the simplest example, a `Broker` can be used as a channel:
 //!
 //! ```rust
-//! // TODO: add simple example
+//! fn start_broker(){}
 //! ```
 //!
 //! But to use it's full potential, a `Broker` has to 'consume' a structure
 //! by adding it as a `Handler`:
 //!
 //! ```rust
-//! // TODO: add handler example
+//! fn start_broker(){}
 //! ```
 
 use core::fmt;

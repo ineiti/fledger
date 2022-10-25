@@ -1,3 +1,15 @@
+//! # A single WebRTC connection
+//! 
+//! This broker handles two connections at the same time: one outgoing connection
+//! and one ingoing connection.
+//! When a message is sent, it is sent to the connection that is alread up and running.
+//! But if the outgoing connection is not established yet, it will be started.
+//! 
+//! The actual calls to the WebRTC code have been abstracted, so that the same
+//! code works for the libc and the wasm implementation.
+//! 
+//! _If you come here, I hope you're not trying to debug something that doesn't work.
+//! This code is quite obscure, and should be rewritten for the 5th time or so._
 use async_trait::async_trait;
 use flmodules::{
     broker::{Broker, Subsystem, SubsystemHandler},
@@ -16,52 +28,73 @@ use crate::{
 use super::WebRTCConnMessage;
 
 #[derive(Error, Debug)]
+/// An error by the connection.
 pub enum NCError {
+    /// Something went wrong when sending to the output queue.
     #[error("Couldn't use output queue")]
     OutputQueue,
+    /// Couldn't setup the WebRTC connection
     #[error(transparent)]
     Setup(#[from] crate::web_rtc::messages::SetupError),
+    /// The broker went nuts
     #[error(transparent)]
     Broker(#[from] flmodules::broker::BrokerError),
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Messages for the [`NodeConnection`] broker.
 pub enum NCMessage {
+    /// Messages to the [`crate::web_rtc::WebRTCConn`] broker
     Output(NCOutput),
+    /// Messages from the [`crate::web_rtc::WebRTCConn`] broker
     Input(NCInput),
+    /// Messages to/from the incoming connection
     Incoming(WebRTCMessage),
+    /// Messages to/from the outgoing connection
     Outgoing(WebRTCMessage),
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Messages to the [`crate::web_rtc::WebRTCConn`]
 pub enum NCOutput {
+    /// Created a connection in the given direction
     Connected(Direction),
+    /// Connection in the given direction has been dropped
     Disconnected(Direction),
+    /// Received a text from any connection
     Text(String),
+    /// Return a changed state from one of the connections
     State((Direction, ConnectionStateMap)),
+    /// Setup message for the connection in the given direction
     Setup((Direction, PeerMessage)),
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Messages from the [`crate::web_rtc::WebRTCConn`]
 pub enum NCInput {
+    /// Text to be sent over the first available connection
     Text(String),
+    /// Disconnect all connections
     Disconnect,
+    /// Return all states
     GetStates,
+    /// Treat the [`PeerMessage`] to setup a new connection with the
+    /// given direction
     Setup((Direction, PeerMessage)),
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// One of the directions for a connection
 pub enum Direction {
+    /// Being initiated by the remote peer
     Incoming,
+    /// Being initiated by this peer
     Outgoing,
 }
 
-/// There might be up to two connections per remote node.
-/// This is in the case both nodes try to set up a connection at the same time.
-/// This race condition is very difficult to catch, so it's easier to just allow
-/// two connections per remote node.
-/// If a second, third, or later incoming connection from the same node happens, the previous
-/// connection is considered stale and discarded.
+/// A single connection between two nodes, either incoming our outgoing.
+/// It will do its best to detect when a connection has gone stale and shut
+/// itself down.
 pub struct NodeConnection {
     msg_queue: Vec<String>,
     state_incoming: Option<ConnectionStateMap>,
@@ -69,6 +102,8 @@ pub struct NodeConnection {
 }
 
 impl NodeConnection {
+    /// Create a new [`NodeConnection`] that will wait for a first message before
+    /// setting up an outgoing connection.
     pub async fn new(spawner: &WebRTCSpawner) -> Result<Broker<NCMessage>, NCError> {
         let mut broker = Broker::new();
         broker
@@ -272,6 +307,7 @@ impl From<NCOutput> for NCMessage {
 }
 
 impl NCInput {
+    /// Convert it to a [`NetworkMessage`]
     pub fn to_net(self, dst: NodeID) -> NetworkMessage {
         NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((dst, self)))
     }

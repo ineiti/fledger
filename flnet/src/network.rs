@@ -5,6 +5,9 @@
 //! As the [`NetworkBroker`] simply returns a [`Broker<NetworkMessage>`], a more
 //! user-friendly wrapper named [`Network`] exists, which is better suited for
 //! usage in a non-[`Broker`] world.
+//! 
+//! Both of these structures are best created with [`crate::network_start`] and 
+//! [`crate::network_broker_start`].
 
 use async_trait::async_trait;
 use core::panic;
@@ -66,6 +69,9 @@ impl Network {
         Ok(Self { broker_net, tap })
     }
 
+    /// Wait for a message to be received from the network.
+    /// This method waits for a [`NetReply`] message to be received, which
+    /// are the only messages interesting for a user.
     pub async fn recv(&mut self) -> NetReply {
         loop {
             let msg = self.tap.recv().await;
@@ -75,20 +81,28 @@ impl Network {
         }
     }
 
+    /// Send a message to the [`NetworkBroker`] asynchronously.
+    /// The message is of type [`NetCall`], as this is what the user can
+    /// send to the [`NetworkBroker`].
     pub fn send(&mut self, msg: NetCall) -> Result<(), BrokerError> {
         self.broker_net.emit_msg(NetworkMessage::Call(msg))
     }
 
+    /// Tries to send a text-message to a remote node.
+    /// The [`NetworkBroker`] will start a connection with the node if there is none available.
+    /// If the remote node is not available, no error is returned.
     pub fn send_msg(&mut self, dst: crate::NodeID, msg: String) -> Result<(), BrokerError> {
         self.send(NetCall::SendNodeMessage(dst, msg))
     }
 
+    /// Requests an updated list of all connected nodes to the signalling server.
     pub fn send_list_request(&mut self) -> Result<(), BrokerError> {
         self.send(NetCall::SendWSUpdateListRequest)
     }
 }
 
 #[derive(Error, Debug)]
+/// Possible errors from the [`NetworkBroker`].
 pub enum NetworkError {
     #[error("Connection not found")]
     ConnectionMissing,
@@ -106,6 +120,13 @@ pub enum NetworkError {
     Setup(#[from] SetupError),
 }
 
+/// The [`NetworkBroker`] handles setting up webRTC connections for all connected nodes.
+/// It can handle incoming and outgoing connections.
+/// 
+/// In this version, all connection setup (signalling) is going through a websocket.
+/// In a next version, it should also be possible to setup new connections (signalling) through existing WebRTC
+/// connections: If A and B are connected, and B and C are connected, C can connect to A by using
+/// B as a signalling server.
 pub struct NetworkBroker {
     node_config: NodeConfig,
     get_update: usize,
@@ -114,13 +135,10 @@ pub struct NetworkBroker {
 
 const UPDATE_INTERVAL: usize = 10;
 
-/// The NetworkBroker handles setting up webRTC connections for all connected nodes.
-/// It can handle incoming and outgoing connections.
-/// In this version, all connection setup (signalling) is going through a websocket.
-/// In a next version, it should also be possible to setup new connections (signalling) through existing WebRTC
-/// connections: If A and B are connected, and B and C are connected, C can connect to A by using
-/// B as a signalling server.
 impl NetworkBroker {
+    /// Starts a new [`NetworkBroker`] and returns a [`Broker<NetworkMessage>`] which can be linked
+    /// to other brokers.
+    /// If you just need a simple send/receive interface, use the [`Network`].
     pub async fn start(
         node_config: NodeConfig,
         ws: Broker<WSClientMessage>,
@@ -231,8 +249,6 @@ impl NetworkBroker {
             }
             NetCall::SendWSStats(ss) => Ok(WSSignalMessageFromNode::NodeStats(ss.clone()).into()),
             NetCall::SendWSUpdateListRequest => Ok(WSSignalMessageFromNode::ListIDsRequest.into()),
-            NetCall::SendWSClearNodes => Ok(WSSignalMessageFromNode::ClearNodes.into()),
-            NetCall::SendWSPeer(pi) => Ok(WSSignalMessageFromNode::PeerSetup(pi).into()),
             NetCall::Connect(id) => Ok(self.connect(&id)),
             NetCall::Disconnect(id) => Ok(self.disconnect(&id).await),
             NetCall::Tick => {
@@ -363,10 +379,17 @@ impl SubsystemHandler<NetworkMessage> for NetworkBroker {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
+/// A Message to/from the [`NetworkBroker`].
+/// The [`NetworkMessage::Call`] and [`NetworkMessage::Reply`] messages are directly related to the [`NetworkBroker`], while
+/// the [`NetworkMessage::WebSocket`] and [`NetworkMessage::WebRTC`] messages are used to link to those modules.
 pub enum NetworkMessage {
+    /// A message to the [`NetworkBroker`]
     Call(NetCall),
+    /// A return message from the [`NetworkBroker`]
     Reply(NetReply),
+    /// Messages to/from the WebSocket.
     WebSocket(WSClientMessage),
+    /// Messages to/from the WebRTC subsystem.
     WebRTC(WebRTCConnMessage),
 }
 
@@ -383,14 +406,27 @@ impl fmt::Display for NetworkMessage {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
+/// These are similar to public methods on a structure.
+/// Sending these messages will call the linked actions.
 pub enum NetCall {
-    SendNodeMessage(U256, String),
+    /// Sends a new text message to the node.
+    /// The [`NetworkBroker`] will try to set up a connection with the remote node,
+    /// if no such connection exists yet.
+    /// If the node is not connected to the signalling handler, nothing happens.
+    SendNodeMessage(NodeID, String),
+    /// Sends some stats to the signalling server to monitor the overall health of
+    /// the system.
     SendWSStats(Vec<NodeStat>),
-    SendWSClearNodes,
+    /// Requests a new list of currenlty connected nodes to the signalling server.
     SendWSUpdateListRequest,
-    SendWSPeer(PeerInfo),
-    Connect(U256),
-    Disconnect(U256),
+    /// Connect to the given node.
+    /// If the node is not connected to the signalling server, no connection is made,
+    /// and no error is produced.
+    Connect(NodeID),
+    /// Manually disconnect from the given node.
+    /// If there is no connection to this node, no error is produced.
+    Disconnect(NodeID),
+    /// This message should be sent once a second to allow calculations of timeouts.
     Tick,
 }
 
@@ -399,9 +435,7 @@ impl fmt::Display for NetCall {
         match self {
             NetCall::SendNodeMessage(_, _) => write!(f, "SendNodeMessage()"),
             NetCall::SendWSStats(_) => write!(f, "SendWSStats()"),
-            NetCall::SendWSClearNodes => write!(f, "SendWSClearNodes"),
             NetCall::SendWSUpdateListRequest => write!(f, "SendWSUpdateListRequest"),
-            NetCall::SendWSPeer(_) => write!(f, "SendWSPeer()"),
             NetCall::Connect(_) => write!(f, "Connect()"),
             NetCall::Disconnect(_) => write!(f, "Disconnect()"),
             NetCall::Tick => write!(f, "Tick"),
@@ -425,12 +459,19 @@ impl From<WSSignalMessageFromNode> for Vec<NetworkMessage> {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
+/// Messages sent from the [`NetworkBroker`] to the user.
 pub enum NetReply {
-    RcvNodeMessage(U256, String),
+    /// A new message has been received from the given node.
+    RcvNodeMessage(NodeID, String),
+    /// An updated list coming from the signalling server.
     RcvWSUpdateList(Vec<NodeInfo>),
+    /// Whenever the state of a connection changes, this message is 
+    /// sent to the user.
     ConnectionState(NetworkConnectionState),
-    Connected(U256),
-    Disconnected(U256),
+    /// A node has been successfully connected.
+    Connected(NodeID),
+    /// A node has been disconnected.
+    Disconnected(NodeID),
 }
 
 impl fmt::Display for NetReply {
@@ -452,9 +493,13 @@ impl From<NetReply> for NetworkMessage {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// The connection state of a remote node.
 pub struct NetworkConnectionState {
-    pub id: U256,
+    /// The ID of the remote node.
+    pub id: NodeID,
+    /// The direction of the connection.
     pub dir: Direction,
+    /// Statistics on the connection.
     pub s: ConnStats,
 }
 
@@ -478,12 +523,20 @@ impl From<WSClientMessage> for NetworkMessage {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Some statistics on the connection.
+/// Not all fields are usable in all implementations.
 pub struct ConnStats {
+    /// What connection type the local end is having.
     pub type_local: ConnType,
+    /// What connection tye the remote end is having.
     pub type_remote: ConnType,
+    /// The current signalling state.
     pub signaling: SignalingState,
+    /// Received bytes
     pub rx_bytes: u64,
+    /// Transmitted bytes
     pub tx_bytes: u64,
+    /// Round-trip time of the connection
     pub delay_ms: u32,
 }
 

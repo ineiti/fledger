@@ -1,3 +1,52 @@
+//! # The signalling server implementation
+//! 
+//! This structure implements a signalling server.
+//! It communicates using [`WSSignalMessageToNode`] and [`WSSignalMessageFromNode`] messages
+//! with the nodes.
+//! 
+//! # Node connection to the signalling server
+//! 
+//! If a node wants to connect to the signalling server, it needs to prove it holds the
+//! private key corresponding to its public key by signing a random message sent by
+//! the signalling server:
+//! 
+//! - Server sends [`WSSignalMessageToNode::Challenge`] with the current version of the
+//! server and a 256-bit random challenge
+//! - Node sends [`WSSignalMessageFromNode::Announce`] containing the [`MessageAnnounce`]
+//! with the node-information and a signature of the challenge
+//! - Server sends [`WSSignalMessageToNode::ListIDsReply`] if the signature has been
+//! verified successfully, else it waits for another announce-message
+//! 
+//! # WebRTC signalling setup
+//! 
+//! Once a node has been connected to the signalling server, other nodes can start a
+//! WebRTC connection with it.
+//! For this, the nodes will send several [`WSSignalMessageFromNode::PeerSetup`] messages
+//! that the signalling server will redirect to the other node.
+//! These messages contain the [`PeerInfo`] and the [`crate::web_rtc::messages::PeerMessage`] needed to setup a WebRTC connection.
+//! One of the nodes is the initializer, while the other is the follower:
+//! 
+//! - Initializer sends a [`crate::web_rtc::messages::PeerMessage::Init`] to the follower
+//! - The follower answers with a [`crate::web_rtc::messages::PeerMessage::Offer`] containing
+//! information necessary for the setup of the connection
+//! - The initializer uses the offer to start its connection and replies with a
+//! [`crate::web_rtc::messages::PeerMessage::Answer`], also containing information for the setting
+//! up of the connection
+//! 
+//! Once the first message has been sent, both nodes will start to exchange 
+//! [`crate::web_rtc::messages::PeerMessage::IceCandidate`] messages which contain information
+//! about possible connection candidates between the two nodes.
+//! These messages will even continue once the connection has been setup, and can be used for
+//! example to create a nice handover when the network connection changes.
+//! 
+//! After the connections are set up, only the `IceCandidate` messages are exchanged between the
+//! nodes.
+//! 
+//! # Usage of the signalling server
+//! 
+//! You can find an example of how the signalling server is used in
+//! <https://github.com/ineiti/fledger/tree/0.7.0/cli/flsignal/src/main.rs>
+
 use std::{
     collections::HashMap,
     fmt::{Error, Formatter},
@@ -7,7 +56,7 @@ use async_trait::async_trait;
 use bimap::BiMap;
 use flmodules::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    nodeids::U256,
+    nodeids::{U256, NodeID},
     timer::{TimerBroker, TimerMessage},
 };
 use serde::{Deserialize, Serialize};
@@ -17,33 +66,44 @@ use crate::{config::NodeInfo, web_rtc::messages::PeerInfo, websocket::WSServerIn
 
 use super::websocket::{WSServerMessage, WSServerOutput};
 
-/// This implements a signalling server. It can be used for tests, in the cli implementation, and
-/// will also be used later directly in the network struct to allow for direct node-node setups.
-/// It handles the setup phase where the nodes authenticate themselves to the server, and passes
-/// PeerInfo messages between nodes.
-/// It also handles statistics by forwarding NodeStats to a listener.
 
 #[derive(Clone, Debug)]
+/// The possible messages for the signalling server broker, including the
+/// connected websocket messages.
 pub enum SignalMessage {
+    /// Messages being sent to the signalling server
     Input(SignalInput),
+    /// Messages coming from the signalling server
     Output(SignalOutput),
+    /// Messages exchanged with the WebSocketServer
     WSServer(WSServerMessage),
 }
 
 #[derive(Clone)]
+/// Messages for the signalling server
 pub enum SignalInput {
-    WebSocket((U256, WSSignalMessageToNode)),
+    /// One minute timer clock for removing stale connections
     Timer,
 }
 
 #[derive(Clone, Debug)]
+/// Messages sent by the signalling server to an evenutal listener
 pub enum SignalOutput {
-    WebSocket((U256, WSSignalMessageFromNode)),
+    /// Statistics about the connected nodes
     NodeStats(Vec<NodeStat>),
-    NewNode(U256),
+    /// Whenever a new node has joined the signalling server
+    NewNode(NodeID),
+    /// If the server has been stopped
     Stopped,
 }
 
+/// This implements a signalling server. 
+/// It can be used for tests, in the cli implementation, and
+/// will also be used later directly in the network struct to allow for direct node-node setups.
+/// 
+/// It handles the setup phase where the nodes authenticate themselves to the server, and passes
+/// PeerInfo messages between nodes.
+/// It also handles statistics by forwarding NodeStats to a listener.
 pub struct SignalServer {
     connection_ids: BiMap<U256, usize>,
     info: HashMap<U256, NodeInfo>,
@@ -51,11 +111,12 @@ pub struct SignalServer {
     ttl_minutes: u64,
 }
 
+/// Our current version - will change if the API is incompatible.
 pub const SIGNAL_VERSION: u64 = 3;
 
 impl SignalServer {
-    /// Creates a new SignalServer.
-    /// ttl_minutes is the minimum time an idle node will be
+    /// Creates a new [`SignalServer`].
+    /// `ttl_minutes` is the minimum time an idle node will be
     /// kept in the list.
     pub async fn new(
         ws_server: Broker<WSServerMessage>,
@@ -106,11 +167,11 @@ impl SignalServer {
 
     fn msg_in(&mut self, msg_in: SignalInput) -> Vec<SignalMessage> {
         match msg_in {
-            SignalInput::WebSocket((dst, msg)) => {
-                if let Some(index) = self.connection_ids.get_by_left(&dst) {
-                    return self.send_msg_node(*index, msg.clone());
-                }
-            }
+            // SignalInput::WebSocket((dst, msg)) => {
+            //     if let Some(index) = self.connection_ids.get_by_left(&dst) {
+            //         return self.send_msg_node(*index, msg.clone());
+            //     }
+            // }
             SignalInput::Timer => self.msg_in_timer(),
         }
         vec![]
@@ -118,7 +179,7 @@ impl SignalServer {
 
     fn msg_wss(&mut self, msg: WSServerOutput) -> Vec<SignalMessage> {
         match msg {
-            WSServerOutput::Message((index, msg_s)) => {
+            WSServerOutput::Message(index, msg_s) => {
                 self.ttl
                     .entry(index.clone())
                     .and_modify(|ttl| *ttl = self.ttl_minutes);
@@ -153,7 +214,6 @@ impl SignalServer {
         match msg {
             WSSignalMessageFromNode::Announce(ann) => self.ws_announce(index, ann),
             WSSignalMessageFromNode::ListIDsRequest => self.ws_list_ids(index),
-            WSSignalMessageFromNode::ClearNodes => self.ws_clear(),
             WSSignalMessageFromNode::PeerSetup(pi) => self.ws_peer_setup(index, pi),
             WSSignalMessageFromNode::NodeStats(ns) => self.ws_node_stats(ns),
         }
@@ -167,7 +227,7 @@ impl SignalServer {
         let challenge_msg =
             serde_json::to_string(&WSSignalMessageToNode::Challenge(SIGNAL_VERSION, challenge))
                 .unwrap();
-        vec![WSServerInput::Message((index, challenge_msg)).into()]
+        vec![WSServerInput::Message(index, challenge_msg).into()]
     }
 
     fn ws_announce(&mut self, index: usize, msg: MessageAnnounce) -> Vec<SignalMessage> {
@@ -198,13 +258,6 @@ impl SignalServer {
         )
     }
 
-    fn ws_clear(&mut self) -> Vec<SignalMessage> {
-        self.ttl.clear();
-        self.connection_ids.clear();
-        self.info.clear();
-        vec![]
-    }
-
     fn ws_peer_setup(&mut self, index: usize, pi: PeerInfo) -> Vec<SignalMessage> {
         let id = match self.connection_ids.get_by_right(&index) {
             Some(id) => id,
@@ -227,7 +280,7 @@ impl SignalServer {
     }
 
     fn send_msg_node(&self, index: usize, msg: WSSignalMessageToNode) -> Vec<SignalMessage> {
-        vec![WSServerInput::Message((index, serde_json::to_string(&msg).unwrap())).into()]
+        vec![WSServerInput::Message(index, serde_json::to_string(&msg).unwrap()).into()]
     }
 
     fn remove_node(&mut self, index: usize) {
@@ -257,6 +310,7 @@ impl SubsystemHandler<SignalMessage> for SignalServer {
 }
 
 /// Message is a list of messages to be sent between the node and the signal server.
+/// 
 /// When a new node connects to the signalling server, the server starts by sending
 /// a "Challenge" to the node.
 /// The node can then announce itself using that challenge.
@@ -268,18 +322,26 @@ impl SubsystemHandler<SignalMessage> for SignalServer {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub enum WSSignalMessageToNode {
+    /// Sends the current version of the signalling server and a random 256 bit number for authentication
     Challenge(u64, U256),
+    /// A list of currently connected nodes
     ListIDsReply(Vec<NodeInfo>),
+    /// Information for setting up a WebRTC connection
     PeerSetup(PeerInfo),
 }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+/// A message coming from a node
 pub enum WSSignalMessageFromNode {
+    /// The reply to a [`WSSignalMessageToNode::Challenge`] message, containing information about the
+    /// node, as well as a signature on the random 256 bit number being sent in the challenge.
     Announce(MessageAnnounce),
+    /// Request an updated list of the currently connected nodes
     ListIDsRequest,
-    ClearNodes,
+    /// Connection information for setting up a WebRTC connection
     PeerSetup(PeerInfo),
+    /// Some statistics about its connections from the remote node
     NodeStats(Vec<NodeStat>),
 }
 
@@ -300,33 +362,45 @@ impl std::fmt::Display for WSSignalMessageFromNode {
             WSSignalMessageFromNode::ListIDsRequest => write!(f, "ListIDsRequest"),
             WSSignalMessageFromNode::PeerSetup(_) => write!(f, "PeerSetup"),
             WSSignalMessageFromNode::NodeStats(_) => write!(f, "NodeStats"),
-            WSSignalMessageFromNode::ClearNodes => write!(f, "ClearNodes"),
         }
     }
 }
 
 #[serde_as]
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+/// What a node sends when it connects to the signalling server
 pub struct MessageAnnounce {
+    /// The signalling server version the node knows
     pub version: u64,
+    /// The challenge the server sent to this node.
+    /// If the challenge is not correct, nothing happens, and the server waits for the
+    /// correct challenge to arrive
     pub challenge: U256,
+    /// Information about the remote node.
+    /// The [`NodeInfo.get_id()`] will be used as the ID of this node.
     pub node_info: NodeInfo,
     #[serde_as(as = "Base64")]
+    /// The signature of the challenge with the private key of the node.
     pub signature: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+/// Some statistics about the connections to other nodes.
 pub struct NodeStat {
-    pub id: U256,
+    /// The id of the remote node
+    pub id: NodeID,
+    /// Some version
     pub version: String,
+    /// The round-trip time in milliseconds
     pub ping_ms: u32,
+    /// How many ping-packets have been received from this node
     pub ping_rx: u32,
 }
 
 impl std::fmt::Debug for SignalInput {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match self {
-            SignalInput::WebSocket(_) => write!(f, "WebSocket"),
+            // SignalInput::WebSocket(_) => write!(f, "WebSocket"),
             SignalInput::Timer => write!(f, "Timer"),
         }
     }

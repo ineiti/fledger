@@ -67,7 +67,7 @@ impl SubsystemHandler<WSServerMessage> for WebSocketServer {
         for msg in from_broker {
             if let WSServerMessage::Input(msg_in) = msg {
                 match msg_in {
-                    WSServerInput::Message((id, msg)) => {
+                    WSServerInput::Message(id, msg) => {
                         let mut connections = self.connections.lock().await;
                         if let Some(conn) = connections.get_mut(id) {
                             if let Err(e) = conn.send(msg).await {
@@ -139,7 +139,7 @@ impl WSConnection {
                             if let Some(out) = match msg_ws {
                                 Ok(msg) => match msg {
                                     Message::Text(s) => {
-                                        Some(WSServerMessage::Output(WSServerOutput::Message((id, s))))
+                                        Some(WSServerMessage::Output(WSServerOutput::Message(id, s)))
                                     }
                                     Message::Close(_) => {
                                         Some(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
@@ -205,7 +205,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             server_tap.recv().unwrap(),
-            WSServerMessage::Output(WSServerOutput::Message((ch_index, txt)))
+            WSServerMessage::Output(WSServerOutput::Message(ch_index, txt))
         );
     }
 
@@ -218,7 +218,7 @@ mod tests {
         server
             .emit_msg_dest(
                 Destination::NoTap,
-                WSServerInput::Message((ch_index, txt.clone())).into(),
+                WSServerInput::Message(ch_index, txt.clone()).into(),
             )
             .unwrap();
         assert_eq!(

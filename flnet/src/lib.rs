@@ -176,16 +176,22 @@ pub use flmodules::broker;
 pub use flmodules::nodeids::{NodeID, NodeIDs, U256};
 
 #[derive(Error, Debug)]
+/// Errors when setting up a new network connection
 pub enum NetworkSetupError {
+    /// Missing wasm or libc feature
     #[error("No libc or wasm feature given")]
     NoFeature,
+    /// Something went wrong with the broker initialization
     #[error(transparent)]
     Broker(#[from] flmodules::broker::BrokerError),
+    /// Problem in the websocket client
     #[error(transparent)]
     WebSocketClient(#[from] websocket::WSClientError),
     #[cfg(feature = "libc")]
+    /// Problem in the websocket server
     #[error(transparent)]
     WebSocketServer(#[from] websocket::WSSError),
+    /// Generic network error
     #[error(transparent)]
     Network(#[from] network::NetworkError),
 }
@@ -211,9 +217,9 @@ mod arch {
 #[cfg(any(feature = "libc", feature = "wasm"))]
 pub use arch::*;
 
-/// Starts a new Broker<NetworkMessage> with a given `node`- and `connection`-configuration.
+/// Starts a new [`broker::Broker<NetworkMessage>`] with a given `node`- and `connection`-configuration.
 /// This returns a raw broker which is mostly suited to connect to other brokers.
-/// If you need an easier access to the WebRTC network, use `network_start`, which returns
+/// If you need an easier access to the WebRTC network, use [`network_start`], which returns
 /// a structure with a more user-friendly API.
 ///
 /// # Example
@@ -247,7 +253,7 @@ pub async fn network_broker_start(
 /// It returns a user-friendly API that can be used to send and
 /// receive messages.
 /// If you want to connect the network with other brokers, then use
-/// the `network_broker_start` method.
+/// the [`network_broker_start`] method.
 pub async fn network_start(
     node: NodeConfig,
     connection: config::ConnectionConfig,
