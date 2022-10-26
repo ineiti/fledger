@@ -4,12 +4,12 @@ categories = ["network-programming"]
 description = "Network setup and communication"
 edition = "2021"
 homepage = "https://fledg.re"
-keywords = ["network", "fledger"]
+keywords = ["network", "webrtc", "signal", "fledger", "STUN", "TURN"]
 license = "MIT OR Apache-2.0"
 name = "flnet"
 readme = "README.md"
 repository = "https://github.com/ineiti/fledger"
-version = "0.7.0"
+version = "0.7.1"
 
 [features]
 testing = []
