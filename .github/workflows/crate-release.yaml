@@ -23,17 +23,20 @@ jobs:
     - uses: katyo/publish-crates@v1
       with:
         path: "./flmodules"
+        publish-delay: 2000
         registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         ignore-unpublished-changes: true
 
     - uses: katyo/publish-crates@v1
       with:
         path: "./flnet"
+        publish-delay: 2000
         registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         ignore-unpublished-changes: true
 
     - uses: katyo/publish-crates@v1
       with:
         path: "./flnode"
+        publish-delay: 2000
         registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         ignore-unpublished-changes: true
