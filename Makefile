@@ -2,6 +2,7 @@ CARGOS := cli/{fledger,flsignal} flarch flbrowser \
 			flmodules flnet flnode test/{fledger-nodejs,signal-fledger,webrtc-libc-wasm/{libc,wasm}} \
 			examples/ping-pong/{wasm,shared,libc}
 MAKE_TESTS := test/{webrtc-libc-wasm,signal-fledger} examples/ping-pong
+CRATES := flarch flmodules flnet flnode
 SHELL := /bin/bash
 
 cargo_check:
@@ -43,6 +44,16 @@ cargo_unused:
 	for cargo in $$( find . -name Cargo.toml ); do \
 		echo Checking for unused crates in $$cargo; \
 		(cd $$(dirname $$cargo) && cargo +nightly udeps -q ); \
+	done
+
+publish:
+	for crate in ${CRATES}; do \
+		CRATE_VERSION=$$(cargo search $$crate | grep "^$$crate " | sed -e "s/.*= \"\(.*\)\".*/\1/"); \
+		CARGO_VERSION=$$(grep "^version" $$crate/Cargo.toml | head -n 1 | sed -e "s/.*\"\(.*\)\".*/\1/"); \
+		if [[ "$$CRATE_VERSION" != "$$CARGO_VERSION" ]]; then \
+			echo "Publishing crate $$crate"; \
+			cargo publish --token $$CARGO_REGISTRY_TOKEN --manifest-path $$crate/Cargo.toml; \
+		fi; \
 	done
 
 update_version:
