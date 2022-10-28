@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - "*"
+  workflow_dispatch:
 
 jobs:
   release:
@@ -14,29 +15,26 @@ jobs:
         toolchain: stable
         override: true
 
-    - uses: katyo/publish-crates@v1
+    - uses: actions-rs/cargo@v1
+      continue-on-error: true
       with:
-        path: "./flarch"
-        registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        ignore-unpublished-changes: true
+        command: publish
+        args: --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --manifest-path flarch/Cargo.toml
 
-    - uses: katyo/publish-crates@v1
+    - uses: actions-rs/cargo@v1
+      continue-on-error: true
       with:
-        path: "./flmodules"
-        publish-delay: 2000
-        registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        ignore-unpublished-changes: true
+        command: publish
+        args: --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --manifest-path flarch/Cargo.toml
 
-    - uses: katyo/publish-crates@v1
+    - uses: actions-rs/cargo@v1
+      continue-on-error: true
       with:
-        path: "./flnet"
-        publish-delay: 2000
-        registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        ignore-unpublished-changes: true
+        command: publish
+        args: --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --manifest-path flarch/Cargo.toml
 
-    - uses: katyo/publish-crates@v1
+    - uses: actions-rs/cargo@v1
+      continue-on-error: true
       with:
-        path: "./flnode"
-        publish-delay: 2000
-        registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        ignore-unpublished-changes: true
+        command: publish
+        args: --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --manifest-path flarch/Cargo.toml
