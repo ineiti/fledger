@@ -1,6 +1,6 @@
 [package]
 name = "flnode"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "Glue code for flnet and flmodules"

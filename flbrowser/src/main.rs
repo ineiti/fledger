@@ -6,13 +6,18 @@ use flnet::{
     network_broker_start,
 };
 use flnode::{node::Node, version::VERSION_STRING};
+use js_sys::JsString;
 use regex::Regex;
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    mem::ManuallyDrop,
     time::{Duration, UNIX_EPOCH},
 };
-use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
+use tokio::sync::mpsc::UnboundedSender;
+use wasm_bindgen::{
+    prelude::{wasm_bindgen, Closure},
+    JsCast, JsValue,
+};
 use web_sys::{window, Document, Event, HtmlTextAreaElement};
 
 use flarch::{data_storage::DataStorageLocal, spawn_local, wait_ms};
@@ -25,196 +30,169 @@ const URL: &str = "wss://signal.fledg.re";
 #[cfg(feature = "local")]
 const URL: &str = "ws://localhost:8765";
 
+#[derive(Debug, Clone)]
+enum Button {
+    SendMsg,
+    DownloadData,
+}
+
+#[wasm_bindgen(module = "/src/main.js")]
+extern "C" {
+    fn downloadFile(fileName: JsString, data: JsString);
+}
+
+// Because I really want to have a 'normal' HTML file and then link it with rust,
+// this code is necessary to link the two.
+// Using things like Yew or others is too far from HTML for me.
+// Any suggestions for a framework that allows to do this in a cleaner way are welcome.
 fn main() {
     spawn_local(async {
-        let mut web = FledgerWeb::new();
-        let window = web_sys::window().expect("no global `window` exists");
-        let document = window.document().expect("should have a document on window");
-        let your_message = document
+        let mut web = FledgerWeb::new().await.expect("Should run fledger");
+
+        // Create a listening channel that fires whenever the user clicks on the `send_msg` button
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Button>();
+        web.link_btn(tx.clone(), Button::SendMsg, "send_msg");
+        web.link_btn(tx, Button::DownloadData, "get_data");
+
+        // Link to the message the user wants to send
+        let your_message = web
+            .document
             .get_element_by_id("your_message")
             .unwrap()
             .dyn_into::<HtmlTextAreaElement>()
             .unwrap();
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<()>();
-
-        let cb = Closure::wrap(Box::new(move |_: Event| {
-            tx.send(())
-                .err()
-                .map(|e| log::error!("Couldn't send message: {e:?}"));
-        }) as Box<dyn FnMut(_)>);
-        document
-            .get_element_by_id("send_msg")
-            .unwrap()
-            .add_event_listener_with_callback("click", &cb.as_ref().unchecked_ref())
-            .expect("Should be able to add event listener");
-
         loop {
-            if let Ok(_) = rx.try_recv() {
-                let msg = your_message.value();
-                if msg != "" {
-                    web.send_msg(msg);
-                    your_message.set_value("");
+            if let Ok(btn) = rx.try_recv() {
+                match btn {
+                    Button::SendMsg => {
+                        // User clicked on the `send_msg` button
+                        let msg = your_message.value();
+                        if msg != "" {
+                            web.node
+                                .add_chat_message(msg)
+                                .await
+                                .expect("Should add chat message");
+                            your_message.set_value("");
+                        }
+                    }
+                    Button::DownloadData => {
+                        let data = web.node.gossip.as_ref().unwrap().storage.get().unwrap();
+                        downloadFile("gossip_event.toml".into(), data.into());
+                    }
                 }
             }
-            if let Some(state) = web.tick() {
-                update_table(&document, &state)
+            if let Some(state) = web.tick().await {
+                update_table(&web, &state)
                     .err()
                     .map(|_| log::error!("While updating table"));
-                sh(&document, "node_info", state.get_node_name());
-                sh(&document, "version", state.get_version());
-                sh(&document, "messages", state.get_msgs());
-                sh(&document, "nodes_known", format!("{}", state.nodes_known));
-                sh(&document, "nodes_online", format!("{}", state.nodes_online));
-                sh(
-                    &document,
-                    "nodes_connected",
-                    format!("{}", state.nodes_connected),
-                );
+                web.set_html_id("node_info", state.get_node_name());
+                web.set_html_id("version", state.get_version());
+                web.set_html_id("messages", state.get_msgs());
+                web.set_html_id("nodes_known", format!("{}", state.nodes_known));
+                web.set_html_id("nodes_online", format!("{}", state.nodes_online));
+                web.set_html_id("nodes_connected", format!("{}", state.nodes_connected));
             }
             wait_ms(1000).await;
         }
     });
 }
 
-fn sh(doc: &Document, id: &str, inner_html: String) {
-    doc.get_element_by_id(id)
-        .unwrap()
-        .set_inner_html(&inner_html);
-}
-
-fn update_table(document: &Document, state: &FledgerState) -> Result<(), JsValue> {
+fn update_table(web: &FledgerWeb, state: &FledgerState) -> Result<(), JsValue> {
     let stats_table = state.get_node_table();
-    let el_fetching = document.get_element_by_id("fetching").unwrap();
-    let el_table_stats = document.get_element_by_id("table_stats").unwrap();
+    let el_fetching = web.document.get_element_by_id("fetching").unwrap();
+    let el_table_stats = web.document.get_element_by_id("table_stats").unwrap();
     el_table_stats.class_list().remove_1("hidden")?;
     el_fetching.class_list().remove_1("hidden")?;
     if stats_table == "" {
         el_table_stats.class_list().add_1("hidden")?;
     } else {
         el_fetching.class_list().add_1("hidden")?;
-        sh(&document, "node_stats", stats_table);
+        web.set_html_id("node_stats", stats_table);
     }
 
     Ok(())
 }
 
+/// FledgerWeb is a nearly generic handler for the FledgerNode.
 pub struct FledgerWeb {
-    node: Arc<Mutex<Option<Node>>>,
+    node: Node,
+    document: Document,
     counter: u32,
-    msgs: Vec<String>,
 }
 
 impl FledgerWeb {
-    pub fn new() -> Self {
+    pub async fn new() -> Result<Self> {
         console_error_panic_hook::set_once();
         FledgerWeb::set_data_storage();
 
         wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
         log::info!("Starting new FledgerWeb");
 
-        let fw = Self {
-            node: Arc::new(Mutex::new(None)),
+        // Get a link to the document
+        let window = web_sys::window().expect("no global `window` exists");
+        Ok(Self {
+            node: Self::node_start().await?,
+            document: window.document().expect("should have a document on window"),
             counter: 0u32,
-            msgs: vec![],
-        };
-
-        let node_cl = fw.node.clone();
-        wasm_bindgen_futures::spawn_local(async {
-            match FledgerWeb::node_start(node_cl).await {
-                Ok(_) => log::info!("Initialized node"),
-                Err(e) => log::error!("Couldn't initialize node: {}", e),
-            }
-        });
-        fw
+        })
     }
 
-    pub fn tick(&mut self) -> Option<FledgerState> {
+    fn link_btn(&self, tx: UnboundedSender<Button>, btn: Button, id: &str) {
+        let cb = ManuallyDrop::new(Closure::wrap(Box::new(move |_: Event| {
+            tx.send(btn.clone())
+                .err()
+                .map(|e| log::error!("Couldn't send message: {e:?}"));
+        }) as Box<dyn FnMut(_)>));
+        self.document
+            .get_element_by_id(id)
+            .unwrap()
+            .add_event_listener_with_callback("click", &cb.as_ref().unchecked_ref())
+            .expect("Should be able to add event listener");
+    }
+
+    fn set_html_id(&self, id: &str, inner_html: String) {
+        self.document
+            .get_element_by_id(id)
+            .unwrap()
+            .set_inner_html(&inner_html);
+    }
+
+    pub async fn tick(&mut self) -> Option<FledgerState> {
         let mut fs = None;
-        if let Ok(mut no) = self.node.try_lock() {
-            if let Some(n) = no.as_mut() {
-                match FledgerState::new(n) {
-                    Ok(f) => fs = Some(f),
-                    Err(e) => log::error!("Couldn't create state: {:?}", e),
-                }
-            }
-        } else {
-            log::error!("Couldn't lock");
+        match FledgerState::new(&self.node) {
+            Ok(f) => fs = Some(f),
+            Err(e) => log::error!("Couldn't create state: {:?}", e),
         }
-        let noc = Arc::clone(&self.node);
-        let msgs = self.msgs.drain(..).collect();
         self.counter += 1;
-        wasm_bindgen_futures::spawn_local(async move {
-            if let Err(e) = Self::update_node(noc, msgs).await {
-                log::error!("Couldn't update node: {:?}", e);
-            };
-        });
+        self.node
+            .request_list()
+            .await
+            .expect("Couldn't request list");
+        self.node
+            .process()
+            .await
+            .expect("Should be able to push process");
         fs
     }
 
-    pub fn send_msg(&mut self, msg: String) {
-        self.msgs.push(msg);
-    }
-}
-
-impl Default for FledgerWeb {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl FledgerWeb {
-    async fn update_node(noc: Arc<Mutex<Option<Node>>>, msgs: Vec<String>) -> Result<()> {
-        if let Ok(mut no) = noc.try_lock() {
-            if let Some(n) = no.as_mut() {
-                for msg in msgs {
-                    if let Err(e) = n.add_chat_message(msg).await {
-                        log::error!("Couldn't add message: {:?}", e);
-                    }
-                }
-                n.request_list().await.map_err(|e| anyhow!(e))?;
-                n.process().await.map_err(|e| anyhow!(e))?;
-            } else {
-                log::warn!("Couldn't lock node");
-            }
-        } else {
-            log::error!("Couldn't lock");
-        }
-        Ok(())
-    }
-
-    async fn node_start(node_mutex: Arc<Mutex<Option<Node>>>) -> Result<()> {
+    async fn node_start() -> Result<Node> {
         let my_storage = DataStorageLocal::new("fledger");
-        if let Ok(mut node) = node_mutex.try_lock() {
-            let node_config = Node::get_config(my_storage.clone())?;
-            let config = ConnectionConfig::new(
-                Some(URL.into()),
-                None,
-                Some(HostLogin {
-                    url: "turn:web.fledg.re:3478".into(),
-                    login: Some(Login {
-                        user: "something".into(),
-                        pass: "something".into(),
-                    }),
+        let node_config = Node::get_config(my_storage.clone())?;
+        let config = ConnectionConfig::new(
+            Some(URL.into()),
+            None,
+            Some(HostLogin {
+                url: "turn:web.fledg.re:3478".into(),
+                login: Some(Login {
+                    user: "something".into(),
+                    pass: "something".into(),
                 }),
-            );
-            let network =
-                network_broker_start(node_config.clone(), config)
-                    .await?;
-            *node = Some(
-                Node::start(my_storage, node_config, network)
-                    .await
-                    .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?,
-            );
-        } else {
-            log::error!("Couldn't lock");
-        }
-        Ok(())
-    }
-
-    fn set_config(data: &str) {
-        if let Err(err) = Node::set_config(DataStorageLocal::new("fledger"), data) {
-            log::warn!("Got error while saving config: {}", err);
-        }
+            }),
+        );
+        let network = network_broker_start(node_config.clone(), config).await?;
+        Ok(Node::start(my_storage, node_config, network)
+            .await
+            .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
     }
 
     fn set_data_storage() {
@@ -224,7 +202,10 @@ impl FledgerWeb {
                 let data_enc = reg.replace(&loc, "");
                 if data_enc != "" {
                     if let Ok(data) = urlencoding::decode(&data_enc) {
-                        FledgerWeb::set_config(&data);
+                        if let Err(err) = Node::set_config(DataStorageLocal::new("fledger"), &data)
+                        {
+                            log::warn!("Got error while saving config: {}", err);
+                        }
                     }
                 }
             }
