@@ -68,6 +68,15 @@ impl GossipEvents {
         }
     }
 
+    /// Processes many messages at a time.
+    pub fn process_messages(&mut self, msgs: Vec<GossipIn>) -> Result<Vec<GossipOut>, serde_yaml::Error>{
+        let mut out = vec![];
+        for msg in msgs {
+            out.extend(self.process_message(msg)?);
+        }
+        Ok(out)
+    }
+
     /// Processes one generic message and returns either an error
     /// or a Vec<MessageOut>.
     pub fn process_message(

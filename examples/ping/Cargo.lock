@@ -901,7 +901,7 @@ dependencies = [
 
 [[package]]
 name = "flmodules"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "async-trait",
  "flarch",
@@ -921,7 +921,7 @@ dependencies = [
 
 [[package]]
 name = "flnet"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-trait",
  "bimap",
