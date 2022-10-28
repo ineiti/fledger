@@ -5,7 +5,7 @@ on:
     - main
 
 jobs:
-  build:
+  docker:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -20,8 +20,11 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           **/target/
-        key: cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: cargo-
+        key: cargo-docker-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-docker
+          cargo-build
+          cargo
 
     - uses: jetli/wasm-pack-action@v0.3.0
       with:
@@ -81,6 +84,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+    - uses: actions/checkout@v2
+
     - name: Publish new crates, if any
       run: make publish
       env:
