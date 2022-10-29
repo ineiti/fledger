@@ -13,23 +13,18 @@ jobs:
       with:
         fetch-depth: 0
 
-    - uses: Swatinem/rust-cache@v2
+    - name: Set up cargo cache
+      uses: actions/cache@v3
+      continue-on-error: false
       with:
-        shared-key: "fledger"
-        workspaces: |
-          flnet
-          test/signal-fledger
-          test/fledger-nodejs
-          test/webrtc-libc-wasm/libc
-          test/webrtc-libc-wasm/wasm
-          flnode
-          flarch
-          cli
-          flbrowser
-          examples/ping-pong/libc
-          examples/ping-pong/wasm
-          examples/ping-pong/shared
-          flmodules
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          **/target/
+        key: cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: cargo-
 
     - name: Run cargo_build
       shell: bash
@@ -45,23 +40,18 @@ jobs:
       with:
         fetch-depth: 0
 
-    - uses: Swatinem/rust-cache@v2
+    - name: Set up cargo cache
+      uses: actions/cache@v3
+      continue-on-error: false
       with:
-        shared-key: "fledger"
-        workspaces: |
-          flnet
-          test/signal-fledger
-          test/fledger-nodejs
-          test/webrtc-libc-wasm/libc
-          test/webrtc-libc-wasm/wasm
-          flnode
-          flarch
-          cli
-          flbrowser
-          examples/ping-pong/libc
-          examples/ping-pong/wasm
-          examples/ping-pong/shared
-          flmodules
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          **/target/
+        key: cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: cargo-
 
     - name: Run cargo_test
       shell: bash
@@ -77,23 +67,18 @@ jobs:
       with:
         fetch-depth: 0
 
-    - uses: Swatinem/rust-cache@v2
+    - name: Set up cargo cache
+      uses: actions/cache@v3
+      continue-on-error: false
       with:
-        shared-key: "fledger"
-        workspaces: |
-          flnet
-          test/signal-fledger
-          test/fledger-nodejs
-          test/webrtc-libc-wasm/libc
-          test/webrtc-libc-wasm/wasm
-          flnode
-          flarch
-          cli
-          flbrowser
-          examples/ping-pong/libc
-          examples/ping-pong/wasm
-          examples/ping-pong/shared
-          flmodules
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          **/target/
+        key: cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: cargo-
 
     - name: Install trunk
       run: cargo install --locked trunk
