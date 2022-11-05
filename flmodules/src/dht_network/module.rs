@@ -1,33 +1,32 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::nodeids::{NodeID, U256};
+use crate::nodeids::NodeID;
 
-type DHTIndex = U256;
+// type DHTIndex = U256;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum DHTNetMessage{
+pub enum DHTNetMessage {
     Input(DHTInput),
-    Output(DHTOutput)
+    Output(DHTOutput),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum DHTInput{
-    Node(NodeID, MessageNode)
+pub enum DHTInput {
+    Node(NodeID, MessageNode),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum DHTOutput{
-    Node(NodeID, MessageNode)
+pub enum DHTOutput {
+    Node(NodeID, MessageNode),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum MessageNode{
+pub enum MessageNode {
     Other(String, String),
-
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct OtherMessage{
+pub struct OtherMessage {
     pub module: String,
     pub msg: String,
 }
