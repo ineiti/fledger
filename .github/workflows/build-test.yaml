@@ -23,8 +23,10 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           **/target/
-        key: cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: cargo-
+        key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-build-
+          cargo
 
     - name: Run cargo_build
       shell: bash
@@ -50,8 +52,10 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           **/target/
-        key: cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: cargo-
+        key: cargo-test-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-test
+          cargo-build
 
     - name: Run cargo_test
       shell: bash
@@ -77,11 +81,13 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           **/target/
-        key: cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: cargo-
+        key: cargo-make_test-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-make_test
+          cargo-build
 
     - name: Install trunk
-      run: cargo install --locked trunk
+      run: which trunk || cargo install --locked trunk
 
     - uses: jetli/wasm-pack-action@v0.3.0
       with:
