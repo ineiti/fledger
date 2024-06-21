@@ -1,20 +1,38 @@
 {
   "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.10.7/.schema/devbox.schema.json",
-  "packages": [
-    "which@latest",
-    "rustup@latest",
-    "libiconv@latest",
-    "openssl@latest",
-    "vscode",
-  ],
+  "packages": {
+    "which":    "latest",
+    "rustup":   "latest",
+    "libiconv": "latest",
+    "openssl":  "latest",
+    "vscode":   "",
+    "darwin.apple_sdk.frameworks.Security": {
+      "platforms": ["x86_64-darwin", "aarch64-darwin"]
+    },
+    "git":       "latest",
+    "less":      "latest",
+    "vim":       "latest",
+    "openssh":   "latest",
+    "trunk":     "latest",
+    "wasm-pack": "latest",
+    "nodejs":    "18"
+  },
   "shell": {
     "init_hook": [
       "if [ ! -d $RUSTUP_HOME/toolchains/stable* ]; then rustup default stable; fi",
+      "if [ ! -d $RUSTUP_HOME/toolchains/stable*/lib/rustlib/wasm32-unknown-unknown ]; then rustup target add wasm32-unknown-unknown; fi",
+      "alias ls='ls --color'"
     ],
     "scripts": {
       "test": [
-        "make cargo_test",
+        "make cargo_test"
       ],
-    },
+      "fledger": [
+        "cd cli && cargo run -p fledger"
+      ]
+    }
   },
+  "env": {
+    "LS_COLORS": "di=33"
+  }
 }

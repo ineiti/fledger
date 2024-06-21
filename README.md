@@ -31,7 +31,7 @@ but also long-term users who have a server where they can run a fledger node.
 The system is set up to be 0-configuration and fast.
 
 What it will never do:
-- DeFi - the security guarantees for 1e6 US-$ and more will never be there
+- DeFi - the security guarantees to handle 1e9 US-$ and more will never be there
 - HODL - Fledger's Mana is not made to be held, but will disappear over time
 
 ## State of Fledger
@@ -59,7 +59,7 @@ of the network code:
 
 ### Binaries
 
-Currently the following components are available that are used to create the fledger-binaries:
+The following components are available that are used to create the fledger-binaries:
 - [Command Line Interfaces](./cli) - command line binaries
   - [Signalling server](./cli/flsignal) - the signalling server for the WebRTC connections
   - [Fledger node](./cli/fledger) - a fledger node implementation for the command line
