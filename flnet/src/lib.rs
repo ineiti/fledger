@@ -42,7 +42,7 @@
 //! Here is a short example of how two nodes can communicate with each other. First of all
 //! you need a locally runing signalling server that you can spin up with:
 //!
-//! ```rust
+//! ```bash
 //! cd cli; cargo run --bin flsignal -- -vv
 //! ```
 //!
@@ -51,7 +51,7 @@
 //!
 //! Here is a small example of how to setup a server that listens to messages from clients.
 //!
-//! ```rust
+//! ```bash
 //! // The server waits for connections by the clients and prints the messages received.
 //! async fn server() -> Result<(), BrokerError> {
 //!     // Create a random node-configuration. It uses serde for easy serialization.
@@ -73,7 +73,7 @@
 //! It is contacted by the client node, which needs the ID of the server to know where
 //! to connect to:
 //!
-//! ```rust
+//! ```bash
 //! // A client sends a single message to a server and then disconnects.
 //! async fn client(server_id: &str) -> Result<(), BrokerError> {
 //!     // Create a random node-configuration. It uses serde for easy serialization.
@@ -116,7 +116,7 @@
 //! The `wasm` feature enables the WASM backend, which only
 //! includes the WebRTC connections and the signalling client:
 //!
-//! ```rust
+//! ```cargo.toml
 //! flnet = {features = ["wasm"], version = "0.7"}
 //! ```
 //!
@@ -124,7 +124,7 @@
 //! which has the WebRTC connections, and both the signalling client
 //! and server part:
 //!
-//! ```rust
+//! ```cargo.toml
 //! flnet = {features = ["libc"], version = "0.7"}
 //! ```
 //!
@@ -224,7 +224,7 @@ pub use arch::*;
 ///
 /// # Example
 ///
-/// ```rust
+/// ```bash
 /// async fn start_network() -> Result<(), NetworkSetupError>{
 ///   let net = network_broker_start();
 /// }
