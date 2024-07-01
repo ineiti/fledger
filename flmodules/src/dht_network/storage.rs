@@ -1,95 +1,285 @@
-use std::{cmp::min, collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
 use crate::nodeids::NodeID;
 
 pub struct Kademlia {
-    k_buckets: HashMap<usize, Vec<Box<dyn ID>>>,
+    // All buckets starting with 0..depth-1 0s
+    buckets: Vec<KBucket>,
+    // The home of the root bucket, including the optimization if the root
+    // bucket is isolated
+    root_bucket: RootBucket,
+    // The root node of this Kademlia instance
+    root: Box<dyn ID>,
+    root_bytes: Vec<u8>,
+    // Maximum number of nodes per bucket
     k: usize,
-    base: Box<dyn ID>,
 }
 
 impl Kademlia {
-    pub fn new(k: usize, base: Box<dyn ID>) -> Self {
+    pub fn new(k: usize, root: Box<dyn ID>) -> Self {
         Self {
-            k_buckets: HashMap::new(),
+            buckets: vec![],
+            root_bucket: RootBucket::new(k, 0),
+            root_bytes: root.get_bytes(),
+            root,
             k,
-            base,
         }
     }
 
-    pub fn add_nodes(&mut self, nodes: Vec<Box<dyn ID>>) {
-        for node in nodes {
-            if let Some(bucket) = self.k_buckets.get_mut(&self.base.distance(&*node)) {
-                bucket.push(node);
-                if bucket.len() > self.k {
-                    bucket.sort_by(|a, b| a.uptime_sec().cmp(&b.uptime_sec()));
-                    bucket.drain(self.k..);
-                }
-            } else {
-                self.k_buckets
-                    .insert(self.base.distance(&*node), vec![node]);
-            }
+    pub fn add_node(&mut self, id: Box<dyn ID>) {
+        let node = KNode::new(&self.root_bytes, id);
+        let state = if node.depth < self.buckets.len() {
+            self.buckets.get_mut(node.depth).unwrap().add_node(node)
+        } else {
+            self.root_bucket.add_node(node)
+        };
+        match state {
+            BucketStatus::Stable => todo!(),
+            BucketStatus::Empty => todo!(),
+            BucketStatus::Overflowing => todo!(),
         }
     }
 
-    pub fn remove_nodes(&mut self, nodes: Vec<Box<dyn ID>>) {
-        for node in nodes {
-            if let Some(bucket) = self.k_buckets.get_mut(&self.base.distance(&*node)) {
-                bucket.retain(|n| !node.equals(n.as_ref()));
-            }
+    pub fn remove_node(&mut self, id: Box<dyn ID>) {
+        let node = KNode::new(&self.root_bytes, id);
+        let state = if node.depth < self.buckets.len() {
+            self.buckets.get_mut(node.depth).unwrap().remove_node(node)
+        } else {
+            self.root_bucket.remove_node(node)
+        };
+        match state {
+            BucketStatus::Stable => todo!(),
+            BucketStatus::Empty => todo!(),
+            BucketStatus::Overflowing => todo!(),
         }
     }
 
-    pub fn closest_nodes(&mut self, node: &dyn ID, nbr: usize) -> Vec<Box<dyn ID>> {
-        let dist = self.base.distance(node);
-        let mut closest = vec![];
-        // Zigzag from the bucket 'dist' back and forth and fill 'closest' with the
-        // nodes found.
-        for i in 0..self.base.bits() {
-            let mut zigzag = dist + i / 2;
-            if i % 2 == 1 {
-                if zigzag > i {
-                    zigzag -= i;
-                } else {
-                    continue;
-                }
-            }
-            if let Some(bucket) = self.k_buckets.get_mut(&zigzag) {
-                let elements = min(nbr - closest.len(), bucket.len());
-                closest.extend(
-                    bucket
-                        .drain(0..elements)
-                        .map(|n| n)
-                        .collect::<Vec<Box<dyn ID>>>(),
-                );
-            }
-            if closest.len() == nbr {
-                break;
-            }
-        }
+    pub fn nearest_nodes(&mut self, _node: Box<dyn ID>) -> Vec<Box<dyn ID>> {
+        vec![]
+    }
 
-        closest
+    pub fn ping_answer(&mut self, _node: Box<dyn ID>) {}
+
+    pub fn tick(&mut self) -> Vec<Box<dyn ID>> {
+        vec![]
     }
 }
 
+struct KBucket {
+    active: Vec<KNode>,
+    cache: Vec<KNode>,
+    k: usize,
+}
+
+impl KBucket {
+    fn new(k: usize) -> Self {
+        Self {
+            active: vec![],
+            cache: vec![],
+            k,
+        }
+    }
+
+    fn add_node(&mut self, node: KNode) -> BucketStatus {
+        if self.active.len() < self.k {
+            self.active.push(node);
+        } else {
+            self.cache.push(node);
+        }
+        BucketStatus::Stable
+    }
+
+    fn remove_node(&mut self, node: KNode) -> BucketStatus {
+        if let Some(pos) = self.active.iter().position(|n| n == &node) {
+            self.active.remove(pos);
+            if self.cache.len() > 0 {
+                self.active.push(self.cache.pop().unwrap());
+            }
+        } else if let Some(pos) = self.cache.iter().position(|n| n == &node) {
+            self.cache.remove(pos);
+        }
+
+        if self.active.len() + self.cache.len() > 0 {
+            BucketStatus::Stable
+        } else {
+            BucketStatus::Empty
+        }
+    }
+}
+
+struct RootBucket {
+    tree: KTree,
+    root: KBucket,
+    k: usize,
+}
+
+impl RootBucket {
+    fn new(k: usize, depth: usize) -> Self {
+        Self {
+            tree: KTree::new(k, depth),
+            root: KBucket::new(k),
+            k,
+        }
+    }
+
+    fn add_node(&mut self, node: KNode) -> BucketStatus {
+        if node.distance.get(self.k).unwrap() == &Bit::One {
+            self.tree.add_node(node)
+        } else {
+            self.root.add_node(node)
+        }
+    }
+
+    fn remove_node(&mut self, node: KNode) -> BucketStatus {
+        if node.distance.get(self.k).unwrap() == &Bit::One {
+            self.tree.remove_node(node)
+        } else {
+            self.root.remove_node(node)
+        }
+    }
+}
+
+struct KTree {
+    top: KTreeNode,
+    k: usize,
+    depth: usize,
+}
+
+impl KTree {
+    fn new(k: usize, depth: usize) -> Self {
+        Self {
+            top: KTreeNode::Leaf(vec![]),
+            k,
+            depth,
+        }
+    }
+
+    fn add_node(&mut self, node: KNode) -> BucketStatus {
+        let mut d = self.depth;
+        let mut p = &mut self.top;
+        loop {
+            match p {
+                KTreeNode::Leaf(l) => {
+                    if l.len() < self.k {
+                        l.push(node);
+                        break;
+                    }
+                    *p = KTreeNode::split_bucket(l.drain(..).collect(), d);
+                }
+                KTreeNode::Node(one, zero) => {
+                    p = match node.distance.get(d).unwrap(){
+                        Bit::Zero => zero,
+                        Bit::One => one,
+                    };
+                }
+            }
+            match node.distance.get(d).unwrap() {
+                Bit::One => {}
+                Bit::Zero => {}
+            }
+            d += 1;
+        }
+        BucketStatus::Stable
+    }
+
+    fn remove_node(&mut self, _node: KNode) -> BucketStatus {
+        BucketStatus::Stable
+    }
+}
+
+enum KTreeNode {
+    Leaf(Vec<KNode>),
+    Node(Box<KTreeNode>, Box<KTreeNode>),
+}
+
+impl KTreeNode {
+    // TODO: do something useful here with the bucket:
+    // - separate it into 1s and 0s bucket
+    // - make sure that if it's all in one bucket, it continues recursively
+    fn split_bucket(bucket: Vec<KNode>, _depth: usize) -> KTreeNode {
+        KTreeNode::Node(
+            Box::new(KTreeNode::Leaf(bucket)),
+            Box::new(KTreeNode::Leaf(vec![])),
+        )
+    }
+}
+
+enum BucketStatus {
+    Stable,
+    Empty,
+    Overflowing,
+}
+
+#[derive(Debug)]
+struct KNode {
+    node: Box<dyn ID>,
+    depth: usize,
+    distance: Vec<Bit>,
+    state: NodeState,
+}
+
+impl KNode {
+    pub fn new(root: &Vec<u8>, node: Box<dyn ID>) -> Self {
+        let distance = Self::distance(root, node.get_bytes());
+        let mut depth = 0;
+        while let Some(bit) = distance.get(depth) {
+            if bit == &Bit::Zero {
+                depth += 1;
+            } else {
+                break;
+            }
+        }
+        Self {
+            node,
+            state: NodeState::Active,
+            depth,
+            distance,
+        }
+    }
+
+    fn distance(root: &Vec<u8>, mut node: Vec<u8>) -> Vec<Bit> {
+        root.iter()
+            .map(|c| (c ^ node.remove(0)).count_ones())
+            .flat_map(|mut x| {
+                (0..7).map(move |_| {
+                    x *= 2;
+                    if x & 0x100 > 0 {
+                        Bit::Zero
+                    } else {
+                        Bit::One
+                    }
+                })
+            })
+            .collect()
+    }
+
+    fn set_state(&mut self, state: NodeState) {
+        self.state = state;
+    }
+}
+
+impl PartialEq for KNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.node.equals(&*other.node)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum Bit {
+    Zero,
+    One,
+}
+
+#[derive(Debug)]
+enum NodeState {
+    // actively used in the k-bucket
+    Active,
+    // node has been pinged this many times
+    Ping(usize),
+}
+
 pub trait ID: Debug {
-    fn uptime_sec(&self) -> usize;
-
     fn get_bytes(&self) -> Vec<u8>;
-
-    fn bits(&self) -> usize {
-        self.get_bytes().len() * 8
-    }
-
-    fn distance(&self, other: &dyn ID) -> usize {
-        let xor = self.get_bytes();
-        let mut xor_other = other.get_bytes();
-        xor.iter()
-            .map(|c| (c ^ xor_other.remove(0)).count_ones())
-            .reduce(|a, i| a + i)
-            .unwrap() as usize
-    }
-
     fn equals(&self, other: &dyn ID) -> bool {
         let mut other_bytes = other.get_bytes().to_vec();
         self.get_bytes()
@@ -102,49 +292,5 @@ pub trait ID: Debug {
 impl ID for NodeID {
     fn get_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
-    }
-
-    fn uptime_sec(&self) -> usize {
-        self.get_bytes()[0] as usize
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::str::FromStr;
-
-    use flarch::start_logging;
-
-    use super::*;
-
-    #[test]
-    fn test_id() {
-        start_logging();
-        
-        assert_eq!(256, NodeID::rnd().bits());
-        let id1 = NodeID::from_str("10").unwrap();
-        assert!(id1.equals(&id1));
-        let id2 = NodeID::from_str("20").unwrap();
-        assert!(!id1.equals(&id2));
-        log::info!("Distance is: {}", id1.distance(&id2));
-        assert_eq!(2, id1.distance(&id2));
-        assert_eq!(2, id2.distance(&id1));
-    }
-
-    #[test]
-    fn add_remove_nodes() {
-        start_logging();
-
-        let mut ids: Vec<Box<dyn ID>> = vec![];
-        for i in 0..8 {
-            ids.push(Box::new(NodeID::from_str(&format!("0{i}")).unwrap()));
-        }
-
-        let mut km = Kademlia::new(2, ids.remove(4));
-        km.add_nodes(ids);
-        for (dist, bucket) in km.k_buckets{
-            log::info!("Distance {dist}: {bucket:?}");
-            assert!(bucket.len() <= 2);
-        }
     }
 }

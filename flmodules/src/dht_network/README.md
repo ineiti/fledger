@@ -63,3 +63,12 @@ To store data, the client does the following:
 If somebody wants to retrive the data, they need the binary-blob-ID
 
 ## The role of the DHT
+
+# Kademlia implementation
+
+Kademlia
+  - Vec<KBucket>
+  - RootBucket
+    - KTree
+      - KTreeNode
+    - KBucket
