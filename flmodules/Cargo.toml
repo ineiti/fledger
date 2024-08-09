@@ -18,14 +18,14 @@ flarch = { path = "../flarch", version = "0.7" }
 
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 # serde_wtih version 2 doesn't work with old configs
-serde_with = {version = "1", features = ["hex", "json"]}
+serde_with = {version = "3", features = ["hex", "json"]}
 sha2 = "0.10"
 rand = "0.8"
 thiserror = "1"
 log = "0.4"
-itertools = "0.10"
+itertools = "0.13"
 async-trait = "0.1"
 futures = "0.3"
 tokio = {version = "1", features = ["sync"]}

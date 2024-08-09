@@ -136,7 +136,7 @@ impl WebRTCConnectionSetupLibc {
                 Box::pin(async move {
                     let mut broker_cl = broker_cl.clone();
                     if let Some(ice) = ice_op {
-                        let ice_str = ice.to_json().await.unwrap().candidate;
+                        let ice_str = ice.to_json().unwrap().candidate;
                         broker_cl
                             .emit_msg(WebRTCMessage::Output(WebRTCOutput::Setup(
                                 PeerMessage::IceCandidate(ice_str),
@@ -145,8 +145,7 @@ impl WebRTCConnectionSetupLibc {
                             .map(|e| log::warn!("Ice candidate queued but not processed: {:?}", e));
                     }
                 })
-            }))
-            .await;
+            }));
 
         let broker_cl = self.broker.clone();
         let resets = Arc::clone(&self.resets);
@@ -173,8 +172,7 @@ impl WebRTCConnectionSetupLibc {
                         .err()
                         .map(|e| log::warn!("UpdateState queued but not processed: {:?}", e));
                 })
-            }))
-            .await;
+            }));
 
         Ok(())
     }
@@ -257,8 +255,7 @@ impl WebRTCConnectionSetupLibc {
                 Box::pin(async move {
                     Self::register_data_channel(rtc_data, rdc, broker, resets_cl).await;
                 })
-            }))
-            .await;
+            }));
 
         Ok(answer.sdp)
     }
@@ -393,8 +390,7 @@ impl WebRTCConnectionSetupLibc {
                         .err()
                         .map(|e| log::warn!("Flush queued but not processed: {:?}", e));
                 })
-            }))
-            .await;
+            }));
         data_channel
             .on_message(Box::new(move |msg: DataChannelMessage| {
                 if resets.load(Ordering::Relaxed) != resets_current {
@@ -409,8 +405,7 @@ impl WebRTCConnectionSetupLibc {
                         .err()
                         .map(|e| log::warn!("Text queued but not processed: {:?}", e));
                 })
-            }))
-            .await;
+            }));
         rtc_data.lock().await.replace(data_channel);
     }
 

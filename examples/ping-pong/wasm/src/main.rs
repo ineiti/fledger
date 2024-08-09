@@ -16,7 +16,6 @@ use shared::{
 };
 
 struct App {
-    link: ComponentLink<Self>,
     logs: Vec<String>,
     config: NodeConfig,
     pp_imp: bool,
@@ -32,21 +31,20 @@ impl Component for App {
     type Message = AppMessage;
     type Properties = ();
 
-    fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        link.send_message(AppMessage::Init);
+    fn create(s: &yew::Context<App>) -> Self {
+        s.link().send_message(AppMessage::Init);
         Self {
-            link,
             logs: vec![],
             config: flnet::config::NodeConfig::new(),
             pp_imp: now() % 1000 >= 500,
         }
     }
 
-    fn update(&mut self, app_msg: Self::Message) -> bool {
+    fn update(&mut self, s: &yew::Context<App>, app_msg: Self::Message) -> bool {
         match app_msg {
             AppMessage::Init => {
                 log::info!("Initializing pingpong");
-                let link = self.link.clone();
+                let link = s.link().clone();
                 let config = self.config.clone();
                 let pp_imp = self.pp_imp;
                 wasm_bindgen_futures::spawn_local(async move {
@@ -72,7 +70,7 @@ impl Component for App {
             }
             AppMessage::NewPingPong(mut pp) => {
                 log::info!("Starting pingpong");
-                let link = self.link.clone();
+                let link = s.link().clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     let mut list = NodeList::new(vec![]);
                     let (mut tap, _) = pp.get_tap().await.expect("Couldn't get tap");
@@ -114,11 +112,11 @@ impl Component for App {
         false
     }
 
-    fn change(&mut self, _: Self::Properties) -> bool {
+    fn changed(&mut self, _s: &yew::Context<App>, _: &Self::Properties) -> bool {
         false
     }
 
-    fn view(&self) -> Html {
+    fn view(&self, _s: &yew::Context<App>) -> Html {
         let logs = self.logs.join("\n");
         let pp_imp = match self.pp_imp {
             true => "Handler",
@@ -127,26 +125,30 @@ impl Component for App {
         html! {
             <>
             <ybc::Navbar
-                classes=classes!("is-success")
+                classes={classes!("is-success")}
                 padded=true
-                navbrand=html!{
+                navbrand={html!{
                     <ybc::NavbarItem>
-                        <ybc::Title classes=classes!("has-text-white") size=ybc::HeaderSize::Is4>{"FLNet Ping-Pong Example"}</ybc::Title>
+                        <ybc::Title 
+                            classes={classes!("has-text-white")} 
+                            size={ybc::HeaderSize::Is4}>
+                            {"FLNet Ping-Pong Example"}
+                        </ybc::Title>
                     </ybc::NavbarItem>
-                }
-                navstart=html!{}
-                navend=html!{}
+                }}
+                navstart={html!{}}
+                navend={html!{}}
             />
 
             <ybc::Hero
-                classes=classes!("is-light")
-                size=ybc::HeroSize::FullheightWithNavbar
-                body=html!{
-                    <ybc::Container classes=classes!("is-centered")>
-                    <ybc::Tile ctx=Ancestor>
-                        <ybc::Tile ctx=Parent size=ybc::TileSize::Twelve>
-                            <ybc::Tile ctx=Parent>
-                                <ybc::Tile ctx=Child classes=classes!("content")>
+                classes={classes!("is-light")}
+                size={ybc::HeroSize::FullheightWithNavbar}
+                body={html!{
+                    <ybc::Container classes={classes!("is-centered")}>
+                    <ybc::Tile ctx={Ancestor}>
+                        <ybc::Tile ctx={Parent} size={ybc::TileSize::Twelve}>
+                            <ybc::Tile ctx={Parent}>
+                                <ybc::Tile ctx={Child} classes={classes!("content")}>
                                 <h1>{"FLNet example"}</h1>
                                 <h2>{"Running "}{pp_imp}</h2>
                                 <h2>{"Ping-pong logs for "}{&self.config.info.name}</h2>
@@ -156,20 +158,20 @@ impl Component for App {
                         </ybc::Tile>
                     </ybc::Tile>
                     </ybc::Container>
-                }>
+                }}>
             </ybc::Hero>
             </>
         }
     }
 
-    fn rendered(&mut self, _first_render: bool) {}
+    fn rendered(&mut self, _s: &yew::Context<App>, _first_render: bool) {}
 
-    fn destroy(&mut self) {}
+    fn destroy(&mut self, _s: &yew::Context<App>) {}
 }
 
 fn main() {
     set_panic_hook();
     wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
 
-    yew::start_app::<App>();
+    yew::Renderer::<App>::new().render();
 }

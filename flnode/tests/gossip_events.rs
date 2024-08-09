@@ -25,7 +25,7 @@ async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
     net.add_nodes(Brokers::ENABLE_ALL, nbr_nodes).await?;
     let id = &net.nodes.keys().next().unwrap().clone();
     // Hand-crafted formula that works for 2, 30, 100 nodes
-    let steps = ((nbr_nodes as f64).log10() + 4.5) as i32;
+    let steps = ((nbr_nodes as f64).log10() + 5.0) as i32;
 
     log::info!("Adding 1st message");
     add_chat_message(&mut net, id, 0).await;

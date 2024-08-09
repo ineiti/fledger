@@ -16,7 +16,7 @@ wasm = ["wasm-bindgen-futures", "wasm-bindgen", "js-sys", "web-sys"]
 
 [dependencies]
 chrono = "0.4"
-env_logger = "0.9"
+env_logger = "0.11"
 futures = "0.3"
 log = "0.4"
 thiserror = "1"
@@ -28,7 +28,7 @@ wasm-bindgen-futures = {version = "0.4", optional = true}
 wasm-bindgen-test = "0.3"
 
 [dev-dependencies]
-flexi_logger = "0.24"
+flexi_logger = "0.28"
 wasm-bindgen-test = "0.3"
 
 [dependencies.web-sys]

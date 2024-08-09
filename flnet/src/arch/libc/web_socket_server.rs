@@ -31,7 +31,7 @@ impl WebSocketServer {
         let conn_thread = tokio::spawn(async move {
             let mut connection_id = 0;
             loop {
-                for (stream, _) in server.accept().await {
+                if let Ok((stream, _)) = server.accept().await {
                     let broker_cl2 = broker_cl.clone();
                     match WSConnection::new(stream, broker_cl2, connection_id).await {
                         Ok(conn) => {

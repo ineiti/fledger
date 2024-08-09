@@ -1,23 +1,36 @@
 # Work in progress
 
 ## Current high-level goal
+- Clean up and make ready for semester student project
 
 ## Current concrete goal
 
-- Create usable crates for a signalling server and webrtc clients
-  - add minimal documentation to crates
-  - have examples for both wasm and libc
-  - Publish fledger crates in crates.io
+# TODO
 
-### Things to do
+## Bugs
+
+- Find why the network stalls after some time
+- Doesn't work in EPFL network
+
+## Cleanups / improvements
+
+- Increase version of flnet
 - Clean up broker / network:
   - Remove `Destination::{All,Others,This}` - Test it
+    only `Destination::All` is ever used
   - Replace `process` with `async-task`
+    Not sure what is up with that. `process` is a method from `Broker`, while `async-task` is a crate
   - Add `process_msg` with a `Destination::Settle<Vec<BrokerID>>`
+    Again, two years later, no idea...
+
+## Reaching out
+
+- Sign up for dev6
 
 # Dates
 
 2022-09-12:
+- update to latest versions of wasm libraries
 
 2022-09-09:
 - Clean up broker / network:

@@ -45,6 +45,7 @@ pub enum NodeError {
 
 use bitflags::bitflags;
 bitflags! {
+    #[derive(Clone, Copy)]
     pub struct Brokers: u32 {
         const ENABLE_STAT = 0b1;
         const ENABLE_RAND = 0b10;

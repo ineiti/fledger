@@ -1,6 +1,7 @@
 # Fledger - the fast, fun, easy ledger
 
-Fledger's main goal is to create a web3 experience in the browser.
+Fledger's main goal is to create a web3 experience in the browser without the
+need for proxies.
 Once the code starts in your browser, it will connect to other browsers,
 and start sharing your diskspace, CPU, and network bandwidth.
 No need to 
@@ -31,7 +32,7 @@ but also long-term users who have a server where they can run a fledger node.
 The system is set up to be 0-configuration and fast.
 
 What it will never do:
-- DeFi - the security guarantees for 1e6 US-$ and more will never be there
+- DeFi - the security guarantees to handle 1e9 US-$ and more will never be there
 - HODL - Fledger's Mana is not made to be held, but will disappear over time
 
 ## State of Fledger
@@ -59,7 +60,7 @@ of the network code:
 
 ### Binaries
 
-Currently the following components are available that are used to create the fledger-binaries:
+The following components are available that are used to create the fledger-binaries:
 - [Command Line Interfaces](./cli) - command line binaries
   - [Signalling server](./cli/flsignal) - the signalling server for the WebRTC connections
   - [Fledger node](./cli/fledger) - a fledger node implementation for the command line
@@ -90,10 +91,10 @@ instructions.
 
 ## Running it on a server
 
-Supposing you have rust installed, you can run:
+Supposing you have [devbox](https://www.jetify.com/devbox/docs/installing_devbox/) installed, you can run:
 
 ```bash
-cargo run cli/fledger
+devbox run fledger
 ```
 
 This will create a new file called `fledger.toml` in the `fledger` directory
@@ -115,46 +116,22 @@ This will run a local signalling server and two nodes that start to communicate.
 Additionally you can open your browser and point ot to http://localhost:8080 to
 access the node in the browser.
 
-# Changelog
+# Developing
 
+If you want to help with developing, please use
+[devbox](https://www.jetify.com/devbox/docs/installing_devbox/)
+to have the same development environment as the other developers.
+Once you install `devbox`, you can get a shell with
+
+```bash
+devbox shell
 ```
-- 0.7.0 - 2022-10-??
-  - Re-arranging crates and publish
-  - Adding examples
-  - Moving stuff around to make it easier to understand
-  - Add background processing of broker messages
-- 0.6.0 - 2022-05-??
-  - Rewrite of networking layer
-  - Use real gossiped decentralized message passing
-  - Offer crates for using parts of fledger directly
-- 0.5.0 - 2022-??-??
-  - Rewrote big parts of the library and application to make it more modular
-- 0.4.1 - 2021-09-16
-  - Using thiserror::Error instead of String
-- 0.4.0 - 2021-07-27
-  - Added signature to the connection with the signal-server, thanks to
-      Bolton Bailey <bolton.bailey@gmail.com>
-    during the IC3 Hackathon
-- 0.3.0 - 2021-04-08
-  - More stable everything
-  - Clean up a lot of locking issues
-  - Fixing issues
-- 0.2.3 - 2021-03-04
-  - Fix node Running
-  - Add docker-compose.yaml
-- 0.2.2 - 2021-03-02
-  - Run some nodes constantly on https://fledg.re to have a minimum consensus
-- 0.2.1 - 2021-02-28
-  - Make the https://web.fledg.re a bit nicer and more automatic
-- 0.2 - 2021-02-26
-  - Simple ping test with the nodes
-  - CLI node using headless Chrome
-  - Have website https://fledg.re running and pointing to an up-to-date
-  Fledger code
-- 0.1 - 2021-02-05
-  - add ICE connection through the server
-    - use websockets to connect to server
-    - implement connection in Node
-- 0.0 - 2020-12-xx
-  - start the idea
-```
+
+Once the shell is started, you can run `Code` to get a VisualCode which uses the rust
+version of devbox.
+I suggest you use the `1YiB.rust-bundle` extension in VisualCode, which makes it easier
+to use rust.
+
+# License
+
+This project is licensed under MIT or Apache2.

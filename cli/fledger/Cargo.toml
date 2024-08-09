@@ -18,7 +18,8 @@ flnode = { path = "../../flnode", version = "0.7" }
 
 clap = "4"
 clap-verbosity-flag = "2"
-env_logger = "0.9"
+env_logger = "0.11"
 log = "0.4"
 thiserror = "1"
 tokio = "1"
+webrtc-util = "0.9"
