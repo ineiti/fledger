@@ -91,10 +91,10 @@ instructions.
 
 ## Running it on a server
 
-Supposing you have rust installed, you can run:
+Supposing you have [devbox](https://www.jetify.com/devbox/docs/installing_devbox/) installed, you can run:
 
 ```bash
-cargo run cli/fledger
+devbox run fledger
 ```
 
 This will create a new file called `fledger.toml` in the `fledger` directory
@@ -115,6 +115,22 @@ make serve_local
 This will run a local signalling server and two nodes that start to communicate.
 Additionally you can open your browser and point ot to http://localhost:8080 to
 access the node in the browser.
+
+# Developing
+
+If you want to help with developing, please use
+[devbox](https://www.jetify.com/devbox/docs/installing_devbox/)
+to have the same development environment as the other developers.
+Once you install `devbox`, you can get a shell with
+
+```bash
+devbox shell
+```
+
+Once the shell is started, you can run `Code` to get a VisualCode which uses the rust
+version of devbox.
+I suggest you use the `1YiB.rust-bundle` extension in VisualCode, which makes it easier
+to use rust.
 
 # License
 

@@ -8,6 +8,9 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 ## [Unreleased]
 
+### Changed
+- Updated versions of most dependencies
+
 ### Added
 
 - License files

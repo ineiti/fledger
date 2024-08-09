@@ -154,6 +154,11 @@ mod test {
     // Tests single messages going into the structure doing the correct thing:
     // - receive 'ping' from the user, send a 'ping' to the network
     // - receive 'ping' from the network replies 'pong' and requests a new list
+    // #BUG: flaky test - failed once with 
+    // thread 'handler::test::test_ping' panicked at src/handler.rs:190:9:
+    // assertion `left == right` failed
+    // left: FromNetwork(c52bea62dddd2f42-659253603d78279c-ea7f42654af68f7a-b5c8b6ad272a30ed, Ping)
+    // right: Tick
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn test_ping() -> Result<(), NetworkSetupError> {
         start_logging();

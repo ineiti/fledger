@@ -21,7 +21,7 @@
   "types": "wasm.d.ts",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.10",
-    "wrtc": "^0.4.7",
+    "@roamhq/wrtc": "^0.8.0",
     "ws": "^7.4.3"
   }
 }

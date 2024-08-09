@@ -1,6 +1,6 @@
 global.WebSocket = require('ws');
 global.Window = function(){};
-const wrtc = require('wrtc');
+const wrtc = require('@roamhq/wrtc');
 global.RTCPeerConnection = wrtc.RTCPeerConnection;
 global.RTCIceCandidate = wrtc.RTCIceCandidate;
 global.fs = require('fs');
