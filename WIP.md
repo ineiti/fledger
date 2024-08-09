@@ -9,11 +9,21 @@
   - have examples for both wasm and libc
   - Publish fledger crates in crates.io
 
-### Things to do
+# TODO
+
+## Bugs
+
+- Find why the network stalls after some time
+
+## Cleanups / improvements
+
 - Clean up broker / network:
   - Remove `Destination::{All,Others,This}` - Test it
+    only `Destination::All` is ever used
   - Replace `process` with `async-task`
+    Not sure what is up with that. `process` is a method from `Broker`, while `async-task` is a crate
   - Add `process_msg` with a `Destination::Settle<Vec<BrokerID>>`
+    Again, two years later, no idea...
 
 # Dates
 

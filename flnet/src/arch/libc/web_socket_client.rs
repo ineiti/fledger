@@ -28,7 +28,7 @@ impl WebSocketClient {
         tokio::spawn(async move {
             wait_ms(1000).await;
             loop {
-                for msg in read.next().await {
+                if let Some(msg) = read.next().await {
                     match msg {
                         Ok(msg) => {
                             if msg.is_text() {
