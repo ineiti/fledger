@@ -428,6 +428,34 @@
         }
       }
     },
+    "procps@latest": {
+      "last_modified": "2024-07-31T08:48:38Z",
+      "resolved": "github:NixOS/nixpkgs/c3392ad349a5227f4a3464dce87bcc5046692fce#procps",
+      "source": "devbox-search",
+      "version": "3.3.17",
+      "systems": {
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/a41mmdr1q7sabmzwkxy52ykn2gc7c4wi-procps-3.3.17",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/a41mmdr1q7sabmzwkxy52ykn2gc7c4wi-procps-3.3.17"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/0dnqnah8rlapghxkp0539bgyycihykwa-procps-3.3.17",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/0dnqnah8rlapghxkp0539bgyycihykwa-procps-3.3.17"
+        }
+      }
+    },
     "rustup@latest": {
       "last_modified": "2024-06-12T20:55:33Z",
       "plugin_version": "0.0.1",

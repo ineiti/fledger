@@ -1,4 +1,5 @@
 RUN_WEB := true
+PKILL = @ps aux | grep "$1" | grep -v grep | awk '{print $$2}' | xargs -r kill
 
 all: kill build run
 
@@ -17,9 +18,9 @@ run: build
 	fi
 
 kill:
-	-pkill -f debug/flsignal
-	-pkill -f debug/libc
-	-pkill -f trunk
+	$(call PKILL,debug/flsignal)
+	$(call PKILL,debug/libc)
+	$(call PKILL,trunk)
 
 test: RUN_WEB := false
 test: run

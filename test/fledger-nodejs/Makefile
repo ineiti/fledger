@@ -3,6 +3,7 @@ wasm := static/wasm_bg.wasm
 TARGET := --release
 build = wasm-pack build ${TARGET} --target nodejs --out-name wasm \
 	--out-dir ./static -- $(FEATURES)
+PKILL = @ps aux | grep "$1" | grep -v grep | awk '{print $$2}' | xargs -r kill
 
 clean:
 	rm -f $(wasm)
@@ -35,7 +36,7 @@ ${wasm}: ${src}
 	${build}
 
 kill:
-	-pkill -f "node ../"
+	$(call PKILL,node ../)
 
 build_local: FEATURES=--features local
 build_local: TARGET=--debug

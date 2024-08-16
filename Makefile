@@ -4,6 +4,7 @@ CARGOS := cli/{fledger,flsignal} flarch flbrowser \
 MAKE_TESTS := test/{webrtc-libc-wasm,signal-fledger} examples/ping-pong
 CRATES := flarch flmodules flnet flnode
 SHELL := /bin/bash
+PKILL = @ps aux | grep "$1" | grep -v grep | awk '{print $$2}' | xargs -r kill
 
 cargo_check:
 	for c in ${CARGOS}; do \
@@ -60,9 +61,9 @@ update_version:
 	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > flnode/src/version.rs
 
 kill:
-	pkill -f flsignal &
-	pkill -f fledger &
-	pkill -f "trunk serve" &
+	$(call PKILL,flsignal)
+	$(call PKILL,fledger)
+	$(call PKILL,trunk serve)
 
 build_local_web:
 	cd flbrowser && trunk build --features local

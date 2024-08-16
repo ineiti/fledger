@@ -1,4 +1,5 @@
 all: kill build run
+PKILL = @ps aux | grep "$1" | grep -v grep | awk '{print $$2}' | xargs -r kill
 
 run:
 	$(MAKE) libc &
@@ -18,9 +19,9 @@ build:
 	make -C wasm build
 
 kill:
-	@-pkill -f "node ../run/main.js"
-	@-pkill -f "cargo run"
-	@-pkill -f "target/debug/webrtc-test-libc"
+	$(call PKILL,node ../run/main.js)
+	$(call PKILL,cargo run)
+	$(call PKILL,target/debug/webrtc-test-libc)
 
 test:
 	$(MAKE) build
