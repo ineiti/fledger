@@ -13,6 +13,7 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 ### Added
 
+- Create a template to fill out
 - License files
 - Devbox
 

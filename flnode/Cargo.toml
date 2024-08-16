@@ -23,7 +23,8 @@ rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
 serde_json = "1"
-serde_yaml = "0.9"
+# serde_yaml 0.9 uses tags in yaml, which fails here
+serde_yaml = "0.8"
 toml = "0.8"
 
 # The "js" is to make sure it also works for the flnode and web crates

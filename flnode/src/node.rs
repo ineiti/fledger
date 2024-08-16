@@ -12,10 +12,10 @@ use flmodules::{
     gossip_events::{
         broker::GossipBroker,
         events::{self, Category, Event},
-        module::{GossipIn, GossipMessage},
+        messages::{GossipIn, GossipMessage},
     },
     nodeids::NodeID,
-    ping::{broker::PingBroker, module::PingConfig},
+    ping::{broker::PingBroker, messages::PingConfig},
     timer::{TimerBroker, TimerMessage},
 };
 use flnet::{
@@ -319,7 +319,7 @@ mod tests {
     use flarch::{data_storage::DataStorageTemp, start_logging};
     use flmodules::gossip_events::{
         events::{Category, Event},
-        module::GossipIn,
+        messages::GossipIn,
     };
 
     use super::*;

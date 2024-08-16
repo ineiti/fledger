@@ -4,7 +4,7 @@ use flarch::start_logging;
 use flmodules::{
     gossip_events::{
         events::{Category, EventsStorage},
-        module::{Config, GossipEvents, GossipIn, GossipOut, MessageNode},
+        messages::{Config, GossipEvents, GossipIn, GossipOut, MessageNode},
     },
     nodeids::NodeID,
 };
@@ -62,11 +62,11 @@ struct EventsConfig {
 
 impl EventsConfig {
     fn new() -> Self {
-        let config1 = std::fs::read_to_string("tests/load/gossip_events-01.toml")
+        let config1 = std::fs::read_to_string("tests/load/gossip_events-01.yaml")
             .expect("Couldn't find gossip-events file");
         let mut storage1 = EventsStorage::new();
         storage1.set(&config1).expect("Setting storage");
-        let config2 = std::fs::read_to_string("tests/load/gossip_events-02.toml")
+        let config2 = std::fs::read_to_string("tests/load/gossip_events-02.yaml")
             .expect("Couldn't find gossip-events file");
         let mut storage2 = EventsStorage::new();
         storage2.set(&config2).expect("Setting storage");

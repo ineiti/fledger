@@ -26,7 +26,7 @@ mode - requesting list of available events from other nodes.
 As described in the previous section, you should write your modules in three
 parts:
 
-1. Basic Logic: storage, configuration, methods.
+1. Core Logic: persistent data, configuration, methods.
 This part does not handle any messages to/from the system, but only provides
 the actual algorithm.
 This might include cryptographic calculations, caching, updating, and other
@@ -36,7 +36,7 @@ Write it in a way that it can also be used by a non-fledger project.
 send during its lifetime.
 All messages defined here must be self-contained: this part must not depend
 directly on any other module's message definitions.
-3. Broker Definition: this part defines the interactio with the other modules.
+3. Translation: this part defines the interactions with the other modules.
 This is mostly done with defining a `Translator` which takes incoming messages
 and outputs messges defined in the `Message Handling` file.
 

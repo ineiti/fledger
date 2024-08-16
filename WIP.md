@@ -16,7 +16,6 @@
     - w/o network
     - local network
     - network with bw and delay
-  - Create a template to fill out
 
 ## Bugs
 
@@ -26,6 +25,12 @@
 
 ## Cleanups / improvements
 
+- yaml files are stored as .toml
+  - make sure old files can be read as .toml
+  - save new files as .yaml
+  - delete old .toml files
+- serde_yaml is deprecated
+  - use serde_yaml_ng with singleton_map_recursive
 - Refactoring
   - move flnet::arch into flarch
   - move flnet::{NodeInfo, NetworkMessage (w/o WebRTC and WSClient)} into flmodules

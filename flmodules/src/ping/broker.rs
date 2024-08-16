@@ -3,12 +3,12 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    random_connections::module::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
+    random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
     timer::TimerMessage,
 };
 
 use super::{
-    module::{MessageNode, Ping, PingConfig, PingIn, PingMessage, PingOut},
+    messages::{MessageNode, Ping, PingConfig, PingIn, PingMessage, PingOut},
     storage::PingStorage,
 };
 

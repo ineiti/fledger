@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use web_sys::window;
 
 use crate::data_storage::{DataStorage, StorageError};
@@ -17,6 +18,7 @@ impl DataStorageLocal {
     }
 }
 
+#[async_trait(?Send)]
 impl DataStorage for DataStorageLocal {
     fn get(&self, key: &str) -> Result<String, StorageError> {
         let key_entry = format!("{}{}", self.base, key);
@@ -52,7 +54,7 @@ impl DataStorage for DataStorageLocal {
             .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))
     }
 
-    fn clone(&self) -> Box<dyn DataStorage> {
+    fn clone(&self) -> Box<dyn DataStorage + Send> {
         Box::new(DataStorageLocal {base: self.base.clone()})
     }
 }

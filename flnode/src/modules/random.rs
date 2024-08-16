@@ -3,7 +3,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use async_trait::async_trait;
 use flmodules::{
     random_connections::{
-        module::{Config, NodeMessage, RandomConnections, RandomIn, RandomMessage, RandomOut},
+        messages::{Config, NodeMessage, RandomConnections, RandomIn, RandomMessage, RandomOut},
         storage::RandomStorage,
     },
     timer::TimerMessage,

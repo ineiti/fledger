@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::nodeids::NodeID;
 use serde::{Deserialize, Serialize};
 
-use super::module::PingConfig;
+use super::messages::PingConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PingStorage {

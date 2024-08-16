@@ -4,13 +4,13 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use crate::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},
-    random_connections::module::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
+    random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
     timer::TimerMessage,
 };
 
 use super::{
     events::{Category, Event, EventsStorage},
-    module::{Config, GossipEvents, GossipIn, GossipMessage, GossipOut, MessageNode},
+    messages::{Config, GossipEvents, GossipIn, GossipMessage, GossipOut, MessageNode},
 };
 
 const MODULE_NAME: &str = "Gossip";
