@@ -1,8 +1,8 @@
 use std::error::Error;
 
 use crate::nodeids::{NodeID, NodeIDs};
-use itertools::concat;
 use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
 use super::core::*;
 
@@ -15,16 +15,15 @@ pub enum TemplateMessage {
 }
 
 /// The messages here represent all possible interactions with this module.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum TemplateIn {
     Node(NodeID, MessageNode),
     UpdateNodeList(NodeIDs),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum TemplateOut {
     Node(NodeID, MessageNode),
-    StorageUpdate(TemplateStorage),
 }
 
 /// These are the messages which will be exchanged between the nodes for this
@@ -41,6 +40,7 @@ pub struct TemplateMessages {
     pub core: TemplateCore,
     nodes: NodeIDs,
     our_id: NodeID,
+    tx: watch::Sender<TemplateStorage>,
 }
 
 impl TemplateMessages {
@@ -49,25 +49,28 @@ impl TemplateMessages {
         storage: TemplateStorage,
         cfg: TemplateConfig,
         our_id: NodeID,
+        tx: watch::Sender<TemplateStorage>,
     ) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
             core: TemplateCore::new(storage, cfg),
             nodes: NodeIDs::empty(),
             our_id,
+            tx,
         })
     }
 
     /// Processes one generic message and returns either an error
     /// or a Vec<MessageOut>.
-    pub fn process_message(
-        &mut self,
-        msg: TemplateIn,
-    ) -> Result<Vec<TemplateOut>, serde_yaml::Error> {
-        log::trace!("got message {:?}", msg);
-        Ok(match msg {
-            TemplateIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
-            TemplateIn::UpdateNodeList(ids) => self.node_list(ids),
-        })
+    pub fn process_messages(&mut self, msgs: Vec<TemplateIn>) -> Vec<TemplateOut> {
+        let mut out = vec![];
+        for msg in msgs {
+            log::trace!("Got msg: {msg:?}");
+            out.extend(match msg {
+                TemplateIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
+                TemplateIn::UpdateNodeList(ids) => self.node_list(ids),
+            });
+        }
+        out
     }
 
     /// Processes a node to node message and returns zero or more
@@ -78,19 +81,20 @@ impl TemplateMessages {
                 // When increasing the counter, send 'self' counter to all other nodes.
                 // Also send a StorageUpdate message.
                 self.core.increase(c);
-                return concat([
-                    self.nodes
-                        .0
-                        .iter()
-                        .map(|id| {
-                            TemplateOut::Node(
-                                id.clone(),
-                                MessageNode::Counter(self.core.storage.counter),
-                            )
-                        })
-                        .collect(),
-                    vec![TemplateOut::StorageUpdate(self.core.storage.clone()).into()],
-                ]);
+                self.tx
+                    .send(self.core.storage.clone())
+                    .expect("while sending new storage");
+                return self
+                    .nodes
+                    .0
+                    .iter()
+                    .map(|id| {
+                        TemplateOut::Node(
+                            id.clone(),
+                            MessageNode::Counter(self.core.storage.counter),
+                        )
+                    })
+                    .collect();
             }
             MessageNode::Counter(c) => log::info!("Got counter from {}: {}", _src, c),
         }
@@ -98,7 +102,7 @@ impl TemplateMessages {
     }
 
     /// Stores the new node list, excluding the ID of this node.
-    pub fn node_list(&mut self, mut ids: NodeIDs) -> Vec<TemplateOut> {
+    fn node_list(&mut self, mut ids: NodeIDs) -> Vec<TemplateOut> {
         self.nodes = ids.remove_missing(&vec![self.our_id].into());
         vec![]
     }
@@ -127,13 +131,18 @@ mod tests {
         let ids = NodeIDs::new(2);
         let id0 = *ids.0.get(0).unwrap();
         let id1 = *ids.0.get(1).unwrap();
-        let mut msg =
-            TemplateMessages::new(TemplateStorage::default(), TemplateConfig::default(), id0)?;
-        msg.process_message(TemplateIn::UpdateNodeList(ids))?;
-        let ret = msg.process_message(TemplateIn::Node(id1, MessageNode::Increase(2)))?;
-        assert_eq!(2, ret.len());
-        assert!(matches!(ret[0], TemplateOut::Node(_, MessageNode::Counter(2))));
-        assert!(matches!(ret[1], TemplateOut::StorageUpdate(_)));
+        let storage = TemplateStorage::default();
+        let (tx, rx) = watch::channel(storage.clone());
+        let mut msg = TemplateMessages::new(storage, TemplateConfig::default(), id0, tx)?;
+        msg.process_messages(vec![TemplateIn::UpdateNodeList(ids).into()]);
+        let ret =
+            msg.process_messages(vec![TemplateIn::Node(id1, MessageNode::Increase(2)).into()]);
+        assert_eq!(1, ret.len());
+        assert!(matches!(
+            ret[0],
+            TemplateOut::Node(_, MessageNode::Counter(2))
+        ));
+        assert_eq!(2, rx.borrow().counter);
         Ok(())
     }
 }

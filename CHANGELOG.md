@@ -10,6 +10,7 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 ### Changed
 - Updated versions of most dependencies
+- use tokio::sync::watch to pass configuration from `Translate` to `Broker`
 
 ### Added
 
