@@ -45,9 +45,10 @@ impl SubsystemHandler<TimerMessage> for TimerBroker {
     async fn messages(&mut self, _: Vec<TimerMessage>) -> Vec<TimerMessage> {
         if self.seconds == 0 {
             self.seconds = 59;
-            return vec![TimerMessage::Minute];
+            vec![TimerMessage::Minute]
+        } else {
+            self.seconds -= 1;
+            vec![]
         }
-        self.seconds -= 1;
-        vec![]
     }
 }

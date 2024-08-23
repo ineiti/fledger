@@ -1,5 +1,6 @@
 use crate::data_storage::{DataStorage, StorageError};
 use wasm_bindgen::{prelude::*, JsValue};
+use async_trait::async_trait;
 
 #[wasm_bindgen(
     inline_js = "module.exports.fswrite = function(name, str) { fs.writeFileSync(name, str); }
@@ -34,6 +35,7 @@ impl DataStorageNode {
     }
 }
 
+#[async_trait(?Send)]
 impl DataStorage for DataStorageNode {
     fn get(&self, key: &str) -> Result<String, StorageError> {
         let name = &self.name(key);
@@ -59,7 +61,7 @@ impl DataStorage for DataStorageNode {
         Ok(())
     }
 
-    fn clone(&self) -> Box<dyn DataStorage> {
+    fn clone(&self) -> Box<dyn DataStorage + Send> {
         Box::new(Self {
             base: self.base.clone(),
         })

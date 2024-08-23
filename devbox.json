@@ -15,7 +15,8 @@
     "openssh":   "latest",
     "trunk":     "latest",
     "wasm-pack": "latest",
-    "nodejs":    "18"
+    "nodejs":    "18",
+    "procps":    "latest"
   },
   "shell": {
     "init_hook": [

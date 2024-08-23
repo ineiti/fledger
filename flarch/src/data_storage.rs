@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use thiserror::Error;
+use async_trait::async_trait;
 
 #[cfg(feature = "node")]
 mod node;
@@ -24,6 +25,7 @@ pub enum StorageError {
 }
 
 /// The DataStorage trait allows access to a persistent storage.
+#[async_trait]
 pub trait DataStorage {
     fn get(&self, key: &str) -> Result<String, StorageError>;
 
@@ -31,7 +33,7 @@ pub trait DataStorage {
 
     fn remove(&mut self, key: &str) -> Result<(), StorageError>;
 
-    fn clone(&self) -> Box<dyn DataStorage>;
+    fn clone(&self) -> Box<dyn DataStorage + Send>;
 }
 
 /// A temporary DataStorage that keeps the data only during its lifetime.
@@ -77,7 +79,7 @@ impl DataStorage for DataStorageTemp {
         Ok(())
     }
 
-    fn clone(&self) -> Box<dyn DataStorage>{
+    fn clone(&self) -> Box<dyn DataStorage + Send>{
         Box::new(Self{kvs: Arc::clone(&self.kvs)})
     }
 }

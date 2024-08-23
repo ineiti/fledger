@@ -428,6 +428,43 @@
         }
       }
     },
+    "procps@latest": {
+      "last_modified": "2024-07-31T08:48:38Z",
+      "resolved": "github:NixOS/nixpkgs/c3392ad349a5227f4a3464dce87bcc5046692fce#procps",
+      "source": "devbox-search",
+      "version": "3.3.17",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "2008",
+              "path": "/nix/store/4f8wdf5qkx4l0brx3ph0jf5s8j5flq67-procps-1003.1-2008",
+              "default": true
+            }
+          ]
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/a41mmdr1q7sabmzwkxy52ykn2gc7c4wi-procps-3.3.17",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/a41mmdr1q7sabmzwkxy52ykn2gc7c4wi-procps-3.3.17"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/0dnqnah8rlapghxkp0539bgyycihykwa-procps-3.3.17",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/0dnqnah8rlapghxkp0539bgyycihykwa-procps-3.3.17"
+        }
+      }
+    },
     "rustup@latest": {
       "last_modified": "2024-06-12T20:55:33Z",
       "plugin_version": "0.0.1",
@@ -608,8 +645,8 @@
       }
     },
     "wasm-pack@latest": {
-      "last_modified": "2024-07-07T07:43:47Z",
-      "resolved": "github:NixOS/nixpkgs/b60793b86201040d9dee019a05089a9150d08b5b#wasm-pack",
+      "last_modified": "2024-07-31T08:48:38Z",
+      "resolved": "github:NixOS/nixpkgs/c3392ad349a5227f4a3464dce87bcc5046692fce#wasm-pack",
       "source": "devbox-search",
       "version": "0.12.1",
       "systems": {
@@ -617,21 +654,21 @@
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/lmbzyvnzjpkgchb4ndv8hd534bzzkik0-wasm-pack-0.12.1",
+              "path": "/nix/store/9750bhhqyl993izlv7c73lz5z6wwwdpg-wasm-pack-0.12.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/lmbzyvnzjpkgchb4ndv8hd534bzzkik0-wasm-pack-0.12.1"
+          "store_path": "/nix/store/9750bhhqyl993izlv7c73lz5z6wwwdpg-wasm-pack-0.12.1"
         },
         "aarch64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/v6xsmg49c0x0wgxwndm98x3vp48qwymd-wasm-pack-0.12.1",
+              "path": "/nix/store/7q76d9axampb42rsgp89db1zqvm70y1x-wasm-pack-0.12.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/v6xsmg49c0x0wgxwndm98x3vp48qwymd-wasm-pack-0.12.1"
+          "store_path": "/nix/store/7q76d9axampb42rsgp89db1zqvm70y1x-wasm-pack-0.12.1"
         },
         "x86_64-darwin": {
           "outputs": [
@@ -647,11 +684,11 @@
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/4z193znc9b1gc8mrbwgpjp5kzaws6xlp-wasm-pack-0.12.1",
+              "path": "/nix/store/mh9735g61rmzhnp0zdr5jli2fm6dwysv-wasm-pack-0.12.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/4z193znc9b1gc8mrbwgpjp5kzaws6xlp-wasm-pack-0.12.1"
+          "store_path": "/nix/store/mh9735g61rmzhnp0zdr5jli2fm6dwysv-wasm-pack-0.12.1"
         }
       }
     },

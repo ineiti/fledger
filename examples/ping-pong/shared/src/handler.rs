@@ -182,6 +182,9 @@ mod test {
             net_tap.recv().unwrap()
         );
 
+        // Remove the "Tick"
+        pp_tap.recv().unwrap();
+
         // Receive a ping message through the network
         net.emit_msg_dest(
             Destination::NoTap,
@@ -190,8 +193,6 @@ mod test {
                 serde_json::to_string(&PPMessageNode::Ping).unwrap(),
             )),
         )?;
-        // Remove the "Tick"
-        pp_tap.recv().unwrap();
         assert_eq!(
             PPMessage::FromNetwork(dst_id.clone(), PPMessageNode::Ping),
             pp_tap.recv().unwrap()

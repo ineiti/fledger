@@ -11,6 +11,7 @@ that inputs a message and outputs a vector of answers
 
 Currently the following modules are available:
 
+- `timer` sends out one message per second and one message per minute
 - `random_connections` takes a list of nodes and randomly selects enough nodes for
 a fully connected network
 - `ping` uses `random_connections` to send regular messages to the connected nodes
@@ -20,7 +21,26 @@ is emitted.
 works both in active mode - sending new messages to neighbours - as in passive
 mode - requesting list of available events from other nodes.
 
-## Broker
+# Adding your own modules
+
+As described in the previous section, you should write your modules in three
+parts:
+
+1. Core Logic: persistent data, configuration, methods.
+This part does not handle any messages to/from the system, but only provides
+the actual algorithm.
+This might include cryptographic calculations, caching, updating, and other
+tasks necessary for the functionality.
+Write it in a way that it can also be used by a non-fledger project.
+2. Message Handling: create all messages that this module should receive or
+send during its lifetime.
+All messages defined here must be self-contained: this part must not depend
+directly on any other module's message definitions.
+3. Translation: this part defines the interactions with the other modules.
+This is mostly done with defining a `Translator` which takes incoming messages
+and outputs messges defined in the `Message Handling` file.
+
+# Broker
 
 I wanted to create a common code for both the libc- and wasm-implementation for
 Fledger.

@@ -3,6 +3,8 @@ use std::{
     path::PathBuf,
 };
 
+use async_trait::async_trait;
+
 use crate::data_storage::{DataStorage, StorageError};
 
 pub struct DataStorageFile {
@@ -33,6 +35,7 @@ impl DataStorageFile {
 
 use std::io::prelude::*;
 
+#[async_trait]
 impl DataStorage for DataStorageFile {
     fn get(&self, key: &str) -> Result<String, StorageError> {
         let name = &self.name(key);
@@ -62,7 +65,7 @@ impl DataStorage for DataStorageFile {
         Ok(())
     }
 
-    fn clone(&self) -> Box<dyn DataStorage> {
+    fn clone(&self) -> Box<dyn DataStorage + Send> {
         Box::new(DataStorageFile {
             dir: self.dir.clone(),
             base: self.base.clone(),

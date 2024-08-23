@@ -43,7 +43,8 @@ serde_derive = "1"
 serde_json = "1"
 # serde_wtih version 2 doesn't work with old configs
 serde_with = {version = "3", features = ["json", "base64"]}
-serde_yaml = "0.9"
+# serde_yaml 0.9 uses tags in yaml, which fails here
+serde_yaml = "0.8"
 sha2 = "0.10"
 thiserror = "1"
 toml = "0.8"

@@ -7,13 +7,35 @@
 
 # TODO
 
+## Features
+
+- Needed for semester project:
+  - Create a proxy module that links to the html display
+  - Import library for html serving with callbacks for loading of elements
+  - Easy simulation 
+    - w/o network
+    - local network
+    - network with bw and delay
+
 ## Bugs
 
-- Find why the network stalls after some time
-- Doesn't work in EPFL network
+- flnet errors - perhaps not necessary to fix if matchbox works:
+  - Find why the network stalls after some time
+  - Doesn't work in EPFL network
 
 ## Cleanups / improvements
 
+- yaml files are stored as .toml
+  - make sure old files can be read as .toml
+  - save new files as .yaml
+  - delete old .toml files
+- serde_yaml is deprecated
+  - use serde_yaml_ng with singleton_map_recursive
+- Refactoring
+  - move flnet::arch into flarch
+  - move flnet::{NodeInfo, NetworkMessage (w/o WebRTC and WSClient)} into flmodules
+  - move flnode::random.rs into flmodules
+- use matchbox from https://github.com/johanhelsing/matchbox
 - Increase version of flnet
 - Clean up broker / network:
   - Remove `Destination::{All,Others,This}` - Test it

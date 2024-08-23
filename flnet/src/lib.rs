@@ -202,6 +202,8 @@ pub mod testing;
 #[cfg(all(feature = "libc", feature = "wasm"))]
 std::compile_error!("flnet cannot have 'libc' and 'wasm' feature simultaneously");
 
+// The following lines import either arch/libc/* or arch/wasm/* to the top-level.
+// This allows the following code on directly relying on either implementation.
 #[cfg(feature = "libc")]
 mod arch {
     mod libc;

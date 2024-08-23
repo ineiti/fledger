@@ -1,3 +1,3 @@
-pub mod module;
+pub mod messages;
 pub mod broker;
 pub mod storage;
