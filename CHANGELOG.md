@@ -17,6 +17,7 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - Create a template to fill out
 - License files
 - Devbox
+- Create a proxy module that links to the html display
 
 ## [0.7.0] - 2022-08-01
 

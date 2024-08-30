@@ -386,7 +386,7 @@ pub struct EventV2 {
 mod tests {
     use std::error::Error;
 
-    use flarch::now;
+    use flarch::tasks::now;
 
     use super::*;
 
