@@ -22,7 +22,7 @@ pub struct TemplateCore {
 }
 
 impl TemplateCore {
-    /// Initializes an EventsStorage with two categories.
+    /// Initializes a new TemplateCore.
     pub fn new(storage: TemplateStorage, config: TemplateConfig) -> Self {
         Self { storage, config }
     }
