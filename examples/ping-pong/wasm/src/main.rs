@@ -7,7 +7,7 @@ use console_error_panic_hook::set_once as set_panic_hook;
 use ybc::TileCtx::{Ancestor, Child, Parent};
 use yew::prelude::*;
 
-use flarch::now;
+use flarch::tasks::now;
 use flnet::{broker::Broker, config::{NodeConfig, ConnectionConfig}};
 
 use shared::{

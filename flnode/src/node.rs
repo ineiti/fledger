@@ -17,6 +17,7 @@ use flmodules::{
     nodeids::NodeID,
     ping::{broker::PingBroker, messages::PingConfig},
     timer::{TimerBroker, TimerMessage},
+    web_proxy::{broker::{WebProxy, WebProxyError}, core::WebProxyConfig},
 };
 use flnet::{
     config::{ConfigError, NodeConfig, NodeInfo},
@@ -41,6 +42,8 @@ pub enum NodeError {
     Broker(#[from] BrokerError),
     #[error(transparent)]
     Yaml(#[from] serde_yaml::Error),
+    #[error(transparent)]
+    WebProxy(#[from] WebProxyError)
 }
 
 use bitflags::bitflags;
@@ -51,7 +54,8 @@ bitflags! {
         const ENABLE_RAND = 0b10;
         const ENABLE_GOSSIP = 0b100;
         const ENABLE_PING = 0b1000;
-        const ENABLE_ALL = 0b1111;
+        const ENABLE_WEBPROXY = 0b10000;
+        const ENABLE_ALL = 0b11111;
     }
 }
 
@@ -73,6 +77,8 @@ pub struct Node {
     pub gossip: Option<GossipBroker>,
     /// Pings all connected nodes and informs about failing nodes
     pub ping: Option<PingBroker>,
+    /// Answers GET requests from another node
+    pub webproxy: Option<WebProxy>,
 }
 
 const STORAGE_GOSSIP_EVENTS: &str = "gossip_events";
@@ -84,7 +90,7 @@ impl Node {
     /// new messages from the signalling server and from other nodes.
     /// The actual logic is handled in Logic.
     pub async fn start(
-        storage: Box<dyn DataStorage>,
+        storage: Box<dyn DataStorage + Send>,
         node_config: NodeConfig,
         broker_net: Broker<NetworkMessage>,
     ) -> Result<Self, NodeError> {
@@ -96,7 +102,7 @@ impl Node {
 
     /// Same as `start`, but only initialize a subset of brokers.
     pub async fn start_some(
-        storage: Box<dyn DataStorage>,
+        storage: Box<dyn DataStorage + Send>,
         node_config: NodeConfig,
         broker_net: Broker<NetworkMessage>,
         brokers: Brokers,
@@ -111,23 +117,32 @@ impl Node {
         let mut random = None;
         let mut gossip = None;
         let mut ping = None;
+        let mut webproxy = None;
         if brokers.contains(Brokers::ENABLE_RAND) {
-            random = Some(RandomBroker::start(id, broker_net.clone()).await?);
+            let rnd = RandomBroker::start(id, broker_net.clone()).await?;
             if brokers.contains(Brokers::ENABLE_GOSSIP) {
-                gossip =
-                    Some(GossipBroker::start(id, random.as_ref().unwrap().broker.clone()).await?);
-                Self::init_gossip(&mut gossip.as_mut().unwrap(), &storage, &node_config.info)
-                    .await?;
+                gossip = Some(GossipBroker::start(id, rnd.broker.clone()).await?);
+                Self::init_gossip(
+                    &mut gossip.as_mut().unwrap(),
+                    storage.clone(),
+                    &node_config.info,
+                )
+                .await?;
             }
             if brokers.contains(Brokers::ENABLE_PING) {
-                ping = Some(
-                    PingBroker::start(
-                        PingConfig::default(),
-                        random.as_ref().unwrap().broker.clone(),
-                    )
-                    .await?,
-                );
+                ping = Some(PingBroker::start(PingConfig::default(), rnd.broker.clone()).await?);
             }
+            if brokers.contains(Brokers::ENABLE_WEBPROXY) {
+                webproxy = Some(
+                    WebProxy::start(
+                        storage.clone(),
+                        id,
+                        rnd.broker.clone(),
+                        WebProxyConfig::default(),
+                    )
+                    .await?);
+            }
+            random = Some(rnd);
         }
         let stat = if brokers.contains(Brokers::ENABLE_STAT) {
             Some(StatBroker::start(broker_net.clone()).await?)
@@ -143,6 +158,7 @@ impl Node {
             random,
             gossip,
             ping,
+            webproxy,
         })
     }
 
@@ -265,7 +281,7 @@ impl Node {
     // Reads the gossip configuration and stores it in the gossip-storage.
     async fn init_gossip(
         gossip: &mut GossipBroker,
-        gossip_storage: &Box<dyn DataStorage>,
+        gossip_storage: Box<dyn DataStorage>,
         node_info: &NodeInfo,
     ) -> Result<(), NodeError> {
         let gossip_msgs_str = gossip_storage.get(STORAGE_GOSSIP_EVENTS).unwrap();

@@ -1,18 +1,5 @@
 pub mod data_storage;
-
-#[cfg(feature = "wasm")]
-pub mod tasks {
-    mod wasm;
-    pub use wasm::*;
-}
-
-#[cfg(not(feature = "wasm"))]
-pub mod tasks {
-    mod libc;
-    pub use libc::*;
-}
-
-pub use tasks::*;
+pub mod tasks;
 
 pub fn start_logging() {
     start_logging_filter(vec![]);

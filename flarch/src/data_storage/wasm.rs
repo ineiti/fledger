@@ -8,7 +8,7 @@ pub struct DataStorageLocal {
 }
 
 impl DataStorageLocal {
-    pub fn new(base_str: &str) -> Box<dyn DataStorage> {
+    pub fn new(base_str: &str) -> Box<dyn DataStorage + Send> {
         let base = if base_str.is_empty() {
             "".to_string()
         } else {

@@ -1,6 +1,6 @@
 use flarch::{
     data_storage::{DataStorage, DataStorageNode},
-    wait_ms,
+    tasks::wait_ms,
 };
 use flnet::{config::ConnectionConfig, network_broker_start};
 use flnode::node::Node;

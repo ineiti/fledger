@@ -21,7 +21,7 @@ serde_derive = "1"
 # serde_yaml 0.9 uses tags in yaml, which fails here
 serde_yaml = "0.8"
 # serde_wtih version 2 doesn't work with old configs
-serde_with = {version = "3", features = ["hex", "json"]}
+serde_with = { version = "3", features = ["hex", "json", "base64"] }
 sha2 = "0.10"
 rand = "0.8"
 thiserror = "1"
@@ -29,7 +29,10 @@ log = "0.4"
 itertools = "0.13"
 async-trait = "0.1"
 futures = "0.3"
-tokio = {version = "1", features = ["sync"]}
+tokio = { version = "1", features = ["sync"] }
 tokio-stream = "0.1"
 
-wasm-bindgen-futures = {version = "0.4", optional = true}
+wasm-bindgen-futures = { version = "0.4", optional = true }
+async-stream = "0.3.5"
+bytes = { version = "1.7.1", features = ["serde"] }
+reqwest = { version = "0.12", features = ["stream"] }

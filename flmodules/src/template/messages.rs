@@ -2,7 +2,6 @@ use std::error::Error;
 
 use crate::nodeids::{NodeID, NodeIDs};
 use serde::{Deserialize, Serialize};
-use tokio::sync::watch;
 
 use super::core::*;
 
@@ -24,6 +23,7 @@ pub enum TemplateIn {
 #[derive(Debug, Clone)]
 pub enum TemplateOut {
     Node(NodeID, MessageNode),
+    UpdateStorage(TemplateStorage),
 }
 
 /// These are the messages which will be exchanged between the nodes for this
@@ -40,7 +40,6 @@ pub struct TemplateMessages {
     pub core: TemplateCore,
     nodes: NodeIDs,
     our_id: NodeID,
-    tx: watch::Sender<TemplateStorage>,
 }
 
 impl TemplateMessages {
@@ -49,13 +48,11 @@ impl TemplateMessages {
         storage: TemplateStorage,
         cfg: TemplateConfig,
         our_id: NodeID,
-        tx: watch::Sender<TemplateStorage>,
     ) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
             core: TemplateCore::new(storage, cfg),
             nodes: NodeIDs::empty(),
             our_id,
-            tx,
         })
     }
 
@@ -81,9 +78,6 @@ impl TemplateMessages {
                 // When increasing the counter, send 'self' counter to all other nodes.
                 // Also send a StorageUpdate message.
                 self.core.increase(c);
-                self.tx
-                    .send(self.core.storage.clone())
-                    .expect("while sending new storage");
                 return self
                     .nodes
                     .0
@@ -94,6 +88,7 @@ impl TemplateMessages {
                             MessageNode::Counter(self.core.storage.counter),
                         )
                     })
+                    .chain(vec![TemplateOut::UpdateStorage(self.core.storage.clone())])
                     .collect();
             }
             MessageNode::Counter(c) => log::info!("Got counter from {}: {}", _src, c),
@@ -132,17 +127,19 @@ mod tests {
         let id0 = *ids.0.get(0).unwrap();
         let id1 = *ids.0.get(1).unwrap();
         let storage = TemplateStorage::default();
-        let (tx, rx) = watch::channel(storage.clone());
-        let mut msg = TemplateMessages::new(storage, TemplateConfig::default(), id0, tx)?;
+        let mut msg = TemplateMessages::new(storage, TemplateConfig::default(), id0)?;
         msg.process_messages(vec![TemplateIn::UpdateNodeList(ids).into()]);
         let ret =
             msg.process_messages(vec![TemplateIn::Node(id1, MessageNode::Increase(2)).into()]);
-        assert_eq!(1, ret.len());
+        assert_eq!(2, ret.len());
         assert!(matches!(
             ret[0],
             TemplateOut::Node(_, MessageNode::Counter(2))
         ));
-        assert_eq!(2, rx.borrow().counter);
+        assert!(matches!(
+            ret[1],
+            TemplateOut::UpdateStorage(TemplateStorage { counter: 2 })
+        ));
         Ok(())
     }
 }

@@ -20,7 +20,10 @@ use wasm_bindgen::{
 };
 use web_sys::{window, Document, Event, HtmlTextAreaElement};
 
-use flarch::{data_storage::DataStorageLocal, spawn_local, wait_ms};
+use flarch::{
+    data_storage::DataStorageLocal,
+    tasks::{spawn_local, wait_ms},
+};
 use flmodules::nodeids::U256;
 use flnet::{config::NodeInfo, network::NetworkConnectionState};
 

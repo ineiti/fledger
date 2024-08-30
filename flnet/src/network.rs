@@ -17,7 +17,7 @@ use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 
-use flarch::Interval;
+use flarch::tasks::Interval;
 use flmodules::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},

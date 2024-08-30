@@ -25,6 +25,7 @@
 
 ## Cleanups / improvements
 
+- use tokio::sync::watch to pass configuration from `Translate` to `Broker`
 - yaml files are stored as .toml
   - make sure old files can be read as .toml
   - save new files as .yaml
