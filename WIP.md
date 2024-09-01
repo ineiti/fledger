@@ -10,7 +10,6 @@
 ## Features
 
 - Needed for semester project:
-  - Create a proxy module that links to the html display
   - Import library for html serving with callbacks for loading of elements
   - Easy simulation 
     - w/o network
@@ -19,6 +18,7 @@
 
 ## Bugs
 
+- flmodules/web_proxy has horrible error handling - too many `expect`s
 - flnet errors - perhaps not necessary to fix if matchbox works:
   - Find why the network stalls after some time
   - Doesn't work in EPFL network

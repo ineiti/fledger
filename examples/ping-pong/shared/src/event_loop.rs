@@ -2,7 +2,7 @@ use std::time::Duration;
 use tokio::select;
 use tokio_stream::StreamExt;
 
-use flarch::{spawn_local, Interval};
+use flarch::tasks::{spawn_local, Interval};
 use flmodules::{
     broker::{Broker, BrokerError},
     nodeids::NodeID,

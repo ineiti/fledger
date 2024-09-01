@@ -80,3 +80,14 @@ ul.no-bullets {
 .wrap {
   white-space: pre-wrap;
 }
+
+#proxy_div {
+  margin: 1em;
+  padding: 1em;
+  border: 1pt solid #888;
+  background-color: #444;
+}
+
+#proxy_url {
+  width: 80%;
+}

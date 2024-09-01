@@ -46,7 +46,7 @@ use futures::{future::BoxFuture, lock::Mutex};
 use thiserror::Error;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-use flarch::spawn_local;
+use flarch::tasks::spawn_local;
 
 #[derive(Debug, Error)]
 /// The only error that can happen is that sending to another broker fails.
@@ -433,9 +433,12 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
     }
 
     // Goes once through all subsystems and processes the messages:
-    // 1. Send all messages to the taps, except those with Destination::NoTap
-    // 2. Translate all messages, and remove the translated ones
+    // 1. Translate all messages, and remove the translated ones
+    // 2. Send all messages to the taps, except those with Destination::NoTap
     // 3. Send all messages to the handlers, and collect messages
+    //
+    // Every tap returning an error is considered closed and removed from
+    // the list of subsystems.
     async fn process_once(&mut self) -> Result<(), BrokerError> {
         self.process_translate_messages().await;
 
@@ -450,7 +453,7 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
         Ok(())
     }
 
-    // Then run translators on the messages. For each message, if it has been
+    // First run translators on the messages. For each message, if it has been
     // translated by at least one translator, it will be deleted from the queue.
     async fn process_translate_messages(&mut self) {
         let mut i = 0;
@@ -497,7 +500,31 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
         }
     }
 
-    // Then send messages to all other subsystems, and collect
+    // Then send the messages to the taps, except Destination::NoTap.
+    async fn send_tap(&mut self) -> Vec<usize> {
+        let mut faulty = vec![];
+        let msgs: Vec<T> = self
+            .msg_queue
+            .iter()
+            .filter(|(dst, _)| dst != &Destination::NoTap)
+            .map(|(_, msg)| msg.clone())
+            .collect();
+
+        let type_id = self.type_id();
+        for (i, ss) in self.subsystems.iter_mut().filter(|(_, ss)| ss.is_tap()) {
+            if let Err(e) = ss.put_messages(*i, msgs.clone()).await {
+                log::warn!(
+                    "{}: Couldn't send to tap: {e:?} - perhaps you should use 'remove_subsystem'?",
+                    type_id
+                );
+                faulty.push(*i);
+            }
+        }
+
+        faulty
+    }
+
+    // Finally send messages to all other subsystems, and collect
     // new messages for next call to 'process'.
     async fn process_handle_messages(&mut self) -> Vec<usize> {
         if self.msg_queue.len() == 0 {
@@ -530,30 +557,6 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
         self.msg_queue = new_msg_queue;
 
         ss_remove
-    }
-
-    // Sends the messages, except Destination::NoTap, to the taps.
-    async fn send_tap(&mut self) -> Vec<usize> {
-        let mut faulty = vec![];
-        let msgs: Vec<T> = self
-            .msg_queue
-            .iter()
-            .filter(|(dst, _)| dst != &Destination::NoTap)
-            .map(|(_, msg)| msg.clone())
-            .collect();
-
-        let type_id = self.type_id();
-        for (i, ss) in self.subsystems.iter_mut().filter(|(_, ss)| ss.is_tap()) {
-            if let Err(e) = ss.put_messages(*i, msgs.clone()).await {
-                log::warn!(
-                    "{}: Couldn't send to tap: {e:?} - perhaps you should use 'remove_subsystem'?",
-                    type_id
-                );
-                faulty.push(*i);
-            }
-        }
-
-        faulty
     }
 
     fn type_id(&self) -> String {

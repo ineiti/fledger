@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use flarch::{data_storage::DataStorage, spawn_local};
+use flarch::{data_storage::DataStorage, tasks::spawn_local};
 use std::error::Error;
 use tokio::sync::watch;
 
@@ -27,7 +27,7 @@ pub struct Template {
     /// Represents the underlying broker.
     pub broker: Broker<TemplateMessage>,
     our_id: NodeID,
-    rx: watch::Receiver<TemplateStorage>,
+    storage: watch::Receiver<TemplateStorage>,
 }
 
 impl Template {
@@ -39,18 +39,22 @@ impl Template {
     ) -> Result<Self, Box<dyn Error>> {
         let str = ds.get(MODULE_NAME).unwrap_or("".into());
         let storage = TemplateStorageSave::from_str(&str).unwrap_or_default();
-        let (tx, rx) = watch::channel(storage.clone());
-        let messages = TemplateMessages::new(storage, config, our_id, tx)?;
-        let broker = Translate::start(rc, messages).await?;
-        let mut rx_spawn = rx.clone();
+        let messages = TemplateMessages::new(storage.clone(), config, our_id)?;
+        let mut broker = Translate::start(rc, messages).await?;
+
+        let (tx, storage) = watch::channel(storage);
+        let (mut tap, _) = broker.get_tap().await?;
         spawn_local(async move {
-            while rx_spawn.changed().await.is_ok() {
-                if let Ok(val) = rx_spawn.borrow().to_yaml() {
-                    ds.set(MODULE_NAME, &val).expect("updating storage");
+            loop {
+                if let Some(TemplateMessage::Output(TemplateOut::UpdateStorage(sto))) = tap.recv().await {
+                    tx.send(sto.clone()).expect("updated storage");
+                    if let Ok(val) = sto.to_yaml() {
+                        ds.set(MODULE_NAME, &val).expect("updating storage");
+                    }    
                 }
             }
         });
-        Ok(Template { broker, our_id, rx })
+        Ok(Template { broker, our_id, storage })
     }
 
     pub fn increase_self(&mut self, counter: u32) -> Result<(), BrokerError> {
@@ -59,7 +63,7 @@ impl Template {
     }
 
     pub fn get_counter(&self) -> u32 {
-        self.rx.borrow().counter
+        self.storage.borrow().counter
     }
 }
 
@@ -153,7 +157,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_increase() -> Result<(), Box<dyn Error>> {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], log::LevelFilter::Info);
 
         let ds = Box::new(DataStorageTemp::new());
         let id0 = NodeID::rnd();
@@ -172,7 +176,6 @@ mod tests {
             tap.0.recv().await.unwrap(),
             RandomMessage::Input(_)
         ));
-
         assert_eq!(1, tr.get_counter());
         Ok(())
     }

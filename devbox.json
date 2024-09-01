@@ -5,7 +5,9 @@
     "rustup":   "latest",
     "libiconv": "latest",
     "openssl":  "latest",
-    "vscode":   "",
+    "darwin.apple_sdk.frameworks.SystemConfiguration": {
+      "platforms": ["x86_64-darwin", "aarch64-darwin"]
+    },
     "darwin.apple_sdk.frameworks.Security": {
       "platforms": ["x86_64-darwin", "aarch64-darwin"]
     },
@@ -16,7 +18,8 @@
     "trunk":     "latest",
     "wasm-pack": "latest",
     "nodejs":    "18",
-    "procps":    "latest"
+    "procps":    "latest",
+    "vscode":    "latest"
   },
   "shell": {
     "init_hook": [

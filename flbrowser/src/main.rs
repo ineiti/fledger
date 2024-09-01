@@ -18,9 +18,12 @@ use wasm_bindgen::{
     prelude::{wasm_bindgen, Closure},
     JsCast, JsValue,
 };
-use web_sys::{window, Document, Event, HtmlTextAreaElement};
+use web_sys::{window, Document, Event, HtmlDivElement, HtmlInputElement, HtmlTextAreaElement};
 
-use flarch::{data_storage::DataStorageLocal, spawn_local, wait_ms};
+use flarch::{
+    data_storage::DataStorageLocal,
+    tasks::{spawn_local, wait_ms},
+};
 use flmodules::nodeids::U256;
 use flnet::{config::NodeInfo, network::NetworkConnectionState};
 
@@ -34,6 +37,7 @@ const URL: &str = "ws://localhost:8765";
 enum Button {
     SendMsg,
     DownloadData,
+    WebProxy,
 }
 
 #[wasm_bindgen(module = "/src/main.js")]
@@ -52,15 +56,14 @@ fn main() {
         // Create a listening channel that fires whenever the user clicks on the `send_msg` button
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Button>();
         web.link_btn(tx.clone(), Button::SendMsg, "send_msg");
-        web.link_btn(tx, Button::DownloadData, "get_data");
+        web.link_btn(tx.clone(), Button::DownloadData, "get_data");
+        web.link_btn(tx, Button::WebProxy, "proxy_request");
 
-        // Link to the message the user wants to send
-        let your_message = web
-            .document
-            .get_element_by_id("your_message")
-            .unwrap()
-            .dyn_into::<HtmlTextAreaElement>()
-            .unwrap();
+        // Link to some elements
+        let your_message: HtmlTextAreaElement = web.get_element("your_message");
+        let proxy_div: HtmlDivElement = web.get_element("proxy_div");
+        let proxy_url: HtmlInputElement = web.get_element("proxy_url");
+
         loop {
             if let Ok(btn) = rx.try_recv() {
                 match btn {
@@ -78,6 +81,25 @@ fn main() {
                     Button::DownloadData => {
                         let data = web.node.gossip.as_ref().unwrap().storage.get().unwrap();
                         downloadFile("gossip_event.toml".into(), data.into());
+                    }
+                    Button::WebProxy => {
+                        let mut response = web
+                            .node
+                            .webproxy
+                            .as_mut()
+                            .unwrap()
+                            .get(&proxy_url.value())
+                            .await
+                            .expect("Getting response");
+                        let proxy = proxy_div.clone();
+                        spawn_local(async move {
+                            let text = format!(
+                                "Proxy: {}<br>{}",
+                                response.proxy(),
+                                response.text().await.unwrap()
+                            );
+                            proxy.set_inner_html(&text);
+                        });
                     }
                 }
             }
@@ -155,6 +177,14 @@ impl FledgerWeb {
             .get_element_by_id(id)
             .unwrap()
             .set_inner_html(&inner_html);
+    }
+
+    fn get_element<ET: JsCast>(&self, id: &str) -> ET {
+        self.document
+            .get_element_by_id(id)
+            .unwrap()
+            .dyn_into::<ET>()
+            .unwrap()
     }
 
     pub async fn tick(&mut self) -> Option<FledgerState> {

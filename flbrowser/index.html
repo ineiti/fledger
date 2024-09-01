@@ -16,8 +16,16 @@
 
     <ul class="nav nav-tabs" id="myTab" role="tablist">
       <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="shareit-tab" data-bs-toggle="tab" data-bs-target="#shareit" type="button"
-          role="tab" aria-controls="shareit" aria-selected="true">ShareIt</button>
+        <button class="nav-link active" id="welcome-tab" data-bs-toggle="tab" data-bs-target="#welcome" type="button"
+          role="tab" aria-controls="welcome" aria-selected="true">Welcome</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="blackboard-tab" data-bs-toggle="tab" data-bs-target="#blackboard" type="button"
+          role="tab" aria-controls="blackboard" aria-selected="true">Blackboard</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="proxy-tab" data-bs-toggle="tab" data-bs-target="#proxy" type="button" role="tab"
+          aria-controls="proxy" aria-selected="false">WebProxy</button>
       </li>
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="status-tab" data-bs-toggle="tab" data-bs-target="#status" type="button" role="tab"
@@ -26,12 +34,55 @@
     </ul>
 
     <div class="tab-content" id="myTabContent">
-      <div class="tab-pane fade show active" id="shareit" role="tabpanel" aria-labelledby="home-tab">
-        <p>This is a decentralized chatting app. Instead of having a central server that stores all
+      <div class="tab-pane fade show active" id="welcome" role="tabpanel" aria-labelledby="welcome-tab">
+        <br>
+        <i class="fa" style="font-size:24px"> </i>
+        <h3>Fledger</h3>
+        <p>Welcome to the latest version of the Fledger Node.
+          Fledger is an experiment in a decentralized system running in your browser.
+          It's goal is to mix things like <a href="https://veilid.com/">Veilid</a>,
+          <a href="https://ipfs.tech/">IPFS</a>, and something like
+          <a href="https://github.com/facebookresearch/narwhal">Narhal</a>.
+        </p>
+        <p>Try it out by clicking on the above tabs to join the Blackboard or the
+          WebProxy.
+        </p>
+        <h4>Uniqueness of Fledger</h4>
+        <p>Instead of having to install all of these things on your computer, handling all the
+          configuration and dependencies, you simply come here and participate in a decentralized
+          system.
+          This version of the system has the following applications:
+        </p>
+        <ul>
+          <li>Decentralized blackboard - write a message for everybody to see</li>
+          <li>Web proxy - route your web traffic through another node (not anonymous yet!)</li>
+        </ul>
+        <h4>Work In Progress</h4>
+        <p>The fledger system is extensible with modules, and we think hard to implement the
+          following modules:
+        </p>
+        <ul>
+          <li>Mixing Network - in a semester project with the <a href="https://dedis.epfl.ch">DEDIS lab</a> at EPFL</li>
+          <li>Storage - IPFS-like decentralized storage where you get storage by sharing your
+            own harddisk storage
+          </li>
+        </ul>
+        <p>These modules will allow to port applications like the following, and add new ones:</p>
+        <ul>
+          <li><a href="https://livequiz.fledg.re">LiveQuiz</a> so that the storage is on fledger</li>
+          <li><a href="https://jemifier.gasser.blue">Jemifier</a> and store the lists on fledger</li>
+          <li>Anonymous surfing</li>
+        </ul>
+        <p></p>
+      </div>
+
+      <div class="tab-pane fade" id="blackboard" role="tabpanel" aria-labelledby="blackboard-tab">
+        <br>
+        <p>This is a decentralized chatting app, implemented like a global blackboard.
+          Instead of having a central server that stores all
           messages, every visitor joining the system stores the last 20 messages. So even if the
           central server goes down or censors messages, the clients can still communicate.
         </p>
-        <p>You can find the code on github: <a href="https://github.com/ineiti/fledger">ineiti/fledger</a></p>
         <br>
         <h3>Your Message</h3>
         <textarea class="form-control" id="your_message" rows="3"></textarea>
@@ -51,27 +102,28 @@
         <br>
         <h3>Messages</h3>
         <div id="messages"></div>
-
       </div>
+
+      <div class="tab-pane fade" id="proxy" role="tabpanel" aria-labelledby="proxy-tab">
+        <br>
+        <h3>WebProxy</h3>
+        <div style="display: flex; flex-flow: row;">
+          <input id="proxy_url" value="https://fledg.re/doc/index.html" />
+          <button id="proxy_request" type="button" class="btn btn-primary">Proxy
+            Request</button>
+        </div>
+        <div id="proxy_div">Enter a URL and click on "Proxy Request".
+          The request will be proxied through one of the nodes online.
+        </div>
+      </div>
+
       <div class="tab-pane fade" id="status" role="tabpanel" aria-labelledby="profile-tab">
+        <br>
         <p>The goal of Fledger is to have a full node running in the web browser.
           Instead of having to invest in big hardware, fledger will be light enough
           that you can participate using a browser.
           You will mine Mana can be used to run smart contracts, store data, or use the
           re-encryption service.</p>
-        <p>The state of the project is</p>
-        <ul>
-          <li>Networking</li>
-          <ul>
-            <li>Done: learning Rust and making WebRTC work reliably</li>
-            <li>Done: setting up of TURN server</li>
-            <li>Done: rewrite of networking backend without reason</li>
-            <li>Done: simple gossiping of content</li>
-            <li>Done 2022-10: create flnet crate with webrtc in libc and wasm</li>
-          </ul>
-          <li>Coming up: decentralized sharing with incentives</li>
-          <li>Coming up: setting up chains for sharing tracking</li>
-        </ul>
         <p>For more information, see the documentation:
           <a href="https://fledg.re/doc/index.html" target="other">Fledger - the blockchain that could</a>
         </p>
@@ -89,12 +141,15 @@
           <tbody id="node_stats">
           </tbody>
         </table>
+        <button id="get_data" type="button" class="btn btn-primary">Get Data</button>
       </div>
     </div>
 
-    <button id="get_data" type="button" class="btn btn-primary">Get Data</button>
     <br />
     <div style="float: right;" id="version"></div>
+    <div style="float: left;">
+      <a href="https://github.com/ineiti/fledger">GitHub</a> - <a href="https://ioc.exchange/@ineiti">@ineiti@ioc.exchange</a>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"

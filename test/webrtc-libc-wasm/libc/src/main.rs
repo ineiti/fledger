@@ -83,7 +83,7 @@ mod tests {
     use super::*;
     use std::sync::mpsc::Receiver;
 
-    use flarch::wait_ms;
+    use flarch::tasks::wait_ms;
 
     // #[tokio::test]
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]

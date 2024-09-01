@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
-use flarch::{start_logging_filter, wait_ms, Interval};
+use flarch::{start_logging_filter, tasks::{wait_ms, Interval}};
 use flmodules::nodeids::U256;
 use flnet::{broker::BrokerError, config::ConnectionConfig, network::NetReply};
 
