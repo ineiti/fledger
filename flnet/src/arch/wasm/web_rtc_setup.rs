@@ -73,14 +73,14 @@ impl WebRTCConnectionSetup {
     ) -> Result<RtcPeerConnection, SetupError> {
         // If no stun server is configured, only local IPs will be sent in the browser.
         // At least the node webrtc does the correct thing...
-        let mut config = RtcConfiguration::new();
+        let config = RtcConfiguration::new();
         let mut servers_obj = vec![get_ice_server(connection_cfg.stun())];
         if let Some(turn) = connection_cfg.turn() {
             servers_obj.push(get_ice_server(turn));
         }
         let servers = serde_wasm_bindgen::to_value(&servers_obj)
             .map_err(|e| SetupError::SetupFail(e.to_string()))?;
-        config.ice_servers(&servers);
+        config.set_ice_servers(&servers);
         RtcPeerConnection::new_with_configuration(&config)
             .map_err(|e| SetupError::SetupFail(format!("PeerConnection error: {:?}", e)))
     }
@@ -177,8 +177,8 @@ impl WebRTCConnectionSetup {
             .as_string()
             .unwrap();
 
-        let mut offer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
-        offer_obj.sdp(&offer_sdp);
+        let offer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
+        offer_obj.set_sdp(&offer_sdp);
         let sld_promise = self.rp_conn.set_local_description(&offer_obj);
         JsFuture::from(sld_promise)
             .await
@@ -196,8 +196,8 @@ impl WebRTCConnectionSetup {
 
         self.dc_create_follow();
 
-        let mut offer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
-        offer_obj.sdp(&offer);
+        let offer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
+        offer_obj.set_sdp(&offer);
         let srd_promise = self.rp_conn.set_remote_description(&offer_obj);
         JsFuture::from(srd_promise)
             .await
@@ -215,8 +215,8 @@ impl WebRTCConnectionSetup {
             .as_string()
             .unwrap();
 
-        let mut answer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
-        answer_obj.sdp(&answer_sdp);
+        let answer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+        answer_obj.set_sdp(&answer_sdp);
         let sld_promise = self.rp_conn.set_local_description(&answer_obj);
         JsFuture::from(sld_promise)
             .await
@@ -237,8 +237,8 @@ impl WebRTCConnectionSetup {
         if self.rp_conn.signaling_state() == RtcSignalingState::Stable {
             return Ok(());
         }
-        let mut answer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
-        answer_obj.sdp(&answer);
+        let answer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+        answer_obj.set_sdp(&answer);
         let srd_promise = self.rp_conn.set_remote_description(&answer_obj);
         JsFuture::from(srd_promise)
             .await
@@ -248,9 +248,9 @@ impl WebRTCConnectionSetup {
 
     // Sends the ICE string to the WebRTC.
     pub async fn ice_put(&mut self, ice: String) -> Result<(), SetupError> {
-        let mut ric_init = RtcIceCandidateInit::new(&ice);
-        ric_init.sdp_mid(Some("0"));
-        ric_init.sdp_m_line_index(Some(0u16));
+        let ric_init = RtcIceCandidateInit::new(&ice);
+        ric_init.set_sdp_mid(Some("0"));
+        ric_init.set_sdp_m_line_index(Some(0u16));
         match RtcIceCandidate::new(&ric_init) {
             Ok(e) => {
                 if let Err(err) = wasm_bindgen_futures::JsFuture::from(
@@ -391,7 +391,7 @@ impl WebRTCConnectionSetup {
             RtcIceGatheringState::New => IceGatheringState::New,
             RtcIceGatheringState::Gathering => IceGatheringState::Gathering,
             RtcIceGatheringState::Complete => IceGatheringState::Complete,
-            RtcIceGatheringState::__Nonexhaustive => IceGatheringState::New,
+            _ => IceGatheringState::New,
         };
 
         let ice_connection = match self.rp_conn.ice_connection_state() {
@@ -402,7 +402,7 @@ impl WebRTCConnectionSetup {
             RtcIceConnectionState::Failed => IceConnectionState::Failed,
             RtcIceConnectionState::Disconnected => IceConnectionState::Disconnected,
             RtcIceConnectionState::Closed => IceConnectionState::Closed,
-            RtcIceConnectionState::__Nonexhaustive => IceConnectionState::New,
+            _ => IceConnectionState::New,
         };
 
         let mut data_connection = None;
@@ -413,7 +413,7 @@ impl WebRTCConnectionSetup {
                     RtcDataChannelState::Open => DataChannelState::Open,
                     RtcDataChannelState::Closing => DataChannelState::Closing,
                     RtcDataChannelState::Closed => DataChannelState::Closed,
-                    RtcDataChannelState::__Nonexhaustive => DataChannelState::Closed,
+                    _ => DataChannelState::Closed,
                 });
             }
         }

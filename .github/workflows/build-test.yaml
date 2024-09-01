@@ -18,20 +18,23 @@ jobs:
       continue-on-error: false
       with:
         path: |
+          target-common
+          .devbox
           ~/.cargo/bin/
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-          **/target/
         key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
-          cargo-build-
-          cargo
+          cargo-build
+
+    - name: Install devbox
+      uses: jetify-com/devbox-install-action@v0.11.0
+      with:
+        enable-cache: 'true'
 
     - name: Run cargo_build
-      shell: bash
-      run: |
-        make cargo_build
+      run: devbox run -- make cargo_build
 
   cargo_test:
     runs-on: ubuntu-latest
@@ -47,20 +50,24 @@ jobs:
       continue-on-error: false
       with:
         path: |
+          target-common
+          .devbox
           ~/.cargo/bin/
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-          **/target/
         key: cargo-test-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           cargo-test
           cargo-build
 
+    - name: Install devbox
+      uses: jetify-com/devbox-install-action@v0.11.0
+      with:
+        enable-cache: 'true'
+
     - name: Run cargo_test
-      shell: bash
-      run: |
-        make cargo_test
+      run: devbox run -- make cargo_test
 
   make_test:
     runs-on: ubuntu-latest
@@ -76,24 +83,21 @@ jobs:
       continue-on-error: false
       with:
         path: |
+          target-common
+          .devbox
           ~/.cargo/bin/
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-          **/target/
         key: cargo-make_test-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           cargo-make_test
           cargo-build
 
-    - name: Install trunk
-      run: which trunk || cargo install --locked trunk
-
-    - uses: jetli/wasm-pack-action@v0.3.0
+    - name: Install devbox
+      uses: jetify-com/devbox-install-action@v0.11.0
       with:
-        version: 'latest'
+        enable-cache: 'true'
 
     - name: Run make_test
-      shell: bash
-      run: |
-        make make_test
+      run: devbox run -- make make_test
