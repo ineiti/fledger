@@ -21,7 +21,7 @@ jobs:
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-        key: cargo-docker-${{ hashFiles('**/Cargo.lock') }}
+        key: cargo-docker-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
         restore-keys: |
           cargo-docker
           cargo-build
@@ -35,7 +35,7 @@ jobs:
       run: devbox run -- make update_version
 
     - name: Build servers
-      run: devbox run -- make build_cli_release build_web
+      run: devbox run -- make build_cli_release build_web_release
 
     - name: Docker build signal
       uses: mr-smithers-excellent/docker-build-push@v5
@@ -43,7 +43,6 @@ jobs:
         image: fledgre/flsignal
         registry: docker.io
         dockerfile: Dockerfile.flsignal
-        directory: target-common/release
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
         tags: latest
@@ -54,7 +53,6 @@ jobs:
         image: fledgre/fledger
         registry: docker.io
         dockerfile: Dockerfile.fledger
-        directory: target-common/release
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
         tags: latest

@@ -1,15 +1,12 @@
-FROM jetpackio/devbox:latest
+FROM debian:bookworm-slim
 
-# Installing your devbox project
-WORKDIR /code
-USER root:root
-RUN mkdir -p /code && chown ${DEVBOX_USER}:${DEVBOX_USER} /code
-USER ${DEVBOX_USER}:${DEVBOX_USER}
-COPY --chown=${DEVBOX_USER}:${DEVBOX_USER} devbox.json devbox.json
-COPY --chown=${DEVBOX_USER}:${DEVBOX_USER} devbox.lock devbox.lock
+RUN apt update && apt install patchelf
 
-RUN devbox run -- echo "Installed Packages."
+COPY target-common/release/fledger fledger
+RUN patchelf --set-interpreter /usr/lib64/ld-linux-x86-64.so.2 fledger
 
+FROM debian:bookworm-slim
 WORKDIR /fledger
-COPY ./fledger fledger
+COPY --from=0 fledger /fledger/fledger
+
 ENTRYPOINT ["/fledger/fledger", "-vv"]
