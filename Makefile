@@ -65,15 +65,23 @@ kill:
 	$(call PKILL,fledger)
 	$(call PKILL,trunk serve)
 
+build_cli:
+	cd cli && cargo build -p fledger && cargo build -p flsignal
+
+build_cli_release:
+	cd cli && cargo build --release -p fledger && cargo build --release -p flsignal
+
+build_web:
+	cd flbrowser && trunk build
+
+build_servers: build_cli build_web
+
 build_local_web:
 	cd flbrowser && trunk build --features local
 
-build_local_cli:
-	cd cli && cargo build -p fledger && cargo build -p flsignal
+build_local: build_local_web build_cli
 
-build_local: build_local_web build_local_cli
-
-serve_two: kill build_local_cli
+serve_two: kill build_cli
 	( cd cli && cargo run --bin flsignal -- -vv ) &
 	sleep 4
 	( cd cli && ( cargo run --bin fledger -- --config fledger/flnode -vv -s ws://localhost:8765 & \

@@ -10,44 +10,32 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: jetli/wasm-pack-action@v0.3.0
-      with:
-        version: 'latest'
-
-    - uses: jetli/trunk-action@v0.5.0
-      with:
-        version: 'v0.20.3'
-
-    - name: Add wasm target
-      run: rustup target add wasm32-unknown-unknown
-
     - name: Set up cargo cache
       uses: actions/cache@v4
       continue-on-error: false
       with:
         path: |
+          target-common
+          .devbox
           ~/.cargo/bin/
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-          **/target/
         key: cargo-docker-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           cargo-docker
           cargo-build
-          cargo
+
+    - name: Install devbox
+      uses: jetify-com/devbox-install-action@v0.11.0
+      with:
+        enable-cache: 'true'
 
     - name: Update build tag
-      run: make update_version
+      run: devbox run -- make update_version
 
-    - name: Build signal server
-      run: cd cli && cargo build --release -p flsignal
-
-    - name: Build flnode for docker server
-      run: cd cli && cargo build --release -p fledger
-
-    - name: Build web server
-      run: cd flbrowser && trunk build
+    - name: Build servers
+      run: devbox run -- make build_cli_release build_web
 
     - name: Docker build signal
       uses: mr-smithers-excellent/docker-build-push@v5
@@ -55,7 +43,7 @@ jobs:
         image: fledgre/flsignal
         registry: docker.io
         dockerfile: Dockerfile.flsignal
-        directory: cli/target/release
+        directory: target-common/release
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
         tags: latest
@@ -66,7 +54,7 @@ jobs:
         image: fledgre/fledger
         registry: docker.io
         dockerfile: Dockerfile.fledger
-        directory: cli/target/release
+        directory: target-common/release
         username: ${{ secrets.DOCKERHUB_NAME }}
         password: ${{ secrets.DOCKERHUB }}
         tags: latest
@@ -88,8 +76,13 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install devbox
+      uses: jetify-com/devbox-install-action@v0.11.0
+      with:
+        enable-cache: 'true'
+
     - name: Publish new crates, if any
-      run: make publish
+      run: devbox run -- make publish
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 

@@ -13,7 +13,7 @@ version = "0.7.2"
 
 [features]
 testing = []
-libc = ["native-tls", "rand", "tokio-tungstenite", "webrtc"]
+libc = ["rand", "tokio-tungstenite", "webrtc"]
 nosend = []
 wasm = [
   "nosend",
@@ -27,22 +27,22 @@ wasm = [
 ]
 
 [dependencies]
-flarch = {path = "../flarch", version = "0.7"}
-flmodules = {path = "../flmodules", version = "0.7"}
+flarch = { path = "../flarch", version = "0.7" }
+flmodules = { path = "../flmodules", version = "0.7" }
 
 async-trait = "0.1"
 bimap = "0.6"
 ed25519-compact = "2"
 futures = "0.3"
-getrandom = {version = "0.2"}
+getrandom = { version = "0.2" }
 itertools = "0.13"
 log = "0.4"
 names = { version = "0.14", default-features = false }
-serde = {version = "1", features = ["derive"]}
+serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
 serde_json = "1"
 # serde_wtih version 2 doesn't work with old configs
-serde_with = {version = "3", features = ["json", "base64"]}
+serde_with = { version = "3", features = ["json", "base64"] }
 # serde_yaml 0.9 uses tags in yaml, which fails here
 serde_yaml = "0.8"
 sha2 = "0.10"
@@ -52,18 +52,19 @@ tokio = "1"
 tokio-stream = "0.1"
 
 # For libc
-native-tls = {version = "0.2", optional = true}
-rand = {version = "0.8", optional = true}
-tokio-tungstenite = {version = "0.23", features = ["native-tls"], optional = true}
-webrtc = {version = "0.11", optional = true}
+rand = { version = "0.8", optional = true }
+tokio-tungstenite = { version = "0.23", features = ["rustls"], optional = true }
+webrtc = { version = "0.11", optional = true }
 
 # For wasm
-js-sys = {version = "0.3", optional = true}
+js-sys = { version = "0.3", optional = true }
 # parking_lot 0.12 needs nightly for wasm support.
-parking_lot = {version = "0.11", features = ["wasm-bindgen"], optional = true}
-wasm-bindgen = {version = "0.2", features = ["serde-serialize"], optional = true}
-wasm-bindgen-futures = {version = "0.4", optional = true}
-serde-wasm-bindgen = {version = "0.6", optional = true}
+parking_lot = { version = "0.11", features = ["wasm-bindgen"], optional = true }
+wasm-bindgen = { version = "0.2", features = [
+  "serde-serialize",
+], optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
 [dependencies.web-sys]
 features = [
   'Headers',
