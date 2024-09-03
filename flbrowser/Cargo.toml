@@ -7,6 +7,10 @@ description = "Web interface for fledger"
 repository = "https://github.com/ineiti/fledger"
 license = "AGPLv3"
 
+[profile.release]
+lto = true
+opt-level = 's'
+
 [features]
 local = []
 

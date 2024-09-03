@@ -71,6 +71,9 @@ build_cli:
 build_cli_release:
 	cd cli && cargo build --release -p fledger && cargo build --release -p flsignal
 
+build_web_release:
+	cd flbrowser && trunk build --release
+
 build_web:
 	cd flbrowser && trunk build
 
