@@ -1,6 +1,6 @@
 FROM debian:bookworm-slim
 
-RUN apt update && apt install patchelf
+RUN apt update && apt install -y patchelf ca-certificates
 
 COPY target-common/release/fledger fledger
 RUN patchelf --set-interpreter /usr/lib64/ld-linux-x86-64.so.2 fledger
@@ -8,5 +8,6 @@ RUN patchelf --set-interpreter /usr/lib64/ld-linux-x86-64.so.2 fledger
 FROM debian:bookworm-slim
 WORKDIR /fledger
 COPY --from=0 fledger /fledger/fledger
+COPY --from=0 /etc/ssl /etc/ssl
 
 ENTRYPOINT ["/fledger/fledger", "-vv"]
