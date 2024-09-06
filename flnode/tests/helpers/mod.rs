@@ -2,13 +2,9 @@ use std::{collections::HashMap, sync::mpsc::Receiver};
 
 use flarch::data_storage::DataStorageTemp;
 use flmodules::{
-    broker::{Broker, BrokerError},
-    nodeids::U256,
-    timer::TimerMessage,
-    Modules,
+    broker::{Broker, BrokerError}, nodeconfig::{NodeConfig, NodeInfo}, nodeids::U256, timer::TimerMessage, Modules
 };
 use flnet::{
-    config::{NodeConfig, NodeInfo},
     network::{NetCall, NetReply, NetworkMessage},
     web_rtc::{node_connection::NCInput, WebRTCConnMessage},
 };

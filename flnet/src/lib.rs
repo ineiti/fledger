@@ -162,15 +162,16 @@
 //! platform.
 //! It can be used for the browser or for node.
 
+use flmodules::nodeconfig::NodeConfig;
 use thiserror::Error;
+use web_rtc::connection::ConnectionConfig;
 
-pub mod config;
 pub mod network;
 pub mod signal;
 pub mod web_rtc;
 pub mod websocket;
 
-use crate::{config::NodeConfig, network::NetworkMessage};
+use crate::network::NetworkMessage;
 
 pub use flmodules::broker;
 pub use flmodules::nodeids::{NodeID, NodeIDs, U256};
@@ -233,7 +234,7 @@ pub use arch::*;
 /// ```
 pub async fn network_broker_start(
     node: NodeConfig,
-    connection: config::ConnectionConfig,
+    connection: ConnectionConfig,
 ) -> Result<broker::Broker<NetworkMessage>, NetworkSetupError> {
     #[cfg(any(feature = "libc", feature = "wasm"))]
     {
@@ -258,7 +259,7 @@ pub async fn network_broker_start(
 /// the [`network_broker_start`] method.
 pub async fn network_start(
     node: NodeConfig,
-    connection: config::ConnectionConfig,
+    connection: ConnectionConfig,
 ) -> Result<network::Network, NetworkSetupError> {
     #[cfg(any(feature = "libc", feature = "wasm"))]
     {

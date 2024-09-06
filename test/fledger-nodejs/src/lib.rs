@@ -2,7 +2,7 @@ use flarch::{
     data_storage::{DataStorage, DataStorageNode},
     tasks::wait_ms,
 };
-use flnet::{config::ConnectionConfig, network_broker_start};
+use flnet::{network_broker_start, web_rtc::connection::ConnectionConfig};
 use flnode::node::Node;
 use wasm_bindgen::prelude::*;
 

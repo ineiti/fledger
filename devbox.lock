@@ -521,8 +521,8 @@
       }
     },
     "vscode@latest": {
-      "last_modified": "2024-08-31T10:12:23Z",
-      "resolved": "github:NixOS/nixpkgs/5629520edecb69630a3f4d17d3d33fc96c13f6fe#vscode",
+      "last_modified": "2024-08-16T17:05:30Z",
+      "resolved": "github:NixOS/nixpkgs/d4a7a4d0e066278bfb0d77bd2a7adde1c0ec9e3d#vscode",
       "source": "devbox-search",
       "version": "1.92.2",
       "systems": {
@@ -530,41 +530,41 @@
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/q93xcjb5dc3rrz8xyvzym8ymqrnh45n2-vscode-1.92.2",
+              "path": "/nix/store/w1vy2d50lcgvj24vmwl99cz81kvynhaj-vscode-1.92.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/q93xcjb5dc3rrz8xyvzym8ymqrnh45n2-vscode-1.92.2"
+          "store_path": "/nix/store/w1vy2d50lcgvj24vmwl99cz81kvynhaj-vscode-1.92.2"
         },
         "aarch64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/jpnpxmagazv9rr3r0zxqb49vz2m2wdkv-vscode-1.92.2",
+              "path": "/nix/store/1glwx946zpqqndf8q4pirg7nwl1zhga1-vscode-1.92.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/jpnpxmagazv9rr3r0zxqb49vz2m2wdkv-vscode-1.92.2"
+          "store_path": "/nix/store/1glwx946zpqqndf8q4pirg7nwl1zhga1-vscode-1.92.2"
         },
         "x86_64-darwin": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/r0llw0jan7rhw8fiml6p9jcrccam71lf-vscode-1.92.2",
+              "path": "/nix/store/zsxk3wcy156yly0401a92dp8c5rwfdcx-vscode-1.92.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/r0llw0jan7rhw8fiml6p9jcrccam71lf-vscode-1.92.2"
+          "store_path": "/nix/store/zsxk3wcy156yly0401a92dp8c5rwfdcx-vscode-1.92.2"
         },
         "x86_64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/49bikavxb70qyymsnblgmp3ddcmxy81x-vscode-1.92.2",
+              "path": "/nix/store/3xm62iszlb6q0fzpgcvyh5fc0p37amhz-vscode-1.92.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/49bikavxb70qyymsnblgmp3ddcmxy81x-vscode-1.92.2"
+          "store_path": "/nix/store/3xm62iszlb6q0fzpgcvyh5fc0p37amhz-vscode-1.92.2"
         }
       }
     },

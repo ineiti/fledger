@@ -5,12 +5,9 @@ use wasm_bindgen::prelude::*;
 
 use flarch::tasks::wait_ms;
 use flnet::{
-    config::{NodeConfig, NodeInfo, ConnectionConfig},
-    network::{NetCall, NetworkError},
-    network::{NetReply, NetworkMessage},
-    network_broker_start, NetworkSetupError,
+    network::{NetCall, NetReply, NetworkError, NetworkMessage}, network_broker_start, web_rtc::connection::ConnectionConfig, NetworkSetupError
 };
-use flmodules::broker::Destination;
+use flmodules::{broker::Destination, nodeconfig::{NodeConfig, NodeInfo}};
 
 const URL: &str = "ws://127.0.0.1:8765";
 

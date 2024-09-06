@@ -4,13 +4,9 @@ use tokio_stream::StreamExt;
 
 use flarch::tasks::{spawn_local, Interval};
 use flmodules::{
-    broker::{Broker, BrokerError},
-    nodeids::NodeID,
+    broker::{Broker, BrokerError}, nodeconfig::NodeInfo, nodeids::NodeID
 };
-use flnet::{
-    config::NodeInfo,
-    network::{NetCall, NetworkMessage, NetReply},
-};
+use flnet::network::{NetCall, NetReply, NetworkMessage};
 
 use crate::common::{PPMessage, PPMessageNode};
 

@@ -13,16 +13,12 @@ use web_sys::{
     RtcSessionDescriptionInit, RtcSignalingState,
 };
 
-use crate::{
-    config::{ConnectionConfig, HostLogin},
-    web_rtc::{
-        messages::{
-            ConnType, ConnectionStateMap, DataChannelState, IceConnectionState, IceGatheringState,
-            PeerMessage, SetupError, SignalingState, WebRTCInput, WebRTCMessage, WebRTCOutput,
-            WebRTCSpawner,
-        },
-        node_connection::Direction,
-    },
+use crate::web_rtc::{
+    connection::{ConnectionConfig, HostLogin}, messages::{
+        ConnType, ConnectionStateMap, DataChannelState, IceConnectionState, IceGatheringState,
+        PeerMessage, SetupError, SignalingState, WebRTCInput, WebRTCMessage, WebRTCOutput,
+        WebRTCSpawner,
+    }, node_connection::Direction
 };
 use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
 

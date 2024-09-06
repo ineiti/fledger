@@ -1,13 +1,9 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use flmodules::{
-    ping::storage::{PingStat, PingStorage},
-    Modules,
+    nodeconfig::NodeInfo, ping::storage::{PingStat, PingStorage}, Modules
 };
-use flnet::{
-    config::{ConnectionConfig, HostLogin, Login},
-    network_broker_start,
-};
+use flnet::{network_broker_start, web_rtc::connection::{ConnectionConfig, HostLogin, Login}};
 use flnode::{node::Node, version::VERSION_STRING};
 use js_sys::JsString;
 use regex::Regex;
@@ -28,7 +24,7 @@ use flarch::{
     tasks::{spawn_local, wait_ms},
 };
 use flmodules::nodeids::U256;
-use flnet::{config::NodeInfo, network::NetworkConnectionState};
+use flnet::network::NetworkConnectionState;
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -239,14 +235,10 @@ impl FledgerWeb {
             }),
         );
         let network = network_broker_start(node_config.clone(), config).await?;
-            node_config.info.modules = Modules::all() - Modules::ENABLE_WEBPROXY;
-        Ok(Node::start(
-            my_storage,
-            node_config,
-            network,
-        )
-        .await
-        .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
+        node_config.info.modules = Modules::all() - Modules::ENABLE_WEBPROXY;
+        Ok(Node::start(my_storage, node_config, network)
+            .await
+            .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
     }
 
     fn set_data_storage() {

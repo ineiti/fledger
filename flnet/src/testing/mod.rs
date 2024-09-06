@@ -1,10 +1,6 @@
-use crate::{
-    config::{NodeConfig, NodeInfo},
-    network::{NetReply, NetworkMessage},
-};
+use crate::network::{NetReply, NetworkMessage};
 use flmodules::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate},
-    nodeids::U256,
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate}, nodeconfig::{NodeConfig, NodeInfo}, nodeids::U256
 };
 
 pub struct NetworkBrokerSimul {

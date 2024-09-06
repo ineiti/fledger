@@ -4,11 +4,12 @@
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 use console_error_panic_hook::set_once as set_panic_hook;
+use flmodules::nodeconfig::NodeConfig;
 use ybc::TileCtx::{Ancestor, Child, Parent};
 use yew::prelude::*;
 
 use flarch::tasks::now;
-use flnet::{broker::Broker, config::{NodeConfig, ConnectionConfig}};
+use flnet::{broker::Broker, web_rtc::connection::ConnectionConfig};
 
 use shared::{
     common::{NodeList, PPMessage},
@@ -35,7 +36,7 @@ impl Component for App {
         s.link().send_message(AppMessage::Init);
         Self {
             logs: vec![],
-            config: flnet::config::NodeConfig::new(),
+            config: NodeConfig::new(),
             pp_imp: now() % 1000 >= 500,
         }
     }
@@ -129,8 +130,8 @@ impl Component for App {
                 padded=true
                 navbrand={html!{
                     <ybc::NavbarItem>
-                        <ybc::Title 
-                            classes={classes!("has-text-white")} 
+                        <ybc::Title
+                            classes={classes!("has-text-white")}
                             size={ybc::HeaderSize::Is4}>
                             {"FLNet Ping-Pong Example"}
                         </ybc::Title>

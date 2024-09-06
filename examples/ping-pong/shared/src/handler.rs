@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 
 use flmodules::{
+    nodeconfig::NodeInfo,
     nodeids::{NodeID, U256},
     timer::{TimerBroker, TimerMessage},
 };
 use flnet::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    config::NodeInfo,
     network::{NetCall, NetworkMessage},
 };
 
@@ -146,15 +146,15 @@ mod test {
     use std::time::Duration;
 
     use flarch::start_logging;
-    use flmodules::broker::Destination;
-    use flnet::{config::NodeConfig, network::NetReply, NetworkSetupError};
+    use flmodules::{broker::Destination, nodeconfig::NodeConfig};
+    use flnet::{network::NetReply, NetworkSetupError};
 
     use super::*;
 
     // Tests single messages going into the structure doing the correct thing:
     // - receive 'ping' from the user, send a 'ping' to the network
     // - receive 'ping' from the network replies 'pong' and requests a new list
-    // #BUG: flaky test - failed once with 
+    // #BUG: flaky test - failed once with
     // thread 'handler::test::test_ping' panicked at src/handler.rs:190:9:
     // assertion `left == right` failed
     // left: FromNetwork(c52bea62dddd2f42-659253603d78279c-ea7f42654af68f7a-b5c8b6ad272a30ed, Ping)

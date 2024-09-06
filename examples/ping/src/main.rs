@@ -4,8 +4,8 @@ use std::time::Duration;
 use tokio_stream::StreamExt;
 
 use flarch::{start_logging_filter, tasks::{wait_ms, Interval}};
-use flmodules::nodeids::U256;
-use flnet::{broker::BrokerError, config::ConnectionConfig, network::NetReply};
+use flmodules::{nodeconfig::NodeConfig, nodeids::U256};
+use flnet::{broker::BrokerError, network::NetReply, web_rtc::connection::ConnectionConfig};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -38,7 +38,7 @@ async fn main() -> Result<(), BrokerError> {
 
 async fn ping() -> Result<(), BrokerError> {
     // Create a random node-configuration. It uses serde for easy serialization.
-    let nc = flnet::config::NodeConfig::new();
+    let nc = NodeConfig::new();
     log::info!("Our node-ID is {:?}", nc.info.get_id());
     // Connect to the signalling server and wait for connection requests.
     let mut net = flnet::network_start(
@@ -74,7 +74,7 @@ async fn ping() -> Result<(), BrokerError> {
 
 async fn server() -> Result<(), BrokerError> {
     // Create a random node-configuration. It uses serde for easy serialization.
-    let nc = flnet::config::NodeConfig::new();
+    let nc = NodeConfig::new();
     // Connect to the signalling server and wait for connection requests.
     let mut net = flnet::network_start(
         nc.clone(),
@@ -93,7 +93,7 @@ async fn server() -> Result<(), BrokerError> {
 
 async fn client(server_id: &str) -> Result<(), BrokerError> {
     // Create a random node-configuration. It uses serde for easy serialization.
-    let nc = flnet::config::NodeConfig::new();
+    let nc = NodeConfig::new();
     // Connect to the signalling server and wait for connection requests.
     let mut net = flnet::network_start(
         nc.clone(),

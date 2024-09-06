@@ -1,14 +1,9 @@
 use thiserror::Error;
 
 use flarch::start_logging_filter;
-use flmodules::{broker::Broker, nodeids::U256};
+use flmodules::{broker::Broker, nodeconfig::NodeConfig, nodeids::U256};
 use flnet::{
-    config::{NodeConfig, ConnectionConfig},
-    network::{NetCall, NetReply, NetworkMessage},
-    network_broker_start,
-    signal::SignalServer,
-    web_socket_server::WebSocketServer,
-    NetworkSetupError,
+    network::{NetCall, NetReply, NetworkMessage}, network_broker_start, signal::SignalServer, web_rtc::connection::ConnectionConfig, web_socket_server::WebSocketServer, NetworkSetupError
 };
 
 const URL: &str = "ws://127.0.0.1:8765";

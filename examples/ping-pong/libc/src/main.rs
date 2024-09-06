@@ -1,7 +1,8 @@
 use clap::{Parser, ValueEnum};
 
 use flarch::start_logging_filter;
-use flnet::{config::ConnectionConfig, NetworkSetupError};
+use flmodules::nodeconfig::NodeConfig;
+use flnet::{web_rtc::connection::ConnectionConfig, NetworkSetupError};
 
 use shared::{
     common::NodeList,
@@ -27,7 +28,7 @@ async fn main() -> Result<(), NetworkSetupError> {
     start_logging_filter(vec!["fl", "libc"]);
     let args = Args::parse();
 
-    let nc = flnet::config::NodeConfig::new();
+    let nc = NodeConfig::new();
     let name = nc.info.name.clone();
     let net = flnet::network_broker_start(nc.clone(), ConnectionConfig::from_signal(URL)).await?;
     let mut list = NodeList::new(vec![]);

@@ -3,8 +3,7 @@ use flarch::{
     start_logging_filter_level, tasks::wait_ms,
 };
 use flnet::{
-    broker::BrokerError, network_broker_start, signal::SignalServer,
-    web_socket_server::WebSocketServer, websocket::WSSError, NetworkSetupError, config::ConnectionConfig,
+    broker::BrokerError, network_broker_start, signal::SignalServer, web_rtc::connection::ConnectionConfig, web_socket_server::WebSocketServer, websocket::WSSError, NetworkSetupError
 };
 use flnode::node::{Node, NodeError};
 use thiserror::Error;

@@ -4,10 +4,9 @@ use flarch::{
     data_storage::{DataStorage, DataStorageFile},
     tasks::wait_ms,
 };
-use flnet::{signal::SIGNAL_VERSION, config::Login};
 use flnet::{
-    config::{ConnectionConfig, HostLogin},
     network_broker_start,
+    signal::SIGNAL_VERSION, web_rtc::connection::{ConnectionConfig, HostLogin, Login},
 };
 use flnode::{node::Node, version::VERSION_STRING};
 

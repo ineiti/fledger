@@ -1,7 +1,6 @@
-use flnet::config::NodeInfo;
 use serde::{Deserialize, Serialize};
 
-use flmodules::nodeids::NodeID;
+use flmodules::{nodeconfig::NodeInfo, nodeids::NodeID};
 
 /// A PPMessage includes messages from the network, messages to be sent to
 /// the network, and receiving an updated list from the signalling server.

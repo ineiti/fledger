@@ -30,14 +30,15 @@ use self::{
 };
 
 pub mod messages;
+pub mod connection;
 pub mod node_connection;
 
 #[derive(Debug, Clone, PartialEq)]
 /// All messages for the [`WebRTCConn`] broker.
 pub enum WebRTCConnMessage {
-    /// Messages coming from the [`crate::network::NetworkBroker`]
+    /// Messages going to the WebRTC interface
     InputNC((NodeID, NCInput)),
-    /// Messages going to the [`crate::network::NetworkBroker`]
+    /// Messages coming from the WebRTC interface
     OutputNC((NodeID, NCOutput)),
     /// Connection request
     Connect(NodeID),

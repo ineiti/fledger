@@ -55,14 +55,12 @@ use std::{
 use async_trait::async_trait;
 use bimap::BiMap;
 use flmodules::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    nodeids::{U256, NodeID},
-    timer::{TimerBroker, TimerMessage},
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler}, nodeconfig::NodeInfo, nodeids::{NodeID, U256}, timer::{TimerBroker, TimerMessage}
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
 
-use crate::{config::NodeInfo, web_rtc::messages::PeerInfo, websocket::WSServerInput};
+use crate::{web_rtc::messages::PeerInfo, websocket::WSServerInput};
 
 use super::websocket::{WSServerMessage, WSServerOutput};
 
