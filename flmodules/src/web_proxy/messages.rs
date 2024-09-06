@@ -89,7 +89,7 @@ impl WebProxyMessages {
     pub fn process_node_message(&mut self, src: NodeID, msg: MessageNode) -> Vec<WebProxyOut> {
         let mut out = match msg {
             MessageNode::Request(nonce, request) => self.start_request(src, nonce, request),
-            MessageNode::Response(nonce, response) => self.handle_response(nonce, response),
+            MessageNode::Response(nonce, response) => self.handle_response(src, nonce, response),
         };
         out.push(WebProxyOut::UpdateStorage(self.core.storage.clone()));
         out
@@ -159,11 +159,11 @@ impl WebProxyMessages {
         vec![]
     }
 
-    fn handle_response(&mut self, nonce: U256, msg: ResponseMessage) -> Vec<WebProxyOut> {
+    fn handle_response(&mut self, src: NodeID, nonce: U256, msg: ResponseMessage) -> Vec<WebProxyOut> {
         self.core
             .handle_response(nonce, msg)
-            .map_or(vec![], |(proxy, header)| {
-                vec![WebProxyOut::ResponseGet(proxy, nonce, header)]
+            .map_or(vec![], | header| {
+                vec![WebProxyOut::ResponseGet(src, nonce, header)]
             })
     }
 }

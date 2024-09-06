@@ -74,12 +74,12 @@ impl WebProxyCore {
         None
     }
 
-    pub fn handle_response(&mut self, nonce: U256, msg: ResponseMessage) -> Option<(NodeID, ResponseHeader)> {
+    pub fn handle_response(&mut self, nonce: U256, msg: ResponseMessage) -> Option<ResponseHeader> {
         if let Some((_, tx)) = self.requests.get(&nonce) {
             match msg {
                 ResponseMessage::Header(header) => {
                     self.storage.counters.rx_packets += 1;
-                    return Some((NodeID::rnd(), header));
+                    return Some(header);
                 }
                 ResponseMessage::Body(body) => {
                     self.storage.counters.rx_packets += 1;

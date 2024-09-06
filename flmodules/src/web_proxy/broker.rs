@@ -3,6 +3,10 @@ use core::str;
 use flarch::{data_storage::DataStorage, tasks::spawn_local};
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
+#[cfg(not(target_family="wasm"))]
+use tokio::time::*;
+#[cfg(target_family="wasm")]
+use wasmtimer::tokio::*;
 
 use crate::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
@@ -80,7 +84,7 @@ impl WebProxy {
         self.web_proxy
             .emit_msg(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx).into())?;
         let (mut tap, id) = self.web_proxy.get_tap().await?;
-        // tokio::time::timeout(tokio::time::Duration::from_secs(5), async move {
+        timeout(tokio::time::Duration::from_secs(5), async move {
             while let Some(msg) = tap.recv().await {
                 if let WebProxyMessage::Output(WebProxyOut::ResponseGet(proxy, rnd, header)) = msg {
                     if rnd == our_rnd {
@@ -91,9 +95,9 @@ impl WebProxy {
             }
             self.web_proxy.remove_subsystem(id).await?;
             return Err(WebProxyError::ResponseTimeout);
-        // })
-        // .await
-        // .map_err(|_| WebProxyError::ResponseTimeout)?
+        })
+        .await
+        .map_err(|_| WebProxyError::ResponseTimeout)?
     }
 
     pub fn get_counters(&mut self) -> Counters {

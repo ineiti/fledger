@@ -87,20 +87,35 @@ fn main() {
                         let proxy_div = proxy_div.clone();
                         let proxy_url = proxy_url.clone();
                         let mut webproxy = webproxy.clone();
+                        let nodes = web.node.nodes_connected();
                         spawn_local(async move {
                             let fetching =
                                 format!("Fetching url from proxy: {}", proxy_url.value());
                             proxy_div.set_inner_html(&fetching);
-                            let mut response = webproxy
-                                .get(&proxy_url.value())
-                                .await
-                                .expect("Getting response");
-                            let text = format!(
-                                "Proxy: {}<br>{}",
-                                response.proxy(),
-                                response.text().await.unwrap()
-                            );
-                            proxy_div.set_inner_html(&text);
+                            match webproxy.get(&proxy_url.value()).await {
+                                Ok(mut response) => {
+                                    let mut proxy_str = format!("{}", response.proxy());
+                                    if let Ok(nodes) = nodes {
+                                        if let Some(info) = nodes
+                                            .iter()
+                                            .find(|&node| node.get_id() == response.proxy())
+                                        {
+                                            proxy_str =
+                                                format!("{} ({})", info.name, info.get_id());
+                                        }
+                                    }
+                                    let text = format!(
+                                        "Proxy: {proxy_str}<br>{}",
+                                        response.text().await.unwrap()
+                                    );
+                                    proxy_div.set_inner_html(&text);
+                                }
+                                Err(e) => {
+                                    let text =
+                                        format!("Got error while fetching page from proxy: {e}");
+                                    proxy_div.set_inner_html(&text);
+                                }
+                            }
                         });
                     }
                 }
