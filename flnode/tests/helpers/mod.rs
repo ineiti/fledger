@@ -5,6 +5,7 @@ use flmodules::{
     broker::{Broker, BrokerError},
     nodeids::U256,
     timer::TimerMessage,
+    Modules,
 };
 use flnet::{
     config::{NodeConfig, NodeInfo},
@@ -12,7 +13,7 @@ use flnet::{
     web_rtc::{node_connection::NCInput, WebRTCConnMessage},
 };
 
-use flnode::node::{Brokers, Node, NodeError};
+use flnode::node::{Node, NodeError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -40,9 +41,9 @@ impl NetworkSimul {
         }
     }
 
-    pub async fn add_nodes(&mut self, brokers: Brokers, nbr: usize) -> Result<(), NetworkError> {
+    pub async fn add_nodes(&mut self, modules: Modules, nbr: usize) -> Result<(), NetworkError> {
         for _ in 0..nbr {
-            self.new_node(brokers).await?;
+            self.new_node(modules).await?;
         }
         self.send_update_list().await?;
         Ok(())
@@ -72,9 +73,9 @@ impl NetworkSimul {
         Ok(())
     }
 
-    async fn new_node(&mut self, brokers: Brokers) -> Result<(), NetworkError> {
+    async fn new_node(&mut self, modules: Modules) -> Result<(), NetworkError> {
         let mut broker = Broker::new();
-        let node_timer = NodeTimer::new(broker.clone(), self.nodes.len() as u32, brokers).await?;
+        let node_timer = NodeTimer::new(broker.clone(), self.nodes.len() as u32, modules).await?;
         let id = node_timer.node.node_config.info.get_id();
         let (tap, _) = broker.get_tap_sync().await?;
         self.node_taps.insert(id, tap);
@@ -164,7 +165,7 @@ impl NodeTimer {
     pub async fn new(
         broker_net: Broker<NetworkMessage>,
         start: u32,
-        brokers: Brokers,
+        modules: Modules,
     ) -> Result<Self, NodeError> {
         let mut node_config = NodeConfig::new();
         // Make sure the public key starts with a hex nibble corresponding to its position in the test.
@@ -179,8 +180,13 @@ impl NodeTimer {
         {
             node_config = NodeConfig::new();
         }
-        let mut node_data =
-            Node::start_some(Box::new(DataStorageTemp::new()), node_config, broker_net.clone(), brokers).await?;
+        node_config.info.modules = modules;
+        let mut node_data = Node::start(
+            Box::new(DataStorageTemp::new()),
+            node_config,
+            broker_net.clone(),
+        )
+        .await?;
         let timer = Broker::new();
         node_data.add_timer(timer.clone()).await;
 

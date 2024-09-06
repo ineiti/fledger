@@ -37,7 +37,6 @@ sha2 = "0.10"
 ed25519-compact = "2"
 itertools = "0.13"
 chrono = "0.4"
-bitflags = "2"
 
 [dev-dependencies]
 env_logger = "0.11"

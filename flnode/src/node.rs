@@ -17,7 +17,11 @@ use flmodules::{
     nodeids::NodeID,
     ping::{broker::PingBroker, messages::PingConfig},
     timer::{TimerBroker, TimerMessage},
-    web_proxy::{broker::{WebProxy, WebProxyError}, core::WebProxyConfig},
+    web_proxy::{
+        broker::{WebProxy, WebProxyError},
+        core::WebProxyConfig,
+    },
+    Modules,
 };
 use flnet::{
     config::{ConfigError, NodeConfig, NodeInfo},
@@ -43,20 +47,7 @@ pub enum NodeError {
     #[error(transparent)]
     Yaml(#[from] serde_yaml::Error),
     #[error(transparent)]
-    WebProxy(#[from] WebProxyError)
-}
-
-use bitflags::bitflags;
-bitflags! {
-    #[derive(Clone, Copy)]
-    pub struct Brokers: u32 {
-        const ENABLE_STAT = 0b1;
-        const ENABLE_RAND = 0b10;
-        const ENABLE_GOSSIP = 0b100;
-        const ENABLE_PING = 0b1000;
-        const ENABLE_WEBPROXY = 0b10000;
-        const ENABLE_ALL = 0b11111;
-    }
+    WebProxy(#[from] WebProxyError),
 }
 
 /// The node structure holds it all together. It is the main structure of the project.
@@ -94,33 +85,21 @@ impl Node {
         node_config: NodeConfig,
         broker_net: Broker<NetworkMessage>,
     ) -> Result<Self, NodeError> {
-        let mut node =
-            Self::start_some(storage, node_config, broker_net, Brokers::ENABLE_ALL).await?;
-        node.add_timer(TimerBroker::start().await?).await;
-        Ok(node)
-    }
-
-    /// Same as `start`, but only initialize a subset of brokers.
-    pub async fn start_some(
-        storage: Box<dyn DataStorage + Send>,
-        node_config: NodeConfig,
-        broker_net: Broker<NetworkMessage>,
-        brokers: Brokers,
-    ) -> Result<Self, NodeError> {
         info!(
             "Starting node: {} = {}",
             node_config.info.name,
             node_config.info.get_id()
         );
 
+        let modules = node_config.info.modules;
         let id = node_config.info.get_id();
         let mut random = None;
         let mut gossip = None;
         let mut ping = None;
         let mut webproxy = None;
-        if brokers.contains(Brokers::ENABLE_RAND) {
+        if modules.contains(Modules::ENABLE_RAND) {
             let rnd = RandomBroker::start(id, broker_net.clone()).await?;
-            if brokers.contains(Brokers::ENABLE_GOSSIP) {
+            if modules.contains(Modules::ENABLE_GOSSIP) {
                 gossip = Some(GossipBroker::start(id, rnd.broker.clone()).await?);
                 Self::init_gossip(
                     &mut gossip.as_mut().unwrap(),
@@ -129,10 +108,10 @@ impl Node {
                 )
                 .await?;
             }
-            if brokers.contains(Brokers::ENABLE_PING) {
+            if modules.contains(Modules::ENABLE_PING) {
                 ping = Some(PingBroker::start(PingConfig::default(), rnd.broker.clone()).await?);
             }
-            if brokers.contains(Brokers::ENABLE_WEBPROXY) {
+            if modules.contains(Modules::ENABLE_WEBPROXY) {
                 webproxy = Some(
                     WebProxy::start(
                         storage.clone(),
@@ -140,17 +119,18 @@ impl Node {
                         rnd.broker.clone(),
                         WebProxyConfig::default(),
                     )
-                    .await?);
+                    .await?,
+                );
             }
             random = Some(rnd);
         }
-        let stat = if brokers.contains(Brokers::ENABLE_STAT) {
+        let stat = if modules.contains(Modules::ENABLE_STAT) {
             Some(StatBroker::start(broker_net.clone()).await?)
         } else {
             None
         };
 
-        Ok(Self {
+        let mut node = Self {
             storage,
             node_config,
             broker_net,
@@ -159,7 +139,9 @@ impl Node {
             gossip,
             ping,
             webproxy,
-        })
+        };
+        node.add_timer(TimerBroker::start().await?).await;
+        Ok(node)
     }
 
     /// Adds a timer broker to the Node. Automatically called by Node::start.

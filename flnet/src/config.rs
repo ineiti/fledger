@@ -5,7 +5,7 @@
 //! based serializations when using text-based serializations like `yaml` or `json`.
 
 use ed25519_compact::{KeyPair, Noise, PublicKey, Seed, Signature};
-use flmodules::nodeids::U256;
+use flmodules::{nodeids::U256, Modules};
 use serde_derive::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
 use std::{
@@ -137,6 +137,8 @@ pub struct NodeInfo {
     /// the public key of the node
     #[serde_as(as = "Base64")]
     pub pubkey: Vec<u8>,
+    // capabilities of this node
+    pub modules: Modules,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -159,6 +161,7 @@ impl NodeInfo {
             name: names::Generator::default().next().unwrap(),
             client: "libc".to_string(),
             pubkey: pubkey.as_ref().to_vec(),
+            modules: Modules::empty(),
         }
     }
 
@@ -223,6 +226,7 @@ impl From<NodeInfoV1> for NodeInfo {
             name: ni.info,
             client: ni.client,
             pubkey: ni.pubkey,
+            modules: Modules::empty(),
         }
     }
 }
@@ -234,6 +238,7 @@ impl TryFrom<NodeInfoToml> for NodeInfo {
             name: nit.info,
             client: nit.client,
             pubkey: nit.pubkey.ok_or(ConfigError::PublicKeyMissing)?,
+            modules: Modules::empty(),
         })
     }
 }

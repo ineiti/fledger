@@ -1,6 +1,9 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
-use flmodules::ping::storage::{PingStat, PingStorage};
+use flmodules::{
+    ping::storage::{PingStat, PingStorage},
+    Modules,
+};
 use flnet::{
     config::{ConnectionConfig, HostLogin, Login},
     network_broker_start,
@@ -223,7 +226,7 @@ impl FledgerWeb {
 
     async fn node_start() -> Result<Node> {
         let my_storage = DataStorageLocal::new("fledger");
-        let node_config = Node::get_config(my_storage.clone())?;
+        let mut node_config = Node::get_config(my_storage.clone())?;
         let config = ConnectionConfig::new(
             Some(URL.into()),
             None,
@@ -236,9 +239,14 @@ impl FledgerWeb {
             }),
         );
         let network = network_broker_start(node_config.clone(), config).await?;
-        Ok(Node::start(my_storage, node_config, network)
-            .await
-            .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
+            node_config.info.modules = Modules::all() - Modules::ENABLE_WEBPROXY;
+        Ok(Node::start(
+            my_storage,
+            node_config,
+            network,
+        )
+        .await
+        .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
     }
 
     fn set_data_storage() {
