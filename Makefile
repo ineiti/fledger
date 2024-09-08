@@ -1,8 +1,8 @@
-CARGOS := cli/{fledger,flsignal} flarch flbrowser \
-			flmodules flnet flnode test/{fledger-nodejs,signal-fledger,webrtc-libc-wasm/{libc,wasm}} \
+CARGOS := cli/{fledger,flsignal} flarch flarch_macro flbrowser \
+			flmodules flnode test/{fledger-nodejs,signal-fledger,webrtc-libc-wasm/{libc,wasm}} \
 			examples/ping-pong/{wasm,shared,libc}
 MAKE_TESTS := test/{webrtc-libc-wasm,signal-fledger} examples/ping-pong
-CRATES := flarch flmodules flnet flnode
+CRATES := flarch flmodules flnode
 SHELL := /bin/bash
 PKILL = @ps aux | grep "$1" | grep -v grep | awk '{print $$2}' | xargs -r kill
 

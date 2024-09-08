@@ -8,14 +8,14 @@ use flmodules::{
     nodeconfig::NodeInfo,
     timer::{TimerBroker, TimerMessage},
 };
-use flnet::network::{NetCall, NetworkMessage};
+use flmodules::network::network::{NetCall, NetworkMessage};
 
 use crate::common::{PPMessage, PPMessageNode};
 
 /// This only runs on localhost.
 pub const URL: &str = "ws://localhost:8765";
 
-/// The PingPong structure is a simple implementation showing how to use the flnet
+/// The PingPong structure is a simple implementation showing how to use the flmodules::network
 /// module and the Broker to create a request/reply system for multiple
 /// nodes.
 /// To use the PingPong structure, it can be called from a libc binary or a
@@ -69,12 +69,12 @@ impl PingPong {
     fn net_to_pp(msg: NetworkMessage) -> Option<PPMessage> {
         if let NetworkMessage::Reply(rep) = msg {
             match rep {
-                flnet::network::NetReply::RcvNodeMessage(from, node_msg) => {
+                flmodules::network::network::NetReply::RcvNodeMessage(from, node_msg) => {
                     serde_json::from_str::<PPMessageNode>(&node_msg)
                         .ok()
                         .map(|ppm| PPMessage::FromNetwork(from, ppm))
                 }
-                flnet::network::NetReply::RcvWSUpdateList(nodes) => Some(PPMessage::List(nodes)),
+                flmodules::network::network::NetReply::RcvWSUpdateList(nodes) => Some(PPMessage::List(nodes)),
                 _ => None,
             }
         } else {
@@ -147,7 +147,7 @@ mod test {
 
     use flarch::{broker::Destination, start_logging};
     use flmodules::nodeconfig::NodeConfig;
-    use flnet::{network::NetReply, NetworkSetupError};
+    use flmodules::network::{network::NetReply, NetworkSetupError};
 
     use super::*;
 
@@ -216,7 +216,7 @@ mod test {
         ))
     }
 
-    use flnet::testing::NetworkBrokerSimul;
+    use flmodules::network::testing::NetworkBrokerSimul;
     use tokio::time::sleep;
 
     // Test a simulation of two nodes with the NetworkBrokerSimul

@@ -8,7 +8,7 @@ use flarch::{
     tasks::{spawn_local, Interval},
 };
 use flmodules::nodeconfig::NodeInfo;
-use flnet::network::{NetCall, NetReply, NetworkMessage};
+use flmodules::network::network::{NetCall, NetReply, NetworkMessage};
 
 use crate::common::{PPMessage, PPMessageNode};
 

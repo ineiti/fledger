@@ -826,11 +826,13 @@ version = "0.7.1"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bimap",
  "bitflags 2.6.0",
  "bytes",
  "ed25519-compact",
  "flarch",
  "futures",
+ "getrandom",
  "itertools",
  "log",
  "names",
@@ -848,32 +850,6 @@ dependencies = [
  "toml",
  "wasm-bindgen-futures",
  "wasmtimer",
-]
-
-[[package]]
-name = "flnet"
-version = "0.7.2"
-dependencies = [
- "async-trait",
- "bimap",
- "ed25519-compact",
- "flarch",
- "flmodules",
- "futures",
- "getrandom",
- "itertools",
- "log",
- "names",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_with",
- "serde_yaml",
- "sha2",
- "thiserror",
- "tokio",
- "tokio-stream",
- "toml",
 ]
 
 [[package]]
@@ -1614,7 +1590,6 @@ dependencies = [
  "clap",
  "flarch",
  "flmodules",
- "flnet",
  "log",
  "tokio",
  "tokio-stream",

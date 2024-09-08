@@ -10,9 +10,14 @@ homepage = "https://fledg.re"
 readme = "README.md"
 keywords = ["test", "utils", "fledger"]
 
+[features]
+testing = []
+
 [dependencies]
 flarch = { path = "../flarch", version = "0.7" }
 
+bimap = "0.6"
+getrandom = { version = "0.2" }
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
 # serde_yaml 0.9 uses tags in yaml, which fails here
@@ -44,3 +49,6 @@ bitflags = { version = "2", features = ["serde"] }
 # For wasm only
 [target.'cfg(target_family="wasm")'.dependencies]
 wasm-bindgen-futures = { version = "0.4" }
+
+[dev-dependencies]
+env_logger = "0.11"

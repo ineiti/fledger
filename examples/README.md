@@ -1,6 +1,6 @@
 # Examples
 
-Here you can find some examples on how to use the flnet crate.
+Here you can find some examples on how to use the flarch crate.
 
 ## Ping
 

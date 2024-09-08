@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::*;
 
 use flarch::{broker::{Destination, BrokerError}, tasks::wait_ms, web_rtc::connection::ConnectionConfig};
 use flmodules::nodeconfig::{NodeConfig, NodeInfo};
-use flnet::{
+use flmodules::network::{
     network::{NetCall, NetReply, NetworkError, NetworkMessage},
     network_broker_start, NetworkSetupError,
 };

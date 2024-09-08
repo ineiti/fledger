@@ -7,7 +7,7 @@ use flarch::{
         connection::ConnectionConfig, web_socket_server::WebSocketServer, websocket::WSSError,
     },
 };
-use flnet::{network_broker_start, signal::SignalServer, NetworkSetupError};
+use flmodules::network::{network_broker_start, signal::SignalServer, NetworkSetupError};
 use flnode::node::{Node, NodeError};
 use thiserror::Error;
 

@@ -12,7 +12,7 @@ use flmodules::{
     },
     timer::TimerMessage,
 };
-use flnet::network::{NetCall, NetReply, NetworkMessage};
+use flmodules::network::network::{NetCall, NetReply, NetworkMessage};
 
 pub struct RandomBroker {
     pub storage: RandomStorage,

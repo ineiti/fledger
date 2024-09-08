@@ -64,7 +64,7 @@ use flarch::{
         websocket::{WSServerInput, WSServerMessage, WSServerOutput},
     },
 };
-use flmodules::{
+use crate::{
     nodeconfig::NodeInfo,
     timer::{TimerBroker, TimerMessage},
 };

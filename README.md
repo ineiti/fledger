@@ -52,11 +52,10 @@ A set of _shared_ crates implement the basic functionality, without the actual i
 of the network code:
 
 - [Decentralized modules](./flmodules/) - modules that are usable for decentralized projects
-- [Networking](./flnet) - traits for the Websocket and the WebRTC, as well as a generic
-  implementation of the networking logic
 - [flnode](./flnode) - a generic implementation of a fledger-node, mostly connecting all
   _flmodules_ together and with the network
 - [flarch](./flarch) - architecture dependant implementations for some async tools
+- [flarch_module](./flarch_module) - macro for easier definitions of `async_trait(?Send)`
 
 ### Binaries
 
@@ -69,9 +68,9 @@ The following components are available that are used to create the fledger-binar
 ### Implementations and Tests
 
 These are the actual implementations of the WebRTC and Websocket for wasm and libc:
-- [WebRTC and Websocket implementations](./flnet) - wasm and libc implementations for WebRTC and Websockets
+- [WebRTC and Websocket implementations](./flarch) - wasm and libc implementations for WebRTC and Websockets
 - [Test directory](./test) - several implementations for testing
-- [Example directory](./example) - example for how to use flnet
+- [Example directory](./example) - example for how to use flarch
 
 ## Next steps
 

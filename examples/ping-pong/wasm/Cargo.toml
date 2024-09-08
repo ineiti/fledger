@@ -6,9 +6,8 @@ edition = "2021"
 
 [dependencies]
 shared = {path = "../shared", version = "0.7"}
-flnet = {path = "../../../flnet", version = "0.7"}
-flarch = {path = "../../../flarch", version = "0.7"}
 flmodules = {path = "../../../flmodules", version = "0.7"}
+flarch = {path = "../../../flarch", version = "0.7"}
 
 console_error_panic_hook = "0.1.6"
 log = "0.4"

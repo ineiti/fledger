@@ -789,11 +789,13 @@ version = "0.7.1"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bimap",
  "bitflags 2.6.0",
  "bytes",
  "ed25519-compact",
  "flarch",
  "futures",
+ "getrandom 0.2.15",
  "itertools",
  "log",
  "names",
@@ -814,32 +816,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "flnet"
-version = "0.7.2"
-dependencies = [
- "async-trait",
- "bimap",
- "ed25519-compact",
- "flarch",
- "flmodules",
- "futures",
- "getrandom 0.2.15",
- "itertools",
- "log",
- "names",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_with",
- "serde_yaml",
- "sha2",
- "thiserror",
- "tokio",
- "tokio-stream",
- "toml",
-]
-
-[[package]]
 name = "fltest-wasm"
 version = "0.7.0"
 dependencies = [
@@ -847,7 +823,6 @@ dependencies = [
  "console_error_panic_hook",
  "flarch",
  "flmodules",
- "flnet",
  "futures",
  "js-sys",
  "log",

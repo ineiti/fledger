@@ -25,8 +25,8 @@ use flarch::{
     tasks::{spawn_local_nosend, wait_ms},
     web_rtc::connection::{ConnectionConfig, HostLogin, Login},
 };
-use flnet::network::NetworkConnectionState;
-use flnet::network_broker_start;
+use flmodules::network::network::NetworkConnectionState;
+use flmodules::network::network_broker_start;
 use flnode::{node::Node, version::VERSION_STRING};
 
 #[cfg(not(feature = "local"))]
@@ -241,7 +241,7 @@ impl FledgerWeb {
             }),
         );
         let network = network_broker_start(node_config.clone(), config).await?;
-        node_config.info.modules = Modules::all() - Modules::ENABLE_WEBPROXY;
+        node_config.info.modules = Modules::all() - Modules::ENABLE_WEBPROXY_REQUESTS;
         Ok(Node::start(my_storage, node_config, network)
             .await
             .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)

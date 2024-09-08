@@ -20,7 +20,6 @@ local = []
 [dependencies]
 flarch = {path="../../flarch", features = ["node"], version = "0.7"}
 flmodules = {path="../../flmodules", version = "0.7"}
-flnet = {path="../../flnet", version = "0.7"}
 flnode = {path = "../../flnode", version = "0.7"}
 
 thiserror = "1"

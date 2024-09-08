@@ -49,7 +49,7 @@ impl Component for App {
                 let pp_imp = self.pp_imp;
                 wasm_bindgen_futures::spawn_local(async move {
                     let id = config.info.get_id();
-                    let net = flnet::network_broker_start(
+                    let net = flmodules::network::network_broker_start(
                         config,
                         ConnectionConfig::from_signal(shared::handler::URL),
                     )
@@ -132,7 +132,7 @@ impl Component for App {
                         <ybc::Title
                             classes={classes!("has-text-white")}
                             size={ybc::HeaderSize::Is4}>
-                            {"FLNet Ping-Pong Example"}
+                            {"flmodules::network Ping-Pong Example"}
                         </ybc::Title>
                     </ybc::NavbarItem>
                 }}
@@ -149,7 +149,7 @@ impl Component for App {
                         <ybc::Tile ctx={Parent} size={ybc::TileSize::Twelve}>
                             <ybc::Tile ctx={Parent}>
                                 <ybc::Tile ctx={Child} classes={classes!("content")}>
-                                <h1>{"FLNet example"}</h1>
+                                <h1>{"flmodules::network example"}</h1>
                                 <h2>{"Running "}{pp_imp}</h2>
                                 <h2>{"Ping-pong logs for "}{&self.config.info.name}</h2>
                                 <pre>{logs}</pre>

@@ -7,7 +7,7 @@ use flarch::{
     web_rtc::{connection::ConnectionConfig, web_socket_server::WebSocketServer},
 };
 use flmodules::nodeconfig::NodeConfig;
-use flnet::{
+use flmodules::network::{
     network::{NetCall, NetReply, NetworkMessage},
     network_broker_start,
     signal::SignalServer,

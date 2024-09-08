@@ -11,7 +11,7 @@ use flmodules::{
     timer::TimerMessage,
     Modules,
 };
-use flnet::network::{NetCall, NetReply, NetworkMessage};
+use flmodules::network::network::{NetCall, NetReply, NetworkMessage};
 
 use flnode::node::{Node, NodeError};
 use thiserror::Error;

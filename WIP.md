@@ -19,7 +19,7 @@
 ## Bugs
 
 - flmodules/web_proxy has horrible error handling - too many `expect`s
-- flnet errors - perhaps not necessary to fix if matchbox works:
+- flarch/webrtc errors - perhaps not necessary to fix if matchbox works:
   - Find why the network stalls after some time
   - Doesn't work in EPFL network
 
@@ -31,12 +31,7 @@
   - delete old .toml files
 - serde_yaml is deprecated
   - use serde_yaml_ng with singleton_map_recursive
-- Refactoring
-  - move flnet::arch into flarch
-  - move flnet::{NodeInfo, NetworkMessage (w/o WebRTC and WSClient)} into flmodules
-  - move flnode::random.rs into flmodules
 - use matchbox from https://github.com/johanhelsing/matchbox
-- Increase version of flnet
 - Clean up broker / network:
   - Remove `Destination::{All,Others,This}` - Test it
     only `Destination::All` is ever used

@@ -23,17 +23,17 @@ use flarch::{
     tasks::Interval,
     web_rtc::{
         messages::{ConnType, PeerInfo, SetupError, SignalingState},
+        node_connection::NCError,
         node_connection::{Direction, NCInput, NCOutput},
         websocket::{WSClientInput, WSClientMessage, WSClientOutput},
         WebRTCConnMessage,
-        node_connection::NCError,
     },
 };
-use flmodules::nodeconfig::{NodeConfig, NodeInfo};
 
-use crate::signal::{
+use crate::network::signal::{
     MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION,
 };
+use crate::nodeconfig::{NodeConfig, NodeInfo};
 
 /// This is a user-friendly version of [`NetworkBroker`].
 /// Upon starting, it waits for the connection to the signalling server.
@@ -88,7 +88,7 @@ impl Network {
     /// Tries to send a text-message to a remote node.
     /// The [`NetworkBroker`] will start a connection with the node if there is none available.
     /// If the remote node is not available, no error is returned.
-    pub fn send_msg(&mut self, dst: crate::NodeID, msg: String) -> Result<(), BrokerError> {
+    pub fn send_msg(&mut self, dst: NodeID, msg: String) -> Result<(), BrokerError> {
         self.send(NetCall::SendNodeMessage(dst, msg))
     }
 

@@ -3,7 +3,7 @@ use flarch::{
     tasks::wait_ms,
     web_rtc::connection::ConnectionConfig,
 };
-use flnet::network_broker_start;
+use flmodules::network::network_broker_start;
 use flnode::node::Node;
 use wasm_bindgen::prelude::*;
 

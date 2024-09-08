@@ -26,7 +26,7 @@ use flmodules::{
     },
     Modules,
 };
-use flnet::network::{NetCall, NetworkError, NetworkMessage};
+use flmodules::network::network::{NetCall, NetworkError, NetworkMessage};
 
 use crate::modules::{random::RandomBroker, stat::StatBroker};
 
