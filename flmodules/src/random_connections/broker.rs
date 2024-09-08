@@ -1,18 +1,19 @@
-use std::sync::mpsc::{channel, Receiver, Sender};
 use async_trait::async_trait;
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 use flarch::{
     broker::{self, Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::U256,
 };
-use flmodules::{
+
+use crate::{
+    network::network::{NetCall, NetReply, NetworkMessage},
     random_connections::{
         messages::{Config, NodeMessage, RandomConnections, RandomIn, RandomMessage, RandomOut},
         storage::RandomStorage,
     },
     timer::TimerMessage,
 };
-use flmodules::network::network::{NetCall, NetReply, NetworkMessage};
 
 pub struct RandomBroker {
     pub storage: RandomStorage,

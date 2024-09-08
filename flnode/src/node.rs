@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use log::{error, info};
 use thiserror::Error;
 
@@ -17,8 +16,10 @@ use flmodules::{
         events::{self, Category, Event},
         messages::{GossipIn, GossipMessage},
     },
+    network::network::{NetCall, NetworkError, NetworkMessage},
     nodeconfig::{ConfigError, NodeConfig, NodeInfo},
     ping::{broker::PingBroker, messages::PingConfig},
+    random_connections::broker::RandomBroker,
     timer::{TimerBroker, TimerMessage},
     web_proxy::{
         broker::{WebProxy, WebProxyError},
@@ -26,9 +27,8 @@ use flmodules::{
     },
     Modules,
 };
-use flmodules::network::network::{NetCall, NetworkError, NetworkMessage};
 
-use crate::modules::{random::RandomBroker, stat::StatBroker};
+use crate::stat::StatBroker;
 
 #[derive(Error, Debug)]
 pub enum NodeError {
