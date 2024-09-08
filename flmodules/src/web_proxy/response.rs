@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
 use tokio::sync::mpsc::Receiver;
 
-use crate::nodeids::NodeID;
+use flarch::nodeids::NodeID;
 
 #[derive(Debug)]
 pub struct Response {

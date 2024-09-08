@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use flmodules::{
-    nodeconfig::NodeInfo, ping::storage::{PingStat, PingStorage}, Modules
+    nodeconfig::NodeInfo,
+    ping::storage::{PingStat, PingStorage},
+    Modules,
 };
-use flnet::{network_broker_start, web_rtc::connection::{ConnectionConfig, HostLogin, Login}};
-use flnode::{node::Node, version::VERSION_STRING};
 use js_sys::JsString;
 use regex::Regex;
 use std::{
@@ -21,10 +21,13 @@ use web_sys::{window, Document, Event, HtmlDivElement, HtmlInputElement, HtmlTex
 
 use flarch::{
     data_storage::DataStorageLocal,
-    tasks::{spawn_local, wait_ms},
+    nodeids::U256,
+    tasks::{spawn_local_nosend, wait_ms},
+    web_rtc::connection::{ConnectionConfig, HostLogin, Login},
 };
-use flmodules::nodeids::U256;
 use flnet::network::NetworkConnectionState;
+use flnet::network_broker_start;
+use flnode::{node::Node, version::VERSION_STRING};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -48,8 +51,8 @@ extern "C" {
 // this code is necessary to link the two.
 // Using things like Yew or others is too far from HTML for me.
 // Any suggestions for a framework that allows to do this in a cleaner way are welcome.
-fn main() {
-    spawn_local(async {
+pub fn main() {
+    spawn_local_nosend(async {
         let mut web = FledgerWeb::new().await.expect("Should run fledger");
 
         // Create a listening channel that fires whenever the user clicks on the `send_msg` button
@@ -84,14 +87,14 @@ fn main() {
                     }
                     Button::WebProxy => {
                         let proxy_div = proxy_div.clone();
-                        let proxy_url = proxy_url.clone();
+                        let proxy_url = proxy_url.value();
                         let mut webproxy = webproxy.clone();
                         let nodes = web.node.nodes_connected();
-                        spawn_local(async move {
+                        spawn_local_nosend(async move {
                             let fetching =
-                                format!("Fetching url from proxy: {}", proxy_url.value());
+                                format!("Fetching url from proxy: {}", proxy_url);
                             proxy_div.set_inner_html(&fetching);
-                            match webproxy.get(&proxy_url.value()).await {
+                            match webproxy.get(&proxy_url).await {
                                 Ok(mut response) => {
                                     let mut proxy_str = format!("{}", response.proxy());
                                     if let Ok(nodes) = nodes {
@@ -128,6 +131,9 @@ fn main() {
                 web.set_html_id("messages", state.get_msgs());
                 web.set_html_id("nodes_online", format!("{}", state.nodes_online));
                 web.set_html_id("nodes_connected", format!("{}", state.nodes_connected));
+                web.set_html_id("msgs_system", format!("{}", state.msgs_system));
+                web.set_html_id("msgs_local", format!("{}", state.msgs_local));
+                web.set_html_id("mana", format!("{}", state.mana));
             }
             wait_ms(1000).await;
         }

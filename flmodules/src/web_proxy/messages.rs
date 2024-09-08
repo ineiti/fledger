@@ -1,9 +1,9 @@
-use crate::{
+use bytes::Bytes;
+use flarch::tasks::spawn_local;
+use flarch::{
     broker::Broker,
     nodeids::{NodeID, NodeIDs, U256},
 };
-use bytes::Bytes;
-use flarch::tasks::spawn_local;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
@@ -73,12 +73,10 @@ impl WebProxyMessages {
     /// or a Vec<MessageOut>.
     pub fn process_messages(&mut self, msgs: Vec<WebProxyIn>) -> Vec<WebProxyOut> {
         msgs.into_iter()
-            .map(|msg| {
-                match msg {
-                    WebProxyIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
-                    WebProxyIn::UpdateNodeList(ids) => self.node_list(ids),
-                    WebProxyIn::RequestGet(rnd, url, tx) => self.request_get(rnd, url, tx),
-                }
+            .map(|msg| match msg {
+                WebProxyIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
+                WebProxyIn::UpdateNodeList(ids) => self.node_list(ids),
+                WebProxyIn::RequestGet(rnd, url, tx) => self.request_get(rnd, url, tx),
             })
             .flatten()
             .collect()
@@ -159,10 +157,15 @@ impl WebProxyMessages {
         vec![]
     }
 
-    fn handle_response(&mut self, src: NodeID, nonce: U256, msg: ResponseMessage) -> Vec<WebProxyOut> {
+    fn handle_response(
+        &mut self,
+        src: NodeID,
+        nonce: U256,
+        msg: ResponseMessage,
+    ) -> Vec<WebProxyOut> {
         self.core
             .handle_response(nonce, msg)
-            .map_or(vec![], | header| {
+            .map_or(vec![], |header| {
                 vec![WebProxyOut::ResponseGet(src, nonce, header)]
             })
     }

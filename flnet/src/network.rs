@@ -17,26 +17,23 @@ use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 
-use flarch::tasks::Interval;
-use flmodules::{
+use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    nodeconfig::{NodeConfig, NodeInfo},
     nodeids::{NodeID, U256},
-};
-
-use crate::{
-    signal::{
-        MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION,
-    },
+    tasks::Interval,
     web_rtc::{
         messages::{ConnType, PeerInfo, SetupError, SignalingState},
         node_connection::{Direction, NCInput, NCOutput},
+        websocket::{WSClientInput, WSClientMessage, WSClientOutput},
         WebRTCConnMessage,
+        node_connection::NCError,
     },
-    websocket::{WSClientInput, WSClientMessage, WSClientOutput},
 };
+use flmodules::nodeconfig::{NodeConfig, NodeInfo};
 
-use crate::web_rtc::node_connection::NCError;
+use crate::signal::{
+    MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION,
+};
 
 /// This is a user-friendly version of [`NetworkBroker`].
 /// Upon starting, it waits for the connection to the signalling server.
@@ -353,8 +350,8 @@ impl NetworkBroker {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(target_family = "unix", async_trait)]
 impl SubsystemHandler<NetworkMessage> for NetworkBroker {
     async fn messages(&mut self, bms: Vec<NetworkMessage>) -> Vec<NetworkMessage> {
         let mut out = vec![];

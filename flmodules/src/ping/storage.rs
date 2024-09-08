@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::nodeids::NodeID;
+use flarch::nodeids::NodeID;
 use serde::{Deserialize, Serialize};
 
 use super::messages::PingConfig;

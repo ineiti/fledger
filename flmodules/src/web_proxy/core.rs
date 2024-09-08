@@ -5,7 +5,7 @@ use flarch::tasks::spawn_local;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
-use crate::nodeids::{NodeID, NodeIDs, U256};
+use flarch::nodeids::{NodeID, NodeIDs, U256};
 
 use super::response::{ResponseHeader, ResponseMessage};
 

@@ -214,7 +214,7 @@ impl From<&Vec<U256>> for NodeIDs {
 
 #[cfg(test)]
 mod tests {
-    use flarch::start_logging;
+    use crate::start_logging;
 
     use super::*;
 

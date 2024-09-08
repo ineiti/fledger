@@ -15,10 +15,10 @@ opt-level = 's'
 local = []
 
 [dependencies]
-flarch = {path="../flarch", features = ["wasm"], version = "0.7"}
-flmodules = {path="../flmodules", features = ["nosend"], version = "0.7"}
-flnet = {path="../flnet", features = ["wasm"], version = "0.7"}
-flnode = {path = "../flnode", features = ["nosend"], version = "0.7"}
+flarch = {path="../flarch", version = "0.7"}
+flmodules = {path="../flmodules", version = "0.7"}
+flnet = {path="../flnet", version = "0.7"}
+flnode = {path = "../flnode", version = "0.7"}
 
 chrono = "0.4"
 anyhow = "1"
@@ -37,6 +37,7 @@ version = "0.3"
 features = [
   'Document',
   'Element',
+  'Event',
   'HtmlElement',
   'HtmlDivElement',
   'HtmlInputElement',

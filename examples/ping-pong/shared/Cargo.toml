@@ -3,9 +3,6 @@ edition = "2021"
 name = "shared"
 version = "0.7.0"
 
-[features]
-nosend = ["flmodules/nosend", "flarch/wasm"]
-
 [dependencies]
 flmodules = {path = "../../../flmodules", version = "0.7"}
 flnet = {path = "../../../flnet", version = "0.7"}

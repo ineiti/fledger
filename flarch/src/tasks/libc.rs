@@ -13,6 +13,10 @@ pub fn now() -> i64 {
     Utc::now().timestamp_millis() as i64
 }
 
+pub fn spawn_local_nosend<F: Future<Output = ()> + 'static>(_: F) {
+    panic!("Cannot spawn NoSend in libc");
+}
+
 /// Spawns the given method on the local scheduler.
 pub fn spawn_local<F: Future<Output = ()> + 'static + Send>(f: F) {
     tokio::spawn(async { f.await });

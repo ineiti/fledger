@@ -19,10 +19,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 
-use flmodules::{
-    broker::{Broker, BrokerError, SubsystemHandler, Translate},
-    nodeids::NodeID,
-};
+use crate::{broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate}, nodeids::NodeID};
 
 use self::{
     messages::WebRTCSpawner,
@@ -32,6 +29,20 @@ use self::{
 pub mod messages;
 pub mod connection;
 pub mod node_connection;
+pub mod websocket;
+
+#[cfg(target_family="windows")]
+compile_error!("flarch is not available for windows");
+
+#[cfg(target_family="wasm")]
+mod wasm;
+#[cfg(target_family="wasm")]
+pub use wasm::*;
+
+#[cfg(target_family="unix")]
+mod libc;
+#[cfg(target_family="unix")]
+pub use libc::*;
 
 #[derive(Debug, Clone, PartialEq)]
 /// All messages for the [`WebRTCConn`] broker.
@@ -56,7 +67,7 @@ impl WebRTCConn {
     /// new outgoing connections.
     pub async fn new(web_rtc: WebRTCSpawner) -> Result<Broker<WebRTCConnMessage>, BrokerError> {
         let mut br = Broker::new();
-        br.add_subsystem(flmodules::broker::Subsystem::Handler(Box::new(Self {
+        br.add_subsystem(Subsystem::Handler(Box::new(Self {
             web_rtc,
             connections: HashMap::new(),
             broker: br.clone(),
@@ -87,8 +98,8 @@ impl WebRTCConn {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family="wasm", async_trait(?Send))]
+#[cfg_attr(target_family="unix", async_trait)]
 impl SubsystemHandler<WebRTCConnMessage> for WebRTCConn {
     async fn messages(&mut self, msgs: Vec<WebRTCConnMessage>) -> Vec<WebRTCConnMessage> {
         for msg in msgs {

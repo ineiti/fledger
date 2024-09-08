@@ -10,9 +10,6 @@ homepage = "https://fledg.re"
 readme = "README.md"
 keywords = ["test", "utils", "fledger"]
 
-[features]
-nosend = ["dep:wasm-bindgen-futures"]
-
 [dependencies]
 flarch = { path = "../flarch", version = "0.7" }
 
@@ -35,8 +32,6 @@ ed25519-compact = "2"
 toml = "0.8"
 serde_json = "1"
 names = { version = "0.14", default-features = false }
-
-wasm-bindgen-futures = { version = "0.4", optional = true }
 async-stream = "0.3.5"
 bytes = { version = "1.7.1", features = ["serde"] }
 reqwest = { version = "0.12", features = [
@@ -45,3 +40,7 @@ reqwest = { version = "0.12", features = [
 ], default-features = false }
 wasmtimer = "0.2.0"
 bitflags = { version = "2", features = ["serde"] }
+
+# For wasm only
+[target.'cfg(target_family="wasm")'.dependencies]
+wasm-bindgen-futures = { version = "0.4" }

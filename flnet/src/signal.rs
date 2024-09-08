@@ -1,69 +1,73 @@
 //! # The signalling server implementation
-//! 
+//!
 //! This structure implements a signalling server.
 //! It communicates using [`WSSignalMessageToNode`] and [`WSSignalMessageFromNode`] messages
 //! with the nodes.
-//! 
+//!
 //! # Node connection to the signalling server
-//! 
+//!
 //! If a node wants to connect to the signalling server, it needs to prove it holds the
 //! private key corresponding to its public key by signing a random message sent by
 //! the signalling server:
-//! 
+//!
 //! - Server sends [`WSSignalMessageToNode::Challenge`] with the current version of the
 //! server and a 256-bit random challenge
 //! - Node sends [`WSSignalMessageFromNode::Announce`] containing the [`MessageAnnounce`]
 //! with the node-information and a signature of the challenge
 //! - Server sends [`WSSignalMessageToNode::ListIDsReply`] if the signature has been
 //! verified successfully, else it waits for another announce-message
-//! 
+//!
 //! # WebRTC signalling setup
-//! 
+//!
 //! Once a node has been connected to the signalling server, other nodes can start a
 //! WebRTC connection with it.
 //! For this, the nodes will send several [`WSSignalMessageFromNode::PeerSetup`] messages
 //! that the signalling server will redirect to the other node.
 //! These messages contain the [`PeerInfo`] and the [`crate::web_rtc::messages::PeerMessage`] needed to setup a WebRTC connection.
 //! One of the nodes is the initializer, while the other is the follower:
-//! 
+//!
 //! - Initializer sends a [`crate::web_rtc::messages::PeerMessage::Init`] to the follower
 //! - The follower answers with a [`crate::web_rtc::messages::PeerMessage::Offer`] containing
 //! information necessary for the setup of the connection
 //! - The initializer uses the offer to start its connection and replies with a
 //! [`crate::web_rtc::messages::PeerMessage::Answer`], also containing information for the setting
 //! up of the connection
-//! 
-//! Once the first message has been sent, both nodes will start to exchange 
+//!
+//! Once the first message has been sent, both nodes will start to exchange
 //! [`crate::web_rtc::messages::PeerMessage::IceCandidate`] messages which contain information
 //! about possible connection candidates between the two nodes.
 //! These messages will even continue once the connection has been setup, and can be used for
 //! example to create a nice handover when the network connection changes.
-//! 
+//!
 //! After the connections are set up, only the `IceCandidate` messages are exchanged between the
 //! nodes.
-//! 
+//!
 //! # Usage of the signalling server
-//! 
+//!
 //! You can find an example of how the signalling server is used in
 //! <https://github.com/ineiti/fledger/tree/0.7.0/cli/flsignal/src/main.rs>
 
+use async_trait::async_trait;
+use bimap::BiMap;
+use serde::{Deserialize, Serialize};
+use serde_with::{base64::Base64, serde_as};
 use std::{
     collections::HashMap,
     fmt::{Error, Formatter},
 };
 
-use async_trait::async_trait;
-use bimap::BiMap;
-use flmodules::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler}, nodeconfig::NodeInfo, nodeids::{NodeID, U256}, timer::{TimerBroker, TimerMessage}
+use flarch::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
+    nodeids::{NodeID, U256},
+    web_rtc::{
+        messages::PeerInfo,
+        websocket::{WSServerInput, WSServerMessage, WSServerOutput},
+    },
 };
-use serde::{Deserialize, Serialize};
-use serde_with::{base64::Base64, serde_as};
-
-use crate::{web_rtc::messages::PeerInfo, websocket::WSServerInput};
-
-use super::websocket::{WSServerMessage, WSServerOutput};
-
+use flmodules::{
+    nodeconfig::NodeInfo,
+    timer::{TimerBroker, TimerMessage},
+};
 
 #[derive(Clone, Debug)]
 /// The possible messages for the signalling server broker, including the
@@ -95,10 +99,10 @@ pub enum SignalOutput {
     Stopped,
 }
 
-/// This implements a signalling server. 
+/// This implements a signalling server.
 /// It can be used for tests, in the cli implementation, and
 /// will also be used later directly in the network struct to allow for direct node-node setups.
-/// 
+///
 /// It handles the setup phase where the nodes authenticate themselves to the server, and passes
 /// PeerInfo messages between nodes.
 /// It also handles statistics by forwarding NodeStats to a listener.
@@ -289,8 +293,8 @@ impl SignalServer {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(target_family = "unix", async_trait)]
 impl SubsystemHandler<SignalMessage> for SignalServer {
     async fn messages(&mut self, from_broker: Vec<SignalMessage>) -> Vec<SignalMessage> {
         let mut out = vec![];
@@ -308,7 +312,7 @@ impl SubsystemHandler<SignalMessage> for SignalServer {
 }
 
 /// Message is a list of messages to be sent between the node and the signal server.
-/// 
+///
 /// When a new node connects to the signalling server, the server starts by sending
 /// a "Challenge" to the node.
 /// The node can then announce itself using that challenge.

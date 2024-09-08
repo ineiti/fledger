@@ -1,7 +1,10 @@
 use crate::network::{NetReply, NetworkMessage};
-use flmodules::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate}, nodeconfig::{NodeConfig, NodeInfo}, nodeids::U256
+use flarch::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate},
+    nodeids::U256,
 };
+
+use flmodules::nodeconfig::{NodeConfig, NodeInfo};
 
 pub struct NetworkBrokerSimul {
     nsh_broker: Broker<NSHubMessage>,
@@ -91,8 +94,8 @@ impl NSHub {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(target_family = "unix", async_trait::async_trait)]
 impl SubsystemHandler<NSHubMessage> for NSHub {
     async fn messages(&mut self, msgs: Vec<NSHubMessage>) -> Vec<NSHubMessage> {
         let mut out = vec![];

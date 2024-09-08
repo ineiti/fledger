@@ -1,4 +1,4 @@
-use crate::nodeids::{NodeID, NodeIDs};
+use flarch::nodeids::{NodeID, NodeIDs};
 use serde::{Deserialize, Serialize};
 
 use super::storage::PingStorage;

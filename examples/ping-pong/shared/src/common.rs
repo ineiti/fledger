@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use flmodules::{nodeconfig::NodeInfo, nodeids::NodeID};
+use flarch::nodeids::NodeID;
+use flmodules::nodeconfig::NodeInfo;
 
 /// A PPMessage includes messages from the network, messages to be sent to
 /// the network, and receiving an updated list from the signalling server.
@@ -58,7 +59,7 @@ impl NodeList {
             return true;
         }
 
-        if self.0.iter().all(|n| new_list.contains(n)){
+        if self.0.iter().all(|n| new_list.contains(n)) {
             return false;
         }
 

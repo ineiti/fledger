@@ -46,7 +46,7 @@ use futures::{future::BoxFuture, lock::Mutex};
 use thiserror::Error;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-use flarch::tasks::spawn_local;
+use crate::{nodeids::U256, tasks::spawn_local};
 
 #[derive(Debug, Error)]
 /// The only error that can happen is that sending to another broker fails.
@@ -88,19 +88,17 @@ impl<T> fmt::Debug for SubsystemAction<T> {
     }
 }
 
-#[cfg(feature = "nosend")]
+#[cfg(target_family="wasm")]
 mod asy {
     pub trait Async {}
     impl<T> Async for T {}
 }
-#[cfg(not(feature = "nosend"))]
+#[cfg(target_family="unix")]
 mod asy {
     pub trait Async: Sync + Send {}
     impl<T: Sync + Send> Async for T {}
 }
 use asy::*;
-
-use crate::nodeids::U256;
 
 /// The broker connects the different subsystem together and offers
 /// a pub/sub system.
@@ -263,11 +261,11 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
     }
 }
 
-#[cfg(not(feature = "nosend"))]
+#[cfg(target_family="unix")]
 /// Defines a method that translates from message type <R> to message
 /// type <T>.
 pub type Translate<R, T> = Box<dyn Fn(R) -> Option<T> + Send + 'static>;
-#[cfg(feature = "nosend")]
+#[cfg(target_family="wasm")]
 /// Defines a method that translates from message type <R> to message
 /// type <T>.
 pub type Translate<R, T> = Box<dyn Fn(R) -> Option<T> + 'static>;
@@ -277,8 +275,8 @@ struct Translator<R: Clone, S: Async + Clone + fmt::Debug> {
     translate: Translate<R, S>,
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family="wasm", async_trait(?Send))]
+#[cfg_attr(target_family="unix", async_trait)]
 impl<R: Async + Clone + fmt::Debug, S: 'static + Async + Clone + fmt::Debug> SubsystemTranslator<R>
     for Translator<R, S>
 {
@@ -564,7 +562,7 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
     }
 }
 
-#[cfg(feature = "nosend")]
+#[cfg(target_family="wasm")]
 /// Subsystems available in a broker.
 /// Every subsystem can be added zero, one, or more times.
 pub enum Subsystem<T> {
@@ -575,7 +573,7 @@ pub enum Subsystem<T> {
     Callback(SubsystemCallback<T>),
     TranslatorCallback(SubsystemTranslatorCallback<T>),
 }
-#[cfg(not(feature = "nosend"))]
+#[cfg(target_family="unix")]
 /// Subsystems available in a broker.
 /// Every subsystem can be added zero, one, or more times.
 pub enum Subsystem<T> {
@@ -653,33 +651,33 @@ impl<T> fmt::Debug for Subsystem<T> {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family="wasm", async_trait(?Send))]
+#[cfg_attr(target_family="unix", async_trait)]
 pub trait SubsystemHandler<T: Async> {
     async fn messages(&mut self, from_broker: Vec<T>) -> Vec<T>;
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family="wasm", async_trait(?Send))]
+#[cfg_attr(target_family="unix", async_trait)]
 pub trait SubsystemTranslator<T: Async> {
     async fn translate(&mut self, trail: Vec<BrokerID>, from_broker: T) -> bool;
     async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError>;
 }
 
-#[cfg(feature = "nosend")]
+#[cfg(target_family="wasm")]
 type SubsystemCallback<T> = Box<dyn Fn(Vec<T>) -> BoxFuture<'static, Vec<(Destination, T)>>>;
-#[cfg(not(feature = "nosend"))]
+#[cfg(target_family="unix")]
 type SubsystemCallback<T> =
     Box<dyn Fn(Vec<T>) -> BoxFuture<'static, Vec<(Destination, T)>> + Send + Sync>;
-#[cfg(feature = "nosend")]
+#[cfg(target_family="wasm")]
 type SubsystemTranslatorCallback<T> = Box<dyn Fn(Vec<BrokerID>, T) -> BoxFuture<'static, bool>>;
-#[cfg(not(feature = "nosend"))]
+#[cfg(target_family="unix")]
 type SubsystemTranslatorCallback<T> =
     Box<dyn Fn(Vec<BrokerID>, T) -> BoxFuture<'static, bool> + Send + Sync>;
 
 #[cfg(test)]
 mod tests {
-    use flarch::{start_logging, start_logging_filter_level};
+    use crate::{start_logging, start_logging_filter_level};
 
     use super::*;
 
@@ -693,8 +691,8 @@ mod tests {
         reply: Vec<(BrokerTest, BrokerTest)>,
     }
 
-    #[cfg_attr(feature = "nosend", async_trait(?Send))]
-    #[cfg_attr(not(feature = "nosend"), async_trait)]
+    #[cfg_attr(target_family="wasm", async_trait(?Send))]
+    #[cfg_attr(target_family="unix", async_trait)]
     impl SubsystemHandler<BrokerTest> for Tps {
         async fn messages(&mut self, msgs: Vec<BrokerTest>) -> Vec<BrokerTest> {
             let mut output = vec![];

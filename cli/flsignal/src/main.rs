@@ -1,6 +1,6 @@
 use clap::Parser;
 use flnet::signal::{SignalServer, SignalMessage, SignalOutput};
-use flnet::web_socket_server::WebSocketServer;
+use flarch::web_rtc::web_socket_server::WebSocketServer;
 
 /// Fledger signalling server
 #[derive(Parser, Debug)]

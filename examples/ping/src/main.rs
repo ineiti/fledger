@@ -3,9 +3,15 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
-use flarch::{start_logging_filter, tasks::{wait_ms, Interval}};
-use flmodules::{nodeconfig::NodeConfig, nodeids::U256};
-use flnet::{broker::BrokerError, network::NetReply, web_rtc::connection::ConnectionConfig};
+use flarch::{
+    broker::BrokerError,
+    nodeids::U256,
+    start_logging_filter,
+    tasks::{wait_ms, Interval},
+    web_rtc::connection::ConnectionConfig,
+};
+use flmodules::nodeconfig::NodeConfig;
+use flnet::network::NetReply;
 
 #[derive(Parser, Debug)]
 struct Args {

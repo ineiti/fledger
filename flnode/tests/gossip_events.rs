@@ -1,5 +1,5 @@
-use flarch::start_logging_filter_level;
-use flmodules::{gossip_events::events, nodeids::U256, Modules};
+use flarch::{nodeids::U256, start_logging_filter_level};
+use flmodules::{gossip_events::events, Modules};
 
 mod helpers;
 use helpers::*;

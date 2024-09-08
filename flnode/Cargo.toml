@@ -10,9 +10,6 @@ homepage = "https://fledg.re"
 readme = "README.md"
 keywords = ["test", "utils", "fledger"]
 
-[features]
-nosend = []
-
 [dependencies]
 flnet = {path="../flnet", version = "0.7"}
 flmodules = {path = "../flmodules", version = "0.7"}

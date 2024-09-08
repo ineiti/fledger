@@ -11,7 +11,7 @@
 //! _If you come here, I hope you're not trying to debug something that doesn't work.
 //! This code is quite obscure, and should be rewritten for the 5th time or so._
 use async_trait::async_trait;
-use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
+use crate::broker::{Broker, BrokerError, Subsystem, SubsystemHandler};
 use thiserror::Error;
 
 use crate::web_rtc::messages::{
@@ -30,7 +30,7 @@ pub enum NCError {
     Setup(#[from] crate::web_rtc::messages::SetupError),
     /// The broker went nuts
     #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
+    Broker(#[from] BrokerError),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -268,8 +268,8 @@ impl NodeConnection {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family="wasm", async_trait(?Send))]
+#[cfg_attr(target_family="unix", async_trait)]
 impl SubsystemHandler<NCMessage> for NodeConnection {
     async fn messages(&mut self, msgs: Vec<NCMessage>) -> Vec<NCMessage> {
         let mut out = vec![];

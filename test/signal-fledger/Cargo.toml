@@ -7,7 +7,7 @@ version = "0.7.0"
 
 [dependencies]
 flarch = {path = "../../flarch", version = "0.7"}
-flnet = {path = "../../flnet", version = "0.7", features = ["libc"]}
+flnet = {path = "../../flnet", version = "0.7"}
 flnode = {path = "../../flnode", version = "0.7"}
 
 env_logger = "0.11"

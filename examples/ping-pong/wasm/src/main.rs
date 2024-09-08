@@ -8,8 +8,7 @@ use flmodules::nodeconfig::NodeConfig;
 use ybc::TileCtx::{Ancestor, Child, Parent};
 use yew::prelude::*;
 
-use flarch::tasks::now;
-use flnet::{broker::Broker, web_rtc::connection::ConnectionConfig};
+use flarch::{broker::Broker, tasks::now, web_rtc::connection::ConnectionConfig};
 
 use shared::{
     common::{NodeList, PPMessage},

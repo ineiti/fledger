@@ -4,7 +4,7 @@ use rand::prelude::SliceRandom;
 use serde::{Deserialize, Serialize};
 
 use super::nodes::Nodes;
-use crate::nodeids::NodeIDs;
+use flarch::nodeids::NodeIDs;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct RandomStorage {

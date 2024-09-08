@@ -1,14 +1,16 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
-
 use async_trait::async_trait;
+
+use flarch::{
+    broker::{self, Broker, BrokerError, Subsystem, SubsystemHandler},
+    nodeids::U256,
+};
 use flmodules::{
     random_connections::{
         messages::{Config, NodeMessage, RandomConnections, RandomIn, RandomMessage, RandomOut},
         storage::RandomStorage,
     },
     timer::TimerMessage,
-    broker::{self, Broker, BrokerError, SubsystemHandler},
-    nodeids::U256,
 };
 use flnet::network::{NetCall, NetReply, NetworkMessage};
 
@@ -60,7 +62,7 @@ impl Translate {
         id: U256,
     ) -> Result<Broker<RandomMessage>, BrokerError> {
         let mut rc = Broker::new();
-        rc.add_subsystem(flmodules::broker::Subsystem::Handler(Box::new(Translate {
+        rc.add_subsystem(Subsystem::Handler(Box::new(Translate {
             storage_tx,
             module: RandomConnections::new(Config::default()),
             id,
@@ -96,9 +98,7 @@ impl Translate {
                             .into(),
                         )
                     }
-                    NetReply::Connected(id) => {
-                        return Some(RandomIn::NodeConnected(id).into())
-                    }
+                    NetReply::Connected(id) => return Some(RandomIn::NodeConnected(id).into()),
                     NetReply::Disconnected(id) => {
                         return Some(RandomIn::NodeDisconnected(id).into())
                     }
@@ -134,8 +134,8 @@ impl Translate {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(target_family = "unix", async_trait)]
 impl SubsystemHandler<RandomMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<RandomMessage>) -> Vec<RandomMessage> {
         let mut out = vec![];
@@ -151,8 +151,6 @@ impl SubsystemHandler<RandomMessage> for Translate {
             self.handle_output(msg);
         }
 
-        out.into_iter()
-            .map(|m| m.into())
-            .collect()
+        out.into_iter().map(|m| m.into()).collect()
     }
 }

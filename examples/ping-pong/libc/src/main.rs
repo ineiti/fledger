@@ -1,8 +1,8 @@
 use clap::{Parser, ValueEnum};
 
-use flarch::start_logging_filter;
+use flarch::{start_logging_filter, web_rtc::connection::ConnectionConfig};
 use flmodules::nodeconfig::NodeConfig;
-use flnet::{web_rtc::connection::ConnectionConfig, NetworkSetupError};
+use flnet::NetworkSetupError;
 
 use shared::{
     common::NodeList,

@@ -162,63 +162,46 @@
 //! platform.
 //! It can be used for the browser or for node.
 
+use flarch::{
+    broker::Broker,
+    web_rtc::{
+        connection::ConnectionConfig, web_rtc_setup::web_rtc_spawner,
+        web_socket_client::WebSocketClient, websocket::WSClientError, WebRTCConn,
+    },
+};
 use flmodules::nodeconfig::NodeConfig;
 use thiserror::Error;
-use web_rtc::connection::ConnectionConfig;
 
 pub mod network;
 pub mod signal;
-pub mod web_rtc;
-pub mod websocket;
 
 use crate::network::NetworkMessage;
 
-pub use flmodules::broker;
-pub use flmodules::nodeids::{NodeID, NodeIDs, U256};
+pub use flarch::{
+    broker::BrokerError,
+    nodeids::{NodeID, NodeIDs, U256},
+};
 
 #[derive(Error, Debug)]
 /// Errors when setting up a new network connection
 pub enum NetworkSetupError {
-    /// Missing wasm or libc feature
-    #[error("No libc or wasm feature given")]
-    NoFeature,
     /// Something went wrong with the broker initialization
     #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
+    Broker(#[from] BrokerError),
     /// Problem in the websocket client
     #[error(transparent)]
-    WebSocketClient(#[from] websocket::WSClientError),
-    #[cfg(feature = "libc")]
-    /// Problem in the websocket server
-    #[error(transparent)]
-    WebSocketServer(#[from] websocket::WSSError),
+    WebSocketClient(#[from] WSClientError),
     /// Generic network error
     #[error(transparent)]
     Network(#[from] network::NetworkError),
+    #[cfg(target_family = "unix")]
+    /// Problem in the websocket server
+    #[error(transparent)]
+    WebSocketServer(#[from] flarch::web_rtc::websocket::WSSError),
 }
 
 #[cfg(feature = "testing")]
 pub mod testing;
-
-#[cfg(all(feature = "libc", feature = "wasm"))]
-std::compile_error!("flnet cannot have 'libc' and 'wasm' feature simultaneously");
-
-// The following lines import either arch/libc/* or arch/wasm/* to the top-level.
-// This allows the following code on directly relying on either implementation.
-#[cfg(feature = "libc")]
-mod arch {
-    mod libc;
-    pub use libc::*;
-}
-
-#[cfg(feature = "wasm")]
-mod arch {
-    mod wasm;
-    pub use wasm::*;
-}
-
-#[cfg(any(feature = "libc", feature = "wasm"))]
-pub use arch::*;
 
 /// Starts a new [`broker::Broker<NetworkMessage>`] with a given `node`- and `connection`-configuration.
 /// This returns a raw broker which is mostly suited to connect to other brokers.
@@ -235,20 +218,12 @@ pub use arch::*;
 pub async fn network_broker_start(
     node: NodeConfig,
     connection: ConnectionConfig,
-) -> Result<broker::Broker<NetworkMessage>, NetworkSetupError> {
-    #[cfg(any(feature = "libc", feature = "wasm"))]
-    {
-        use crate::{network::NetworkBroker, web_rtc::WebRTCConn};
+) -> Result<Broker<NetworkMessage>, NetworkSetupError> {
+    use crate::network::NetworkBroker;
 
-        let ws = web_socket_client::WebSocketClient::connect(&connection.signal()).await?;
-        let webrtc = WebRTCConn::new(web_rtc_setup::web_rtc_spawner(connection)).await?;
-        Ok(NetworkBroker::start(node.clone(), ws, webrtc).await?)
-    }
-    #[cfg(not(any(feature = "libc", feature = "wasm")))]
-    {
-        log::error!("Couldn't connect node {node:?} to {connection:?}");
-        Err(NetworkSetupError::NoFeature)
-    }
+    let ws = WebSocketClient::connect(&connection.signal()).await?;
+    let webrtc = WebRTCConn::new(web_rtc_spawner(connection)).await?;
+    Ok(NetworkBroker::start(node.clone(), ws, webrtc).await?)
 }
 
 /// Starts a new connection to the signalling server using the `node`-
@@ -261,14 +236,6 @@ pub async fn network_start(
     node: NodeConfig,
     connection: ConnectionConfig,
 ) -> Result<network::Network, NetworkSetupError> {
-    #[cfg(any(feature = "libc", feature = "wasm"))]
-    {
-        let net_broker = network_broker_start(node, connection).await?;
-        Ok(network::Network::start(net_broker).await?)
-    }
-    #[cfg(not(any(feature = "libc", feature = "wasm")))]
-    {
-        log::error!("Couldn't connect node {node:?} to {connection:?}");
-        Err(NetworkSetupError::NoFeature)
-    }
+    let net_broker = network_broker_start(node, connection).await?;
+    Ok(network::Network::start(net_broker).await?)
 }

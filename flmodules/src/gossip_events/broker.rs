@@ -1,16 +1,18 @@
 use async_trait::async_trait;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use crate::{
+use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},
-    random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
-    timer::TimerMessage,
 };
 
 use super::{
     events::{Category, Event, EventsStorage},
     messages::{Config, GossipEvents, GossipIn, GossipMessage, GossipOut, MessageNode},
+};
+use crate::{
+    random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
+    timer::TimerMessage,
 };
 
 const MODULE_NAME: &str = "Gossip";
@@ -167,8 +169,8 @@ impl Translate {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(target_family = "unix", async_trait)]
 impl SubsystemHandler<GossipMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<GossipMessage>) -> Vec<GossipMessage> {
         let mut out = vec![];
@@ -182,9 +184,7 @@ impl SubsystemHandler<GossipMessage> for Translate {
             log::trace!("Outputting: {msg:?}");
             self.handle_output(msg);
         }
-        out.into_iter()
-            .map(|o| o.into())
-            .collect()
+        out.into_iter().map(|o| o.into()).collect()
     }
 }
 
@@ -193,7 +193,7 @@ mod tests {
     use std::error::Error;
 
     use crate::gossip_events::events::{Category, Event};
-    use crate::nodeids::NodeID;
+    use flarch::nodeids::NodeID;
     use flarch::{start_logging, tasks::now};
 
     use super::*;

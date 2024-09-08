@@ -4,9 +4,9 @@ use std::sync::Arc;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{ErrorEvent, MessageEvent, WebSocket};
 
-use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
+use crate::broker::{Broker, Subsystem, SubsystemHandler};
 
-use crate::websocket::{WSClientError, WSClientInput, WSClientMessage, WSClientOutput};
+use crate::web_rtc::websocket::{WSClientError, WSClientInput, WSClientMessage, WSClientOutput};
 
 pub struct WebSocketClient {
     ws: Arc<Mutex<WebSocket>>,

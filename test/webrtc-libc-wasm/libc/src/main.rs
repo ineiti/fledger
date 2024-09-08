@@ -1,9 +1,17 @@
 use thiserror::Error;
 
-use flarch::start_logging_filter;
-use flmodules::{broker::Broker, nodeconfig::NodeConfig, nodeids::U256};
+use flarch::{
+    broker::{Broker, BrokerError},
+    nodeids::U256,
+    start_logging_filter,
+    web_rtc::{connection::ConnectionConfig, web_socket_server::WebSocketServer},
+};
+use flmodules::nodeconfig::NodeConfig;
 use flnet::{
-    network::{NetCall, NetReply, NetworkMessage}, network_broker_start, signal::SignalServer, web_rtc::connection::ConnectionConfig, web_socket_server::WebSocketServer, NetworkSetupError
+    network::{NetCall, NetReply, NetworkMessage},
+    network_broker_start,
+    signal::SignalServer,
+    NetworkSetupError,
 };
 
 const URL: &str = "ws://127.0.0.1:8765";
@@ -13,7 +21,7 @@ enum MainError {
     #[error(transparent)]
     NetworkSetup(#[from] NetworkSetupError),
     #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
+    Broker(#[from] BrokerError),
 }
 
 #[tokio::main]

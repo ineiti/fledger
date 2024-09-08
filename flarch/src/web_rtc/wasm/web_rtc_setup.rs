@@ -20,7 +20,7 @@ use crate::web_rtc::{
         WebRTCSpawner,
     }, node_connection::Direction
 };
-use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
+use crate::broker::{Broker, Subsystem, SubsystemHandler};
 
 pub struct WebRTCConnectionSetup {
     pub rp_conn: RtcPeerConnection,

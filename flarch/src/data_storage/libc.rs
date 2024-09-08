@@ -7,6 +7,17 @@ use async_trait::async_trait;
 
 use crate::data_storage::{DataStorage, StorageError};
 
+pub struct DataStorageLocal {}
+impl DataStorageLocal {
+    pub fn new(_: &str) -> Box<dyn DataStorage + Send> {
+        panic!("Only implemented for target_family=wasm");
+    }
+
+    pub fn clone() -> Box<dyn DataStorage + Send> {
+        panic!("Only implemented for target_family=wasm");
+    }
+}
+
 pub struct DataStorageFile {
     dir: PathBuf,
     base: String,

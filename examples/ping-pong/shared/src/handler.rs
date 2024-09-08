@@ -1,14 +1,14 @@
 use async_trait::async_trait;
 
+use flarch::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
+    nodeids::{NodeID, U256},
+};
 use flmodules::{
     nodeconfig::NodeInfo,
-    nodeids::{NodeID, U256},
     timer::{TimerBroker, TimerMessage},
 };
-use flnet::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    network::{NetCall, NetworkMessage},
-};
+use flnet::network::{NetCall, NetworkMessage};
 
 use crate::common::{PPMessage, PPMessageNode};
 
@@ -105,8 +105,8 @@ impl PingPong {
 // ToNetwork messages are sent to the network, and automatically set up necessary connections.
 // For PPMessageNode::Ping messages, a pong is replied, and an update list request is sent to
 // the signalling server.
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(target_family = "unix", async_trait)]
 impl SubsystemHandler<PPMessage> for PingPong {
     async fn messages(&mut self, msgs: Vec<PPMessage>) -> Vec<PPMessage> {
         for msg in msgs {
@@ -145,8 +145,8 @@ impl SubsystemHandler<PPMessage> for PingPong {
 mod test {
     use std::time::Duration;
 
-    use flarch::start_logging;
-    use flmodules::{broker::Destination, nodeconfig::NodeConfig};
+    use flarch::{broker::Destination, start_logging};
+    use flmodules::nodeconfig::NodeConfig;
     use flnet::{network::NetReply, NetworkSetupError};
 
     use super::*;

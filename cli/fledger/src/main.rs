@@ -3,11 +3,9 @@ use clap::Parser;
 use flarch::{
     data_storage::{DataStorage, DataStorageFile},
     tasks::wait_ms,
+    web_rtc::connection::{ConnectionConfig, HostLogin, Login},
 };
-use flnet::{
-    network_broker_start,
-    signal::SIGNAL_VERSION, web_rtc::connection::{ConnectionConfig, HostLogin, Login},
-};
+use flnet::{network_broker_start, signal::SIGNAL_VERSION};
 use flnode::{node::Node, version::VERSION_STRING};
 
 /// Fledger node CLI binary

@@ -12,7 +12,8 @@ keywords = ["network", "signalling", "webrtc"]
 categories = ["network-programming"]
 
 [dependencies]
-flnet = {path = "../../flnet", version = "0.7", features = ["libc"]}
+flnet = {path = "../../flnet", version = "0.7"}
+flarch = {path = "../../flarch", version = "0.7"}
 
 clap = "4"
 clap-verbosity-flag = "2"

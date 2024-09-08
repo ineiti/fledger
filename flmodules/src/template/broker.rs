@@ -3,10 +3,10 @@ use flarch::{data_storage::DataStorage, tasks::spawn_local};
 use std::error::Error;
 use tokio::sync::watch;
 
-use crate::{
+use crate::random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut};
+use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::NodeID,
-    random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
 };
 
 use super::{
@@ -46,15 +46,21 @@ impl Template {
         let (mut tap, _) = broker.get_tap().await?;
         spawn_local(async move {
             loop {
-                if let Some(TemplateMessage::Output(TemplateOut::UpdateStorage(sto))) = tap.recv().await {
+                if let Some(TemplateMessage::Output(TemplateOut::UpdateStorage(sto))) =
+                    tap.recv().await
+                {
                     tx.send(sto.clone()).expect("updated storage");
                     if let Ok(val) = sto.to_yaml() {
                         ds.set(MODULE_NAME, &val).expect("updating storage");
-                    }    
+                    }
                 }
             }
         });
-        Ok(Template { broker, our_id, storage })
+        Ok(Template {
+            broker,
+            our_id,
+            storage,
+        })
     }
 
     pub fn increase_self(&mut self, counter: u32) -> Result<(), BrokerError> {
@@ -130,8 +136,8 @@ impl Translate {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(target_family = "unix", async_trait)]
 impl SubsystemHandler<TemplateMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<TemplateMessage>) -> Vec<TemplateMessage> {
         let msgs_in = msgs

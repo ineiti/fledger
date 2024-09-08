@@ -764,10 +764,23 @@ dependencies = [
  "chrono",
  "env_logger",
  "futures",
+ "js-sys",
  "log",
+ "rand",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "sha2",
  "thiserror",
  "tokio",
+ "tokio-tungstenite",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "web-sys",
+ "webrtc",
 ]
 
 [[package]]
@@ -796,6 +809,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "toml",
+ "wasm-bindgen-futures",
  "wasmtimer",
 ]
 
@@ -813,7 +827,6 @@ dependencies = [
  "itertools",
  "log",
  "names",
- "rand",
  "serde",
  "serde_derive",
  "serde_json",
@@ -823,9 +836,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite",
  "toml",
- "webrtc",
 ]
 
 [[package]]
@@ -1958,11 +1969,11 @@ dependencies = [
 
 [[package]]
 name = "schannel"
-version = "0.1.23"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbc91545643bcf3a0bbb6569265615222618bdf33ce4ffbbd13c4bbd4c093534"
+checksum = "e9aaafd5a2b6e3d657ff009d82fbd630b6bd54dd4eb06f21693925cdf80f9b8b"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2039,6 +2050,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99fce0ffe7310761ca6bf9faf5115afbc19688edd00171d81b1bb1b116c63e09"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2710,6 +2732,8 @@ checksum = "a82edfc16a6c469f5f44dc7b571814045d60404b55a0ee849f9bcfa2e63dd9b5"
 dependencies = [
  "cfg-if",
  "once_cell",
+ "serde",
+ "serde_json",
  "wasm-bindgen-macro",
 ]
 

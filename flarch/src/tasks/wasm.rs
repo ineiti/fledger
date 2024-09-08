@@ -17,6 +17,11 @@ pub fn spawn_local<F: Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
 
+/// Spawns the future on the local schedule.
+pub fn spawn_local_nosend<F: Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
+}
+
 /// Schedules a method in the background to run after dur.
 pub fn schedule_once<F>(cb: F, dur: Duration)
 where

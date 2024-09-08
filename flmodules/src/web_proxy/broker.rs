@@ -3,15 +3,15 @@ use core::str;
 use flarch::{data_storage::DataStorage, tasks::spawn_local};
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
-#[cfg(not(target_family="wasm"))]
+#[cfg(not(target_family = "wasm"))]
 use tokio::time::*;
-#[cfg(target_family="wasm")]
+#[cfg(target_family = "wasm")]
 use wasmtimer::tokio::*;
 
-use crate::{
+use crate::random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut};
+use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},
-    random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
 };
 
 use super::{
@@ -166,8 +166,8 @@ impl Translate {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(target_family = "unix", async_trait)]
 impl SubsystemHandler<WebProxyMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<WebProxyMessage>) -> Vec<WebProxyMessage> {
         let msgs_in = msgs
@@ -187,9 +187,8 @@ impl SubsystemHandler<WebProxyMessage> for Translate {
 
 #[cfg(test)]
 mod tests {
+    use flarch::nodeids::NodeIDs;
     use flarch::{data_storage::DataStorageTemp, start_logging_filter_level, tasks::wait_ms};
-
-    use crate::nodeids::NodeIDs;
 
     use super::*;
 

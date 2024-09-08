@@ -3,11 +3,12 @@ use std::sync::mpsc::RecvError;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
-use flarch::tasks::wait_ms;
+use flarch::{broker::{Destination, BrokerError}, tasks::wait_ms, web_rtc::connection::ConnectionConfig};
+use flmodules::nodeconfig::{NodeConfig, NodeInfo};
 use flnet::{
-    network::{NetCall, NetReply, NetworkError, NetworkMessage}, network_broker_start, web_rtc::connection::ConnectionConfig, NetworkSetupError
+    network::{NetCall, NetReply, NetworkError, NetworkMessage},
+    network_broker_start, NetworkSetupError,
 };
-use flmodules::{broker::Destination, nodeconfig::{NodeConfig, NodeInfo}};
 
 const URL: &str = "ws://127.0.0.1:8765";
 
@@ -18,7 +19,7 @@ enum StartError {
     #[error(transparent)]
     Network(#[from] NetworkError),
     #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
+    Broker(#[from] BrokerError),
     #[error(transparent)]
     Receive(#[from] RecvError),
 }
