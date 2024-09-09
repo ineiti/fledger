@@ -47,7 +47,6 @@
 //! You can find an example of how the signalling server is used in
 //! <https://github.com/ineiti/fledger/tree/0.7.0/cli/flsignal/src/main.rs>
 
-use async_trait::async_trait;
 use bimap::BiMap;
 use serde::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
@@ -57,12 +56,10 @@ use std::{
 };
 
 use flarch::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    nodeids::{NodeID, U256},
-    web_rtc::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler}, nodeids::{NodeID, U256}, platform_async_trait, web_rtc::{
         messages::PeerInfo,
         websocket::{WSServerInput, WSServerMessage, WSServerOutput},
-    },
+    }
 };
 use crate::{
     nodeconfig::NodeInfo,
@@ -293,8 +290,7 @@ impl SignalServer {
     }
 }
 
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(target_family = "unix", async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<SignalMessage> for SignalServer {
     async fn messages(&mut self, from_broker: Vec<SignalMessage>) -> Vec<SignalMessage> {
         let mut out = vec![];

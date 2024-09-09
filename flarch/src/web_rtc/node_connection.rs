@@ -10,8 +10,8 @@
 //!
 //! _If you come here, I hope you're not trying to debug something that doesn't work.
 //! This code is quite obscure, and should be rewritten for the 5th time or so._
-use async_trait::async_trait;
 use crate::broker::{Broker, BrokerError, Subsystem, SubsystemHandler};
+use flarch_macro::platform_async_trait;
 use thiserror::Error;
 
 use crate::web_rtc::messages::{
@@ -268,8 +268,7 @@ impl NodeConnection {
     }
 }
 
-#[cfg_attr(target_family="wasm", async_trait(?Send))]
-#[cfg_attr(target_family="unix", async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<NCMessage> for NodeConnection {
     async fn messages(&mut self, msgs: Vec<NCMessage>) -> Vec<NCMessage> {
         let mut out = vec![];

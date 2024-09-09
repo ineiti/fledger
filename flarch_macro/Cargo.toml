@@ -1,0 +1,19 @@
+[package]
+name = "flarch_macro"
+version = "0.7.2"
+edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "Arch-dependant macros"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["utils", "fledger"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }

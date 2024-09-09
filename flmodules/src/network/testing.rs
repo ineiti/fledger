@@ -1,6 +1,6 @@
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate},
-    nodeids::U256,
+    nodeids::U256, platform_async_trait,
 };
 
 use crate::nodeconfig::{NodeConfig, NodeInfo};
@@ -94,8 +94,7 @@ impl NSHub {
     }
 }
 
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(target_family = "unix", async_trait::async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<NSHubMessage> for NSHub {
     async fn messages(&mut self, msgs: Vec<NSHubMessage>) -> Vec<NSHubMessage> {
         let mut out = vec![];

@@ -800,6 +800,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "env_logger",
+ "flarch_macro",
  "futures",
  "js-sys",
  "log",
@@ -818,6 +819,15 @@ dependencies = [
  "wasm-bindgen-test",
  "web-sys",
  "webrtc",
+]
+
+[[package]]
+name = "flarch_macro"
+version = "0.7.2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.72",
 ]
 
 [[package]]

@@ -1,8 +1,6 @@
-use async_trait::async_trait;
-
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    nodeids::{NodeID, U256},
+    nodeids::{NodeID, U256}, platform_async_trait,
 };
 use flmodules::{
     nodeconfig::NodeInfo,
@@ -105,8 +103,7 @@ impl PingPong {
 // ToNetwork messages are sent to the network, and automatically set up necessary connections.
 // For PPMessageNode::Ping messages, a pong is replied, and an update list request is sent to
 // the signalling server.
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(target_family = "unix", async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<PPMessage> for PingPong {
     async fn messages(&mut self, msgs: Vec<PPMessage>) -> Vec<PPMessage> {
         for msg in msgs {

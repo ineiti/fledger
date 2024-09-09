@@ -1,4 +1,4 @@
-use async_trait::async_trait;
+use flarch::platform_async_trait;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
@@ -38,8 +38,7 @@ impl TimerBroker {
     }
 }
 
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(target_family = "unix", async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<TimerMessage> for TimerBroker {
     async fn messages(&mut self, _: Vec<TimerMessage>) -> Vec<TimerMessage> {
         if self.seconds == 0 {

@@ -17,7 +17,7 @@
 
 use std::collections::HashMap;
 
-use async_trait::async_trait;
+use flarch_macro::platform_async_trait;
 
 use crate::{broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate}, nodeids::NodeID};
 
@@ -98,8 +98,7 @@ impl WebRTCConn {
     }
 }
 
-#[cfg_attr(target_family="wasm", async_trait(?Send))]
-#[cfg_attr(target_family="unix", async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<WebRTCConnMessage> for WebRTCConn {
     async fn messages(&mut self, msgs: Vec<WebRTCConnMessage>) -> Vec<WebRTCConnMessage> {
         for msg in msgs {

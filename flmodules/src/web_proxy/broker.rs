@@ -1,6 +1,5 @@
-use async_trait::async_trait;
 use core::str;
-use flarch::{data_storage::DataStorage, tasks::spawn_local};
+use flarch::{data_storage::DataStorage, tasks::spawn_local, platform_async_trait};
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
 #[cfg(not(target_family = "wasm"))]
@@ -166,8 +165,7 @@ impl Translate {
     }
 }
 
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(target_family = "unix", async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<WebProxyMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<WebProxyMessage>) -> Vec<WebProxyMessage> {
         let msgs_in = msgs

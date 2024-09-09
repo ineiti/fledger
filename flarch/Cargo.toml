@@ -14,6 +14,8 @@ version = "0.7.0"
 node = []
 
 [dependencies]
+flarch_macro = { version = "0.7", path = "../flarch_macro" }
+
 chrono = "0.4"
 env_logger = "0.11"
 futures = "0.3"
@@ -31,6 +33,7 @@ serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 
+# For libc
 [target.'cfg(target_family="unix")'.dependencies]
 webrtc = { version = "0.11" }
 tokio-tungstenite = { version = "0.23", features = ["rustls-tls-native-roots"] }

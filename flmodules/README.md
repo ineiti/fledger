@@ -7,7 +7,7 @@ For this, most modules have the following structure:
 - `broker.rs` - which contains the code to interact with the other modules
 - `module.rs` - with the main code of the module, with at least a `process_msg` method
 that inputs a message and outputs a vector of answers
-- data-structures - implementing the basic functionality of the module.
+- `data-structures` - implementing the basic functionality of the module.
 
 Currently the following modules are available:
 
@@ -20,6 +20,10 @@ is emitted.
 - `gossip_events` exchanges events emitted by the nodes and updates the list. It
 works both in active mode - sending new messages to neighbours - as in passive
 mode - requesting list of available events from other nodes.
+- `network` is the basic networking code to set up a new connection using
+the signalling server.
+- `web_proxy` allows sending a http GET request to another node, using the other
+node as a proxy.
 
 # Adding your own modules
 

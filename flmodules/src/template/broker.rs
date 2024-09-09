@@ -1,5 +1,4 @@
-use async_trait::async_trait;
-use flarch::{data_storage::DataStorage, tasks::spawn_local};
+use flarch::{data_storage::DataStorage, platform_async_trait, tasks::spawn_local};
 use std::error::Error;
 use tokio::sync::watch;
 
@@ -136,8 +135,7 @@ impl Translate {
     }
 }
 
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(target_family = "unix", async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<TemplateMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<TemplateMessage>) -> Vec<TemplateMessage> {
         let msgs_in = msgs

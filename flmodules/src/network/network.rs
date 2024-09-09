@@ -9,7 +9,6 @@
 //! Both of these structures are best created with [`crate::network_start`] and
 //! [`crate::network_broker_start`].
 
-use async_trait::async_trait;
 use core::panic;
 use itertools::concat;
 use std::{fmt, time::Duration};
@@ -18,16 +17,12 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 
 use flarch::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    nodeids::{NodeID, U256},
-    tasks::Interval,
-    web_rtc::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler}, nodeids::{NodeID, U256}, platform_async_trait, tasks::Interval, web_rtc::{
         messages::{ConnType, PeerInfo, SetupError, SignalingState},
-        node_connection::NCError,
-        node_connection::{Direction, NCInput, NCOutput},
+        node_connection::{Direction, NCError, NCInput, NCOutput},
         websocket::{WSClientInput, WSClientMessage, WSClientOutput},
         WebRTCConnMessage,
-    },
+    }
 };
 
 use crate::network::signal::{
@@ -350,8 +345,7 @@ impl NetworkBroker {
     }
 }
 
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(target_family = "unix", async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<NetworkMessage> for NetworkBroker {
     async fn messages(&mut self, bms: Vec<NetworkMessage>) -> Vec<NetworkMessage> {
         let mut out = vec![];

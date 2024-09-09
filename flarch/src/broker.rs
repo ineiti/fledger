@@ -41,7 +41,7 @@ use std::{
     },
 };
 
-use async_trait::async_trait;
+use flarch_macro::platform_async_trait;
 use futures::{future::BoxFuture, lock::Mutex};
 use thiserror::Error;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -88,12 +88,12 @@ impl<T> fmt::Debug for SubsystemAction<T> {
     }
 }
 
-#[cfg(target_family="wasm")]
+#[cfg(target_family = "wasm")]
 mod asy {
     pub trait Async {}
     impl<T> Async for T {}
 }
-#[cfg(target_family="unix")]
+#[cfg(target_family = "unix")]
 mod asy {
     pub trait Async: Sync + Send {}
     impl<T: Sync + Send> Async for T {}
@@ -261,11 +261,11 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
     }
 }
 
-#[cfg(target_family="unix")]
+#[cfg(target_family = "unix")]
 /// Defines a method that translates from message type <R> to message
 /// type <T>.
 pub type Translate<R, T> = Box<dyn Fn(R) -> Option<T> + Send + 'static>;
-#[cfg(target_family="wasm")]
+#[cfg(target_family = "wasm")]
 /// Defines a method that translates from message type <R> to message
 /// type <T>.
 pub type Translate<R, T> = Box<dyn Fn(R) -> Option<T> + 'static>;
@@ -275,8 +275,7 @@ struct Translator<R: Clone, S: Async + Clone + fmt::Debug> {
     translate: Translate<R, S>,
 }
 
-#[cfg_attr(target_family="wasm", async_trait(?Send))]
-#[cfg_attr(target_family="unix", async_trait)]
+#[platform_async_trait()]
 impl<R: Async + Clone + fmt::Debug, S: 'static + Async + Clone + fmt::Debug> SubsystemTranslator<R>
     for Translator<R, S>
 {
@@ -562,7 +561,7 @@ impl<T: Async + Clone + fmt::Debug + 'static> Intern<T> {
     }
 }
 
-#[cfg(target_family="wasm")]
+#[cfg(target_family = "wasm")]
 /// Subsystems available in a broker.
 /// Every subsystem can be added zero, one, or more times.
 pub enum Subsystem<T> {
@@ -573,7 +572,7 @@ pub enum Subsystem<T> {
     Callback(SubsystemCallback<T>),
     TranslatorCallback(SubsystemTranslatorCallback<T>),
 }
-#[cfg(target_family="unix")]
+#[cfg(target_family = "unix")]
 /// Subsystems available in a broker.
 /// Every subsystem can be added zero, one, or more times.
 pub enum Subsystem<T> {
@@ -651,27 +650,25 @@ impl<T> fmt::Debug for Subsystem<T> {
     }
 }
 
-#[cfg_attr(target_family="wasm", async_trait(?Send))]
-#[cfg_attr(target_family="unix", async_trait)]
+#[platform_async_trait()]
 pub trait SubsystemHandler<T: Async> {
     async fn messages(&mut self, from_broker: Vec<T>) -> Vec<T>;
 }
 
-#[cfg_attr(target_family="wasm", async_trait(?Send))]
-#[cfg_attr(target_family="unix", async_trait)]
+#[platform_async_trait()]
 pub trait SubsystemTranslator<T: Async> {
     async fn translate(&mut self, trail: Vec<BrokerID>, from_broker: T) -> bool;
     async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError>;
 }
 
-#[cfg(target_family="wasm")]
+#[cfg(target_family = "wasm")]
 type SubsystemCallback<T> = Box<dyn Fn(Vec<T>) -> BoxFuture<'static, Vec<(Destination, T)>>>;
-#[cfg(target_family="unix")]
+#[cfg(target_family = "unix")]
 type SubsystemCallback<T> =
     Box<dyn Fn(Vec<T>) -> BoxFuture<'static, Vec<(Destination, T)>> + Send + Sync>;
-#[cfg(target_family="wasm")]
+#[cfg(target_family = "wasm")]
 type SubsystemTranslatorCallback<T> = Box<dyn Fn(Vec<BrokerID>, T) -> BoxFuture<'static, bool>>;
-#[cfg(target_family="unix")]
+#[cfg(target_family = "unix")]
 type SubsystemTranslatorCallback<T> =
     Box<dyn Fn(Vec<BrokerID>, T) -> BoxFuture<'static, bool> + Send + Sync>;
 
@@ -691,8 +688,7 @@ mod tests {
         reply: Vec<(BrokerTest, BrokerTest)>,
     }
 
-    #[cfg_attr(target_family="wasm", async_trait(?Send))]
-    #[cfg_attr(target_family="unix", async_trait)]
+    #[platform_async_trait()]
     impl SubsystemHandler<BrokerTest> for Tps {
         async fn messages(&mut self, msgs: Vec<BrokerTest>) -> Vec<BrokerTest> {
             let mut output = vec![];
