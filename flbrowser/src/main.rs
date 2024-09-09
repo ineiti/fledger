@@ -131,9 +131,9 @@ pub fn main() {
                 web.set_html_id("messages", state.get_msgs());
                 web.set_html_id("nodes_online", format!("{}", state.nodes_online));
                 web.set_html_id("nodes_connected", format!("{}", state.nodes_connected));
+                web.set_html_id("mana", format!("{}", state.mana));
                 web.set_html_id("msgs_system", format!("{}", state.msgs_system));
                 web.set_html_id("msgs_local", format!("{}", state.msgs_local));
-                web.set_html_id("mana", format!("{}", state.mana));
             }
             wait_ms(1000).await;
         }
@@ -271,8 +271,8 @@ pub struct FledgerState {
     states: HashMap<U256, NetworkConnectionState>,
     pings: PingStorage,
     msgs: FledgerMessages,
-    pub msgs_system: u32,
-    pub msgs_local: u32,
+    pub msgs_system: usize,
+    pub msgs_local: usize,
     pub mana: u32,
     pub nodes_online: usize,
     pub nodes_connected: usize,
@@ -314,11 +314,11 @@ impl FledgerState {
             info,
             nodes_online: node.nodes_online()?.len(),
             nodes_connected: node.nodes_connected()?.len(),
+            msgs_system: 0,
+            msgs_local: msgs.len(),
+            mana: 0,
             msgs: FledgerMessages::new(msgs, &nodes_info.clone().into_values().collect()),
             nodes_info,
-            msgs_system: 0,
-            msgs_local: 0,
-            mana: 0,
             states: node.stat.as_ref().unwrap().states.clone(),
             pings: node.ping.as_ref().unwrap().storage.clone(),
         })
