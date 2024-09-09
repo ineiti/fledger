@@ -43,12 +43,7 @@ reqwest = { version = "0.12", features = [
     "stream",
     "rustls-tls",
 ], default-features = false }
-wasmtimer = "0.2.0"
 bitflags = { version = "2", features = ["serde"] }
-
-# For wasm only
-[target.'cfg(target_family="wasm")'.dependencies]
-wasm-bindgen-futures = { version = "0.4" }
 
 [dev-dependencies]
 env_logger = "0.11"

@@ -2,8 +2,9 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+pub use tokio::time;
 
-use tokio::time::{self, sleep, Duration, Instant};
+use tokio::time::{sleep, Duration, Instant};
 
 use futures::{Future, Stream};
 

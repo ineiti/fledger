@@ -1,11 +1,12 @@
 use core::str;
-use flarch::{data_storage::DataStorage, platform_async_trait, tasks::spawn_local};
+use flarch::{
+    data_storage::DataStorage,
+    platform_async_trait,
+    tasks::spawn_local,
+    tasks::time::{timeout, Duration},
+};
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
-#[cfg(not(target_family = "wasm"))]
-use tokio::time::*;
-#[cfg(target_family = "wasm")]
-use wasmtimer::tokio::*;
 
 use crate::random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut};
 use flarch::{
@@ -83,7 +84,7 @@ impl WebProxy {
         self.web_proxy
             .emit_msg(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx).into())?;
         let (mut tap, id) = self.web_proxy.get_tap().await?;
-        timeout(tokio::time::Duration::from_secs(5), async move {
+        timeout(Duration::from_secs(5), async move {
             while let Some(msg) = tap.recv().await {
                 if let WebProxyMessage::Output(WebProxyOut::ResponseGet(proxy, rnd, header)) = msg {
                     if rnd == our_rnd {

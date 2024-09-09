@@ -6,6 +6,11 @@ use std::{
 };
 use tokio::sync::oneshot::channel;
 
+pub mod time {
+    pub use std::time::*;
+    pub use wasmtimer::tokio::*;
+}
+
 /// Returns the milliseconds since 1/1/1970 as i64.
 pub fn now() -> i64 {
     use js_sys::Date;

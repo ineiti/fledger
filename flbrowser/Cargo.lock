@@ -786,6 +786,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "wasmtimer",
  "web-sys",
  "webrtc",
 ]
@@ -849,8 +850,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "toml",
- "wasm-bindgen-futures",
- "wasmtimer",
 ]
 
 [[package]]
