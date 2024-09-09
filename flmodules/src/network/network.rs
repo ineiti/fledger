@@ -169,6 +169,10 @@ impl NetworkBroker {
     async fn msg_ws(&mut self, msg: WSClientOutput) -> Vec<NetworkMessage> {
         let msg_node_str = match msg {
             WSClientOutput::Message(msg) => msg,
+            WSClientOutput::Error(e) => {
+                log::error!("Websocket client error: {e}");
+                return vec![];
+            }
             _ => return vec![],
         };
         let msg_node =

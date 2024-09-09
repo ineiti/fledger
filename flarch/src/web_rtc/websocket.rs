@@ -66,6 +66,8 @@ pub enum WSClientInput {
     Message(String),
     /// Disconnect the websocket - no further messages will be sent after this message.
     Disconnect,
+    /// Connect the websocket - this starts or resets the connection
+    Connect,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

@@ -108,8 +108,13 @@ impl RandomConnections {
                         NodeMessage::Module(msg),
                     ))]
                 } else {
-                    log::warn!("{self:p} Dropping message to unconnected node {dst}");
-                    vec![]
+                    log::warn!(
+                        "{self:p} Dropping message to unconnected node {dst} - trying to connect"
+                    );
+                    vec![
+                        RandomOut::DisconnectNode(dst),
+                        RandomOut::ListUpdate(self.storage.connected.get_nodes()),
+                    ]
                 }
             }
         };
