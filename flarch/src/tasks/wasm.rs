@@ -6,6 +6,11 @@ use std::{
 };
 use tokio::sync::oneshot::channel;
 
+pub mod time {
+    pub use std::time::*;
+    pub use wasmtimer::tokio::*;
+}
+
 /// Returns the milliseconds since 1/1/1970 as i64.
 pub fn now() -> i64 {
     use js_sys::Date;
@@ -14,6 +19,11 @@ pub fn now() -> i64 {
 
 /// Spawns the future on the local schedule.
 pub fn spawn_local<F: Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
+}
+
+/// Spawns the future on the local schedule.
+pub fn spawn_local_nosend<F: Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
 

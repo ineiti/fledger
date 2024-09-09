@@ -1,12 +1,15 @@
-use crate::{
-    broker::Broker,
-    nodeids::{NodeID, NodeIDs, U256},
-};
 use bytes::Bytes;
 use flarch::tasks::spawn_local;
+use flarch::{
+    broker::Broker,
+    nodeids::{NodeID, U256},
+};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
+
+use crate::nodeconfig::NodeInfo;
+use crate::Modules;
 
 use super::{
     broker::WebProxyError,
@@ -26,7 +29,7 @@ pub enum WebProxyMessage {
 #[derive(Debug, Clone)]
 pub enum WebProxyIn {
     Node(NodeID, MessageNode),
-    UpdateNodeList(NodeIDs),
+    NodeInfoConnected(Vec<NodeInfo>),
     RequestGet(U256, String, Sender<Bytes>),
 }
 
@@ -73,12 +76,10 @@ impl WebProxyMessages {
     /// or a Vec<MessageOut>.
     pub fn process_messages(&mut self, msgs: Vec<WebProxyIn>) -> Vec<WebProxyOut> {
         msgs.into_iter()
-            .map(|msg| {
-                match msg {
-                    WebProxyIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
-                    WebProxyIn::UpdateNodeList(ids) => self.node_list(ids),
-                    WebProxyIn::RequestGet(rnd, url, tx) => self.request_get(rnd, url, tx),
-                }
+            .map(|msg| match msg {
+                WebProxyIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
+                WebProxyIn::NodeInfoConnected(ids) => self.node_list(ids),
+                WebProxyIn::RequestGet(rnd, url, tx) => self.request_get(rnd, url, tx),
             })
             .flatten()
             .collect()
@@ -89,15 +90,22 @@ impl WebProxyMessages {
     pub fn process_node_message(&mut self, src: NodeID, msg: MessageNode) -> Vec<WebProxyOut> {
         let mut out = match msg {
             MessageNode::Request(nonce, request) => self.start_request(src, nonce, request),
-            MessageNode::Response(nonce, response) => self.handle_response(nonce, response),
+            MessageNode::Response(nonce, response) => self.handle_response(src, nonce, response),
         };
         out.push(WebProxyOut::UpdateStorage(self.core.storage.clone()));
         out
     }
 
     /// Stores the new node list, excluding the ID of this node.
-    fn node_list(&mut self, nodes: NodeIDs) -> Vec<WebProxyOut> {
-        self.core.node_list(nodes);
+    fn node_list(&mut self, nodes: Vec<NodeInfo>) -> Vec<WebProxyOut> {
+        self.core.node_list(
+            nodes
+                .iter()
+                .filter(|ni| ni.modules.contains(Modules::ENABLE_WEBPROXY_REQUESTS))
+                .map(|ni| ni.get_id())
+                .collect::<Vec<NodeID>>()
+                .into(),
+        );
         vec![]
     }
 
@@ -159,11 +167,16 @@ impl WebProxyMessages {
         vec![]
     }
 
-    fn handle_response(&mut self, nonce: U256, msg: ResponseMessage) -> Vec<WebProxyOut> {
+    fn handle_response(
+        &mut self,
+        src: NodeID,
+        nonce: U256,
+        msg: ResponseMessage,
+    ) -> Vec<WebProxyOut> {
         self.core
             .handle_response(nonce, msg)
-            .map_or(vec![], |(proxy, header)| {
-                vec![WebProxyOut::ResponseGet(proxy, nonce, header)]
+            .map_or(vec![], |header| {
+                vec![WebProxyOut::ResponseGet(src, nonce, header)]
             })
     }
 }

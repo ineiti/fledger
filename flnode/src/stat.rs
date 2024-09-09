@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::mpsc::Receiver};
 
-use flnet::network::{NetReply, NetworkConnectionState, NetworkMessage};
-use flmodules::{
+use flmodules::network::network::{NetReply, NetworkConnectionState, NetworkMessage};
+use flarch::{
     broker::{Broker, BrokerError},
     nodeids::U256,
 };

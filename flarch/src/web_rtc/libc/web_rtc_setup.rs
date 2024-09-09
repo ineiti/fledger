@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
+use crate::broker::{Broker, Subsystem, SubsystemHandler};
 use futures::lock::Mutex;
 use webrtc::{
     api::{
@@ -26,15 +26,11 @@ use webrtc::{
     },
 };
 
-use crate::{
-    config::{ConnectionConfig, HostLogin},
-    web_rtc::{
-        messages::{
-            ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError,
-            SignalingState, WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner,
-        },
-        node_connection::Direction,
-    },
+use crate::web_rtc::{
+    connection::{ConnectionConfig, HostLogin}, messages::{
+        ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError, SignalingState,
+        WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner,
+    }, node_connection::Direction
 };
 
 fn get_ice_server(host: HostLogin) -> RTCIceServer {
@@ -149,8 +145,8 @@ impl WebRTCConnectionSetupLibc {
 
         let broker_cl = self.broker.clone();
         let resets = Arc::clone(&self.resets);
-        self.connection
-            .on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
+        self.connection.on_peer_connection_state_change(Box::new(
+            move |s: RTCPeerConnectionState| {
                 log::trace!("Peer Connection State has changed: {}", s);
                 if resets.load(Ordering::Relaxed) != resets_current {
                     log::warn!("Got message for deprecated on_connection_state");
@@ -172,7 +168,8 @@ impl WebRTCConnectionSetupLibc {
                         .err()
                         .map(|e| log::warn!("UpdateState queued but not processed: {:?}", e));
                 })
-            }));
+            },
+        ));
 
         Ok(())
     }
@@ -373,39 +370,37 @@ impl WebRTCConnectionSetupLibc {
         let mut broker_cl = broker.clone();
         let resets_current = resets.load(Ordering::Relaxed);
         let resets_cl = Arc::clone(&resets);
-        data_channel
-            .on_open(Box::new(move || {
-                if resets_cl.load(Ordering::Relaxed) != resets_current {
-                    log::warn!("Got message for deprecated on_open");
-                    return Box::pin(async {});
-                }
-                Box::pin(async move {
-                    log::trace!("DataChannel opened");
-                    broker_cl
-                        .emit_msg(WebRTCMessage::Output(WebRTCOutput::Connected))
-                        .err()
-                        .map(|e| log::warn!("Connected queued but not processed: {:?}", e));
-                    broker_cl
-                        .emit_msg(WebRTCMessage::Input(WebRTCInput::Flush))
-                        .err()
-                        .map(|e| log::warn!("Flush queued but not processed: {:?}", e));
-                })
-            }));
-        data_channel
-            .on_message(Box::new(move |msg: DataChannelMessage| {
-                if resets.load(Ordering::Relaxed) != resets_current {
-                    log::warn!("Got message for deprecated on_message");
-                    return Box::pin(async {});
-                }
-                let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
-                let mut broker = broker.clone();
-                Box::pin(async move {
-                    broker
-                        .emit_msg(WebRTCMessage::Output(WebRTCOutput::Text(msg_str)))
-                        .err()
-                        .map(|e| log::warn!("Text queued but not processed: {:?}", e));
-                })
-            }));
+        data_channel.on_open(Box::new(move || {
+            if resets_cl.load(Ordering::Relaxed) != resets_current {
+                log::warn!("Got message for deprecated on_open");
+                return Box::pin(async {});
+            }
+            Box::pin(async move {
+                log::trace!("DataChannel opened");
+                broker_cl
+                    .emit_msg(WebRTCMessage::Output(WebRTCOutput::Connected))
+                    .err()
+                    .map(|e| log::warn!("Connected queued but not processed: {:?}", e));
+                broker_cl
+                    .emit_msg(WebRTCMessage::Input(WebRTCInput::Flush))
+                    .err()
+                    .map(|e| log::warn!("Flush queued but not processed: {:?}", e));
+            })
+        }));
+        data_channel.on_message(Box::new(move |msg: DataChannelMessage| {
+            if resets.load(Ordering::Relaxed) != resets_current {
+                log::warn!("Got message for deprecated on_message");
+                return Box::pin(async {});
+            }
+            let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
+            let mut broker = broker.clone();
+            Box::pin(async move {
+                broker
+                    .emit_msg(WebRTCMessage::Output(WebRTCOutput::Text(msg_str)))
+                    .err()
+                    .map(|e| log::warn!("Text queued but not processed: {:?}", e));
+            })
+        }));
         rtc_data.lock().await.replace(data_channel);
     }
 

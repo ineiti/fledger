@@ -1,31 +1,23 @@
 //! # A single WebRTC connection
-//! 
+//!
 //! This broker handles two connections at the same time: one outgoing connection
 //! and one ingoing connection.
 //! When a message is sent, it is sent to the connection that is alread up and running.
 //! But if the outgoing connection is not established yet, it will be started.
-//! 
+//!
 //! The actual calls to the WebRTC code have been abstracted, so that the same
 //! code works for the libc and the wasm implementation.
-//! 
+//!
 //! _If you come here, I hope you're not trying to debug something that doesn't work.
 //! This code is quite obscure, and should be rewritten for the 5th time or so._
-use async_trait::async_trait;
-use flmodules::{
-    broker::{Broker, Subsystem, SubsystemHandler},
-    nodeids::NodeID,
-};
+use crate::broker::{Broker, BrokerError, Subsystem, SubsystemHandler};
+use flarch_macro::platform_async_trait;
 use thiserror::Error;
 
-use crate::{
-    network::NetworkMessage,
-    web_rtc::messages::{
-        ConnectionStateMap, DataChannelState, PeerMessage, WebRTCInput, WebRTCMessage,
-        WebRTCOutput, WebRTCSpawner,
-    },
+use crate::web_rtc::messages::{
+    ConnectionStateMap, DataChannelState, PeerMessage, WebRTCInput, WebRTCMessage, WebRTCOutput,
+    WebRTCSpawner,
 };
-
-use super::WebRTCConnMessage;
 
 #[derive(Error, Debug)]
 /// An error by the connection.
@@ -38,7 +30,7 @@ pub enum NCError {
     Setup(#[from] crate::web_rtc::messages::SetupError),
     /// The broker went nuts
     #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
+    Broker(#[from] BrokerError),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -276,8 +268,7 @@ impl NodeConnection {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<NCMessage> for NodeConnection {
     async fn messages(&mut self, msgs: Vec<NCMessage>) -> Vec<NCMessage> {
         let mut out = vec![];
@@ -303,12 +294,5 @@ impl From<NCInput> for NCMessage {
 impl From<NCOutput> for NCMessage {
     fn from(msg: NCOutput) -> NCMessage {
         NCMessage::Output(msg)
-    }
-}
-
-impl NCInput {
-    /// Convert it to a [`NetworkMessage`]
-    pub fn to_net(self, dst: NodeID) -> NetworkMessage {
-        NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((dst, self)))
     }
 }

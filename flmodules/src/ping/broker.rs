@@ -1,8 +1,8 @@
-use async_trait::async_trait;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
+use flarch::{broker::{Broker, BrokerError, Subsystem, SubsystemHandler}, platform_async_trait};
+
 use crate::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
     timer::TimerMessage,
 };
@@ -133,8 +133,7 @@ impl Translate {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<PingMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<PingMessage>) -> Vec<PingMessage> {
         let mut out = vec![];

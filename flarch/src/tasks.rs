@@ -1,9 +1,9 @@
-#[cfg(feature = "wasm")]
+#[cfg(target_family="wasm")]
 mod wasm;
-#[cfg(feature = "wasm")]
+#[cfg(target_family="wasm")]
 pub use wasm::*;
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(target_family="unix")]
 mod libc;
-#[cfg(not(feature = "wasm"))]
+#[cfg(target_family="unix")]
 pub use libc::*;

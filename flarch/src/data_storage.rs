@@ -5,17 +5,17 @@ use std::{
 use thiserror::Error;
 use async_trait::async_trait;
 
-#[cfg(feature = "node")]
+#[cfg(all(target_family="wasm", feature = "node"))]
 mod node;
-#[cfg(feature = "node")]
+#[cfg(all(target_family="wasm", feature = "node"))]
 pub use node::*;
-#[cfg(all(feature = "wasm", not(feature = "node")))]
+#[cfg(all(target_family="wasm", not(feature = "node")))]
 mod wasm;
-#[cfg(all(feature = "wasm", not(feature = "node")))]
+#[cfg(all(target_family="wasm", not(feature = "node")))]
 pub use wasm::*;
-#[cfg(not(feature = "wasm"))]
+#[cfg(target_family="unix")]
 mod libc;
-#[cfg(not(feature = "wasm"))]
+#[cfg(target_family="unix")]
 pub use libc::*;
 
 #[derive(Error, Debug)]

@@ -13,8 +13,10 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
 
-use crate::websocket::{WSError, WSSError, WSServerInput, WSServerMessage, WSServerOutput};
-use flmodules::broker::{Broker, Subsystem, SubsystemHandler};
+use crate::broker::{Broker, Subsystem, SubsystemHandler};
+use crate::web_rtc::websocket::{
+    WSError, WSSError, WSServerInput, WSServerMessage, WSServerOutput,
+};
 
 pub struct WebSocketServer {
     connections: Arc<Mutex<Vec<WSConnection>>>,
@@ -186,9 +188,10 @@ impl WSConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::web_socket_client::WebSocketClient;
-    use crate::websocket::{WSClientInput, WSClientMessage, WSClientOutput};
-    use flarch::start_logging;
+    use crate::broker::Destination;
+    use crate::start_logging;
+    use crate::web_rtc::web_socket_client::WebSocketClient;
+    use crate::web_rtc::websocket::{WSClientInput, WSClientMessage, WSClientOutput};
     use std::sync::mpsc::Receiver;
 
     async fn send_client_server(
@@ -253,17 +256,10 @@ mod tests {
             send_server_client(&mut server, &client2_tap, 1, "there 2".to_string()).await;
         }
 
-        client1
-            .emit_msg(WSClientInput::Disconnect.into())
-            .await
-            .unwrap();
-        client2
-            .emit_msg(WSClientInput::Disconnect.into())
-            .await
-            .unwrap();
+        client1.emit_msg(WSClientInput::Disconnect.into()).unwrap();
+        client2.emit_msg(WSClientInput::Disconnect.into()).unwrap();
         server
             .emit_msg(WSServerMessage::Input(WSServerInput::Stop))
-            .await
             .unwrap();
     }
 }

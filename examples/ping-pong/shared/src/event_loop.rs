@@ -2,15 +2,13 @@ use std::time::Duration;
 use tokio::select;
 use tokio_stream::StreamExt;
 
-use flarch::tasks::{spawn_local, Interval};
-use flmodules::{
+use flarch::{
     broker::{Broker, BrokerError},
     nodeids::NodeID,
+    tasks::{spawn_local, Interval},
 };
-use flnet::{
-    config::NodeInfo,
-    network::{NetCall, NetworkMessage, NetReply},
-};
+use flmodules::nodeconfig::NodeInfo;
+use flmodules::network::network::{NetCall, NetReply, NetworkMessage};
 
 use crate::common::{PPMessage, PPMessageNode};
 

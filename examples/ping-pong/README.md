@@ -1,6 +1,6 @@
 # Ping-Pong Example
 
-A simple example for the flnet crate that shows how it can
+A simple example for the flarch crate that shows how it can
 be used with a shared code and a short implementation for
 libc and wasm:
 

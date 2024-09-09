@@ -1,21 +1,19 @@
-use async_trait::async_trait;
-
+use flarch::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
+    nodeids::{NodeID, U256}, platform_async_trait,
+};
 use flmodules::{
-    nodeids::{NodeID, U256},
+    nodeconfig::NodeInfo,
     timer::{TimerBroker, TimerMessage},
 };
-use flnet::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    config::NodeInfo,
-    network::{NetCall, NetworkMessage},
-};
+use flmodules::network::network::{NetCall, NetworkMessage};
 
 use crate::common::{PPMessage, PPMessageNode};
 
 /// This only runs on localhost.
 pub const URL: &str = "ws://localhost:8765";
 
-/// The PingPong structure is a simple implementation showing how to use the flnet
+/// The PingPong structure is a simple implementation showing how to use the flmodules::network
 /// module and the Broker to create a request/reply system for multiple
 /// nodes.
 /// To use the PingPong structure, it can be called from a libc binary or a
@@ -69,12 +67,12 @@ impl PingPong {
     fn net_to_pp(msg: NetworkMessage) -> Option<PPMessage> {
         if let NetworkMessage::Reply(rep) = msg {
             match rep {
-                flnet::network::NetReply::RcvNodeMessage(from, node_msg) => {
+                flmodules::network::network::NetReply::RcvNodeMessage(from, node_msg) => {
                     serde_json::from_str::<PPMessageNode>(&node_msg)
                         .ok()
                         .map(|ppm| PPMessage::FromNetwork(from, ppm))
                 }
-                flnet::network::NetReply::RcvWSUpdateList(nodes) => Some(PPMessage::List(nodes)),
+                flmodules::network::network::NetReply::RcvWSUpdateList(nodes) => Some(PPMessage::List(nodes)),
                 _ => None,
             }
         } else {
@@ -105,8 +103,7 @@ impl PingPong {
 // ToNetwork messages are sent to the network, and automatically set up necessary connections.
 // For PPMessageNode::Ping messages, a pong is replied, and an update list request is sent to
 // the signalling server.
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<PPMessage> for PingPong {
     async fn messages(&mut self, msgs: Vec<PPMessage>) -> Vec<PPMessage> {
         for msg in msgs {
@@ -145,16 +142,16 @@ impl SubsystemHandler<PPMessage> for PingPong {
 mod test {
     use std::time::Duration;
 
-    use flarch::start_logging;
-    use flmodules::broker::Destination;
-    use flnet::{config::NodeConfig, network::NetReply, NetworkSetupError};
+    use flarch::{broker::Destination, start_logging};
+    use flmodules::nodeconfig::NodeConfig;
+    use flmodules::network::{network::NetReply, NetworkSetupError};
 
     use super::*;
 
     // Tests single messages going into the structure doing the correct thing:
     // - receive 'ping' from the user, send a 'ping' to the network
     // - receive 'ping' from the network replies 'pong' and requests a new list
-    // #BUG: flaky test - failed once with 
+    // #BUG: flaky test - failed once with
     // thread 'handler::test::test_ping' panicked at src/handler.rs:190:9:
     // assertion `left == right` failed
     // left: FromNetwork(c52bea62dddd2f42-659253603d78279c-ea7f42654af68f7a-b5c8b6ad272a30ed, Ping)
@@ -216,7 +213,7 @@ mod test {
         ))
     }
 
-    use flnet::testing::NetworkBrokerSimul;
+    use flmodules::network::testing::NetworkBrokerSimul;
     use tokio::time::sleep;
 
     // Test a simulation of two nodes with the NetworkBrokerSimul

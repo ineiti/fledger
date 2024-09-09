@@ -5,7 +5,7 @@ use flarch::tasks::spawn_local;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
-use crate::nodeids::{NodeID, NodeIDs, U256};
+use flarch::nodeids::{NodeID, NodeIDs, U256};
 
 use super::response::{ResponseHeader, ResponseMessage};
 
@@ -74,12 +74,12 @@ impl WebProxyCore {
         None
     }
 
-    pub fn handle_response(&mut self, nonce: U256, msg: ResponseMessage) -> Option<(NodeID, ResponseHeader)> {
+    pub fn handle_response(&mut self, nonce: U256, msg: ResponseMessage) -> Option<ResponseHeader> {
         if let Some((_, tx)) = self.requests.get(&nonce) {
             match msg {
                 ResponseMessage::Header(header) => {
                     self.storage.counters.rx_packets += 1;
-                    return Some((NodeID::rnd(), header));
+                    return Some(header);
                 }
                 ResponseMessage::Body(body) => {
                     self.storage.counters.rx_packets += 1;

@@ -1,6 +1,6 @@
-//! # FLNet - sending data over WebRTC in libc and wasm
+//! # flmodules::network - sending data over WebRTC in libc and wasm
 //!
-//! FLNet is used in fledger to communicate between browsers.
+//! flmodules::network is used in fledger to communicate between browsers.
 //! It uses the WebRTC protocol and a signalling-server with websockets.
 //! The outstanding feature of this implementation is that it works
 //! both for WASM and libc with the same interface.
@@ -55,9 +55,9 @@
 //! // The server waits for connections by the clients and prints the messages received.
 //! async fn server() -> Result<(), BrokerError> {
 //!     // Create a random node-configuration. It uses serde for easy serialization.
-//!     let nc = flnet::config::NodeConfig::new();
+//!     let nc = flmodules::network::config::NodeConfig::new();
 //!     // Connect to the signalling server and wait for connection requests.
-//!     let mut net = flnet::network_start(nc.clone(), "ws://localhost:8765")
+//!     let mut net = flmodules::network::network_start(nc.clone(), "ws://localhost:8765")
 //!         .await
 //!         .expect("Starting network");
 //!
@@ -77,9 +77,9 @@
 //! // A client sends a single message to a server and then disconnects.
 //! async fn client(server_id: &str) -> Result<(), BrokerError> {
 //!     // Create a random node-configuration. It uses serde for easy serialization.
-//!     let nc = flnet::config::NodeConfig::new();
+//!     let nc = flmodules::network::config::NodeConfig::new();
 //!     // Connect to the signalling server and wait for connection requests.
-//!     let mut net = flnet::network_start(nc.clone(), "ws://localhost:8765")
+//!     let mut net = flmodules::network::network_start(nc.clone(), "ws://localhost:8765")
 //!         .await
 //!         .expect("Starting network");
 //!
@@ -106,10 +106,10 @@
 //!
 //! ## Features
 //!
-//! FLNet has two features to choose between WASM and libc implementation.
+//! flmodules::network has two features to choose between WASM and libc implementation.
 //! Unfortunately it is not detected automatically yet.
 //! If you write code that is shared between the two, you can add
-//! `flnet` without any features to your `Cargo.toml`.
+//! `flmodules::network` without any features to your `Cargo.toml`.
 //! The appropriate feature will then be added once you compile the
 //! final code.
 //!
@@ -117,7 +117,7 @@
 //! includes the WebRTC connections and the signalling client:
 //!
 //! ```cargo.toml
-//! flnet = {features = ["wasm"], version = "0.7"}
+//! flmodules::network = {features = ["wasm"], version = "0.7"}
 //! ```
 //!
 //! With the `libc` feature, the libc backend is enabled,
@@ -125,7 +125,7 @@
 //! and server part:
 //!
 //! ```cargo.toml
-//! flnet = {features = ["libc"], version = "0.7"}
+//! flmodules::network = {features = ["libc"], version = "0.7"}
 //! ```
 //!
 //! ## Cross-platform usage
@@ -141,12 +141,12 @@
 //!         \    /
 //!         shared
 //!           |
-//!         flnet
+//!         flmodules::network
 //! ```
 //!
-//! The `shared` code only depends on the `flnet` crate without a given feature.
+//! The `shared` code only depends on the `flmodules::network` crate without a given feature.
 //! It is common between the WASM and the libc implementation.
-//! Only the `flbrowser` and `fledger-cli` depend on the `flnet` crate with the
+//! Only the `flbrowser` and `fledger-cli` depend on the `flmodules::network` crate with the
 //! appropriate feature set.
 //!
 //! You can find an example in the [ping-pong](https://github.com/ineiti/fledger/tree/0.7.0/examples/ping-pong/) directory.
@@ -164,60 +164,41 @@
 
 use thiserror::Error;
 
-pub mod config;
 pub mod network;
 pub mod signal;
-pub mod web_rtc;
-pub mod websocket;
 
-use crate::{config::NodeConfig, network::NetworkMessage};
+use flarch::{
+    broker::Broker,
+    broker::BrokerError,
+    web_rtc::{
+        connection::ConnectionConfig, web_rtc_setup::web_rtc_spawner,
+        web_socket_client::WebSocketClient, websocket::WSClientError, WebRTCConn,
+    },
+};
 
-pub use flmodules::broker;
-pub use flmodules::nodeids::{NodeID, NodeIDs, U256};
+use crate::network::network::NetworkMessage;
+use crate::nodeconfig::NodeConfig;
 
 #[derive(Error, Debug)]
 /// Errors when setting up a new network connection
 pub enum NetworkSetupError {
-    /// Missing wasm or libc feature
-    #[error("No libc or wasm feature given")]
-    NoFeature,
     /// Something went wrong with the broker initialization
     #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
+    Broker(#[from] BrokerError),
     /// Problem in the websocket client
     #[error(transparent)]
-    WebSocketClient(#[from] websocket::WSClientError),
-    #[cfg(feature = "libc")]
-    /// Problem in the websocket server
-    #[error(transparent)]
-    WebSocketServer(#[from] websocket::WSSError),
+    WebSocketClient(#[from] WSClientError),
     /// Generic network error
     #[error(transparent)]
     Network(#[from] network::NetworkError),
+    #[cfg(target_family = "unix")]
+    /// Problem in the websocket server
+    #[error(transparent)]
+    WebSocketServer(#[from] flarch::web_rtc::websocket::WSSError),
 }
 
 #[cfg(feature = "testing")]
 pub mod testing;
-
-#[cfg(all(feature = "libc", feature = "wasm"))]
-std::compile_error!("flnet cannot have 'libc' and 'wasm' feature simultaneously");
-
-// The following lines import either arch/libc/* or arch/wasm/* to the top-level.
-// This allows the following code on directly relying on either implementation.
-#[cfg(feature = "libc")]
-mod arch {
-    mod libc;
-    pub use libc::*;
-}
-
-#[cfg(feature = "wasm")]
-mod arch {
-    mod wasm;
-    pub use wasm::*;
-}
-
-#[cfg(any(feature = "libc", feature = "wasm"))]
-pub use arch::*;
 
 /// Starts a new [`broker::Broker<NetworkMessage>`] with a given `node`- and `connection`-configuration.
 /// This returns a raw broker which is mostly suited to connect to other brokers.
@@ -233,21 +214,13 @@ pub use arch::*;
 /// ```
 pub async fn network_broker_start(
     node: NodeConfig,
-    connection: config::ConnectionConfig,
-) -> Result<broker::Broker<NetworkMessage>, NetworkSetupError> {
-    #[cfg(any(feature = "libc", feature = "wasm"))]
-    {
-        use crate::{network::NetworkBroker, web_rtc::WebRTCConn};
+    connection: ConnectionConfig,
+) -> Result<Broker<NetworkMessage>, NetworkSetupError> {
+    use crate::network::network::NetworkBroker;
 
-        let ws = web_socket_client::WebSocketClient::connect(&connection.signal()).await?;
-        let webrtc = WebRTCConn::new(web_rtc_setup::web_rtc_spawner(connection)).await?;
-        Ok(NetworkBroker::start(node.clone(), ws, webrtc).await?)
-    }
-    #[cfg(not(any(feature = "libc", feature = "wasm")))]
-    {
-        log::error!("Couldn't connect node {node:?} to {connection:?}");
-        Err(NetworkSetupError::NoFeature)
-    }
+    let ws = WebSocketClient::connect(&connection.signal()).await?;
+    let webrtc = WebRTCConn::new(web_rtc_spawner(connection)).await?;
+    Ok(NetworkBroker::start(node.clone(), ws, webrtc).await?)
 }
 
 /// Starts a new connection to the signalling server using the `node`-
@@ -258,16 +231,8 @@ pub async fn network_broker_start(
 /// the [`network_broker_start`] method.
 pub async fn network_start(
     node: NodeConfig,
-    connection: config::ConnectionConfig,
+    connection: ConnectionConfig,
 ) -> Result<network::Network, NetworkSetupError> {
-    #[cfg(any(feature = "libc", feature = "wasm"))]
-    {
-        let net_broker = network_broker_start(node, connection).await?;
-        Ok(network::Network::start(net_broker).await?)
-    }
-    #[cfg(not(any(feature = "libc", feature = "wasm")))]
-    {
-        log::error!("Couldn't connect node {node:?} to {connection:?}");
-        Err(NetworkSetupError::NoFeature)
-    }
+    let net_broker = network_broker_start(node, connection).await?;
+    Ok(network::Network::start(net_broker).await?)
 }

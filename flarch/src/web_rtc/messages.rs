@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::mpsc::RecvError;
 use thiserror::Error;
 
-use flmodules::{broker::Broker, nodeids::NodeID};
+use crate::{broker::{Broker, BrokerError}, nodeids::NodeID};
 
 use super::node_connection::Direction;
 
@@ -28,7 +28,7 @@ pub enum SetupError {
     Send(String),
     /// Some error from the broker subsystem
     #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
+    Broker(#[from] BrokerError),
     /// Couldn't receive a message
     #[error(transparent)]
     Recv(#[from] RecvError),
@@ -78,7 +78,7 @@ pub enum WebRTCInput {
     Reset,
 }
 
-#[cfg(not(feature = "nosend"))]
+#[cfg(target_family="unix")]
 /// The spawner will create a new [`Broker<WebRTCMessage>`] ready to handle either an incoing
 /// or an outgoing connection.
 pub type WebRTCSpawner = Box<
@@ -86,7 +86,7 @@ pub type WebRTCSpawner = Box<
         + Send
         + Sync,
 >;
-#[cfg(feature = "nosend")]
+#[cfg(target_family="wasm")]
 /// The spawner will create a new [`Broker<WebRTCMessage>`] ready to handle either an incoing
 /// or an outgoing connection.
 pub type WebRTCSpawner =

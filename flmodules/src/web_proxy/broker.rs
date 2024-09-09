@@ -1,13 +1,17 @@
-use async_trait::async_trait;
 use core::str;
-use flarch::{data_storage::DataStorage, tasks::spawn_local};
+use flarch::{
+    data_storage::DataStorage,
+    platform_async_trait,
+    tasks::spawn_local,
+    tasks::time::{timeout, Duration},
+};
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
 
-use crate::{
+use crate::random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut};
+use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},
-    random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
 };
 
 use super::{
@@ -80,7 +84,7 @@ impl WebProxy {
         self.web_proxy
             .emit_msg(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx).into())?;
         let (mut tap, id) = self.web_proxy.get_tap().await?;
-        // tokio::time::timeout(tokio::time::Duration::from_secs(5), async move {
+        timeout(Duration::from_secs(5), async move {
             while let Some(msg) = tap.recv().await {
                 if let WebProxyMessage::Output(WebProxyOut::ResponseGet(proxy, rnd, header)) = msg {
                     if rnd == our_rnd {
@@ -91,9 +95,9 @@ impl WebProxy {
             }
             self.web_proxy.remove_subsystem(id).await?;
             return Err(WebProxyError::ResponseTimeout);
-        // })
-        // .await
-        // .map_err(|_| WebProxyError::ResponseTimeout)?
+        })
+        .await
+        .map_err(|_| WebProxyError::ResponseTimeout)?
     }
 
     pub fn get_counters(&mut self) -> Counters {
@@ -127,7 +131,9 @@ impl Translate {
     fn link_rnd_proxy(msg: RandomMessage) -> Option<WebProxyMessage> {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
-                RandomOut::ListUpdate(list) => Some(WebProxyIn::UpdateNodeList(list.into()).into()),
+                RandomOut::NodeInfoConnected(list) => {
+                    Some(WebProxyIn::NodeInfoConnected(list).into())
+                }
                 RandomOut::NodeMessageFromNetwork((id, msg)) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)
@@ -162,8 +168,7 @@ impl Translate {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<WebProxyMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<WebProxyMessage>) -> Vec<WebProxyMessage> {
         let msgs_in = msgs
@@ -185,7 +190,7 @@ impl SubsystemHandler<WebProxyMessage> for Translate {
 mod tests {
     use flarch::{data_storage::DataStorageTemp, start_logging_filter_level, tasks::wait_ms};
 
-    use crate::nodeids::NodeIDs;
+    use crate::nodeconfig::NodeConfig;
 
     use super::*;
 
@@ -193,22 +198,24 @@ mod tests {
     async fn test_get() -> Result<(), WebProxyError> {
         start_logging_filter_level(vec![], log::LevelFilter::Debug);
         let cl_ds = Box::new(DataStorageTemp::new());
-        let cl_id = NodeID::rnd();
+        let cl_in = NodeConfig::new().info;
+        let cl_id = cl_in.get_id();
         let mut cl_rnd = Broker::new();
 
         let wp_ds = Box::new(DataStorageTemp::new());
-        let wp_id = NodeID::rnd();
+        let wp_in = NodeConfig::new().info;
+        let wp_id = wp_in.get_id();
         let mut wp_rnd = Broker::new();
 
-        let list: NodeIDs = vec![cl_id, wp_id].into();
         let mut cl =
             WebProxy::start(cl_ds, cl_id, cl_rnd.clone(), WebProxyConfig::default()).await?;
         let (mut cl_tap, _) = cl_rnd.get_tap().await?;
         let _wp = WebProxy::start(wp_ds, wp_id, wp_rnd.clone(), WebProxyConfig::default()).await?;
         let (mut wp_tap, _) = wp_rnd.get_tap().await?;
 
-        cl_rnd.emit_msg(RandomMessage::Output(RandomOut::ListUpdate(list.clone())))?;
-        wp_rnd.emit_msg(RandomMessage::Output(RandomOut::ListUpdate(list)))?;
+        let list = vec![cl_in, wp_in];
+        cl_rnd.emit_msg(RandomMessage::Output(RandomOut::NodeInfoConnected(list.clone())))?;
+        wp_rnd.emit_msg(RandomMessage::Output(RandomOut::NodeInfoConnected(list)))?;
 
         let (tx, mut rx) = channel(1);
         spawn_local(async move {

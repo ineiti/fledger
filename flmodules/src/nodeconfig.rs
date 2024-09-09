@@ -5,7 +5,7 @@
 //! based serializations when using text-based serializations like `yaml` or `json`.
 
 use ed25519_compact::{KeyPair, Noise, PublicKey, Seed, Signature};
-use flmodules::nodeids::U256;
+use flarch::nodeids::U256;
 use serde_derive::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
 use std::{
@@ -14,100 +14,7 @@ use std::{
 };
 use thiserror::Error;
 
-/// A configuration to set up a WebRTC connection.
-#[derive(Debug, Clone)]
-pub struct ConnectionConfig {
-    /// The signalling server, defaults to "ws://localhost:8765"
-    signal_server: Option<String>,
-    /// The STUN server, defaults to "stun:stun.l.google.com:19302"
-    stun_server: Option<HostLogin>,
-    /// The TURN server, by default none
-    turn_server: Option<HostLogin>,
-}
-
-impl Default for ConnectionConfig {
-    fn default() -> Self {
-        Self {
-            signal_server: Some("ws://localhost:8765".into()),
-            stun_server: Some(HostLogin {
-                url: "stun:stun.l.google.com:19302".into(),
-                login: None,
-            }),
-            turn_server: None,
-        }
-    }
-}
-
-impl ConnectionConfig {
-    pub fn new(
-        signal_server: Option<String>,
-        stun_server: Option<HostLogin>,
-        turn_server: Option<HostLogin>,
-    ) -> Self {
-        Self {
-            signal_server,
-            stun_server,
-            turn_server,
-        }
-    }
-
-    /// Returns a ConnectionConfig with only the url of the signalling server set.
-    pub fn from_signal(url: &str) -> Self {
-        Self {
-            signal_server: Some(url.into()),
-            stun_server: None,
-            turn_server: None,
-        }
-    }
-
-    /// Returns the signalling server, or the default if none set.
-    pub fn signal(&self) -> String {
-        self.signal_server
-            .as_ref()
-            .unwrap_or(&"ws://localhost:8765".into())
-            .clone()
-    }
-
-    /// Returns the STUN server, or the default if none set.
-    pub fn stun(&self) -> HostLogin {
-        self.stun_server
-            .as_ref()
-            .unwrap_or(&HostLogin::from_url("stun:stun.l.google.com:19302"))
-            .clone()
-    }
-
-    /// Returns an Option to the turn server, as there is no default available publicly.
-    pub fn turn(&self) -> Option<HostLogin> {
-        self.turn_server.clone()
-    }
-}
-
-/// A URL with an optional username/password.
-#[derive(Debug, Clone)]
-pub struct HostLogin {
-    /// The URL for the host
-    pub url: String,
-    /// An optional username/password to authenticate to the host
-    pub login: Option<Login>,
-}
-
-impl HostLogin {
-    pub fn from_url(url: &str) -> Self {
-        Self {
-            url: url.into(),
-            login: None,
-        }
-    }
-}
-
-/// A login with a username/password.
-#[derive(Debug, Clone)]
-pub struct Login {
-    /// The username
-    pub user: String,
-    /// The password
-    pub pass: String,
-}
+use crate::Modules;
 
 /// Errors to be returned when setting up a new config
 #[derive(Error, Debug)]
@@ -128,7 +35,7 @@ pub enum ConfigError {
 
 /// NodeInfo is the public information of the node.
 #[serde_as]
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Hash)]
 pub struct NodeInfo {
     /// Name of the node, up to 256 bytes
     pub name: String,
@@ -137,6 +44,9 @@ pub struct NodeInfo {
     /// the public key of the node
     #[serde_as(as = "Base64")]
     pub pubkey: Vec<u8>,
+    // capabilities of this node
+    #[serde(default = "Modules::all")]
+    pub modules: Modules,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -159,6 +69,7 @@ impl NodeInfo {
             name: names::Generator::default().next().unwrap(),
             client: "libc".to_string(),
             pubkey: pubkey.as_ref().to_vec(),
+            modules: Modules::all(),
         }
     }
 
@@ -223,6 +134,7 @@ impl From<NodeInfoV1> for NodeInfo {
             name: ni.info,
             client: ni.client,
             pubkey: ni.pubkey,
+            modules: Modules::empty(),
         }
     }
 }
@@ -234,6 +146,7 @@ impl TryFrom<NodeInfoToml> for NodeInfo {
             name: nit.info,
             client: nit.client,
             pubkey: nit.pubkey.ok_or(ConfigError::PublicKeyMissing)?,
+            modules: Modules::empty(),
         })
     }
 }
@@ -255,6 +168,8 @@ impl PartialEq for NodeInfo {
         self.get_id() == other.get_id()
     }
 }
+
+impl Eq for NodeInfo {}
 
 /// NodeConfig is stored on the node itself and contains the private key.
 #[serde_as]

@@ -3,12 +3,8 @@ edition = "2021"
 name = "shared"
 version = "0.7.0"
 
-[features]
-nosend = ["flmodules/nosend", "flarch/wasm"]
-
 [dependencies]
 flmodules = {path = "../../../flmodules", version = "0.7"}
-flnet = {path = "../../../flnet", version = "0.7"}
 flarch = {path = "../../../flarch", version = "0.7"}
 
 async-trait = "0.1"
@@ -19,5 +15,5 @@ tokio = "1"
 tokio-stream = "0.1"
 
 [dev-dependencies]
-flnet = {path = "../../../flnet", version = "0.7", features = ["testing"]}
+flmodules = {path = "../../../flmodules", version = "0.7", features = ["testing"]}
 tokio = {version = "1", features = ["rt-multi-thread"]}

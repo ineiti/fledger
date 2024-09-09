@@ -3,18 +3,14 @@ name = "flnode"
 version = "0.7.1"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
-description = "Glue code for flnet and flmodules"
+description = "Glue code for flmodules"
 repository = "https://github.com/ineiti/fledger"
 license = "MIT OR Apache-2.0"
 homepage = "https://fledg.re"
 readme = "README.md"
 keywords = ["test", "utils", "fledger"]
 
-[features]
-nosend = []
-
 [dependencies]
-flnet = {path="../flnet", version = "0.7"}
 flmodules = {path = "../flmodules", version = "0.7"}
 flarch = {path = "../flarch", version = "0.7"}
 
@@ -37,7 +33,6 @@ sha2 = "0.10"
 ed25519-compact = "2"
 itertools = "0.13"
 chrono = "0.4"
-bitflags = "2"
 
 [dev-dependencies]
 env_logger = "0.11"

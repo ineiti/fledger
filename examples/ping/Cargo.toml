@@ -8,7 +8,6 @@ version = "0.1.0"
 [dependencies]
 flarch = {path = "../../flarch", version = "0.7"}
 flmodules = {path = "../../flmodules", version = "0.7"}
-flnet = {path = "../../flnet", version = "0.7", features = ["libc"]}
 
 clap = {version = "4", features = ["derive"]}
 log = "0.4"

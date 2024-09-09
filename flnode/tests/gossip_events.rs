@@ -1,8 +1,7 @@
-use flarch::{start_logging_filter_level};
-use flmodules::{gossip_events::events, nodeids::U256};
+use flarch::{nodeids::U256, start_logging_filter_level};
+use flmodules::{gossip_events::events, Modules};
 
 mod helpers;
-use flnode::node::Brokers;
 use helpers::*;
 
 #[tokio::test]
@@ -22,7 +21,7 @@ async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
 
     let mut net = NetworkSimul::new();
     log::info!("Creating {nbr_nodes} nodes");
-    net.add_nodes(Brokers::ENABLE_ALL, nbr_nodes).await?;
+    net.add_nodes(Modules::all(), nbr_nodes).await?;
     let id = &net.nodes.keys().next().unwrap().clone();
     // Hand-crafted formula that works for 2, 30, 100 nodes
     let steps = ((nbr_nodes as f64).log10() + 5.0) as i32;
@@ -58,7 +57,7 @@ async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
                     2 * nbr_nodes
                 );
                 assert_eq!(2 * nbr_nodes, nbr);
-                net.add_nodes(Brokers::ENABLE_ALL, nbr_nodes).await?;
+                net.add_nodes(Modules::all(), nbr_nodes).await?;
             }
             s if s == steps * 3 => {
                 log::info!("Checking messages {} == {nbr}", 4 * nbr_nodes);

@@ -1,7 +1,7 @@
 # Ping example
 
 This example only works as a rust binary.
-It is a simple example of how the flnet crate can work and set
+It is a simple example of how the flarch crate can work and set
 up a communication between two endpoints.
 
 You can build it and then run it in different modes: `ping`, `server`, `client`.

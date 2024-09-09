@@ -1,12 +1,9 @@
 use std::error::Error;
 
-use flarch::start_logging;
-use flmodules::{
-    gossip_events::{
-        events::{Category, EventsStorage},
-        messages::{Config, GossipEvents, GossipIn, GossipOut, MessageNode},
-    },
-    nodeids::NodeID,
+use flarch::{nodeids::NodeID, start_logging};
+use flmodules::gossip_events::{
+    events::{Category, EventsStorage},
+    messages::{Config, GossipEvents, GossipIn, GossipOut, MessageNode},
 };
 
 #[tokio::test]

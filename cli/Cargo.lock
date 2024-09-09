@@ -318,6 +318,9 @@ name = "bitflags"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "block-buffer"
@@ -810,11 +813,35 @@ dependencies = [
  "async-trait",
  "chrono",
  "env_logger",
+ "flarch_macro",
  "futures",
+ "js-sys",
  "log",
+ "rand",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "sha2",
  "thiserror",
  "tokio",
+ "tokio-tungstenite",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "wasmtimer",
+ "web-sys",
+ "webrtc",
+]
+
+[[package]]
+name = "flarch_macro"
+version = "0.7.2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.77",
 ]
 
 [[package]]
@@ -825,7 +852,7 @@ dependencies = [
  "clap-verbosity-flag",
  "env_logger",
  "flarch",
- "flnet",
+ "flmodules",
  "flnode",
  "log",
  "thiserror",
@@ -839,38 +866,18 @@ version = "0.7.1"
 dependencies = [
  "async-stream",
  "async-trait",
- "bytes",
- "flarch",
- "futures",
- "itertools",
- "log",
- "rand",
- "reqwest",
- "serde",
- "serde_derive",
- "serde_with",
- "serde_yaml",
- "sha2",
- "thiserror",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
-name = "flnet"
-version = "0.7.2"
-dependencies = [
- "async-trait",
  "bimap",
+ "bitflags 2.6.0",
+ "bytes",
  "ed25519-compact",
  "flarch",
- "flmodules",
  "futures",
  "getrandom",
  "itertools",
  "log",
  "names",
  "rand",
+ "reqwest",
  "serde",
  "serde_derive",
  "serde_json",
@@ -880,9 +887,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite",
  "toml",
- "webrtc",
 ]
 
 [[package]]
@@ -890,12 +895,10 @@ name = "flnode"
 version = "0.7.1"
 dependencies = [
  "async-trait",
- "bitflags 2.6.0",
  "chrono",
  "ed25519-compact",
  "flarch",
  "flmodules",
- "flnet",
  "futures",
  "getrandom",
  "itertools",
@@ -918,7 +921,8 @@ dependencies = [
  "clap",
  "clap-verbosity-flag",
  "env_logger",
- "flnet",
+ "flarch",
+ "flmodules",
  "log",
  "thiserror",
  "tokio",
@@ -2005,9 +2009,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-native-certs"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04182dffc9091a404e0fc069ea5cd60e5b866c3adf881eff99a32d048242dffa"
+checksum = "e5bfb394eeed242e909609f56089eecfe5fda225042e8b171791b9c95f5931e5"
 dependencies = [
  "openssl-probe",
  "rustls-pemfile",
@@ -2060,11 +2064,11 @@ dependencies = [
 
 [[package]]
 name = "schannel"
-version = "0.1.23"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbc91545643bcf3a0bbb6569265615222618bdf33ce4ffbbd13c4bbd4c093534"
+checksum = "e9aaafd5a2b6e3d657ff009d82fbd630b6bd54dd4eb06f21693925cdf80f9b8b"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2141,6 +2145,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99fce0ffe7310761ca6bf9faf5115afbc19688edd00171d81b1bb1b116c63e09"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2812,6 +2827,8 @@ checksum = "a82edfc16a6c469f5f44dc7b571814045d60404b55a0ee849f9bcfa2e63dd9b5"
 dependencies = [
  "cfg-if",
  "once_cell",
+ "serde",
+ "serde_json",
  "wasm-bindgen-macro",
 ]
 
@@ -2908,6 +2925,20 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "wasmtimer"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f656cd8858a5164932d8a90f936700860976ec21eb00e0fe2aa8cab13f6b4cf"
+dependencies = [
+ "futures",
+ "js-sys",
+ "parking_lot",
+ "pin-utils",
+ "slab",
+ "wasm-bindgen",
 ]
 
 [[package]]

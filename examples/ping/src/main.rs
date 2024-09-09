@@ -3,9 +3,15 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
-use flarch::{start_logging_filter, tasks::{wait_ms, Interval}};
-use flmodules::nodeids::U256;
-use flnet::{broker::BrokerError, config::ConnectionConfig, network::NetReply};
+use flarch::{
+    broker::BrokerError,
+    nodeids::U256,
+    start_logging_filter,
+    tasks::{wait_ms, Interval},
+    web_rtc::connection::ConnectionConfig,
+};
+use flmodules::nodeconfig::NodeConfig;
+use flmodules::network::network::NetReply;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -38,10 +44,10 @@ async fn main() -> Result<(), BrokerError> {
 
 async fn ping() -> Result<(), BrokerError> {
     // Create a random node-configuration. It uses serde for easy serialization.
-    let nc = flnet::config::NodeConfig::new();
+    let nc = NodeConfig::new();
     log::info!("Our node-ID is {:?}", nc.info.get_id());
     // Connect to the signalling server and wait for connection requests.
-    let mut net = flnet::network_start(
+    let mut net = flmodules::network::network_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )
@@ -74,9 +80,9 @@ async fn ping() -> Result<(), BrokerError> {
 
 async fn server() -> Result<(), BrokerError> {
     // Create a random node-configuration. It uses serde for easy serialization.
-    let nc = flnet::config::NodeConfig::new();
+    let nc = NodeConfig::new();
     // Connect to the signalling server and wait for connection requests.
-    let mut net = flnet::network_start(
+    let mut net = flmodules::network::network_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )
@@ -93,9 +99,9 @@ async fn server() -> Result<(), BrokerError> {
 
 async fn client(server_id: &str) -> Result<(), BrokerError> {
     // Create a random node-configuration. It uses serde for easy serialization.
-    let nc = flnet::config::NodeConfig::new();
+    let nc = NodeConfig::new();
     // Connect to the signalling server and wait for connection requests.
-    let mut net = flnet::network_start(
+    let mut net = flmodules::network::network_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )

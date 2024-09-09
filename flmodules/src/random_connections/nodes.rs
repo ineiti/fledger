@@ -1,5 +1,5 @@
 use core::cmp::min;
-use crate::nodeids::{NodeID, NodeIDs};
+use flarch::nodeids::{NodeID, NodeIDs};
 use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]

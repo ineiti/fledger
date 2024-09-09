@@ -1,15 +1,14 @@
 //! # Network related structures
-//! 
+//!
 //! The basic structure here is [`NetworkBroker`], which handles all communications
 //! with the signalling server and setting up of new WebRTC connections.
 //! As the [`NetworkBroker`] simply returns a [`Broker<NetworkMessage>`], a more
 //! user-friendly wrapper named [`Network`] exists, which is better suited for
 //! usage in a non-[`Broker`] world.
-//! 
-//! Both of these structures are best created with [`crate::network_start`] and 
+//!
+//! Both of these structures are best created with [`crate::network_start`] and
 //! [`crate::network_broker_start`].
 
-use async_trait::async_trait;
 use core::panic;
 use itertools::concat;
 use std::{fmt, time::Duration};
@@ -17,26 +16,25 @@ use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 
-use flarch::tasks::Interval;
-use flmodules::{
+use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},
+    platform_async_trait,
+    tasks::Interval,
+    web_rtc::{
+        messages::{ConnType, PeerInfo, SetupError, SignalingState},
+        node_connection::{Direction, NCError, NCInput, NCOutput},
+        websocket::{WSClientInput, WSClientMessage, WSClientOutput},
+        WebRTCConnMessage,
+    },
 };
 
 use crate::{
-    config::{NodeConfig, NodeInfo},
-    signal::{
+    network::signal::{
         MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION,
     },
-    web_rtc::{
-        messages::{ConnType, PeerInfo, SetupError, SignalingState},
-        node_connection::{Direction, NCInput, NCOutput},
-        WebRTCConnMessage,
-    },
-    websocket::{WSClientInput, WSClientMessage, WSClientOutput},
+    nodeconfig::{NodeConfig, NodeInfo},
 };
-
-use crate::web_rtc::node_connection::NCError;
 
 /// This is a user-friendly version of [`NetworkBroker`].
 /// Upon starting, it waits for the connection to the signalling server.
@@ -91,7 +89,7 @@ impl Network {
     /// Tries to send a text-message to a remote node.
     /// The [`NetworkBroker`] will start a connection with the node if there is none available.
     /// If the remote node is not available, no error is returned.
-    pub fn send_msg(&mut self, dst: crate::NodeID, msg: String) -> Result<(), BrokerError> {
+    pub fn send_msg(&mut self, dst: NodeID, msg: String) -> Result<(), BrokerError> {
         self.send(NetCall::SendNodeMessage(dst, msg))
     }
 
@@ -122,7 +120,7 @@ pub enum NetworkError {
 
 /// The [`NetworkBroker`] handles setting up webRTC connections for all connected nodes.
 /// It can handle incoming and outgoing connections.
-/// 
+///
 /// In this version, all connection setup (signalling) is going through a websocket.
 /// In a next version, it should also be possible to setup new connections (signalling) through existing WebRTC
 /// connections: If A and B are connected, and B and C are connected, C can connect to A by using
@@ -215,9 +213,10 @@ impl NetworkBroker {
                     } else {
                         vec![]
                     },
-                    vec![
-                        NCInput::Setup((pi.get_direction(&own_id), pi.message)).to_net(remote_node)
-                    ],
+                    vec![NetworkMessage::from_nc(
+                        NCInput::Setup((pi.get_direction(&own_id), pi.message)),
+                        remote_node,
+                    )],
                 ])
             }
         }
@@ -244,7 +243,7 @@ impl NetworkBroker {
                     } else {
                         vec![]
                     },
-                    vec![NCInput::Text(msg_str).to_net(id)],
+                    vec![NetworkMessage::from_nc(NCInput::Text(msg_str), id)],
                 ]))
             }
             NetCall::SendWSStats(ss) => Ok(WSSignalMessageFromNode::NodeStats(ss.clone()).into()),
@@ -318,7 +317,7 @@ impl NetworkBroker {
             log::warn!("Already disconnected from {}", dst);
         } else {
             self.connections.retain(|id| id != dst);
-            out.push(NCInput::Disconnect.to_net(*dst));
+            out.push(NetworkMessage::from_nc(NCInput::Disconnect, *dst));
         }
         out
     }
@@ -352,8 +351,7 @@ impl NetworkBroker {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<NetworkMessage> for NetworkBroker {
     async fn messages(&mut self, bms: Vec<NetworkMessage>) -> Vec<NetworkMessage> {
         let mut out = vec![];
@@ -401,6 +399,13 @@ impl fmt::Display for NetworkMessage {
             NetworkMessage::WebSocket(_) => write!(f, "WebSocket()"),
             NetworkMessage::WebRTC(_) => write!(f, "WebRTC()"),
         }
+    }
+}
+
+impl NetworkMessage {
+    /// Convert a [`NCInput`] to Self
+    pub fn from_nc(input: NCInput, dst: NodeID) -> Self {
+        Self::WebRTC(WebRTCConnMessage::InputNC((dst, input)))
     }
 }
 
@@ -465,7 +470,7 @@ pub enum NetReply {
     RcvNodeMessage(NodeID, String),
     /// An updated list coming from the signalling server.
     RcvWSUpdateList(Vec<NodeInfo>),
-    /// Whenever the state of a connection changes, this message is 
+    /// Whenever the state of a connection changes, this message is
     /// sent to the user.
     ConnectionState(NetworkConnectionState),
     /// A node has been successfully connected.

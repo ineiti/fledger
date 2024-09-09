@@ -10,6 +10,8 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::broker::BrokerError;
+
 #[derive(Error, Debug)]
 /// Wrapper for an error in the websocket implementations
 pub enum WSError {
@@ -26,20 +28,20 @@ pub enum WSClientError {
     Connection(String),
     /// Passing a broker error
     #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
+    Broker(#[from] BrokerError),
 }
 
-#[cfg(feature = "libc")]
 #[derive(Error, Debug)]
 /// WebSocket server error
 pub enum WSSError {
     /// Passing a broker error
     #[error(transparent)]
-    Broker(#[from] flmodules::broker::BrokerError),
+    Broker(#[from] BrokerError),
     /// Tokio error while joining channels
     #[error(transparent)]
     Join(#[from] tokio::task::JoinError),
     /// Tokio error while getting client
+    #[cfg(target_family="unix")]
     #[error(transparent)]
     Client(#[from] tokio_tungstenite::tungstenite::Error),
     /// Generic IO error

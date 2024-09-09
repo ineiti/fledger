@@ -11,9 +11,8 @@ readme = "README.md"
 keywords = ["test", "libc", "webrtc", "websocket", "fledger"]
 
 [dependencies]
-flnet = {path="../../../flnet", version = "0.7", features = ["libc"]}
-flarch = {path="../../../flarch", version = "0.7"}
 flmodules = {path="../../../flmodules", version = "0.7"}
+flarch = {path="../../../flarch", version = "0.7"}
 
 log = "0.4"
 thiserror = "1"

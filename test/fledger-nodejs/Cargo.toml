@@ -19,9 +19,8 @@ local = []
 
 [dependencies]
 flarch = {path="../../flarch", features = ["node"], version = "0.7"}
-flmodules = {path="../../flmodules", features = ["nosend"], version = "0.7"}
-flnet = {path="../../flnet", features = ["wasm"], version = "0.7"}
-flnode = {path = "../../flnode", features = ["nosend"], version = "0.7"}
+flmodules = {path="../../flmodules", version = "0.7"}
+flnode = {path = "../../flnode", version = "0.7"}
 
 thiserror = "1"
 env_logger = "0.11"

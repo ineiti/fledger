@@ -14,6 +14,9 @@
   <div class="main">
     <h2><i id="node_info">Starting up</i></h2>
 
+    <p>Nodes connected/online: <span id="nodes_connected"></span> /
+      <span id="nodes_online"></span></p>
+
     <ul class="nav nav-tabs" id="myTab" role="tablist">
       <li class="nav-item" role="presentation">
         <button class="nav-link active" id="welcome-tab" data-bs-toggle="tab" data-bs-target="#welcome" type="button"
@@ -89,17 +92,6 @@
         <button id="send_msg" type="button" class="btn btn-primary" style="float: right;">Send</button>
 
         <br>
-        <h3>Statistics</h3>
-        <ul>
-          <li>Nodes connected: <span id="nodes_connected"></span></li>
-          <li>Nodes online: <span id="nodes_online"></span></li>
-          <li>Nodes known: <span id="nodes_known"></span></li>
-          <!-- <li>Messages stored total: <span id="msgs_system"></span></li>
-          <li>Messages stored locally: <span id="msgs_local"></span></li>
-          <li>Mana: <span id="mana"></span></li> -->
-        </ul>
-
-        <br>
         <h3>Messages</h3>
         <div id="messages"></div>
       </div>
@@ -108,6 +100,7 @@
         <br>
         <h3>WebProxy</h3>
         <div style="display: flex; flex-flow: row;">
+          <!-- <input id="proxy_url" value="http://localhost:8080" /> -->
           <input id="proxy_url" value="https://fledg.re/doc/index.html" />
           <button id="proxy_request" type="button" class="btn btn-primary">Proxy
             Request</button>
@@ -128,6 +121,11 @@
           <a href="https://fledg.re/doc/index.html" target="other">Fledger - the blockchain that could</a>
         </p>
         <p>Or find the code on github: <a href="https://github.com/ineiti/fledger">ineiti/fledger</a></p>
+        <ul>
+          <li>Mana: <span id="mana"></span></li>
+          <li>Total messages: <span id="msgs_system"></span></li>
+          <li>Local messages: <span id="msgs_local"></span></li>
+        </ul>
         <div id="fetching">Fetching node list</div>
         <table class="styled-table table" id="table_stats" class="hidden">
           <thead>
@@ -152,9 +150,7 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
-    integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
-    crossorigin="anonymous"></script>
+  <script data-trunk src="bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

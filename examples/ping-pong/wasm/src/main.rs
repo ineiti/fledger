@@ -4,11 +4,11 @@
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 use console_error_panic_hook::set_once as set_panic_hook;
+use flmodules::nodeconfig::NodeConfig;
 use ybc::TileCtx::{Ancestor, Child, Parent};
 use yew::prelude::*;
 
-use flarch::tasks::now;
-use flnet::{broker::Broker, config::{NodeConfig, ConnectionConfig}};
+use flarch::{broker::Broker, tasks::now, web_rtc::connection::ConnectionConfig};
 
 use shared::{
     common::{NodeList, PPMessage},
@@ -35,7 +35,7 @@ impl Component for App {
         s.link().send_message(AppMessage::Init);
         Self {
             logs: vec![],
-            config: flnet::config::NodeConfig::new(),
+            config: NodeConfig::new(),
             pp_imp: now() % 1000 >= 500,
         }
     }
@@ -49,7 +49,7 @@ impl Component for App {
                 let pp_imp = self.pp_imp;
                 wasm_bindgen_futures::spawn_local(async move {
                     let id = config.info.get_id();
-                    let net = flnet::network_broker_start(
+                    let net = flmodules::network::network_broker_start(
                         config,
                         ConnectionConfig::from_signal(shared::handler::URL),
                     )
@@ -129,10 +129,10 @@ impl Component for App {
                 padded=true
                 navbrand={html!{
                     <ybc::NavbarItem>
-                        <ybc::Title 
-                            classes={classes!("has-text-white")} 
+                        <ybc::Title
+                            classes={classes!("has-text-white")}
                             size={ybc::HeaderSize::Is4}>
-                            {"FLNet Ping-Pong Example"}
+                            {"flmodules::network Ping-Pong Example"}
                         </ybc::Title>
                     </ybc::NavbarItem>
                 }}
@@ -149,7 +149,7 @@ impl Component for App {
                         <ybc::Tile ctx={Parent} size={ybc::TileSize::Twelve}>
                             <ybc::Tile ctx={Parent}>
                                 <ybc::Tile ctx={Child} classes={classes!("content")}>
-                                <h1>{"FLNet example"}</h1>
+                                <h1>{"flmodules::network example"}</h1>
                                 <h2>{"Running "}{pp_imp}</h2>
                                 <h2>{"Ping-pong logs for "}{&self.config.info.name}</h2>
                                 <pre>{logs}</pre>

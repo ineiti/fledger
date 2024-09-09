@@ -2,8 +2,9 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+pub use tokio::time;
 
-use tokio::time::{self, sleep, Duration, Instant};
+use tokio::time::{sleep, Duration, Instant};
 
 use futures::{Future, Stream};
 
@@ -11,6 +12,10 @@ use futures::{Future, Stream};
 pub fn now() -> i64 {
     use chrono::Utc;
     Utc::now().timestamp_millis() as i64
+}
+
+pub fn spawn_local_nosend<F: Future<Output = ()> + 'static>(_: F) {
+    panic!("Cannot spawn NoSend in libc");
 }
 
 /// Spawns the given method on the local scheduler.

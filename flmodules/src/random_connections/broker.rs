@@ -1,16 +1,19 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use async_trait::async_trait;
-use flmodules::{
+use flarch::{
+    broker::{self, Broker, BrokerError, Subsystem, SubsystemHandler},
+    nodeids::U256,
+    platform_async_trait,
+};
+
+use crate::{
+    network::network::{NetCall, NetReply, NetworkMessage},
     random_connections::{
         messages::{Config, NodeMessage, RandomConnections, RandomIn, RandomMessage, RandomOut},
         storage::RandomStorage,
     },
     timer::TimerMessage,
-    broker::{self, Broker, BrokerError, SubsystemHandler},
-    nodeids::U256,
 };
-use flnet::network::{NetCall, NetworkMessage};
 
 pub struct RandomBroker {
     pub storage: RandomStorage,
@@ -60,7 +63,7 @@ impl Translate {
         id: U256,
     ) -> Result<Broker<RandomMessage>, BrokerError> {
         let mut rc = Broker::new();
-        rc.add_subsystem(flmodules::broker::Subsystem::Handler(Box::new(Translate {
+        rc.add_subsystem(Subsystem::Handler(Box::new(Translate {
             storage_tx,
             module: RandomConnections::new(Config::default()),
             id,
@@ -79,27 +82,23 @@ impl Translate {
         Box::new(move |msg: NetworkMessage| {
             if let NetworkMessage::Reply(msg_net) = msg {
                 match msg_net {
-                    flnet::network::NetReply::RcvNodeMessage(id, msg_str) => {
+                    NetReply::RcvNodeMessage(id, msg_str) => {
                         if let Ok(msg_rnd) = serde_yaml::from_str::<NodeMessage>(&msg_str) {
                             return Some(RandomIn::NodeMessageFromNetwork((id, msg_rnd)).into());
                         }
                     }
-                    flnet::network::NetReply::RcvWSUpdateList(list) => {
+                    NetReply::RcvWSUpdateList(list) => {
                         return Some(
                             RandomIn::NodeList(
-                                list.iter()
-                                    .map(|n| n.get_id())
-                                    .filter(|id| id != &our_id)
-                                    .collect::<Vec<U256>>()
-                                    .into(),
+                                list.into_iter()
+                                    .filter(|ni| ni.get_id() != our_id)
+                                    .collect(),
                             )
                             .into(),
                         )
                     }
-                    flnet::network::NetReply::Connected(id) => {
-                        return Some(RandomIn::NodeConnected(id).into())
-                    }
-                    flnet::network::NetReply::Disconnected(id) => {
+                    NetReply::Connected(id) => return Some(RandomIn::NodeConnected(id).into()),
+                    NetReply::Disconnected(id) => {
                         return Some(RandomIn::NodeDisconnected(id).into())
                     }
                     _ => {}
@@ -134,8 +133,7 @@ impl Translate {
     }
 }
 
-#[cfg_attr(feature = "nosend", async_trait(?Send))]
-#[cfg_attr(not(feature = "nosend"), async_trait)]
+#[platform_async_trait()]
 impl SubsystemHandler<RandomMessage> for Translate {
     async fn messages(&mut self, msgs: Vec<RandomMessage>) -> Vec<RandomMessage> {
         let mut out = vec![];
@@ -151,8 +149,6 @@ impl SubsystemHandler<RandomMessage> for Translate {
             self.handle_output(msg);
         }
 
-        out.into_iter()
-            .map(|m| m.into())
-            .collect()
+        out.into_iter().map(|m| m.into()).collect()
     }
 }

@@ -1,11 +1,10 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
-use flmodules::ping::storage::{PingStat, PingStorage};
-use flnet::{
-    config::{ConnectionConfig, HostLogin, Login},
-    network_broker_start,
+use flmodules::{
+    nodeconfig::NodeInfo,
+    ping::storage::{PingStat, PingStorage},
+    Modules,
 };
-use flnode::{node::Node, version::VERSION_STRING};
 use js_sys::JsString;
 use regex::Regex;
 use std::{
@@ -22,10 +21,13 @@ use web_sys::{window, Document, Event, HtmlDivElement, HtmlInputElement, HtmlTex
 
 use flarch::{
     data_storage::DataStorageLocal,
-    tasks::{spawn_local, wait_ms},
+    nodeids::U256,
+    tasks::{spawn_local_nosend, wait_ms},
+    web_rtc::connection::{ConnectionConfig, HostLogin, Login},
 };
-use flmodules::nodeids::U256;
-use flnet::{config::NodeInfo, network::NetworkConnectionState};
+use flmodules::network::network::NetworkConnectionState;
+use flmodules::network::network_broker_start;
+use flnode::{node::Node, version::VERSION_STRING};
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -49,8 +51,8 @@ extern "C" {
 // this code is necessary to link the two.
 // Using things like Yew or others is too far from HTML for me.
 // Any suggestions for a framework that allows to do this in a cleaner way are welcome.
-fn main() {
-    spawn_local(async {
+pub fn main() {
+    spawn_local_nosend(async {
         let mut web = FledgerWeb::new().await.expect("Should run fledger");
 
         // Create a listening channel that fires whenever the user clicks on the `send_msg` button
@@ -63,6 +65,7 @@ fn main() {
         let your_message: HtmlTextAreaElement = web.get_element("your_message");
         let proxy_div: HtmlDivElement = web.get_element("proxy_div");
         let proxy_url: HtmlInputElement = web.get_element("proxy_url");
+        let webproxy = web.node.webproxy.as_mut().unwrap().clone();
 
         loop {
             if let Ok(btn) = rx.try_recv() {
@@ -83,22 +86,38 @@ fn main() {
                         downloadFile("gossip_event.toml".into(), data.into());
                     }
                     Button::WebProxy => {
-                        let mut response = web
-                            .node
-                            .webproxy
-                            .as_mut()
-                            .unwrap()
-                            .get(&proxy_url.value())
-                            .await
-                            .expect("Getting response");
-                        let proxy = proxy_div.clone();
-                        spawn_local(async move {
-                            let text = format!(
-                                "Proxy: {}<br>{}",
-                                response.proxy(),
-                                response.text().await.unwrap()
-                            );
-                            proxy.set_inner_html(&text);
+                        let proxy_div = proxy_div.clone();
+                        let proxy_url = proxy_url.value();
+                        let mut webproxy = webproxy.clone();
+                        let nodes = web.node.nodes_connected();
+                        spawn_local_nosend(async move {
+                            let fetching =
+                                format!("Fetching url from proxy: {}", proxy_url);
+                            proxy_div.set_inner_html(&fetching);
+                            match webproxy.get(&proxy_url).await {
+                                Ok(mut response) => {
+                                    let mut proxy_str = format!("{}", response.proxy());
+                                    if let Ok(nodes) = nodes {
+                                        if let Some(info) = nodes
+                                            .iter()
+                                            .find(|&node| node.get_id() == response.proxy())
+                                        {
+                                            proxy_str =
+                                                format!("{} ({})", info.name, info.get_id());
+                                        }
+                                    }
+                                    let text = format!(
+                                        "Proxy: {proxy_str}<br>{}",
+                                        response.text().await.unwrap()
+                                    );
+                                    proxy_div.set_inner_html(&text);
+                                }
+                                Err(e) => {
+                                    let text =
+                                        format!("Got error while fetching page from proxy: {e}");
+                                    proxy_div.set_inner_html(&text);
+                                }
+                            }
                         });
                     }
                 }
@@ -110,9 +129,11 @@ fn main() {
                 web.set_html_id("node_info", state.get_node_name());
                 web.set_html_id("version", state.get_version());
                 web.set_html_id("messages", state.get_msgs());
-                web.set_html_id("nodes_known", format!("{}", state.nodes_known));
                 web.set_html_id("nodes_online", format!("{}", state.nodes_online));
                 web.set_html_id("nodes_connected", format!("{}", state.nodes_connected));
+                web.set_html_id("msgs_system", format!("{}", state.msgs_system));
+                web.set_html_id("msgs_local", format!("{}", state.msgs_local));
+                web.set_html_id("mana", format!("{}", state.mana));
             }
             wait_ms(1000).await;
         }
@@ -148,7 +169,7 @@ impl FledgerWeb {
         FledgerWeb::set_data_storage();
 
         wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
-        log::info!("Starting new FledgerWeb");
+        log::info!("Starting new FledgerWeb on {URL}");
 
         // Get a link to the document
         let window = web_sys::window().expect("no global `window` exists");
@@ -207,7 +228,7 @@ impl FledgerWeb {
 
     async fn node_start() -> Result<Node> {
         let my_storage = DataStorageLocal::new("fledger");
-        let node_config = Node::get_config(my_storage.clone())?;
+        let mut node_config = Node::get_config(my_storage.clone())?;
         let config = ConnectionConfig::new(
             Some(URL.into()),
             None,
@@ -220,6 +241,7 @@ impl FledgerWeb {
             }),
         );
         let network = network_broker_start(node_config.clone(), config).await?;
+        node_config.info.modules = Modules::all() - Modules::ENABLE_WEBPROXY_REQUESTS;
         Ok(Node::start(my_storage, node_config, network)
             .await
             .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
@@ -252,7 +274,6 @@ pub struct FledgerState {
     pub msgs_system: u32,
     pub msgs_local: u32,
     pub mana: u32,
-    pub nodes_known: usize,
     pub nodes_online: usize,
     pub nodes_connected: usize,
 }
@@ -291,7 +312,6 @@ impl FledgerState {
         let nodes_info = node.nodes_info_all()?;
         Ok(Self {
             info,
-            nodes_known: nodes_info.len(),
             nodes_online: node.nodes_online()?.len(),
             nodes_connected: node.nodes_connected()?.len(),
             msgs: FledgerMessages::new(msgs, &nodes_info.clone().into_values().collect()),
