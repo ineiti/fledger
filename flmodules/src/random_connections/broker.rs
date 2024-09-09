@@ -2,7 +2,8 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 
 use flarch::{
     broker::{self, Broker, BrokerError, Subsystem, SubsystemHandler},
-    nodeids::U256, platform_async_trait,
+    nodeids::U256,
+    platform_async_trait,
 };
 
 use crate::{
@@ -89,11 +90,9 @@ impl Translate {
                     NetReply::RcvWSUpdateList(list) => {
                         return Some(
                             RandomIn::NodeList(
-                                list.iter()
-                                    .map(|n| n.get_id())
-                                    .filter(|id| id != &our_id)
-                                    .collect::<Vec<U256>>()
-                                    .into(),
+                                list.into_iter()
+                                    .filter(|ni| ni.get_id() != our_id)
+                                    .collect(),
                             )
                             .into(),
                         )

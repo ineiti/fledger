@@ -17,18 +17,24 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 
 use flarch::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler}, nodeids::{NodeID, U256}, platform_async_trait, tasks::Interval, web_rtc::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
+    nodeids::{NodeID, U256},
+    platform_async_trait,
+    tasks::Interval,
+    web_rtc::{
         messages::{ConnType, PeerInfo, SetupError, SignalingState},
         node_connection::{Direction, NCError, NCInput, NCOutput},
         websocket::{WSClientInput, WSClientMessage, WSClientOutput},
         WebRTCConnMessage,
-    }
+    },
 };
 
-use crate::network::signal::{
-    MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION,
+use crate::{
+    network::signal::{
+        MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION,
+    },
+    nodeconfig::{NodeConfig, NodeInfo},
 };
-use crate::nodeconfig::{NodeConfig, NodeInfo};
 
 /// This is a user-friendly version of [`NetworkBroker`].
 /// Upon starting, it waits for the connection to the signalling server.

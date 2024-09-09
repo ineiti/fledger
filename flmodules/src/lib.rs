@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 bitflags! {
-    #[derive(Clone, Copy, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Hash)]
     pub struct Modules: u32 {
         const ENABLE_STAT = 0x1;
         const ENABLE_RAND = 0x2;

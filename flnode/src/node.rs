@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use log::{error, info};
+use std::collections::HashMap;
 use thiserror::Error;
 
 use flarch::{
@@ -290,8 +290,6 @@ impl Node {
 
     /// Fetches the config
     pub fn get_config(storage: Box<dyn DataStorage>) -> Result<NodeConfig, NodeError> {
-        let client = "unknown";
-
         let config_str = match storage.get(STORAGE_CONFIG) {
             Ok(s) => s,
             Err(_) => {
@@ -300,7 +298,16 @@ impl Node {
             }
         };
         let mut config = NodeConfig::decode(&config_str)?;
-        config.info.client = client.to_string();
+        #[cfg(target_family = "wasm")]
+        let enable_webproxy_request = false;
+        // Only unix based clients can send http GET requests.
+        #[cfg(target_family = "unix")]
+        let enable_webproxy_request = true;
+
+        config
+            .info
+            .modules
+            .set(Modules::ENABLE_WEBPROXY_REQUESTS, enable_webproxy_request);
         Self::set_config(storage, &config.encode())?;
         Ok(config)
     }

@@ -1,5 +1,5 @@
 use core::str;
-use flarch::{data_storage::DataStorage, tasks::spawn_local, platform_async_trait};
+use flarch::{data_storage::DataStorage, platform_async_trait, tasks::spawn_local};
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
 #[cfg(not(target_family = "wasm"))]
@@ -130,7 +130,9 @@ impl Translate {
     fn link_rnd_proxy(msg: RandomMessage) -> Option<WebProxyMessage> {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
-                RandomOut::ListUpdate(list) => Some(WebProxyIn::UpdateNodeList(list.into()).into()),
+                RandomOut::NodeInfoConnected(list) => {
+                    Some(WebProxyIn::NodeInfoConnected(list).into())
+                }
                 RandomOut::NodeMessageFromNetwork((id, msg)) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)
@@ -185,8 +187,9 @@ impl SubsystemHandler<WebProxyMessage> for Translate {
 
 #[cfg(test)]
 mod tests {
-    use flarch::nodeids::NodeIDs;
     use flarch::{data_storage::DataStorageTemp, start_logging_filter_level, tasks::wait_ms};
+
+    use crate::nodeconfig::NodeConfig;
 
     use super::*;
 
@@ -194,22 +197,24 @@ mod tests {
     async fn test_get() -> Result<(), WebProxyError> {
         start_logging_filter_level(vec![], log::LevelFilter::Debug);
         let cl_ds = Box::new(DataStorageTemp::new());
-        let cl_id = NodeID::rnd();
+        let cl_in = NodeConfig::new().info;
+        let cl_id = cl_in.get_id();
         let mut cl_rnd = Broker::new();
 
         let wp_ds = Box::new(DataStorageTemp::new());
-        let wp_id = NodeID::rnd();
+        let wp_in = NodeConfig::new().info;
+        let wp_id = wp_in.get_id();
         let mut wp_rnd = Broker::new();
 
-        let list: NodeIDs = vec![cl_id, wp_id].into();
         let mut cl =
             WebProxy::start(cl_ds, cl_id, cl_rnd.clone(), WebProxyConfig::default()).await?;
         let (mut cl_tap, _) = cl_rnd.get_tap().await?;
         let _wp = WebProxy::start(wp_ds, wp_id, wp_rnd.clone(), WebProxyConfig::default()).await?;
         let (mut wp_tap, _) = wp_rnd.get_tap().await?;
 
-        cl_rnd.emit_msg(RandomMessage::Output(RandomOut::ListUpdate(list.clone())))?;
-        wp_rnd.emit_msg(RandomMessage::Output(RandomOut::ListUpdate(list)))?;
+        let list = vec![cl_in, wp_in];
+        cl_rnd.emit_msg(RandomMessage::Output(RandomOut::NodeInfoConnected(list.clone())))?;
+        wp_rnd.emit_msg(RandomMessage::Output(RandomOut::NodeInfoConnected(list)))?;
 
         let (tx, mut rx) = channel(1);
         spawn_local(async move {

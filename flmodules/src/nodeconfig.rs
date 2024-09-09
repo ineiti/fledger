@@ -35,7 +35,7 @@ pub enum ConfigError {
 
 /// NodeInfo is the public information of the node.
 #[serde_as]
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Hash)]
 pub struct NodeInfo {
     /// Name of the node, up to 256 bytes
     pub name: String,
@@ -69,7 +69,7 @@ impl NodeInfo {
             name: names::Generator::default().next().unwrap(),
             client: "libc".to_string(),
             pubkey: pubkey.as_ref().to_vec(),
-            modules: Modules::empty(),
+            modules: Modules::all(),
         }
     }
 
@@ -168,6 +168,8 @@ impl PartialEq for NodeInfo {
         self.get_id() == other.get_id()
     }
 }
+
+impl Eq for NodeInfo {}
 
 /// NodeConfig is stored on the node itself and contains the private key.
 #[serde_as]

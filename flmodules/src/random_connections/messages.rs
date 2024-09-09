@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use flarch::nodeids::{NodeID, NodeIDs, U256};
 
+use crate::nodeconfig::NodeInfo;
+
 use super::storage::RandomStorage;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -25,7 +27,7 @@ pub struct ModuleMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RandomIn {
-    NodeList(NodeIDs),
+    NodeList(Vec<NodeInfo>),
     NodeFailure(NodeID),
     NodeConnected(NodeID),
     NodeDisconnected(NodeID),
@@ -39,6 +41,7 @@ pub enum RandomOut {
     ConnectNode(NodeID),
     DisconnectNode(NodeID),
     ListUpdate(NodeIDs),
+    NodeInfoConnected(Vec<NodeInfo>),
     NodeMessageToNetwork((NodeID, NodeMessage)),
     NodeMessageFromNetwork((NodeID, ModuleMessage)),
     Storage(RandomStorage),
@@ -67,7 +70,7 @@ impl RandomConnections {
     pub fn process_message(&mut self, msg: RandomIn) -> Vec<RandomOut> {
         let out = match msg {
             RandomIn::NodeList(nodes) => {
-                self.storage.new_list(nodes);
+                self.storage.new_infos(nodes);
                 self.new_connection()
             }
             RandomIn::NodeConnected(node) => {
@@ -193,6 +196,7 @@ impl RandomConnections {
     fn update(&self) -> Vec<RandomOut> {
         vec![
             RandomOut::ListUpdate(self.storage.connected.get_nodes()),
+            RandomOut::NodeInfoConnected(self.storage.get_connected_info()),
             RandomOut::Storage(self.storage.clone()),
         ]
     }
@@ -241,7 +245,7 @@ impl From<RandomOut> for RandomMessage {
 mod tests {
     use flarch::start_logging;
 
-    use crate::random_connections::nodes::Nodes;
+    use crate::{nodeconfig::NodeConfig, random_connections::nodes::Nodes};
 
     use super::*;
     use core::fmt::Error;
@@ -260,7 +264,7 @@ mod tests {
     fn test_update_list() -> Result<(), Error> {
         start_logging();
 
-        let nodes = NodeIDs::new(1);
+        let nodes = vec![NodeConfig::new().info];
         let mut rc = RandomConnections::new(Config::default());
         let reply = rc.process_message(RandomIn::NodeList(nodes));
         log::debug!("{reply:?}");

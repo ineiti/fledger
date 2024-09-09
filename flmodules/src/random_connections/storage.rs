@@ -1,16 +1,20 @@
-use std::cmp::{min, max};
+use std::cmp::{max, min};
 
+use itertools::Itertools;
 use rand::prelude::SliceRandom;
 use serde::{Deserialize, Serialize};
 
+use crate::nodeconfig::NodeInfo;
+
 use super::nodes::Nodes;
-use flarch::nodeids::NodeIDs;
+use flarch::nodeids::{NodeIDs, U256};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct RandomStorage {
     pub connected: Nodes,
     pub connecting: Nodes,
     pub known: NodeIDs,
+    pub infos: Vec<NodeInfo>,
 }
 
 impl Default for RandomStorage {
@@ -19,6 +23,7 @@ impl Default for RandomStorage {
             connected: Nodes::new(),
             connecting: Nodes::new(),
             known: NodeIDs::empty(),
+            infos: vec![],
         }
     }
 }
@@ -30,6 +35,30 @@ impl RandomStorage {
 
     pub fn new_list(&mut self, list: NodeIDs) {
         self.known.merge(list);
+    }
+
+    pub fn new_infos(&mut self, list: Vec<NodeInfo>) {
+        self.new_list(
+            list.iter()
+                .map(|ni| ni.get_id())
+                .collect::<Vec<U256>>()
+                .into(),
+        );
+        self.infos = self
+            .infos
+            .iter()
+            .chain(list.iter())
+            .unique()
+            .cloned()
+            .collect();
+    }
+
+    pub fn get_connected_info(&self) -> Vec<NodeInfo> {
+        self.infos
+            .iter()
+            .filter(|ni| self.connected.contains(&ni.get_id()))
+            .cloned()
+            .collect()
     }
 
     pub fn connect(&mut self, nodes: NodeIDs) {
