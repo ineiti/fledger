@@ -170,7 +170,7 @@ impl NetworkBroker {
         let msg_node_str = match msg {
             WSClientOutput::Message(msg) => msg,
             WSClientOutput::Error(e) => {
-                log::error!("Websocket client error: {e}");
+                log::warn!("Websocket client error: {e}");
                 return vec![];
             }
             _ => return vec![],
