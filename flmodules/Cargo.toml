@@ -1,6 +1,6 @@
 [package]
 name = "flmodules"
-version = "0.7.1"
+version = "0.8.0"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "Modules used in fledger"
@@ -14,7 +14,7 @@ keywords = ["test", "utils", "fledger"]
 testing = []
 
 [dependencies]
-flarch = { path = "../flarch", version = "0.7" }
+flarch = { path = "../flarch", version = "0.8" }
 
 bimap = "0.6"
 getrandom = { version = "0.2" }

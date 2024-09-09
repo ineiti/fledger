@@ -798,7 +798,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "flarch"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -827,7 +827,7 @@ dependencies = [
 
 [[package]]
 name = "flarch_macro"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -836,7 +836,7 @@ dependencies = [
 
 [[package]]
 name = "flmodules"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -1311,7 +1311,7 @@ checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
 
 [[package]]
 name = "libc"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "clap",
  "flarch",
@@ -2216,7 +2216,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "flarch",

@@ -6,8 +6,8 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-flarch = {path = "../../flarch", version = "0.7"}
-flmodules = {path = "../../flmodules", version = "0.7"}
+flarch = {path = "../../flarch", version = "0.8"}
+flmodules = {path = "../../flmodules", version = "0.8"}
 
 clap = {version = "4", features = ["derive"]}
 log = "0.4"
