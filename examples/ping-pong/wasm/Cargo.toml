@@ -1,13 +1,13 @@
 [package]
 name = "ping-pong-web"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Anthony Dodd <dodd.anthonyjosiah@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-shared = {path = "../shared", version = "0.7"}
-flmodules = {path = "../../../flmodules", version = "0.7"}
-flarch = {path = "../../../flarch", version = "0.7"}
+shared = {path = "../shared", version = "0.8"}
+flmodules = {path = "../../../flmodules", version = "0.8"}
+flarch = {path = "../../../flarch", version = "0.8"}
 
 console_error_panic_hook = "0.1.6"
 log = "0.4"

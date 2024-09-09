@@ -8,16 +8,26 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 ## [Unreleased]
 
+## [0.8.0] - 2024-09-09
+
 ### Changed
 - Updated versions of most dependencies
 - use tokio::sync::watch to pass configuration from `Translate` to `Broker`
+- re-arranged modules:
+  - removed flnet
+  - put all arch-dependant code to flarch
+  - replaced feature-flags "wasm", "libc", "nosend" with #[cfg(target_family="(wasm|unix)")]
+- updated login screen in flbrowser
+
+### Removed
+- flnet went into flarch and flmodules
 
 ### Added
-
 - Create a template to fill out
 - License files
 - Devbox
 - Create a proxy module that links to the html display
+- Added a webproxy module to send GET requests from another node
 
 ## [0.7.0] - 2022-08-01
 

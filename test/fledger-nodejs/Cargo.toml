@@ -1,6 +1,6 @@
 [package]
 name = "fledger-node"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "The fledger server as a CLI using node, to test wasm"
@@ -18,9 +18,9 @@ crate-type = ["cdylib", "rlib"]
 local = []
 
 [dependencies]
-flarch = {path="../../flarch", features = ["node"], version = "0.7"}
-flmodules = {path="../../flmodules", version = "0.7"}
-flnode = {path = "../../flnode", version = "0.7"}
+flarch = {path="../../flarch", features = ["node"], version = "0.8"}
+flmodules = {path="../../flmodules", version = "0.8"}
+flnode = {path = "../../flnode", version = "0.8"}
 
 thiserror = "1"
 env_logger = "0.11"

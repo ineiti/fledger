@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "flarch_macro"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "proc-macro2",
  "quote",

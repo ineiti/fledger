@@ -1,14 +1,14 @@
 [package]
 edition = "2021"
 name = "libc"
-version = "0.7.0"
+version = "0.8.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-flarch = {path = "../../../flarch", version = "0.7"}
-flmodules = {path = "../../../flmodules", version = "0.7"}
-shared = {path = "../shared", version = "0.7"}
+flarch = {path = "../../../flarch", version = "0.8"}
+flmodules = {path = "../../../flmodules", version = "0.8"}
+shared = {path = "../shared", version = "0.8"}
 
 clap = {version = "4", features = ["derive"]}
 log = "0.4"

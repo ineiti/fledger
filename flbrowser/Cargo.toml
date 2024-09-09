@@ -1,6 +1,6 @@
 [package]
 name = "flbrowser"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Linus Gasser <ineiti@gasser.blue>"]
 edition = "2021"
 description = "Web interface for fledger"
@@ -15,9 +15,9 @@ opt-level = 's'
 local = []
 
 [dependencies]
-flarch = {path="../flarch", version = "0.7"}
-flmodules = {path="../flmodules", version = "0.7"}
-flnode = {path = "../flnode", version = "0.7"}
+flarch = {path="../flarch", version = "0.8"}
+flmodules = {path="../flmodules", version = "0.8"}
+flnode = {path = "../flnode", version = "0.8"}
 
 chrono = "0.4"
 anyhow = "1"

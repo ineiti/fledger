@@ -8,13 +8,13 @@ license = "MIT OR Apache-2.0"
 name = "flarch"
 readme = "README.md"
 repository = "https://github.com/ineiti/fledger"
-version = "0.7.0"
+version = "0.8.0"
 
 [features]
 node = []
 
 [dependencies]
-flarch_macro = { version = "0.7", path = "../flarch_macro" }
+flarch_macro = { version = "0.8", path = "../flarch_macro" }
 
 chrono = "0.4"
 env_logger = "0.11"
