@@ -3,8 +3,8 @@ use std::sync::{
     Arc,
 };
 
-use async_trait::async_trait;
 use crate::broker::{Broker, Subsystem, SubsystemHandler};
+use async_trait::async_trait;
 use futures::lock::Mutex;
 use webrtc::{
     api::{
@@ -27,10 +27,12 @@ use webrtc::{
 };
 
 use crate::web_rtc::{
-    connection::{ConnectionConfig, HostLogin}, messages::{
+    connection::{ConnectionConfig, HostLogin},
+    messages::{
         ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError, SignalingState,
         WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner,
-    }, node_connection::Direction
+    },
+    node_connection::Direction,
 };
 
 fn get_ice_server(host: HostLogin) -> RTCIceServer {
@@ -401,6 +403,11 @@ impl WebRTCConnectionSetupLibc {
                     .map(|e| log::warn!("Text queued but not processed: {:?}", e));
             })
         }));
+        if let Some(dc) = rtc_data.lock().await.take() {
+            if let Err(e) = dc.close().await {
+                log::warn!("While closing datachannel: {e:?}");
+            }
+        }
         rtc_data.lock().await.replace(data_channel);
     }
 
@@ -432,6 +439,10 @@ impl WebRTCConnectionSetupLibc {
     async fn reset(&mut self) -> Result<(), SetupError> {
         if let Some(mut rd) = self.rtc_data.try_lock() {
             *rd = None;
+        }
+
+        if let Err(e) = self.connection.close().await {
+            log::warn!("While closing old connection: {e:?}");
         }
 
         self.connection = Self::make_connection(self.connection_cfg.clone()).await?;

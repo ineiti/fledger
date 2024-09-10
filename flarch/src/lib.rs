@@ -28,3 +28,4 @@ pub fn start_logging_filter_level(filters: Vec<&str>, level: log::LevelFilter) {
 }
 
 pub use flarch_macro::platform_async_trait;
+pub use rand::random;

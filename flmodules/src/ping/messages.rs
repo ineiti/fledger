@@ -20,6 +20,7 @@ pub enum PingIn {
     Tick,
     Message((NodeID, MessageNode)),
     NodeList(NodeIDs),
+    DisconnectNode(NodeID),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -53,6 +54,10 @@ impl Ping {
             PingIn::Tick => self.tick(),
             PingIn::Message((id, msg_node)) => self.message(id, msg_node),
             PingIn::NodeList(ids) => self.new_nodes(ids),
+            PingIn::DisconnectNode(id) => {
+                self.storage.remove_node(&id);
+                vec![]
+            }
         }
     }
 
