@@ -12,14 +12,16 @@ use web_sys::{
     RtcSessionDescriptionInit, RtcSignalingState,
 };
 
+use crate::broker::{Broker, Subsystem, SubsystemHandler};
 use crate::web_rtc::{
-    connection::{ConnectionConfig, HostLogin}, messages::{
+    connection::{ConnectionConfig, HostLogin},
+    messages::{
         ConnType, ConnectionStateMap, DataChannelState, IceConnectionState, IceGatheringState,
         PeerMessage, SetupError, SignalingState, WebRTCInput, WebRTCMessage, WebRTCOutput,
         WebRTCSpawner,
-    }, node_connection::Direction
+    },
+    node_connection::Direction,
 };
-use crate::broker::{Broker, Subsystem, SubsystemHandler};
 
 pub struct WebRTCConnectionSetup {
     pub rp_conn: RtcPeerConnection,
@@ -196,17 +198,16 @@ impl WebRTCConnectionSetup {
         let srd_promise = self.rp_conn.set_remote_description(&offer_obj);
         JsFuture::from(srd_promise)
             .await
-            .map_err(|e| SetupError::SetupFail(e.as_string().unwrap()))?;
+            .map_err(|e| SetupError::SetupFail(format!("{e:?}")))?;
 
         let answer = match JsFuture::from(self.rp_conn.create_answer()).await {
             Ok(f) => f,
             Err(e) => {
-                error!("Error answer: {:?}", e);
-                return Err(SetupError::SetupFail(e.as_string().unwrap()));
+                return Err(SetupError::SetupFail(format!("{e:?}")));
             }
         };
         let answer_sdp = Reflect::get(&answer, &JsValue::from_str("sdp"))
-            .map_err(|e| SetupError::SetupFail(e.as_string().unwrap()))?
+            .map_err(|e| SetupError::SetupFail(format!("{e:?}")))?
             .as_string()
             .unwrap();
 
@@ -215,7 +216,7 @@ impl WebRTCConnectionSetup {
         let sld_promise = self.rp_conn.set_local_description(&answer_obj);
         JsFuture::from(sld_promise)
             .await
-            .map_err(|e| SetupError::SetupFail(e.as_string().unwrap()))?;
+            .map_err(|e| SetupError::SetupFail(format!("{e:?}")))?;
         Ok(answer_sdp)
     }
 
@@ -254,7 +255,7 @@ impl WebRTCConnectionSetup {
                 )
                 .await
                 {
-                    warn!("Couldn't add ice candidate: {:?}", err);
+                    log::warn!("Couldn't add ice candidate: {:?}", err);
                 }
                 Ok(())
             }
@@ -477,6 +478,10 @@ impl WebRTCConnection {
                 return Ok(Some(WebRTCMessage::Output(WebRTCOutput::State(
                     self.setup.get_state().await?,
                 ))));
+            }
+            WebRTCInput::Disconnect => {
+                log::info!("Closing connection");
+                self.setup.close();
             }
             WebRTCInput::Reset => self.setup.reset()?,
         }

@@ -427,6 +427,17 @@ impl WebRTCConnectionSetupLibc {
                     self.get_state().await?,
                 ))));
             }
+            WebRTCInput::Disconnect => {
+                log::info!("Disconnecting node");
+                if let Some(dc) = self.rtc_data.lock().await.take() {
+                    if let Err(e) = dc.close().await {
+                        log::warn!("While closing datachannel: {e:?}");
+                    }
+                }
+                if let Err(e) = self.connection.close().await {
+                    log::warn!("While closing old connection: {e:?}");
+                }
+            }
             WebRTCInput::Reset => {
                 if self.direction.is_some() {
                     self.reset().await?;

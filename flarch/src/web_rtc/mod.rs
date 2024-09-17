@@ -5,13 +5,13 @@
 //! a connection, it doesn't describe how the nodes need to communicate to
 //! set up the connection.
 //! The messages for setting up the connection are described in the [`crate::signal::SignalServer`].
-//! 
+//!
 //! # Bidirectional connections
-//! 
+//!
 //! Every WebRTC connection has one or two connections inside:
 //! - _outgoing_ is the connection initiated by this node
 //! - _incoming_ is the connection initiated by the other node
-//! 
+//!
 //! This is necessary, as it is always possible that two nodes want to start
 //! connecting to each other concurrently.
 
@@ -19,29 +19,32 @@ use std::collections::HashMap;
 
 use flarch_macro::platform_async_trait;
 
-use crate::{broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate}, nodeids::NodeID};
+use crate::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate},
+    nodeids::NodeID,
+};
 
 use self::{
     messages::WebRTCSpawner,
     node_connection::{NCError, NCInput, NCMessage, NCOutput, NodeConnection},
 };
 
-pub mod messages;
 pub mod connection;
+pub mod messages;
 pub mod node_connection;
 pub mod websocket;
 
-#[cfg(target_family="windows")]
+#[cfg(target_family = "windows")]
 compile_error!("flarch is not available for windows");
 
-#[cfg(target_family="wasm")]
+#[cfg(target_family = "wasm")]
 mod wasm;
-#[cfg(target_family="wasm")]
+#[cfg(target_family = "wasm")]
 pub use wasm::*;
 
-#[cfg(target_family="unix")]
+#[cfg(target_family = "unix")]
 mod libc;
-#[cfg(target_family="unix")]
+#[cfg(target_family = "unix")]
 pub use libc::*;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,7 +68,7 @@ pub struct WebRTCConn {
 }
 
 impl WebRTCConn {
-    /// Creates a new [`Broker<WebRTCConnMessage>`] that will accept incoming connections and set up 
+    /// Creates a new [`Broker<WebRTCConnMessage>`] that will accept incoming connections and set up
     /// new outgoing connections.
     pub async fn new(web_rtc: WebRTCSpawner) -> Result<Broker<WebRTCConnMessage>, BrokerError> {
         let mut br = Broker::new();
@@ -88,6 +91,20 @@ impl WebRTCConn {
         }
 
         Ok(())
+    }
+
+    fn try_send(&mut self, dst: NodeID, msg: NCInput) {
+        if let Some(conn) = self.connections.get_mut(&dst) {
+            if let NCInput::Setup(_, m) = msg.clone() {
+                log::warn!("Sending setup {m:?}");
+            }
+
+            conn.emit_msg(NCMessage::Input(msg.clone()))
+                .err()
+                .map(|e| log::error!("When sending message {msg:?} to webrtc: {e:?}"));
+        } else {
+            log::warn!("Dropping message {:?} to unconnected node {}", msg, dst);
+        }
     }
 
     fn from_nc(id: NodeID) -> Translate<NCMessage, WebRTCConnMessage> {

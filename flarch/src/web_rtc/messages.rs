@@ -76,6 +76,8 @@ pub enum WebRTCInput {
     UpdateState,
     /// Try to reconnect, or throw an error if incoming connection
     Reset,
+    /// Disconnect this node
+    Disconnect,
 }
 
 #[cfg(target_family="unix")]
