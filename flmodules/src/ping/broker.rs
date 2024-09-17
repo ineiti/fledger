@@ -90,11 +90,11 @@ impl Translate {
             match msg_out {
                 RandomOut::DisconnectNode(id) => Some(PingIn::DisconnectNode(id).into()),
                 RandomOut::ListUpdate(list) => Some(PingIn::NodeList(list.into()).into()),
-                RandomOut::NodeMessageFromNetwork((id, msg)) => {
+                RandomOut::NodeMessageFromNetwork(id, msg) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)
                             .ok()
-                            .map(|msg_node| PingIn::Message((id, msg_node)).into())
+                            .map(|msg_node| PingIn::Message(id, msg_node).into())
                     } else {
                         None
                     }
@@ -109,14 +109,14 @@ impl Translate {
     fn link_ping_rnd(msg: PingMessage) -> Option<RandomMessage> {
         if let PingMessage::Output(msg_out) = msg {
             match msg_out {
-                PingOut::Message((id, msg_node)) => Some(
-                    RandomIn::NodeMessageToNetwork((
+                PingOut::Message(id, msg_node) => Some(
+                    RandomIn::NodeMessageToNetwork(
                         id,
                         ModuleMessage {
                             module: MODULE_NAME.into(),
                             msg: serde_yaml::to_string(&msg_node).unwrap(),
                         },
-                    ))
+                    )
                     .into(),
                 ),
                 PingOut::Failed(id) => Some(RandomIn::NodeFailure(id).into()),

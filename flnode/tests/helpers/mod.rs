@@ -138,16 +138,16 @@ impl NetworkSimul {
                 from_id,
                 NetReply::RcvNodeMessage(id.clone(), msg_str).into(),
             )],
-            NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((
+            NetworkMessage::WebRTC(WebRTCConnMessage::InputNC(
                 id_dst,
                 NCInput::Text(msg_node),
-            ))) => {
+            )) => {
                 vec![(
                     id_dst.clone(),
-                    NetworkMessage::WebRTC(WebRTCConnMessage::InputNC((
+                    NetworkMessage::WebRTC(WebRTCConnMessage::InputNC(
                         *id,
                         NCInput::Text(msg_node.clone()).into(),
-                    )))
+                    ))
                     .into(),
                 )]
             }

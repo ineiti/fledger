@@ -31,8 +31,8 @@ pub enum RandomIn {
     NodeFailure(NodeID),
     NodeConnected(NodeID),
     NodeDisconnected(NodeID),
-    NodeMessageFromNetwork((NodeID, NodeMessage)),
-    NodeMessageToNetwork((NodeID, ModuleMessage)),
+    NodeMessageFromNetwork(NodeID, NodeMessage),
+    NodeMessageToNetwork(NodeID, ModuleMessage),
     Tick,
 }
 
@@ -42,8 +42,8 @@ pub enum RandomOut {
     DisconnectNode(NodeID),
     ListUpdate(NodeIDs),
     NodeInfoConnected(Vec<NodeInfo>),
-    NodeMessageToNetwork((NodeID, NodeMessage)),
-    NodeMessageFromNetwork((NodeID, ModuleMessage)),
+    NodeMessageToNetwork(NodeID, NodeMessage),
+    NodeMessageFromNetwork(NodeID, ModuleMessage),
     Storage(RandomStorage),
 }
 
@@ -100,13 +100,13 @@ impl RandomConnections {
                     self.update(),
                 ])
             }
-            RandomIn::NodeMessageFromNetwork((id, node_msg)) => self.network_msg(id, node_msg),
-            RandomIn::NodeMessageToNetwork((dst, msg)) => {
+            RandomIn::NodeMessageFromNetwork(id, node_msg) => self.network_msg(id, node_msg),
+            RandomIn::NodeMessageToNetwork(dst, msg) => {
                 if self.storage.connected.contains(&dst) {
-                    vec![RandomOut::NodeMessageToNetwork((
+                    vec![RandomOut::NodeMessageToNetwork(
                         dst,
                         NodeMessage::Module(msg),
-                    ))]
+                    )]
                 } else {
                     log::warn!(
                         "{self:p} Dropping message to unconnected node {dst} - makeing sure we're disconnected"
@@ -124,7 +124,7 @@ impl RandomConnections {
     /// Processes one message from the network.
     pub fn network_msg(&mut self, id: U256, msg: NodeMessage) -> Vec<RandomOut> {
         match msg {
-            NodeMessage::Module(msg_mod) => vec![RandomOut::NodeMessageFromNetwork((id, msg_mod))],
+            NodeMessage::Module(msg_mod) => vec![RandomOut::NodeMessageFromNetwork(id, msg_mod)],
             NodeMessage::DropConnection => {
                 self.storage.disconnect((&vec![id]).into());
                 concat([vec![RandomOut::DisconnectNode(id)], self.new_connection()])
@@ -157,7 +157,7 @@ impl RandomConnections {
             .into_iter()
             .flat_map(|n| {
                 vec![
-                    RandomOut::NodeMessageToNetwork((n, NodeMessage::DropConnection)),
+                    RandomOut::NodeMessageToNetwork(n, NodeMessage::DropConnection),
                     RandomOut::DisconnectNode(n),
                 ]
             })

@@ -134,7 +134,7 @@ impl Translate {
                 RandomOut::NodeInfoConnected(list) => {
                     Some(WebProxyIn::NodeInfoConnected(list).into())
                 }
-                RandomOut::NodeMessageFromNetwork((id, msg)) => {
+                RandomOut::NodeMessageFromNetwork(id, msg) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)
                             .ok()
@@ -153,13 +153,13 @@ impl Translate {
     fn link_proxy_rnd(msg: WebProxyMessage) -> Option<RandomMessage> {
         if let WebProxyMessage::Output(WebProxyOut::Node(id, msg_node)) = msg {
             Some(
-                RandomIn::NodeMessageToNetwork((
+                RandomIn::NodeMessageToNetwork(
                     id,
                     ModuleMessage {
                         module: MODULE_NAME.into(),
                         msg: serde_yaml::to_string(&msg_node).unwrap(),
                     },
-                ))
+                )
                 .into(),
             )
         } else {
@@ -232,25 +232,25 @@ mod tests {
                 return Ok(());
             }
 
-            if let Ok(RandomMessage::Input(RandomIn::NodeMessageToNetwork((dst, msg)))) =
+            if let Ok(RandomMessage::Input(RandomIn::NodeMessageToNetwork(dst, msg))) =
                 cl_tap.try_recv()
             {
                 log::debug!("Sending to WP: {msg:?}");
                 wp_rnd
-                    .emit_msg(RandomMessage::Output(RandomOut::NodeMessageFromNetwork((
+                    .emit_msg(RandomMessage::Output(RandomOut::NodeMessageFromNetwork(
                         dst, msg,
-                    ))))
+                    )))
                     .expect("sending to wp");
             }
 
-            if let Ok(RandomMessage::Input(RandomIn::NodeMessageToNetwork((dst, msg)))) =
+            if let Ok(RandomMessage::Input(RandomIn::NodeMessageToNetwork(dst, msg))) =
                 wp_tap.try_recv()
             {
                 log::debug!("Sending to CL: {msg:?}");
                 cl_rnd
-                    .emit_msg(RandomMessage::Output(RandomOut::NodeMessageFromNetwork((
+                    .emit_msg(RandomMessage::Output(RandomOut::NodeMessageFromNetwork(
                         dst, msg,
-                    ))))
+                    )))
                     .expect("sending to wp");
             }
 

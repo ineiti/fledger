@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use js_sys::Reflect;
-use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wasm_bindgen::{prelude::*, JsCast};

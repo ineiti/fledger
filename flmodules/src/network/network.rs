@@ -218,7 +218,7 @@ impl NetworkBroker {
                         vec![]
                     },
                     vec![NetworkMessage::from_nc(
-                        NCInput::Setup((pi.get_direction(&own_id), pi.message)),
+                        NCInput::Setup(pi.get_direction(&own_id), pi.message),
                         remote_node,
                     )],
                 ])
@@ -271,7 +271,7 @@ impl NetworkBroker {
             NCOutput::Connected(_) => vec![NetReply::Connected(id).into()],
             NCOutput::Disconnected(_) => vec![NetReply::Disconnected(id).into()],
             NCOutput::Text(msg) => vec![NetReply::RcvNodeMessage(id, msg).into()],
-            NCOutput::State((dir, state)) => {
+            NCOutput::State(dir, state) => {
                 vec![NetReply::ConnectionState(NetworkConnectionState {
                     id,
                     dir,
@@ -286,7 +286,8 @@ impl NetworkBroker {
                 })
                 .into()]
             }
-            NCOutput::Setup((dir, pm)) => {
+            NCOutput::Setup(dir, pm) => {
+                log::warn!("msg_node - Setup for {dir:?} - {pm:?}");
                 let mut id_init = self.node_config.info.get_id();
                 let mut id_follow = id;
                 if dir == Direction::Incoming {
@@ -342,8 +343,8 @@ impl NetworkBroker {
     fn to_web_rtc(msg: NetworkMessage) -> Option<WebRTCConnMessage> {
         if let NetworkMessage::WebRTC(msg_webrtc) = msg {
             match msg_webrtc {
-                WebRTCConnMessage::InputNC(_) | WebRTCConnMessage::Connect(_) => Some(msg_webrtc),
-                WebRTCConnMessage::OutputNC(_) => None,
+                WebRTCConnMessage::OutputNC(_, _) => None,
+                _ => Some(msg_webrtc),
             }
         } else {
             None
@@ -351,7 +352,7 @@ impl NetworkBroker {
     }
 
     fn from_web_rtc(msg: WebRTCConnMessage) -> Option<NetworkMessage> {
-        matches!(msg, WebRTCConnMessage::OutputNC(_)).then(|| NetworkMessage::WebRTC(msg))
+        matches!(msg, WebRTCConnMessage::OutputNC(_, _)).then(|| NetworkMessage::WebRTC(msg))
     }
 }
 
@@ -369,7 +370,7 @@ impl SubsystemHandler<NetworkMessage> for NetworkBroker {
                 NetworkMessage::WebSocket(WSClientMessage::Output(ws)) => {
                     out.extend(self.msg_ws(ws).await)
                 }
-                NetworkMessage::WebRTC(WebRTCConnMessage::OutputNC((id, msg))) => {
+                NetworkMessage::WebRTC(WebRTCConnMessage::OutputNC(id, msg)) => {
                     out.extend(self.msg_node(id, msg).await)
                 }
                 _ => {}
@@ -409,7 +410,7 @@ impl fmt::Display for NetworkMessage {
 impl NetworkMessage {
     /// Convert a [`NCInput`] to Self
     pub fn from_nc(input: NCInput, dst: NodeID) -> Self {
-        Self::WebRTC(WebRTCConnMessage::InputNC((dst, input)))
+        Self::WebRTC(WebRTCConnMessage::InputNC(dst, input))
     }
 }
 

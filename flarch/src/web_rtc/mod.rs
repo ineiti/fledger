@@ -48,11 +48,13 @@ pub use libc::*;
 /// All messages for the [`WebRTCConn`] broker.
 pub enum WebRTCConnMessage {
     /// Messages going to the WebRTC interface
-    InputNC((NodeID, NCInput)),
+    InputNC(NodeID, NCInput),
     /// Messages coming from the WebRTC interface
-    OutputNC((NodeID, NCOutput)),
+    OutputNC(NodeID, NCOutput),
     /// Connection request
     Connect(NodeID),
+    /// Disconnect this node
+    Disconnect(NodeID),
 }
 
 /// The actual implementation of the WebRTC connection setup.
@@ -91,7 +93,7 @@ impl WebRTCConn {
     fn from_nc(id: NodeID) -> Translate<NCMessage, WebRTCConnMessage> {
         Box::new(move |msg| {
             if let NCMessage::Output(ncmsg) = msg {
-                return Some(WebRTCConnMessage::OutputNC((id, ncmsg)));
+                return Some(WebRTCConnMessage::OutputNC(id, ncmsg));
             }
             None
         })
@@ -103,22 +105,25 @@ impl SubsystemHandler<WebRTCConnMessage> for WebRTCConn {
     async fn messages(&mut self, msgs: Vec<WebRTCConnMessage>) -> Vec<WebRTCConnMessage> {
         for msg in msgs {
             match msg {
-                WebRTCConnMessage::InputNC((dst, msg_in)) => {
-                    if let Some(conn) = self.connections.get_mut(&dst) {
-                        conn.emit_msg(NCMessage::Input(msg_in.clone()))
-                            .err()
-                            .map(|e| {
-                                log::error!("When sending message {msg_in:?} to webrtc: {e:?}")
-                            });
-                    } else {
-                        log::warn!("Dropping message {:?} to unconnected node {}", msg_in, dst);
-                    }
+                WebRTCConnMessage::InputNC(dst, msg_in) => {
+                    self.try_send(dst, msg_in);
+                }
+                WebRTCConnMessage::Disconnect(dst) => {
+                    self.try_send(dst, NCInput::Disconnect);
                 }
                 WebRTCConnMessage::Connect(dst) => {
                     self.ensure_connection(&dst)
                         .await
                         .err()
                         .map(|e| log::error!("When starting webrtc-connection {e:?}"));
+                    log::warn!("Sending PeerMessage::Init");
+                    self.try_send(
+                        dst,
+                        NCInput::Setup(
+                            node_connection::Direction::Outgoing,
+                            messages::PeerMessage::Init,
+                        ),
+                    );
                 }
                 _ => {}
             };

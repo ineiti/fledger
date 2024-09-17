@@ -84,7 +84,7 @@ impl Translate {
                 match msg_net {
                     NetReply::RcvNodeMessage(id, msg_str) => {
                         if let Ok(msg_rnd) = serde_yaml::from_str::<NodeMessage>(&msg_str) {
-                            return Some(RandomIn::NodeMessageFromNetwork((id, msg_rnd)).into());
+                            return Some(RandomIn::NodeMessageFromNetwork(id, msg_rnd).into());
                         }
                     }
                     NetReply::RcvWSUpdateList(list) => {
@@ -113,7 +113,7 @@ impl Translate {
             match msg_out {
                 RandomOut::ConnectNode(id) => return Some(NetCall::Connect(id).into()),
                 RandomOut::DisconnectNode(id) => return Some(NetCall::Disconnect(id).into()),
-                RandomOut::NodeMessageToNetwork((id, msg)) => {
+                RandomOut::NodeMessageToNetwork(id, msg) => {
                     let msg_str = serde_yaml::to_string(&msg).unwrap();
                     return Some(NetCall::SendNodeMessage(id, msg_str).into());
                 }
