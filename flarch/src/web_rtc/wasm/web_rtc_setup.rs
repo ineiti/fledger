@@ -83,7 +83,7 @@ impl WebRTCConnectionSetup {
     }
 
     pub fn reset(&mut self) -> Result<(), SetupError> {
-        if self.direction.is_none(){
+        if self.direction.is_none() {
             return Ok(());
         }
         self.direction = None;
@@ -331,20 +331,17 @@ impl WebRTCConnectionSetup {
             onmessage_callback.forget();
 
             let broker_cl = broker.clone();
-            let onerror_callback = Closure::wrap(Box::new(move |ev: MessageEvent| {
+            let onclose_callback = Closure::wrap(Box::new(move |_: MessageEvent| {
                 let mut broker = broker_cl.clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     broker
-                        .emit_msg(WebRTCMessage::Output(WebRTCOutput::Error(format!(
-                            "{:?}",
-                            ev
-                        ))))
+                        .emit_msg(WebRTCMessage::Output(WebRTCOutput::Disconnected))
                         .err()
                         .map(|e| log::error!("While sending message: {:?}", e));
                 });
             }) as Box<dyn FnMut(MessageEvent)>);
-            dc_clone.set_onclose(Some(onerror_callback.as_ref().unchecked_ref()));
-            onerror_callback.forget();
+            dc_clone.set_onclose(Some(onclose_callback.as_ref().unchecked_ref()));
+            onclose_callback.forget();
         }) as Box<dyn FnMut(Event)>);
         dc.set_onopen(Some(ondatachannel_open.as_ref().unchecked_ref()));
         ondatachannel_open.forget();
@@ -486,9 +483,7 @@ impl WebRTCConnection {
                     self.setup.get_state().await?,
                 ))));
             }
-            WebRTCInput::Disconnect => {
-                self.setup.reset()?
-            }
+            WebRTCInput::Disconnect => self.setup.reset()?,
             WebRTCInput::Reset => self.setup.reset()?,
         }
         Ok(None)
