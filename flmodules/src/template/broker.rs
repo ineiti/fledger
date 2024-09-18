@@ -101,7 +101,7 @@ impl Translate {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
                 RandomOut::ListUpdate(list) => Some(TemplateIn::UpdateNodeList(list.into()).into()),
-                RandomOut::NodeMessageFromNetwork((id, msg)) => {
+                RandomOut::NodeMessageFromNetwork(id, msg) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)
                             .ok()
@@ -120,13 +120,13 @@ impl Translate {
     fn link_template_rnd(msg: TemplateMessage) -> Option<RandomMessage> {
         if let TemplateMessage::Output(TemplateOut::Node(id, msg_node)) = msg {
             Some(
-                RandomIn::NodeMessageToNetwork((
+                RandomIn::NodeMessageToNetwork(
                     id,
                     ModuleMessage {
                         module: MODULE_NAME.into(),
                         msg: serde_yaml::to_string(&msg_node).unwrap(),
                     },
-                ))
+                )
                 .into(),
             )
         } else {

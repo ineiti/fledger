@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use js_sys::Reflect;
-use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wasm_bindgen::{prelude::*, JsCast};
@@ -13,14 +12,16 @@ use web_sys::{
     RtcSessionDescriptionInit, RtcSignalingState,
 };
 
+use crate::broker::{Broker, Subsystem, SubsystemHandler};
 use crate::web_rtc::{
-    connection::{ConnectionConfig, HostLogin}, messages::{
+    connection::{ConnectionConfig, HostLogin},
+    messages::{
         ConnType, ConnectionStateMap, DataChannelState, IceConnectionState, IceGatheringState,
         PeerMessage, SetupError, SignalingState, WebRTCInput, WebRTCMessage, WebRTCOutput,
         WebRTCSpawner,
-    }, node_connection::Direction
+    },
+    node_connection::Direction,
 };
-use crate::broker::{Broker, Subsystem, SubsystemHandler};
 
 pub struct WebRTCConnectionSetup {
     pub rp_conn: RtcPeerConnection,
@@ -82,6 +83,11 @@ impl WebRTCConnectionSetup {
     }
 
     pub fn reset(&mut self) -> Result<(), SetupError> {
+        if self.direction.is_none() {
+            return Ok(());
+        }
+        self.direction = None;
+
         let empty_callback = Closure::wrap(Box::new(move |_: MessageEvent| {
             log::warn!("Got callback after reset");
         }) as Box<dyn FnMut(MessageEvent)>);
@@ -99,15 +105,18 @@ impl WebRTCConnectionSetup {
 
         empty_callback.forget();
 
-        self.rp_conn.close();
+        self.close();
         self.rp_conn = Self::create_rp_conn(self.config.clone())?;
         WebRTCConnectionSetup::ice_start(&self.rp_conn, self.broker.clone());
-        self.direction = None;
+        Ok(())
+    }
+
+    fn close(&mut self) {
+        self.rp_conn.close();
         if let Some(mut rd) = self.rtc_data.try_lock() {
             rd.as_ref().map(|r| r.close());
             *rd = None;
         }
-        Ok(())
     }
 
     pub fn ice_start(rp_conn: &RtcPeerConnection, broker: Broker<WebRTCMessage>) {
@@ -156,7 +165,6 @@ impl WebRTCConnectionSetup {
     // Returns the offer string that needs to be sent to the `Follower` node.
     pub async fn make_offer(&mut self) -> Result<String, SetupError> {
         if self.direction.is_some() {
-            log::warn!("Resetting with offer in already opened connection");
             self.reset()?;
         };
         self.direction = Some(Direction::Outgoing);
@@ -185,7 +193,6 @@ impl WebRTCConnectionSetup {
     // Takes the offer string
     pub async fn make_answer(&mut self, offer: String) -> Result<String, SetupError> {
         if self.direction.is_some() {
-            log::warn!("Resetting with offer in already opened connection");
             self.reset()?;
         };
         self.direction = Some(Direction::Incoming);
@@ -197,17 +204,16 @@ impl WebRTCConnectionSetup {
         let srd_promise = self.rp_conn.set_remote_description(&offer_obj);
         JsFuture::from(srd_promise)
             .await
-            .map_err(|e| SetupError::SetupFail(e.as_string().unwrap()))?;
+            .map_err(|e| SetupError::SetupFail(format!("{e:?}")))?;
 
         let answer = match JsFuture::from(self.rp_conn.create_answer()).await {
             Ok(f) => f,
             Err(e) => {
-                error!("Error answer: {:?}", e);
-                return Err(SetupError::SetupFail(e.as_string().unwrap()));
+                return Err(SetupError::SetupFail(format!("{e:?}")));
             }
         };
         let answer_sdp = Reflect::get(&answer, &JsValue::from_str("sdp"))
-            .map_err(|e| SetupError::SetupFail(e.as_string().unwrap()))?
+            .map_err(|e| SetupError::SetupFail(format!("{e:?}")))?
             .as_string()
             .unwrap();
 
@@ -216,7 +222,7 @@ impl WebRTCConnectionSetup {
         let sld_promise = self.rp_conn.set_local_description(&answer_obj);
         JsFuture::from(sld_promise)
             .await
-            .map_err(|e| SetupError::SetupFail(e.as_string().unwrap()))?;
+            .map_err(|e| SetupError::SetupFail(format!("{e:?}")))?;
         Ok(answer_sdp)
     }
 
@@ -255,7 +261,7 @@ impl WebRTCConnectionSetup {
                 )
                 .await
                 {
-                    warn!("Couldn't add ice candidate: {:?}", err);
+                    log::warn!("Couldn't add ice candidate: {:?}", err);
                 }
                 Ok(())
             }
@@ -297,6 +303,7 @@ impl WebRTCConnectionSetup {
     ) {
         let dc_clone = dc.clone();
         let ondatachannel_open = Closure::wrap(Box::new(move |_ev: Event| {
+            log::trace!("DataChannel is opened");
             let mut broker_clone = broker.clone();
             let rtc_data = Arc::clone(&rtc_data);
             let dc_clone2 = dc_clone.clone();
@@ -324,20 +331,17 @@ impl WebRTCConnectionSetup {
             onmessage_callback.forget();
 
             let broker_cl = broker.clone();
-            let onerror_callback = Closure::wrap(Box::new(move |ev: MessageEvent| {
+            let onclose_callback = Closure::wrap(Box::new(move |_: MessageEvent| {
                 let mut broker = broker_cl.clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     broker
-                        .emit_msg(WebRTCMessage::Output(WebRTCOutput::Error(format!(
-                            "{:?}",
-                            ev
-                        ))))
+                        .emit_msg(WebRTCMessage::Output(WebRTCOutput::Disconnected))
                         .err()
                         .map(|e| log::error!("While sending message: {:?}", e));
                 });
             }) as Box<dyn FnMut(MessageEvent)>);
-            dc_clone.set_onclose(Some(onerror_callback.as_ref().unchecked_ref()));
-            onerror_callback.forget();
+            dc_clone.set_onclose(Some(onclose_callback.as_ref().unchecked_ref()));
+            onclose_callback.forget();
         }) as Box<dyn FnMut(Event)>);
         dc.set_onopen(Some(ondatachannel_open.as_ref().unchecked_ref()));
         ondatachannel_open.forget();
@@ -479,6 +483,7 @@ impl WebRTCConnection {
                     self.setup.get_state().await?,
                 ))));
             }
+            WebRTCInput::Disconnect => self.setup.reset()?,
             WebRTCInput::Reset => self.setup.reset()?,
         }
         Ok(None)
@@ -491,11 +496,11 @@ impl SubsystemHandler<WebRTCMessage> for WebRTCConnection {
         let mut out = vec![];
         for msg in msgs {
             if let WebRTCMessage::Input(msg_in) = msg {
-                match self.msg_in(msg_in).await {
+                match self.msg_in(msg_in.clone()).await {
                     Ok(Some(msg)) => out.push(msg),
                     Ok(None) => {}
                     Err(e) => {
-                        log::warn!("Error processing message: {:?}", e);
+                        log::trace!("{:p} Error processing message {msg_in:?}: {:?}", self, e);
                     }
                 }
             }

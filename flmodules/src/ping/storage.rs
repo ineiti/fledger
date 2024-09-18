@@ -34,17 +34,19 @@ impl PingStorage {
         if self.stats.contains_key(&id) {
             return;
         }
-        self.stats
-            .insert(id, PingStat{
+        self.stats.insert(
+            id,
+            PingStat {
                 lastping: 0,
                 rx: 0,
                 tx: 1,
-            });
+            },
+        );
         self.ping.push(id);
     }
 
     pub fn pong(&mut self, id: NodeID) {
-        if let Some(mut stat) = self.stats.remove(&id){
+        if let Some(mut stat) = self.stats.remove(&id) {
             stat.lastping = 0;
             stat.rx += 1;
             self.stats.insert(id, stat);
@@ -59,6 +61,11 @@ impl PingStorage {
         self.tick_countdown();
     }
 
+    pub fn remove_node(&mut self, id: &NodeID) {
+        self.stats.remove(id);
+        self.failed.push(*id);
+    }
+
     fn tick_countdown(&mut self) {
         let mut failed = vec![];
         for (id, stat) in self.stats.iter_mut() {
@@ -71,8 +78,7 @@ impl PingStorage {
             }
         }
         for id in failed {
-            self.stats.remove(&id);
-            self.failed.push(id);
+            self.remove_node(&id);
         }
     }
 }

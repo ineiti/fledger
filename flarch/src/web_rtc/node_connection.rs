@@ -56,9 +56,9 @@ pub enum NCOutput {
     /// Received a text from any connection
     Text(String),
     /// Return a changed state from one of the connections
-    State((Direction, ConnectionStateMap)),
+    State(Direction, ConnectionStateMap),
     /// Setup message for the connection in the given direction
-    Setup((Direction, PeerMessage)),
+    Setup(Direction, PeerMessage),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -72,7 +72,7 @@ pub enum NCInput {
     GetStates,
     /// Treat the [`PeerMessage`] to setup a new connection with the
     /// given direction
-    Setup((Direction, PeerMessage)),
+    Setup(Direction, PeerMessage),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -191,34 +191,36 @@ impl NodeConnection {
                 out
             }
             NCInput::Disconnect => vec![
-                NCMessage::Incoming(WebRTCMessage::Input(WebRTCInput::Reset)),
-                NCMessage::Outgoing(WebRTCMessage::Input(WebRTCInput::Reset)),
+                NCMessage::Incoming(WebRTCMessage::Input(WebRTCInput::Disconnect)),
+                NCMessage::Outgoing(WebRTCMessage::Input(WebRTCInput::Disconnect)),
             ],
 
             NCInput::GetStates => {
                 let mut out = vec![];
                 if let Some(state) = self.state_incoming {
-                    out.push(NCMessage::Output(NCOutput::State((
+                    out.push(NCMessage::Output(NCOutput::State(
                         Direction::Incoming,
                         state.clone(),
-                    ))));
+                    )));
                 }
                 if let Some(state) = self.state_outgoing {
-                    out.push(NCMessage::Output(NCOutput::State((
+                    out.push(NCMessage::Output(NCOutput::State(
                         Direction::Outgoing,
                         state.clone(),
-                    ))));
+                    )));
                 }
                 out
             }
-            NCInput::Setup((dir, pm)) => match dir {
-                Direction::Incoming => vec![NCMessage::Incoming(WebRTCMessage::Input(
-                    WebRTCInput::Setup(pm),
-                ))],
-                Direction::Outgoing => vec![NCMessage::Outgoing(WebRTCMessage::Input(
-                    WebRTCInput::Setup(pm),
-                ))],
-            },
+            NCInput::Setup(dir, pm) => {
+                match dir {
+                    Direction::Incoming => vec![NCMessage::Incoming(WebRTCMessage::Input(
+                        WebRTCInput::Setup(pm),
+                    ))],
+                    Direction::Outgoing => vec![NCMessage::Outgoing(WebRTCMessage::Input(
+                        WebRTCInput::Setup(pm),
+                    ))],
+                }
+            }
         }
     }
 
@@ -238,7 +240,7 @@ impl NodeConnection {
                     out.extend(self.send_queue());
                     out
                 }
-                WebRTCOutput::Setup(pm) => vec![NCMessage::Output(NCOutput::Setup((dir, pm)))],
+                WebRTCOutput::Setup(pm) => vec![NCMessage::Output(NCOutput::Setup(dir, pm))],
                 WebRTCOutput::Text(msg_str) => {
                     vec![NCMessage::Output(NCOutput::Text(msg_str))]
                 }
@@ -247,7 +249,7 @@ impl NodeConnection {
                         Direction::Incoming => self.state_incoming = Some(state),
                         Direction::Outgoing => self.state_outgoing = Some(state),
                     }
-                    vec![NCMessage::Output(NCOutput::State((dir, state)))]
+                    vec![NCMessage::Output(NCOutput::State(dir, state))]
                 }
                 WebRTCOutput::Disconnected | WebRTCOutput::Error(_) => {
                     let msg = match dir {

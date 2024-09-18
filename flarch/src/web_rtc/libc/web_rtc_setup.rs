@@ -3,8 +3,8 @@ use std::sync::{
     Arc,
 };
 
-use async_trait::async_trait;
 use crate::broker::{Broker, Subsystem, SubsystemHandler};
+use async_trait::async_trait;
 use futures::lock::Mutex;
 use webrtc::{
     api::{
@@ -27,10 +27,12 @@ use webrtc::{
 };
 
 use crate::web_rtc::{
-    connection::{ConnectionConfig, HostLogin}, messages::{
+    connection::{ConnectionConfig, HostLogin},
+    messages::{
         ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError, SignalingState,
         WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner,
-    }, node_connection::Direction
+    },
+    node_connection::Direction,
 };
 
 fn get_ice_server(host: HostLogin) -> RTCIceServer {
@@ -184,7 +186,6 @@ impl WebRTCConnectionSetupLibc {
     /// Returns the offer string that needs to be sent to the `Follower` node.
     async fn make_offer(&mut self) -> Result<String, SetupError> {
         if self.direction.is_some() {
-            log::warn!("Resetting connection because of new offer");
             self.reset().await?;
         }
         self.direction = Some(Direction::Outgoing);
@@ -206,13 +207,13 @@ impl WebRTCConnectionSetupLibc {
             .set_local_description(offer.clone())
             .await
             .map_err(to_error)?;
+
         Ok(offer.sdp)
     }
 
     /// Takes the offer string
     async fn make_answer(&mut self, offer: String) -> Result<String, SetupError> {
         if self.direction.is_some() {
-            log::warn!("Resetting connection because of new answer");
             self.reset().await?;
         }
         self.direction = Some(Direction::Incoming);
@@ -375,8 +376,9 @@ impl WebRTCConnectionSetupLibc {
                 log::warn!("Got message for deprecated on_open");
                 return Box::pin(async {});
             }
+
+            log::trace!("DataChannel is opened");
             Box::pin(async move {
-                log::trace!("DataChannel opened");
                 broker_cl
                     .emit_msg(WebRTCMessage::Output(WebRTCOutput::Connected))
                     .err()
@@ -401,6 +403,11 @@ impl WebRTCConnectionSetupLibc {
                     .map(|e| log::warn!("Text queued but not processed: {:?}", e));
             })
         }));
+        if let Some(dc) = rtc_data.lock().await.take() {
+            if let Err(e) = dc.close().await {
+                log::warn!("While closing datachannel: {e:?}");
+            }
+        }
         rtc_data.lock().await.replace(data_channel);
     }
 
@@ -420,6 +427,11 @@ impl WebRTCConnectionSetupLibc {
                     self.get_state().await?,
                 ))));
             }
+            WebRTCInput::Disconnect => {
+                if let Err(e) = self.reset().await {
+                    log::warn!("While closing old connection: {e:?}");
+                }
+            }
             WebRTCInput::Reset => {
                 if self.direction.is_some() {
                     self.reset().await?;
@@ -430,13 +442,34 @@ impl WebRTCConnectionSetupLibc {
     }
 
     async fn reset(&mut self) -> Result<(), SetupError> {
+        if self.direction.is_none() {
+            return Ok(());
+        }
+        self.direction = None;
+
+        // Replacing all listeners with empty listeners
         if let Some(mut rd) = self.rtc_data.try_lock() {
+            if let Some(ref mut dc) = rd.as_ref() {
+                dc.on_message(Box::new(|_: DataChannelMessage| Box::pin(async {})));
+                dc.on_open(Box::new(|| Box::pin(async {})));
+            }
             *rd = None;
+        }
+        self.connection
+            .on_data_channel(Box::new(|_: Arc<RTCDataChannel>| Box::pin(async {})));
+        self.connection
+            .on_peer_connection_state_change(Box::new(|_: RTCPeerConnectionState| {
+                Box::pin(async {})
+            }));
+        self.connection
+            .on_ice_candidate(Box::new(|_: Option<RTCIceCandidate>| Box::pin(async {})));
+
+        if let Err(e) = self.connection.close().await {
+            log::warn!("While closing old connection: {e:?}");
         }
 
         self.connection = Self::make_connection(self.connection_cfg.clone()).await?;
         self.setup_connection().await?;
-        self.direction = None;
         Ok(())
     }
 }
@@ -447,11 +480,11 @@ impl SubsystemHandler<WebRTCMessage> for WebRTCConnectionSetupLibc {
         let mut out = vec![];
         for msg in msgs {
             if let WebRTCMessage::Input(msg_in) = msg {
-                match self.msg_in(msg_in).await {
+                match self.msg_in(msg_in.clone()).await {
                     Ok(Some(msg)) => out.push(msg),
                     Ok(None) => {}
                     Err(e) => {
-                        log::warn!("{:p} Error processing message: {:?}", self, e);
+                        log::trace!("{:p} Error processing message {msg_in:?}: {:?}", self, e);
                     }
                 }
             }

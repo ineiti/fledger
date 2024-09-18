@@ -166,7 +166,7 @@ impl SignalServer {
 
     fn msg_in(&mut self, msg_in: SignalInput) -> Vec<SignalMessage> {
         match msg_in {
-            // SignalInput::WebSocket((dst, msg)) => {
+            // SignalInput::WebSocket(dst, msg) => {
             //     if let Some(index) = self.connection_ids.get_by_left(&dst) {
             //         return self.send_msg_node(*index, msg.clone());
             //     }

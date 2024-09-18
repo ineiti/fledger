@@ -18,13 +18,14 @@ pub enum PingMessage {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PingIn {
     Tick,
-    Message((NodeID, MessageNode)),
+    Message(NodeID, MessageNode),
     NodeList(NodeIDs),
+    DisconnectNode(NodeID),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PingOut {
-    Message((NodeID, MessageNode)),
+    Message(NodeID, MessageNode),
     Storage(PingStorage),
     Failed(NodeID),
 }
@@ -51,8 +52,12 @@ impl Ping {
     pub fn process_msg(&mut self, msg: PingIn) -> Vec<PingOut> {
         match msg {
             PingIn::Tick => self.tick(),
-            PingIn::Message((id, msg_node)) => self.message(id, msg_node),
+            PingIn::Message(id, msg_node) => self.message(id, msg_node),
             PingIn::NodeList(ids) => self.new_nodes(ids),
+            PingIn::DisconnectNode(id) => {
+                self.storage.remove_node(&id);
+                vec![]
+            }
         }
     }
 
@@ -67,7 +72,7 @@ impl Ping {
     pub fn message(&mut self, id: NodeID, msg: MessageNode) -> Vec<PingOut> {
         match msg {
             MessageNode::Ping => {
-                vec![PingOut::Message((id, MessageNode::Pong))]
+                vec![PingOut::Message(id, MessageNode::Pong)]
             }
             MessageNode::Pong => {
                 self.storage.pong(id);
@@ -86,7 +91,7 @@ impl Ping {
     fn create_messages(&mut self) -> Vec<PingOut> {
         let mut out = vec![];
         for id in self.storage.ping.drain(..) {
-            out.push(PingOut::Message((id, MessageNode::Ping)).into());
+            out.push(PingOut::Message(id, MessageNode::Ping).into());
         }
         for id in self.storage.failed.drain(..) {
             out.push(PingOut::Failed(id).into());

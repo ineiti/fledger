@@ -117,7 +117,7 @@ impl Translate {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
                 RandomOut::ListUpdate(list) => Some(GossipIn::NodeList(list.into()).into()),
-                RandomOut::NodeMessageFromNetwork((id, msg)) => {
+                RandomOut::NodeMessageFromNetwork(id, msg) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)
                             .ok()
@@ -136,13 +136,13 @@ impl Translate {
     fn link_gossip_rnd(msg: GossipMessage) -> Option<RandomMessage> {
         if let GossipMessage::Output(GossipOut::Node(id, msg_node)) = msg {
             Some(
-                RandomIn::NodeMessageToNetwork((
+                RandomIn::NodeMessageToNetwork(
                     id,
                     ModuleMessage {
                         module: MODULE_NAME.into(),
                         msg: serde_yaml::to_string(&msg_node).unwrap(),
                     },
-                ))
+                )
                 .into(),
             )
         } else {
@@ -222,13 +222,13 @@ mod tests {
         let msg = MessageNode::Events(vec![event.clone()]);
         broker_rnd
             .settle_msg(
-                RandomOut::NodeMessageFromNetwork((
+                RandomOut::NodeMessageFromNetwork(
                     id2,
                     ModuleMessage {
                         module: MODULE_NAME.into(),
                         msg: serde_yaml::to_string(&msg).unwrap(),
                     },
-                ))
+                )
                 .into(),
             )
             .await?;
@@ -242,7 +242,7 @@ mod tests {
 
     fn assert_msg_reid(tap: &Receiver<RandomMessage>, id2: &NodeID) -> Result<(), Box<dyn Error>> {
         for msg in tap.try_iter() {
-            if let RandomMessage::Input(RandomIn::NodeMessageToNetwork((id, msg_mod))) = msg {
+            if let RandomMessage::Input(RandomIn::NodeMessageToNetwork(id, msg_mod)) = msg {
                 assert_eq!(id2, &id);
                 assert_eq!(MODULE_NAME.to_string(), msg_mod.module);
                 let msg_yaml = serde_yaml::from_str(&msg_mod.msg)?;

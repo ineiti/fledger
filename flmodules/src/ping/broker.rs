@@ -1,6 +1,9 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use flarch::{broker::{Broker, BrokerError, Subsystem, SubsystemHandler}, platform_async_trait};
+use flarch::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
+    platform_async_trait,
+};
 
 use crate::{
     random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
@@ -85,12 +88,13 @@ impl Translate {
     fn link_rnd_ping(msg: RandomMessage) -> Option<PingMessage> {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
+                RandomOut::DisconnectNode(id) => Some(PingIn::DisconnectNode(id).into()),
                 RandomOut::ListUpdate(list) => Some(PingIn::NodeList(list.into()).into()),
-                RandomOut::NodeMessageFromNetwork((id, msg)) => {
+                RandomOut::NodeMessageFromNetwork(id, msg) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)
                             .ok()
-                            .map(|msg_node| PingIn::Message((id, msg_node)).into())
+                            .map(|msg_node| PingIn::Message(id, msg_node).into())
                     } else {
                         None
                     }
@@ -105,18 +109,18 @@ impl Translate {
     fn link_ping_rnd(msg: PingMessage) -> Option<RandomMessage> {
         if let PingMessage::Output(msg_out) = msg {
             match msg_out {
-                PingOut::Message((id, msg_node)) => Some(
-                    RandomIn::NodeMessageToNetwork((
+                PingOut::Message(id, msg_node) => Some(
+                    RandomIn::NodeMessageToNetwork(
                         id,
                         ModuleMessage {
                             module: MODULE_NAME.into(),
                             msg: serde_yaml::to_string(&msg_node).unwrap(),
                         },
-                    ))
+                    )
                     .into(),
                 ),
                 PingOut::Failed(id) => Some(RandomIn::NodeFailure(id).into()),
-                _ => None
+                _ => None,
             }
         } else {
             None
@@ -148,8 +152,6 @@ impl SubsystemHandler<PingMessage> for Translate {
             self.handle_output(msg);
         }
 
-        out.into_iter()
-            .map(|o| o.into())
-            .collect()
+        out.into_iter().map(|o| o.into()).collect()
     }
 }
