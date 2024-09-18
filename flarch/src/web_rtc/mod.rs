@@ -95,10 +95,6 @@ impl WebRTCConn {
 
     fn try_send(&mut self, dst: NodeID, msg: NCInput) {
         if let Some(conn) = self.connections.get_mut(&dst) {
-            if let NCInput::Setup(_, m) = msg.clone() {
-                log::warn!("Sending setup {m:?}");
-            }
-
             conn.emit_msg(NCMessage::Input(msg.clone()))
                 .err()
                 .map(|e| log::error!("When sending message {msg:?} to webrtc: {e:?}"));
@@ -133,7 +129,6 @@ impl SubsystemHandler<WebRTCConnMessage> for WebRTCConn {
                         .await
                         .err()
                         .map(|e| log::error!("When starting webrtc-connection {e:?}"));
-                    log::warn!("Sending PeerMessage::Init");
                     self.try_send(
                         dst,
                         NCInput::Setup(

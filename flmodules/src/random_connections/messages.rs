@@ -109,7 +109,7 @@ impl RandomConnections {
                     )]
                 } else {
                     log::warn!(
-                        "{self:p} Dropping message to unconnected node {dst} - makeing sure we're disconnected"
+                        "{self:p} Dropping message to unconnected node {dst} - making sure we're disconnected"
                     );
                     vec![
                         RandomOut::DisconnectNode(dst),

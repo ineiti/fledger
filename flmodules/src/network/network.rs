@@ -239,10 +239,6 @@ impl NetworkBroker {
 
                 Ok(concat(vec![
                     if !self.connections.contains(&id) {
-                        log::warn!(
-                            "Got message to unconnected node and connecting first to {}",
-                            id
-                        );
                         self.connect(&id)
                     } else {
                         vec![]
@@ -287,7 +283,6 @@ impl NetworkBroker {
                 .into()]
             }
             NCOutput::Setup(dir, pm) => {
-                log::warn!("msg_node - Setup for {dir:?} - {pm:?}");
                 let mut id_init = self.node_config.info.get_id();
                 let mut id_follow = id;
                 if dir == Direction::Incoming {

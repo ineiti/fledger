@@ -83,6 +83,11 @@ impl WebRTCConnectionSetup {
     }
 
     pub fn reset(&mut self) -> Result<(), SetupError> {
+        if self.direction.is_none(){
+            return Ok(());
+        }
+        self.direction = None;
+
         let empty_callback = Closure::wrap(Box::new(move |_: MessageEvent| {
             log::warn!("Got callback after reset");
         }) as Box<dyn FnMut(MessageEvent)>);
@@ -100,15 +105,18 @@ impl WebRTCConnectionSetup {
 
         empty_callback.forget();
 
-        self.rp_conn.close();
+        self.close();
         self.rp_conn = Self::create_rp_conn(self.config.clone())?;
         WebRTCConnectionSetup::ice_start(&self.rp_conn, self.broker.clone());
-        self.direction = None;
+        Ok(())
+    }
+
+    fn close(&mut self) {
+        self.rp_conn.close();
         if let Some(mut rd) = self.rtc_data.try_lock() {
             rd.as_ref().map(|r| r.close());
             *rd = None;
         }
-        Ok(())
     }
 
     pub fn ice_start(rp_conn: &RtcPeerConnection, broker: Broker<WebRTCMessage>) {
@@ -157,7 +165,6 @@ impl WebRTCConnectionSetup {
     // Returns the offer string that needs to be sent to the `Follower` node.
     pub async fn make_offer(&mut self) -> Result<String, SetupError> {
         if self.direction.is_some() {
-            log::warn!("Resetting with offer in already opened connection");
             self.reset()?;
         };
         self.direction = Some(Direction::Outgoing);
@@ -186,7 +193,6 @@ impl WebRTCConnectionSetup {
     // Takes the offer string
     pub async fn make_answer(&mut self, offer: String) -> Result<String, SetupError> {
         if self.direction.is_some() {
-            log::warn!("Resetting with offer in already opened connection");
             self.reset()?;
         };
         self.direction = Some(Direction::Incoming);
@@ -297,6 +303,7 @@ impl WebRTCConnectionSetup {
     ) {
         let dc_clone = dc.clone();
         let ondatachannel_open = Closure::wrap(Box::new(move |_ev: Event| {
+            log::trace!("DataChannel is opened");
             let mut broker_clone = broker.clone();
             let rtc_data = Arc::clone(&rtc_data);
             let dc_clone2 = dc_clone.clone();
@@ -480,8 +487,7 @@ impl WebRTCConnection {
                 ))));
             }
             WebRTCInput::Disconnect => {
-                log::info!("Closing connection");
-                self.setup.close();
+                self.setup.reset()?
             }
             WebRTCInput::Reset => self.setup.reset()?,
         }
@@ -495,11 +501,11 @@ impl SubsystemHandler<WebRTCMessage> for WebRTCConnection {
         let mut out = vec![];
         for msg in msgs {
             if let WebRTCMessage::Input(msg_in) = msg {
-                match self.msg_in(msg_in).await {
+                match self.msg_in(msg_in.clone()).await {
                     Ok(Some(msg)) => out.push(msg),
                     Ok(None) => {}
                     Err(e) => {
-                        log::warn!("Error processing message: {:?}", e);
+                        log::trace!("{:p} Error processing message {msg_in:?}: {:?}", self, e);
                     }
                 }
             }

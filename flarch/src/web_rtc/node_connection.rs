@@ -211,14 +211,16 @@ impl NodeConnection {
                 }
                 out
             }
-            NCInput::Setup(dir, pm) => match dir {
-                Direction::Incoming => vec![NCMessage::Incoming(WebRTCMessage::Input(
-                    WebRTCInput::Setup(pm),
-                ))],
-                Direction::Outgoing => vec![NCMessage::Outgoing(WebRTCMessage::Input(
-                    WebRTCInput::Setup(pm),
-                ))],
-            },
+            NCInput::Setup(dir, pm) => {
+                match dir {
+                    Direction::Incoming => vec![NCMessage::Incoming(WebRTCMessage::Input(
+                        WebRTCInput::Setup(pm),
+                    ))],
+                    Direction::Outgoing => vec![NCMessage::Outgoing(WebRTCMessage::Input(
+                        WebRTCInput::Setup(pm),
+                    ))],
+                }
+            }
         }
     }
 
