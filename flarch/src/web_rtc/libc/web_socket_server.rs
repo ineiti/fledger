@@ -75,6 +75,7 @@ impl SubsystemHandler<WSServerMessage> for WebSocketServer {
                             if let Err(e) = conn.send(msg).await {
                                 log::error!("Error while sending: {e}");
                                 conn.close();
+                                connections.remove(id);
                             }
                         }
                     }
@@ -82,6 +83,7 @@ impl SubsystemHandler<WSServerMessage> for WebSocketServer {
                         let mut connections = self.connections.lock().await;
                         if let Some(conn) = connections.get_mut(id) {
                             conn.close();
+                            connections.remove(id);
                         }
                     }
                     WSServerInput::Stop => {
