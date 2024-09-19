@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     log::info!("Started listening on port 8765");
     for msg in msgs {
-        log::debug!("{:?}", msg);
+        // log::debug!("Got message {:?}", msg);
         if matches!(msg, SignalMessage::Output(SignalOutput::Stopped)) {
             log::error!("Server stopped working - exiting");
             return Ok(());

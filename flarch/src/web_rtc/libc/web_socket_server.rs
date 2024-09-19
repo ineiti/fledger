@@ -4,7 +4,7 @@ use futures::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::{
     net::{TcpListener, TcpStream},
     select,
@@ -19,14 +19,14 @@ use crate::web_rtc::websocket::{
 };
 
 pub struct WebSocketServer {
-    connections: Arc<Mutex<Vec<WSConnection>>>,
+    connections: Arc<Mutex<HashMap<usize, WSConnection>>>,
     conn_thread: JoinHandle<()>,
 }
 
 impl WebSocketServer {
     pub async fn new(port: u16) -> Result<Broker<WSServerMessage>, WSSError> {
         let server = TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
-        let connections = Arc::new(Mutex::new(Vec::new()));
+        let connections = Arc::new(Mutex::new(HashMap::new()));
         let connections_cl = Arc::clone(&connections);
         let mut broker = Broker::new();
         let mut broker_cl = broker.clone();
@@ -37,17 +37,17 @@ impl WebSocketServer {
                     let broker_cl2 = broker_cl.clone();
                     match WSConnection::new(stream, broker_cl2, connection_id).await {
                         Ok(conn) => {
-                            log::trace!("Got new connection");
-                            connections_cl.lock().await.push(conn);
+                            log::warn!("Got new connection {connection_id}");
+                            (*connections_cl.lock().await).insert(connection_id, conn);
                             broker_cl
                                 .emit_msg(WSServerMessage::Output(WSServerOutput::NewConnection(
                                     connection_id,
                                 )))
                                 .expect("Error sending connect message");
+                            connection_id += 1;
                         }
                         Err(e) => log::error!("Error while getting connection: {:?}", e),
                     }
-                    connection_id += 1;
                 }
             }
         });
@@ -71,19 +71,28 @@ impl SubsystemHandler<WSServerMessage> for WebSocketServer {
                 match msg_in {
                     WSServerInput::Message(id, msg) => {
                         let mut connections = self.connections.lock().await;
-                        if let Some(conn) = connections.get_mut(id) {
+                        if let Some(conn) = connections.get_mut(&id) {
                             if let Err(e) = conn.send(msg).await {
                                 log::error!("Error while sending: {e}");
                                 conn.close();
-                                connections.remove(id);
+                                connections.remove(&id);
+                                return vec![WSServerMessage::Output(
+                                    WSServerOutput::Disconnection(id),
+                                )];
                             }
+                        } else {
+                            log::warn!("No connection found");
+                            return vec![WSServerMessage::Output(WSServerOutput::Disconnection(
+                                id,
+                            ))];
                         }
                     }
                     WSServerInput::Close(id) => {
+                        log::warn!("Closing {id}");
                         let mut connections = self.connections.lock().await;
-                        if let Some(conn) = connections.get_mut(id) {
+                        if let Some(conn) = connections.get_mut(&id) {
                             conn.close();
-                            connections.remove(id);
+                            connections.remove(&id);
                         }
                     }
                     WSServerInput::Stop => {
@@ -133,6 +142,7 @@ impl WSConnection {
             loop {
                 select! {
                     _ = (&mut rx) => {
+                        log::warn!("In loop_read");
                         broker
                         .emit_msg(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
                         .expect("While sending message to broker.");
@@ -146,12 +156,13 @@ impl WSConnection {
                                         Some(WSServerMessage::Output(WSServerOutput::Message(id, s)))
                                     }
                                     Message::Close(_) => {
+                                        log::warn!("Websocket closed for {id}");
                                         Some(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
                                     }
                                     _ => None,
                                 },
                                 Err(e) => {
-                                    log::warn!("Closing connection because of error: {e:?}");
+                                    log::warn!("Closing connection {id} because of error: {e:?}");
                                     Some(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
                                 }
                             } {
