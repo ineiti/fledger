@@ -8,6 +8,9 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 ## [Unreleased]
 
+### Fixed
+- reconnections should work better now, both for libc and wasm
+
 ## [0.8.0] - 2024-09-09
 
 ### Changed
