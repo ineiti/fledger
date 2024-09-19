@@ -1,0 +1,66 @@
+name: Docker Build Dev
+on:
+  workflow_dispatch:
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up cargo cache
+      uses: actions/cache@v4
+      continue-on-error: false
+      with:
+        path: |
+          target-common
+          .devbox
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: cargo-docker-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+        restore-keys: |
+          cargo-docker
+          cargo-build
+
+    - name: Install devbox
+      uses: jetify-com/devbox-install-action@v0.11.0
+      with:
+        enable-cache: 'true'
+
+    - name: Update build tag
+      run: devbox run -- make update_version
+
+    - name: Build servers
+      run: devbox run -- make build_cli_release build_web_release
+
+    - name: Docker build signal
+      uses: mr-smithers-excellent/docker-build-push@v5
+      with:
+        image: fledgre/flsignal
+        registry: docker.io
+        dockerfile: Dockerfile.flsignal
+        username: ${{ secrets.DOCKERHUB_NAME }}
+        password: ${{ secrets.DOCKERHUB }}
+        tags: dev
+
+    - name: Docker build fledger
+      uses: mr-smithers-excellent/docker-build-push@v5
+      with:
+        image: fledgre/fledger
+        registry: docker.io
+        dockerfile: Dockerfile.fledger
+        username: ${{ secrets.DOCKERHUB_NAME }}
+        password: ${{ secrets.DOCKERHUB }}
+        tags: dev
+
+    - name: Docker build web
+      uses: mr-smithers-excellent/docker-build-push@v5
+      with:
+        image: fledgre/web
+        registry: docker.io
+        dockerfile: Dockerfile.web
+        username: ${{ secrets.DOCKERHUB_NAME }}
+        password: ${{ secrets.DOCKERHUB }}
+        tags: dev
