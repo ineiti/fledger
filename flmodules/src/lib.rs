@@ -21,3 +21,5 @@ pub mod ping;
 pub mod web_proxy;
 pub mod network;
 pub mod overlay;
+pub mod dht_storage;
+pub mod ledger;
