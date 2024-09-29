@@ -5,6 +5,14 @@ use serde::{Deserialize, Serialize};
 
 use super::core::*;
 
+/// These are the messages which will be exchanged between the nodes for this
+/// module.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MessageNode {
+    Increase(u32),
+    Counter(u32),
+}
+
 /// First wrap all messages coming into this module and all messages going out in
 /// a single message time.
 #[derive(Clone, Debug)]
@@ -24,14 +32,6 @@ pub enum TemplateIn {
 pub enum TemplateOut {
     Node(NodeID, MessageNode),
     UpdateStorage(TemplateStorage),
-}
-
-/// These are the messages which will be exchanged between the nodes for this
-/// module.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum MessageNode {
-    Increase(u32),
-    Counter(u32),
 }
 
 /// The message handling part, but only for template messages.

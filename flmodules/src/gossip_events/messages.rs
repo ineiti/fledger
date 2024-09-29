@@ -1,7 +1,7 @@
 use flarch::nodeids::{NodeID, NodeIDs, U256};
 use serde::{Deserialize, Serialize};
 
-use super::events::*;
+use super::core::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MessageNode {
@@ -69,7 +69,10 @@ impl GossipEvents {
     }
 
     /// Processes many messages at a time.
-    pub fn process_messages(&mut self, msgs: Vec<GossipIn>) -> Result<Vec<GossipOut>, serde_yaml::Error>{
+    pub fn process_messages(
+        &mut self,
+        msgs: Vec<GossipIn>,
+    ) -> Result<Vec<GossipOut>, serde_yaml::Error> {
         let mut out = vec![];
         for msg in msgs {
             out.extend(self.process_message(msg)?);
@@ -79,10 +82,7 @@ impl GossipEvents {
 
     /// Processes one generic message and returns either an error
     /// or a Vec<MessageOut>.
-    pub fn process_message(
-        &mut self,
-        msg: GossipIn,
-    ) -> Result<Vec<GossipOut>, serde_yaml::Error> {
+    pub fn process_message(&mut self, msg: GossipIn) -> Result<Vec<GossipOut>, serde_yaml::Error> {
         log::trace!("{} got message {:?}", self.cfg.our_id, msg);
         Ok(match msg {
             GossipIn::Tick => self.tick(),
@@ -114,10 +114,7 @@ impl GossipEvents {
         if self.storage.add_event(event.clone()) {
             return itertools::concat([
                 self.send_events(self.cfg.our_id, &[event]),
-                vec![
-                    GossipOut::Updated,
-                    GossipOut::Storage(self.storage.clone()),
-                ],
+                vec![GossipOut::Updated, GossipOut::Storage(self.storage.clone())],
             ]);
         }
         vec![]

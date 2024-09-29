@@ -5,13 +5,7 @@ use flarch::nodeids::{NodeID, NodeIDs, U256};
 
 use crate::nodeconfig::NodeInfo;
 
-use super::storage::RandomStorage;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum RandomMessage {
-    Input(RandomIn),
-    Output(RandomOut),
-}
+use super::core::RandomStorage;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NodeMessage {
@@ -23,6 +17,12 @@ pub enum NodeMessage {
 pub struct ModuleMessage {
     pub module: String,
     pub msg: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RandomMessage {
+    Input(RandomIn),
+    Output(RandomOut),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -13,10 +13,10 @@ use flarch::{
 use flmodules::{
     gossip_events::{
         broker::GossipBroker,
-        events::{self, Category, Event},
+        core::{self, Category, Event},
         messages::{GossipIn, GossipMessage},
     },
-    network::network::{NetCall, NetworkError, NetworkMessage},
+    network::messages::{NetworkIn, NetworkError, NetworkMessage},
     nodeconfig::{ConfigError, NodeConfig, NodeInfo},
     ping::{broker::PingBroker, messages::PingConfig},
     random_connections::broker::RandomBroker,
@@ -149,7 +149,7 @@ impl Node {
         timer
             .forward(
                 self.broker_net.clone(),
-                Box::new(|msg| (msg == TimerMessage::Second).then(|| NetCall::Tick.into())),
+                Box::new(|msg| (msg == TimerMessage::Second).then(|| NetworkIn::Tick.into())),
             )
             .await;
         if let Some(r) = self.random.as_mut() {
@@ -194,7 +194,7 @@ impl Node {
     /// Requests a list of all connected nodes
     pub async fn request_list(&mut self) -> Result<(), NodeError> {
         self.broker_net
-            .emit_msg(NetCall::SendWSUpdateListRequest.into())?;
+            .emit_msg(NetworkIn::SendWSUpdateListRequest.into())?;
         Ok(())
     }
 
@@ -247,8 +247,8 @@ impl Node {
     /// Adds a new chat message that will be broadcasted to the system.
     pub async fn add_chat_message(&mut self, msg: String) -> Result<(), NodeError> {
         if let Some(g) = self.gossip.as_mut() {
-            let event = events::Event {
-                category: events::Category::TextMessage,
+            let event = core::Event {
+                category: core::Category::TextMessage,
                 src: self.node_config.info.get_id(),
                 created: now(),
                 msg,
@@ -323,7 +323,7 @@ impl Node {
 mod tests {
     use flarch::{data_storage::DataStorageTemp, start_logging};
     use flmodules::gossip_events::{
-        events::{Category, Event},
+        core::{Category, Event},
         messages::GossipIn,
     };
 

@@ -11,7 +11,7 @@ use flmodules::{
     timer::TimerMessage,
     Modules,
 };
-use flmodules::network::network::{NetCall, NetReply, NetworkMessage};
+use flmodules::network::messages::{NetworkIn, NetworkOut, NetworkMessage};
 
 use flnode::node::{Node, NodeError};
 use thiserror::Error;
@@ -66,7 +66,7 @@ impl NetworkSimul {
         for id in self.nodes.keys() {
             if let Some(broker) = self.node_brokers.get_mut(id) {
                 broker
-                    .settle_msg(NetReply::RcvWSUpdateList(list.clone()).into())
+                    .settle_msg(NetworkOut::RcvWSUpdateList(list.clone()).into())
                     .await?;
             }
         }
@@ -128,15 +128,15 @@ impl NetworkSimul {
 
     fn process_msg(&self, id: &U256, msg: NetworkMessage) -> Vec<(U256, NetworkMessage)> {
         match msg {
-            NetworkMessage::Call(NetCall::Connect(id_dst)) => {
+            NetworkMessage::Input(NetworkIn::Connect(id_dst)) => {
                 vec![
-                    (*id, NetReply::Connected(id_dst).into()),
-                    (id_dst, NetReply::Connected(*id).into()),
+                    (*id, NetworkOut::Connected(id_dst).into()),
+                    (id_dst, NetworkOut::Connected(*id).into()),
                 ]
             }
-            NetworkMessage::Call(NetCall::SendNodeMessage(from_id, msg_str)) => vec![(
+            NetworkMessage::Input(NetworkIn::SendNodeMessage(from_id, msg_str)) => vec![(
                 from_id,
-                NetReply::RcvNodeMessage(id.clone(), msg_str).into(),
+                NetworkOut::RcvNodeMessage(id.clone(), msg_str).into(),
             )],
             NetworkMessage::WebRTC(WebRTCConnMessage::InputNC(
                 id_dst,

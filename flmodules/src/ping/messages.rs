@@ -1,7 +1,7 @@
 use flarch::nodeids::{NodeID, NodeIDs};
 use serde::{Deserialize, Serialize};
 
-use super::storage::PingStorage;
+use super::core::PingStorage;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MessageNode {

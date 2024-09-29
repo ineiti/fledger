@@ -3,16 +3,6 @@ use flmodules::{timer::TimerMessage, Modules};
 mod helpers;
 use helpers::*;
 
-#[tokio::test]
-async fn ping() -> Result<(), NetworkError> {
-    start_logging();
-
-    for n in &[2, 3, 4, 5, 10, 20, 50, 100] {
-        ping_n(*n).await?;
-    }
-    Ok(())
-}
-
 async fn ping_n(nbr_nodes: usize) -> Result<(), NetworkError> {
     let mut net = NetworkSimul::new();
     log::info!("Creating {nbr_nodes} nodes");
@@ -46,4 +36,19 @@ async fn ping_n(nbr_nodes: usize) -> Result<(), NetworkError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn ping() -> Result<(), NetworkError> {
+        start_logging();
+
+        for n in &[2, 3, 4, 5, 10, 20, 50, 100] {
+            ping_n(*n).await?;
+        }
+        Ok(())
+    }
 }

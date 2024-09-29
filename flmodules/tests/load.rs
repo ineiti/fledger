@@ -2,7 +2,7 @@ use std::error::Error;
 
 use flarch::{nodeids::NodeID, start_logging};
 use flmodules::gossip_events::{
-    events::{Category, EventsStorage},
+    core::{Category, EventsStorage},
     messages::{Config, GossipEvents, GossipIn, GossipOut, MessageNode},
 };
 

@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     messages::{MessageNode, Ping, PingConfig, PingIn, PingMessage, PingOut},
-    storage::PingStorage,
+    core::PingStorage,
 };
 
 const MODULE_NAME: &str = "Ping";

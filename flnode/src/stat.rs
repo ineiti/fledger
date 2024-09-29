@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::mpsc::Receiver};
 
-use flmodules::network::network::{NetReply, NetworkConnectionState, NetworkMessage};
+use flmodules::network::messages::{NetworkOut, NetworkConnectionState, NetworkMessage};
 use flarch::{
     broker::{Broker, BrokerError},
     nodeids::U256,
@@ -23,7 +23,7 @@ impl StatBroker {
 
     pub fn update(&mut self) {
         for msg in self.tap.try_iter() {
-            if let NetworkMessage::Reply(NetReply::ConnectionState(state)) = msg {
+            if let NetworkMessage::Output(NetworkOut::ConnectionState(state)) = msg {
                 self.states.insert(state.id, state);
             }
         }

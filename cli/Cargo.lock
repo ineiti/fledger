@@ -911,6 +911,7 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "thiserror",
+ "tokio",
  "toml",
 ]
 

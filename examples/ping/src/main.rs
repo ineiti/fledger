@@ -11,7 +11,7 @@ use flarch::{
     web_rtc::connection::ConnectionConfig,
 };
 use flmodules::nodeconfig::NodeConfig;
-use flmodules::network::network::NetReply;
+use flmodules::network::messages::NetworkOut;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -61,9 +61,9 @@ async fn ping() -> Result<(), BrokerError> {
             msg = net.recv() => {
                     match msg {
                         // Display the messages received
-                        NetReply::RcvNodeMessage(from, msg) => log::info!("Got message {msg:?} from node {from}"),
+                        NetworkOut::RcvNodeMessage(from, msg) => log::info!("Got message {msg:?} from node {from}"),
                         // If a new list is available, ping all nodes in the list
-                        NetReply::RcvWSUpdateList(list) => for node in list {
+                        NetworkOut::RcvWSUpdateList(list) => for node in list {
                             if node.get_id() != nc.info.get_id() {
                                 // Sends a text message to the 'node' if it's not ourselves
                                 net.send_msg(node.get_id(), "Ping".into())?
