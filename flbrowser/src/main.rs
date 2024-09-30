@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use flmodules::{
     nodeconfig::NodeInfo,
-    ping::storage::{PingStat, PingStorage},
+    ping::core::{PingStat, PingStorage},
     Modules,
 };
 use js_sys::JsString;
@@ -25,7 +25,7 @@ use flarch::{
     tasks::{spawn_local_nosend, wait_ms},
     web_rtc::connection::{ConnectionConfig, HostLogin, Login},
 };
-use flmodules::network::network::NetworkConnectionState;
+use flmodules::network::messages::NetworkConnectionState;
 use flmodules::network::network_broker_start;
 use flnode::{node::Node, version::VERSION_STRING};
 
@@ -382,7 +382,7 @@ pub struct FledgerMessages {
 
 impl FledgerMessages {
     fn new(
-        mut tm_msgs: Vec<flmodules::gossip_events::events::Event>,
+        mut tm_msgs: Vec<flmodules::gossip_events::core::Event>,
         nodes: &Vec<NodeInfo>,
     ) -> Self {
         tm_msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());

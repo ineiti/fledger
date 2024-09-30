@@ -17,6 +17,17 @@ use super::{
     response::{ResponseHeader, ResponseMessage},
 };
 
+/// Messages between different instances of this module.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MessageNode {
+    /// The request holds a random ID so that the reply can be mapped to the correct
+    /// request.
+    Request(U256, String),
+    /// The reply uses the random ID from the request and returns blocks of the
+    /// reply, indexed by the second argument.
+    Response(U256, ResponseMessage),
+}
+
 /// First wrap all messages coming into this module and all messages going out in
 /// a single message.
 #[derive(Clone, Debug)]
@@ -39,17 +50,6 @@ pub enum WebProxyOut {
     Node(NodeID, MessageNode),
     ResponseGet(NodeID, U256, ResponseHeader),
     UpdateStorage(WebProxyStorage),
-}
-
-/// Messages between different instances of this module.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum MessageNode {
-    /// The request holds a random ID so that the reply can be mapped to the correct
-    /// request.
-    Request(U256, String),
-    /// The reply uses the random ID from the request and returns blocks of the
-    /// reply, indexed by the second argument.
-    Response(U256, ResponseMessage),
 }
 
 /// The message handling part, but only for WebProxy messages.

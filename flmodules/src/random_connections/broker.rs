@@ -7,10 +7,10 @@ use flarch::{
 };
 
 use crate::{
-    network::network::{NetCall, NetReply, NetworkMessage},
+    network::messages::{NetworkIn, NetworkOut, NetworkMessage},
     random_connections::{
         messages::{Config, NodeMessage, RandomConnections, RandomIn, RandomMessage, RandomOut},
-        storage::RandomStorage,
+        core::RandomStorage,
     },
     timer::TimerMessage,
 };
@@ -80,14 +80,14 @@ impl Translate {
 
     fn link_net_rnd(our_id: U256) -> broker::Translate<NetworkMessage, RandomMessage> {
         Box::new(move |msg: NetworkMessage| {
-            if let NetworkMessage::Reply(msg_net) = msg {
+            if let NetworkMessage::Output(msg_net) = msg {
                 match msg_net {
-                    NetReply::RcvNodeMessage(id, msg_str) => {
+                    NetworkOut::RcvNodeMessage(id, msg_str) => {
                         if let Ok(msg_rnd) = serde_yaml::from_str::<NodeMessage>(&msg_str) {
                             return Some(RandomIn::NodeMessageFromNetwork(id, msg_rnd).into());
                         }
                     }
-                    NetReply::RcvWSUpdateList(list) => {
+                    NetworkOut::RcvWSUpdateList(list) => {
                         return Some(
                             RandomIn::NodeList(
                                 list.into_iter()
@@ -97,8 +97,8 @@ impl Translate {
                             .into(),
                         )
                     }
-                    NetReply::Connected(id) => return Some(RandomIn::NodeConnected(id).into()),
-                    NetReply::Disconnected(id) => {
+                    NetworkOut::Connected(id) => return Some(RandomIn::NodeConnected(id).into()),
+                    NetworkOut::Disconnected(id) => {
                         return Some(RandomIn::NodeDisconnected(id).into())
                     }
                     _ => {}
@@ -111,11 +111,11 @@ impl Translate {
     fn link_rnd_net(msg: RandomMessage) -> Option<NetworkMessage> {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
-                RandomOut::ConnectNode(id) => return Some(NetCall::Connect(id).into()),
-                RandomOut::DisconnectNode(id) => return Some(NetCall::Disconnect(id).into()),
+                RandomOut::ConnectNode(id) => return Some(NetworkIn::Connect(id).into()),
+                RandomOut::DisconnectNode(id) => return Some(NetworkIn::Disconnect(id).into()),
                 RandomOut::NodeMessageToNetwork(id, msg) => {
                     let msg_str = serde_yaml::to_string(&msg).unwrap();
-                    return Some(NetCall::SendNodeMessage(id, msg_str).into());
+                    return Some(NetworkIn::SendNodeMessage(id, msg_str).into());
                 }
                 _ => {}
             }

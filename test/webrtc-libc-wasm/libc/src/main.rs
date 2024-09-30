@@ -8,7 +8,7 @@ use flarch::{
 };
 use flmodules::nodeconfig::NodeConfig;
 use flmodules::network::{
-    network::{NetCall, NetReply, NetworkMessage},
+    messages::{NetworkIn, NetworkOut, NetworkMessage},
     network_broker_start,
     signal::SignalServer,
     NetworkSetupError,
@@ -39,7 +39,7 @@ async fn main() -> Result<(), MainError> {
 
     loop {
         let msg = tap.recv().await.expect("expected message");
-        if let NetworkMessage::Reply(NetReply::RcvNodeMessage(id, msg_net)) = msg {
+        if let NetworkMessage::Output(NetworkOut::RcvNodeMessage(id, msg_net)) = msg {
             log::info!("Got message from other node: {}", msg_net);
             if msgs_rcv == 0 {
                 msgs_rcv += 1;
@@ -74,7 +74,7 @@ async fn spawn_node() -> Result<(NodeConfig, Broker<NetworkMessage>), MainError>
 }
 
 async fn send(src: &mut Broker<NetworkMessage>, id: U256, msg: &str) {
-    src.emit_msg(NetworkMessage::Call(NetCall::SendNodeMessage(
+    src.emit_msg(NetworkMessage::Input(NetworkIn::SendNodeMessage(
         id,
         msg.into(),
     )))
@@ -115,7 +115,7 @@ mod tests {
 
     async fn wait_msg(tap: &Receiver<NetworkMessage>, msg: &str) {
         for msg_net in tap {
-            if let NetworkMessage::Reply(NetReply::RcvNodeMessage(_, nm)) = &msg_net {
+            if let NetworkMessage::Output(NetworkOut::RcvNodeMessage(_, nm)) = &msg_net {
                 if nm == msg {
                     break;
                 }

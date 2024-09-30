@@ -1,20 +1,8 @@
 use flarch::{nodeids::U256, start_logging_filter_level};
-use flmodules::{gossip_events::events, Modules};
+use flmodules::{gossip_events::core, Modules};
 
 mod helpers;
 use helpers::*;
-
-#[tokio::test]
-async fn gossip_2() -> Result<(), NetworkError> {
-    gossip(2).await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn gossip_30() -> Result<(), NetworkError> {
-    gossip(30).await?;
-    Ok(())
-}
 
 async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
     start_logging_filter_level(vec![], log::LevelFilter::Debug);
@@ -71,8 +59,8 @@ async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
 }
 
 async fn add_chat_message(net: &mut NetworkSimul, id: &U256, step: i32) {
-    let msg = events::Event {
-        category: events::Category::TextMessage,
+    let msg = core::Event {
+        category: core::Category::TextMessage,
         src: U256::rnd(),
         created: step as i64,
         msg: "msg".into(),
@@ -86,4 +74,21 @@ async fn add_chat_message(net: &mut NetworkSimul, id: &U256, step: i32) {
         .add_event(msg)
         .await
         .expect("adding new event");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[tokio::test]
+    async fn gossip_2() -> Result<(), NetworkError> {
+        gossip(2).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn gossip_30() -> Result<(), NetworkError> {
+        gossip(30).await?;
+        Ok(())
+    }
 }

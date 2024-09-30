@@ -36,6 +36,66 @@ use crate::{
     nodeconfig::{NodeConfig, NodeInfo},
 };
 
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, PartialEq)]
+/// A Message to/from the [`NetworkBroker`].
+/// The [`NetworkMessage::Call`] and [`NetworkMessage::Output`] messages are directly related to the [`NetworkBroker`], while
+/// the [`NetworkMessage::WebSocket`] and [`NetworkMessage::WebRTC`] messages are used to link to those modules.
+pub enum NetworkMessage {
+    /// A message to the [`NetworkBroker`]
+    Input(NetworkIn),
+    /// A return message from the [`NetworkBroker`]
+    Output(NetworkOut),
+    /// Messages to/from the WebSocket.
+    WebSocket(WSClientMessage),
+    /// Messages to/from the WebRTC subsystem.
+    WebRTC(WebRTCConnMessage),
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, PartialEq)]
+/// These are similar to public methods on a structure.
+/// Sending these messages will call the linked actions.
+pub enum NetworkIn {
+    /// Sends a new text message to the node.
+    /// The [`NetworkBroker`] will try to set up a connection with the remote node,
+    /// if no such connection exists yet.
+    /// If the node is not connected to the signalling handler, nothing happens.
+    SendNodeMessage(NodeID, String),
+    /// Sends some stats to the signalling server to monitor the overall health of
+    /// the system.
+    SendWSStats(Vec<NodeStat>),
+    /// Requests a new list of currenlty connected nodes to the signalling server.
+    SendWSUpdateListRequest,
+    /// Connect to the given node.
+    /// If the node is not connected to the signalling server, no connection is made,
+    /// and no error is produced.
+    Connect(NodeID),
+    /// Manually disconnect from the given node.
+    /// If there is no connection to this node, no error is produced.
+    Disconnect(NodeID),
+    /// This message should be sent once a second to allow calculations of timeouts.
+    Tick,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, PartialEq)]
+/// Messages sent from the [`NetworkBroker`] to the user.
+pub enum NetworkOut {
+    /// A new message has been received from the given node.
+    RcvNodeMessage(NodeID, String),
+    /// An updated list coming from the signalling server.
+    RcvWSUpdateList(Vec<NodeInfo>),
+    /// Whenever the state of a connection changes, this message is
+    /// sent to the user.
+    ConnectionState(NetworkConnectionState),
+    /// A node has been successfully connected.
+    Connected(NodeID),
+    /// A node has been disconnected.
+    Disconnected(NodeID),
+}
+
 /// This is a user-friendly version of [`NetworkBroker`].
 /// Upon starting, it waits for the connection to the signalling server.
 /// It has a simple API to send and receive messages to other nodes.
@@ -58,7 +118,7 @@ impl Network {
                     return Err(NetworkError::SignallingServer);
                 }
                 msg = tap.recv() => {
-                    if matches!(msg, Some(NetworkMessage::Reply(NetReply::RcvWSUpdateList(_)))){
+                    if matches!(msg, Some(NetworkMessage::Output(NetworkOut::RcvWSUpdateList(_)))){
                         break;
                     }
                 }
@@ -68,34 +128,34 @@ impl Network {
     }
 
     /// Wait for a message to be received from the network.
-    /// This method waits for a [`NetReply`] message to be received, which
+    /// This method waits for a [`NetworkOut`] message to be received, which
     /// are the only messages interesting for a user.
-    pub async fn recv(&mut self) -> NetReply {
+    pub async fn recv(&mut self) -> NetworkOut {
         loop {
             let msg = self.tap.recv().await;
-            if let Some(NetworkMessage::Reply(msg_reply)) = msg {
+            if let Some(NetworkMessage::Output(msg_reply)) = msg {
                 return msg_reply;
             }
         }
     }
 
     /// Send a message to the [`NetworkBroker`] asynchronously.
-    /// The message is of type [`NetCall`], as this is what the user can
+    /// The message is of type [`NetworkIn`], as this is what the user can
     /// send to the [`NetworkBroker`].
-    pub fn send(&mut self, msg: NetCall) -> Result<(), BrokerError> {
-        self.broker_net.emit_msg(NetworkMessage::Call(msg))
+    pub fn send(&mut self, msg: NetworkIn) -> Result<(), BrokerError> {
+        self.broker_net.emit_msg(NetworkMessage::Input(msg))
     }
 
     /// Tries to send a text-message to a remote node.
     /// The [`NetworkBroker`] will start a connection with the node if there is none available.
     /// If the remote node is not available, no error is returned.
     pub fn send_msg(&mut self, dst: NodeID, msg: String) -> Result<(), BrokerError> {
-        self.send(NetCall::SendNodeMessage(dst, msg))
+        self.send(NetworkIn::SendNodeMessage(dst, msg))
     }
 
     /// Requests an updated list of all connected nodes to the signalling server.
     pub fn send_list_request(&mut self) -> Result<(), BrokerError> {
-        self.send(NetCall::SendWSUpdateListRequest)
+        self.send(NetworkIn::SendWSUpdateListRequest)
     }
 }
 
@@ -200,7 +260,7 @@ impl NetworkBroker {
                 ]
             }
             WSSignalMessageToNode::ListIDsReply(list) => {
-                vec![NetReply::RcvWSUpdateList(list).into()]
+                vec![NetworkOut::RcvWSUpdateList(list).into()]
             }
             WSSignalMessageToNode::PeerSetup(pi) => {
                 let own_id = self.node_config.info.get_id();
@@ -226,9 +286,9 @@ impl NetworkBroker {
         }
     }
 
-    async fn msg_call(&mut self, msg: NetCall) -> Result<Vec<NetworkMessage>, NetworkError> {
+    async fn msg_call(&mut self, msg: NetworkIn) -> Result<Vec<NetworkMessage>, NetworkError> {
         match msg {
-            NetCall::SendNodeMessage(id, msg_str) => {
+            NetworkIn::SendNodeMessage(id, msg_str) => {
                 log::trace!(
                     "msg_call: {}->{}: {:?} / {:?}",
                     self.node_config.info.get_id(),
@@ -246,11 +306,11 @@ impl NetworkBroker {
                     vec![NetworkMessage::from_nc(NCInput::Text(msg_str), id)],
                 ]))
             }
-            NetCall::SendWSStats(ss) => Ok(WSSignalMessageFromNode::NodeStats(ss.clone()).into()),
-            NetCall::SendWSUpdateListRequest => Ok(WSSignalMessageFromNode::ListIDsRequest.into()),
-            NetCall::Connect(id) => Ok(self.connect(&id)),
-            NetCall::Disconnect(id) => Ok(self.disconnect(&id).await),
-            NetCall::Tick => {
+            NetworkIn::SendWSStats(ss) => Ok(WSSignalMessageFromNode::NodeStats(ss.clone()).into()),
+            NetworkIn::SendWSUpdateListRequest => Ok(WSSignalMessageFromNode::ListIDsRequest.into()),
+            NetworkIn::Connect(id) => Ok(self.connect(&id)),
+            NetworkIn::Disconnect(id) => Ok(self.disconnect(&id).await),
+            NetworkIn::Tick => {
                 self.get_update -= 1;
                 Ok((self.get_update == 0)
                     .then(|| {
@@ -264,11 +324,11 @@ impl NetworkBroker {
 
     async fn msg_node(&mut self, id: U256, msg_nc: NCOutput) -> Vec<NetworkMessage> {
         match msg_nc {
-            NCOutput::Connected(_) => vec![NetReply::Connected(id).into()],
-            NCOutput::Disconnected(_) => vec![NetReply::Disconnected(id).into()],
-            NCOutput::Text(msg) => vec![NetReply::RcvNodeMessage(id, msg).into()],
+            NCOutput::Connected(_) => vec![NetworkOut::Connected(id).into()],
+            NCOutput::Disconnected(_) => vec![NetworkOut::Disconnected(id).into()],
+            NCOutput::Text(msg) => vec![NetworkOut::RcvNodeMessage(id, msg).into()],
             NCOutput::State(dir, state) => {
-                vec![NetReply::ConnectionState(NetworkConnectionState {
+                vec![NetworkOut::ConnectionState(NetworkConnectionState {
                     id,
                     dir,
                     s: ConnStats {
@@ -300,7 +360,7 @@ impl NetworkBroker {
 
     /// Connect to the given node.
     fn connect(&mut self, dst: &U256) -> Vec<NetworkMessage> {
-        let mut out = vec![NetReply::Connected(*dst).into()];
+        let mut out = vec![NetworkOut::Connected(*dst).into()];
         if self.connections.contains(dst) {
             log::warn!("Already connected to {}", dst);
         } else {
@@ -312,7 +372,7 @@ impl NetworkBroker {
 
     /// Disconnects from a given node.
     async fn disconnect(&mut self, dst: &U256) -> Vec<NetworkMessage> {
-        let mut out = vec![NetReply::Disconnected(*dst).into()];
+        let mut out = vec![NetworkOut::Disconnected(*dst).into()];
         if !self.connections.contains(dst) {
             log::warn!("Already disconnected from {}", dst);
         } else {
@@ -361,7 +421,7 @@ impl SubsystemHandler<NetworkMessage> for NetworkBroker {
                 self.node_config.info.get_id()
             );
             match msg {
-                NetworkMessage::Call(c) => out.extend(self.msg_call(c).await.unwrap()),
+                NetworkMessage::Input(c) => out.extend(self.msg_call(c).await.unwrap()),
                 NetworkMessage::WebSocket(WSClientMessage::Output(ws)) => {
                     out.extend(self.msg_ws(ws).await)
                 }
@@ -375,27 +435,12 @@ impl SubsystemHandler<NetworkMessage> for NetworkBroker {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq)]
-/// A Message to/from the [`NetworkBroker`].
-/// The [`NetworkMessage::Call`] and [`NetworkMessage::Reply`] messages are directly related to the [`NetworkBroker`], while
-/// the [`NetworkMessage::WebSocket`] and [`NetworkMessage::WebRTC`] messages are used to link to those modules.
-pub enum NetworkMessage {
-    /// A message to the [`NetworkBroker`]
-    Call(NetCall),
-    /// A return message from the [`NetworkBroker`]
-    Reply(NetReply),
-    /// Messages to/from the WebSocket.
-    WebSocket(WSClientMessage),
-    /// Messages to/from the WebRTC subsystem.
-    WebRTC(WebRTCConnMessage),
-}
 
 impl fmt::Display for NetworkMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NetworkMessage::Call(c) => write!(f, "Call({})", c),
-            NetworkMessage::Reply(r) => write!(f, "Reply({})", r),
+            NetworkMessage::Input(c) => write!(f, "Call({})", c),
+            NetworkMessage::Output(r) => write!(f, "Reply({})", r),
             NetworkMessage::WebSocket(_) => write!(f, "WebSocket()"),
             NetworkMessage::WebRTC(_) => write!(f, "WebRTC()"),
         }
@@ -409,48 +454,22 @@ impl NetworkMessage {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq)]
-/// These are similar to public methods on a structure.
-/// Sending these messages will call the linked actions.
-pub enum NetCall {
-    /// Sends a new text message to the node.
-    /// The [`NetworkBroker`] will try to set up a connection with the remote node,
-    /// if no such connection exists yet.
-    /// If the node is not connected to the signalling handler, nothing happens.
-    SendNodeMessage(NodeID, String),
-    /// Sends some stats to the signalling server to monitor the overall health of
-    /// the system.
-    SendWSStats(Vec<NodeStat>),
-    /// Requests a new list of currenlty connected nodes to the signalling server.
-    SendWSUpdateListRequest,
-    /// Connect to the given node.
-    /// If the node is not connected to the signalling server, no connection is made,
-    /// and no error is produced.
-    Connect(NodeID),
-    /// Manually disconnect from the given node.
-    /// If there is no connection to this node, no error is produced.
-    Disconnect(NodeID),
-    /// This message should be sent once a second to allow calculations of timeouts.
-    Tick,
-}
-
-impl fmt::Display for NetCall {
+impl fmt::Display for NetworkIn {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NetCall::SendNodeMessage(_, _) => write!(f, "SendNodeMessage()"),
-            NetCall::SendWSStats(_) => write!(f, "SendWSStats()"),
-            NetCall::SendWSUpdateListRequest => write!(f, "SendWSUpdateListRequest"),
-            NetCall::Connect(_) => write!(f, "Connect()"),
-            NetCall::Disconnect(_) => write!(f, "Disconnect()"),
-            NetCall::Tick => write!(f, "Tick"),
+            NetworkIn::SendNodeMessage(_, _) => write!(f, "SendNodeMessage()"),
+            NetworkIn::SendWSStats(_) => write!(f, "SendWSStats()"),
+            NetworkIn::SendWSUpdateListRequest => write!(f, "SendWSUpdateListRequest"),
+            NetworkIn::Connect(_) => write!(f, "Connect()"),
+            NetworkIn::Disconnect(_) => write!(f, "Disconnect()"),
+            NetworkIn::Tick => write!(f, "Tick"),
         }
     }
 }
 
-impl From<NetCall> for NetworkMessage {
-    fn from(msg: NetCall) -> Self {
-        Self::Call(msg)
+impl From<NetworkIn> for NetworkMessage {
+    fn from(msg: NetworkIn) -> Self {
+        Self::Input(msg)
     }
 }
 
@@ -462,38 +481,21 @@ impl From<WSSignalMessageFromNode> for Vec<NetworkMessage> {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq)]
-/// Messages sent from the [`NetworkBroker`] to the user.
-pub enum NetReply {
-    /// A new message has been received from the given node.
-    RcvNodeMessage(NodeID, String),
-    /// An updated list coming from the signalling server.
-    RcvWSUpdateList(Vec<NodeInfo>),
-    /// Whenever the state of a connection changes, this message is
-    /// sent to the user.
-    ConnectionState(NetworkConnectionState),
-    /// A node has been successfully connected.
-    Connected(NodeID),
-    /// A node has been disconnected.
-    Disconnected(NodeID),
-}
-
-impl fmt::Display for NetReply {
+impl fmt::Display for NetworkOut {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NetReply::RcvNodeMessage(_, _) => write!(f, "RcvNodeMessage()"),
-            NetReply::RcvWSUpdateList(_) => write!(f, "RcvWSUpdateList()"),
-            NetReply::ConnectionState(_) => write!(f, "ConnectionState()"),
-            NetReply::Connected(_) => write!(f, "Connected()"),
-            NetReply::Disconnected(_) => write!(f, "Disconnected()"),
+            NetworkOut::RcvNodeMessage(_, _) => write!(f, "RcvNodeMessage()"),
+            NetworkOut::RcvWSUpdateList(_) => write!(f, "RcvWSUpdateList()"),
+            NetworkOut::ConnectionState(_) => write!(f, "ConnectionState()"),
+            NetworkOut::Connected(_) => write!(f, "Connected()"),
+            NetworkOut::Disconnected(_) => write!(f, "Disconnected()"),
         }
     }
 }
 
-impl From<NetReply> for NetworkMessage {
-    fn from(msg: NetReply) -> Self {
-        Self::Reply(msg)
+impl From<NetworkOut> for NetworkMessage {
+    fn from(msg: NetworkOut) -> Self {
+        Self::Output(msg)
     }
 }
 
@@ -510,7 +512,7 @@ pub struct NetworkConnectionState {
 
 impl From<NetworkConnectionState> for NetworkMessage {
     fn from(msg: NetworkConnectionState) -> Self {
-        NetReply::ConnectionState(msg).into()
+        NetworkOut::ConnectionState(msg).into()
     }
 }
 

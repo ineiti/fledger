@@ -8,7 +8,7 @@ use flarch::{
     tasks::{spawn_local, Interval},
 };
 use flmodules::nodeconfig::NodeInfo;
-use flmodules::network::network::{NetCall, NetReply, NetworkMessage};
+use flmodules::network::messages::{NetworkIn, NetworkOut, NetworkMessage};
 
 use crate::common::{PPMessage, PPMessageNode};
 
@@ -59,10 +59,10 @@ fn update_list(
     net: &mut Broker<NetworkMessage>,
     nodes: &Vec<NodeInfo>,
 ) -> Result<(), BrokerError> {
-    net.emit_msg(NetworkMessage::Call(NetCall::SendWSUpdateListRequest))?;
+    net.emit_msg(NetworkMessage::Input(NetworkIn::SendWSUpdateListRequest))?;
     for node in nodes.iter() {
         if node.get_id() != id {
-            net.emit_msg(NetworkMessage::Call(NetCall::SendNodeMessage(
+            net.emit_msg(NetworkMessage::Input(NetworkIn::SendNodeMessage(
                 node.get_id(),
                 serde_json::to_string(&PPMessageNode::Ping).unwrap(),
             )))?;
@@ -77,20 +77,20 @@ fn new_msg(
     ret: &mut Broker<PPMessage>,
     msg: Option<NetworkMessage>,
 ) -> Result<Option<Vec<NodeInfo>>, BrokerError> {
-    if let Some(NetworkMessage::Reply(msg_tap)) = msg {
+    if let Some(NetworkMessage::Output(msg_tap)) = msg {
         match msg_tap {
-            NetReply::RcvNodeMessage(from, msg_net) => {
+            NetworkOut::RcvNodeMessage(from, msg_net) => {
                 if let Ok(msg) = serde_json::from_str::<PPMessageNode>(&msg_net) {
                     ret.emit_msg(PPMessage::FromNetwork(from, msg.clone()))?;
                     if msg == PPMessageNode::Ping {
-                        net.emit_msg(NetworkMessage::Call(NetCall::SendNodeMessage(
+                        net.emit_msg(NetworkMessage::Input(NetworkIn::SendNodeMessage(
                             from,
                             serde_json::to_string(&PPMessageNode::Pong).unwrap(),
                         )))?;
                     }
                 }
             }
-            NetReply::RcvWSUpdateList(list) => {
+            NetworkOut::RcvWSUpdateList(list) => {
                 ret.emit_msg(PPMessage::List(list.clone()))?;
                 return Ok(Some(list));
             }

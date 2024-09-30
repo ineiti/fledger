@@ -3,16 +3,6 @@ mod helpers;
 use flmodules::Modules;
 use helpers::*;
 
-#[tokio::test]
-async fn connect_nodes() -> Result<(), NetworkError> {
-    start_logging();
-
-    for n in &[2, 3, 4, 5, 10, 20, 50, 100] {
-        connect_nodes_n(*n).await?;
-    }
-    Ok(())
-}
-
 async fn connect_nodes_n(nbr_nodes: usize) -> Result<(), NetworkError> {
     let mut net = NetworkSimul::new();
     log::info!("Creating {nbr_nodes} nodes");
@@ -42,4 +32,19 @@ async fn connect_nodes_n(nbr_nodes: usize) -> Result<(), NetworkError> {
     }
     assert_eq!(nbr_nodes, nodes_visited.len());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[tokio::test]
+    async fn connect_nodes() -> Result<(), NetworkError> {
+        start_logging();
+
+        for n in &[2, 3, 4, 5, 10, 20, 50, 100] {
+            connect_nodes_n(*n).await?;
+        }
+        Ok(())
+    }
 }

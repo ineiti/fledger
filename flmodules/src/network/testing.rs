@@ -1,10 +1,11 @@
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler, Translate},
-    nodeids::U256, platform_async_trait,
+    nodeids::U256,
+    platform_async_trait,
 };
 
+use super::messages::{NetworkIn, NetworkOut, NetworkMessage};
 use crate::nodeconfig::{NodeConfig, NodeInfo};
-use super::network::{NetReply, NetworkMessage, NetCall};
 
 pub struct NetworkBrokerSimul {
     nsh_broker: Broker<NSHubMessage>,
@@ -70,18 +71,18 @@ impl NSHub {
     }
 
     fn net_msg(&self, id: U256, net_msg: NetworkMessage) -> Vec<NSHubMessage> {
-        if let NetworkMessage::Call(msg) = net_msg {
+        if let NetworkMessage::Input(msg) = net_msg {
             match msg {
-                NetCall::SendNodeMessage(id_dst, msg_node) => {
+                NetworkIn::SendNodeMessage(id_dst, msg_node) => {
                     vec![NSHubMessage::ToClient(
                         id_dst,
-                        NetworkMessage::Reply(NetReply::RcvNodeMessage(id, msg_node)),
+                        NetworkMessage::Output(NetworkOut::RcvNodeMessage(id, msg_node)),
                     )]
                 }
-                NetCall::SendWSUpdateListRequest => {
+                NetworkIn::SendWSUpdateListRequest => {
                     vec![NSHubMessage::ToClient(
                         id,
-                        NetworkMessage::Reply(NetReply::RcvWSUpdateList(self.nodes.clone())),
+                        NetworkMessage::Output(NetworkOut::RcvWSUpdateList(self.nodes.clone())),
                     )]
                 }
                 _ => {

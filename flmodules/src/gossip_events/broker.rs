@@ -6,7 +6,7 @@ use flarch::{
 };
 
 use super::{
-    events::{Category, Event, EventsStorage},
+    core::{Category, Event, EventsStorage},
     messages::{Config, GossipEvents, GossipIn, GossipMessage, GossipOut, MessageNode},
 };
 use crate::{
@@ -190,7 +190,7 @@ impl SubsystemHandler<GossipMessage> for Translate {
 mod tests {
     use std::error::Error;
 
-    use crate::gossip_events::events::{Category, Event};
+    use crate::gossip_events::core::{Category, Event};
     use flarch::nodeids::NodeID;
     use flarch::{start_logging, tasks::now};
 
