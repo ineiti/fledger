@@ -1,1 +1,8 @@
-cli/signal/grafana
+.devbox
+target-common
+.git
+examples
+test
+Dockerfile*
+Makefile
+*.md

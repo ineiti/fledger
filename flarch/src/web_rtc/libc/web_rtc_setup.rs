@@ -8,22 +8,18 @@ use async_trait::async_trait;
 use futures::lock::Mutex;
 use webrtc::{
     api::{
-        interceptor_registry::register_default_interceptors, media_engine::MediaEngine, APIBuilder,
-    },
-    data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel},
-    ice_transport::{
+        interceptor_registry::register_default_interceptors, media_engine::MediaEngine, setting_engine::SettingEngine, APIBuilder
+    }, data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel}, ice::mdns::MulticastDnsMode, ice_transport::{
         ice_candidate::{RTCIceCandidate, RTCIceCandidateInit},
         ice_connection_state::RTCIceConnectionState,
         ice_credential_type::RTCIceCredentialType,
         ice_server::RTCIceServer,
-    },
-    interceptor::registry::Registry,
-    peer_connection::{
+    }, interceptor::registry::Registry, peer_connection::{
         configuration::RTCConfiguration,
         peer_connection_state::RTCPeerConnectionState,
         sdp::{sdp_type::RTCSdpType, session_description::RTCSessionDescription},
         RTCPeerConnection,
-    },
+    }
 };
 
 use crate::web_rtc::{
@@ -100,10 +96,16 @@ impl WebRTCConnectionSetupLibc {
         // Use the default set of Interceptors
         registry = register_default_interceptors(registry, &mut m).map_err(to_error)?;
 
+        // There seems to be some trouble with mdns where it can flood the local network
+        // with requests - so turn it off.
+        let mut setting_engine = SettingEngine::default();
+        setting_engine.set_ice_multicast_dns_mode(MulticastDnsMode::Disabled);
+
         // Create the API object with the MediaEngine
         let api = APIBuilder::new()
             .with_media_engine(m)
             .with_interceptor_registry(registry)
+            .with_setting_engine(setting_engine)
             .build();
 
         // Prepare the configuration
