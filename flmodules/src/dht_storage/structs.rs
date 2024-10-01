@@ -1,8 +1,8 @@
 use bytes::Bytes;
 use num_bigint::BigUint;
 
+use crate::ledger::core::LedgerSetup;
 use flarch::nodeids::U256;
-use crate::ledger::core::{LedgerConfig, LedgerState};
 
 pub struct Entry {
     pub id: U256,
@@ -18,10 +18,12 @@ pub enum EntryData {
     Blob(Blob),
 }
 
+pub struct LedgerState {}
+
 pub struct Domain {
     pub id: U256,
     pub name: String,
-    pub ledger: LedgerConfig,
+    pub ledger: LedgerSetup,
 }
 
 pub struct GroupConfig {

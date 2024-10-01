@@ -1,19 +1,13 @@
 use flarch::nodeids::{NodeIDs, U256};
 use serde::{Deserialize, Serialize};
 
-pub struct LedgerConfig {
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct LedgerSetup {
     pub id: U256,
     pub spread: u32,
     pub min_mem: u64,
     pub dynamic: bool,
     pub members: NodeIDs,
-    pub state: LedgerState,
-}
-
-pub struct LedgerState {
-    pub epoch: u64,
-    pub index: u64,
-    pub merkle_tree: String,
 }
 
 pub enum LedgerStatus {
@@ -25,33 +19,26 @@ pub enum LedgerStatus {
 /// Whatever hardcoded config you want to pass to your module.
 /// It must have a default option.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct TemplateConfig {
-    multiplier: u32,
-}
+pub struct LedgerConfig {}
 
-impl Default for TemplateConfig {
+impl Default for LedgerConfig {
     fn default() -> Self {
-        Self { multiplier: 1 }
+        Self {}
     }
 }
 
 /// The TemplateCore structure holds a configuration and the storage
 /// needed to persist over reloads of the node.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct TemplateCore {
-    pub storage: TemplateStorage,
-    pub config: TemplateConfig,
+pub struct Ledger {
+    pub storage: LedgerStorage,
+    pub config: LedgerConfig,
 }
 
-impl TemplateCore {
+impl Ledger {
     /// Initializes a new TemplateCore.
-    pub fn new(storage: TemplateStorage, config: TemplateConfig) -> Self {
+    pub fn new(storage: LedgerStorage, config: LedgerConfig) -> Self {
         Self { storage, config }
-    }
-
-    // Here are the different methods to interact with this module.
-    pub fn increase(&mut self, i: u32) {
-        self.storage.counter += i * self.config.multiplier;
     }
 }
 
@@ -60,18 +47,18 @@ impl TemplateCore {
 /// This allows to update to the latest version, supposing that new fields can be filled
 /// with default values.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum TemplateStorageSave {
-    V1(TemplateStorage),
+pub enum LedgerStorageSave {
+    V1(LedgerStorage),
 }
 
-impl TemplateStorageSave {
-    pub fn from_str(data: &str) -> Result<TemplateStorage, serde_yaml::Error> {
-        return Ok(serde_yaml::from_str::<TemplateStorageSave>(data)?.to_latest());
+impl LedgerStorageSave {
+    pub fn from_str(data: &str) -> Result<LedgerStorage, serde_yaml::Error> {
+        return Ok(serde_yaml::from_str::<LedgerStorageSave>(data)?.to_latest());
     }
 
-    fn to_latest(self) -> TemplateStorage {
+    fn to_latest(self) -> LedgerStorage {
         match self {
-            TemplateStorageSave::V1(es) => es,
+            LedgerStorageSave::V1(es) => es,
         }
     }
 }
@@ -85,17 +72,17 @@ impl TemplateStorageSave {
 ///   - add a `V(x+1)` enum pointing to `TemplateStorage`
 /// - adapt `TemplateStorageSave::to_latest` to go from `Vx` to `V(x+1)`
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct TemplateStorage {
+pub struct LedgerStorage {
     pub counter: u32,
 }
 
-impl TemplateStorage {
+impl LedgerStorage {
     pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
-        serde_yaml::to_string::<TemplateStorageSave>(&TemplateStorageSave::V1(self.clone()))
+        serde_yaml::to_string::<LedgerStorageSave>(&LedgerStorageSave::V1(self.clone()))
     }
 }
 
-impl Default for TemplateStorage {
+impl Default for LedgerStorage {
     fn default() -> Self {
         Self { counter: 0 }
     }
@@ -107,21 +94,10 @@ impl Default for TemplateStorage {
 mod tests {
     use std::error::Error;
 
-    use super::*;
+    // use super::*;
 
     #[test]
     fn test_increase() -> Result<(), Box<dyn Error>> {
-        let mut tc = TemplateCore::new(TemplateStorage::default(), TemplateConfig::default());
-        tc.increase(1);
-        assert_eq!(1, tc.storage.counter);
-
-        tc.increase(2);
-        assert_eq!(3, tc.storage.counter);
-
-        tc.config.multiplier = 2;
-        tc.increase(1);
-        assert_eq!(5, tc.storage.counter);
-
         Ok(())
     }
 }
