@@ -96,13 +96,9 @@ serve_local: kill build_local_web serve_two
 	open http://localhost:8080
 
 docker_dev:
-	rustup target add x86_64-unknown-linux-gnu
-	mkdir -p cli/target/debug-x86
-	docker run -ti -v $(PWD):/mnt/fledger:cached \
-		rust:latest /mnt/fledger/run_docker.sh
 	for cli in fledger flsignal; do \
-		docker build cli/target/debug-x86 -f Dockerfile.$$cli -t fledgre/$$cli:dev && \
-		# docker push fledgre/$$cli:dev; \
+		docker build --target $$cli --platform linux/amd64 -t fledgre/$$cli:dev . -f Dockerfile.dev --progress plain; \
+		docker push fledgre/$$cli:dev; \
 	done
 
 clean:
