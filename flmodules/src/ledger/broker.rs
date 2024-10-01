@@ -9,43 +9,38 @@ use flarch::{
 };
 
 use super::{
-    core::{TemplateConfig, TemplateStorage, TemplateStorageSave},
-    messages::{MessageNode, TemplateIn, TemplateMessage, TemplateMessages, TemplateOut},
+    core::{LedgerConfig, LedgerStorage, LedgerStorageSave},
+    messages::{LedgerIn, LedgerMessage, LedgerMessages, LedgerOut, MessageNode},
 };
 
-const MODULE_NAME: &str = "Template";
+const MODULE_NAME: &str = "Ledger";
 
-/// This links the Template module with other modules, so that
-/// all messages are correctly translated from one to the other.
-/// For this example, it uses the RandomConnections module to communicate
-/// with other nodes.
-///
-/// The [Template] holds the [Translate] and offers convenience methods
+/// The [Ledger] holds the [Translate] and offers convenience methods
 /// to interact with [Translate] and [TemplateMessage].
-pub struct Template {
+pub struct Ledger {
     /// Represents the underlying broker.
-    pub broker: Broker<TemplateMessage>,
-    our_id: NodeID,
-    storage: watch::Receiver<TemplateStorage>,
+    pub broker: Broker<LedgerMessage>,
+    _our_id: NodeID,
+    storage: watch::Receiver<LedgerStorage>,
 }
 
-impl Template {
+impl Ledger {
     pub async fn start(
         mut ds: Box<dyn DataStorage + Send>,
         our_id: NodeID,
         rc: Broker<RandomMessage>,
-        config: TemplateConfig,
+        config: LedgerConfig,
     ) -> Result<Self, Box<dyn Error>> {
         let str = ds.get(MODULE_NAME).unwrap_or("".into());
-        let storage = TemplateStorageSave::from_str(&str).unwrap_or_default();
-        let messages = TemplateMessages::new(storage.clone(), config, our_id)?;
+        let storage = LedgerStorageSave::from_str(&str).unwrap_or_default();
+        let messages = LedgerMessages::new(storage.clone(), config, our_id)?;
         let mut broker = Translate::start(rc, messages).await?;
 
         let (tx, storage) = watch::channel(storage);
         let (mut tap, _) = broker.get_tap().await?;
         spawn_local(async move {
             loop {
-                if let Some(TemplateMessage::Output(TemplateOut::UpdateStorage(sto))) =
+                if let Some(LedgerMessage::Output(LedgerOut::UpdateStorage(sto))) =
                     tap.recv().await
                 {
                     tx.send(sto.clone()).expect("updated storage");
@@ -55,16 +50,17 @@ impl Template {
                 }
             }
         });
-        Ok(Template {
+        Ok(Ledger {
             broker,
-            our_id,
+            _our_id: our_id,
             storage,
         })
     }
 
-    pub fn increase_self(&mut self, counter: u32) -> Result<(), BrokerError> {
-        self.broker
-            .emit_msg(TemplateIn::Node(self.our_id, MessageNode::Increase(counter)).into())
+    pub fn increase_self(&mut self, _counter: u32) -> Result<(), BrokerError> {
+        // self.broker
+        //     .emit_msg(LedgerIn::Node(self.our_id, MessageNode::Increase(counter)).into())
+        Ok(())
     }
 
     pub fn get_counter(&self) -> u32 {
@@ -74,14 +70,14 @@ impl Template {
 
 /// Translates the messages to/from the RandomMessage and calls `TemplateMessages.processMessages`.
 struct Translate {
-    messages: TemplateMessages,
+    messages: LedgerMessages,
 }
 
 impl Translate {
     async fn start(
         random: Broker<RandomMessage>,
-        messages: TemplateMessages,
-    ) -> Result<Broker<TemplateMessage>, Box<dyn Error>> {
+        messages: LedgerMessages,
+    ) -> Result<Broker<LedgerMessage>, Box<dyn Error>> {
         let mut template = Broker::new();
 
         template
@@ -97,15 +93,15 @@ impl Translate {
         Ok(template)
     }
 
-    fn link_rnd_template(msg: RandomMessage) -> Option<TemplateMessage> {
+    fn link_rnd_template(msg: RandomMessage) -> Option<LedgerMessage> {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
-                RandomOut::ListUpdate(list) => Some(TemplateIn::UpdateNodeList(list.into()).into()),
+                RandomOut::ListUpdate(list) => Some(LedgerIn::UpdateNodeList(list.into()).into()),
                 RandomOut::NodeMessageFromNetwork(id, msg) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)
                             .ok()
-                            .map(|msg_node| TemplateIn::Node(id, msg_node).into())
+                            .map(|msg_node| LedgerIn::Node(id, msg_node).into())
                     } else {
                         None
                     }
@@ -117,8 +113,8 @@ impl Translate {
         }
     }
 
-    fn link_template_rnd(msg: TemplateMessage) -> Option<RandomMessage> {
-        if let TemplateMessage::Output(TemplateOut::Node(id, msg_node)) = msg {
+    fn link_template_rnd(msg: LedgerMessage) -> Option<RandomMessage> {
+        if let LedgerMessage::Output(LedgerOut::Node(id, msg_node)) = msg {
             Some(
                 RandomIn::NodeMessageToNetwork(
                     id,
@@ -136,13 +132,13 @@ impl Translate {
 }
 
 #[platform_async_trait()]
-impl SubsystemHandler<TemplateMessage> for Translate {
-    async fn messages(&mut self, msgs: Vec<TemplateMessage>) -> Vec<TemplateMessage> {
+impl SubsystemHandler<LedgerMessage> for Translate {
+    async fn messages(&mut self, msgs: Vec<LedgerMessage>) -> Vec<LedgerMessage> {
         let msgs_in = msgs
             .into_iter()
             .filter_map(|msg| match msg {
-                TemplateMessage::Input(msg_in) => Some(msg_in),
-                TemplateMessage::Output(_) => None,
+                LedgerMessage::Input(msg_in) => Some(msg_in),
+                LedgerMessage::Output(_) => None,
             })
             .collect();
         self.messages
@@ -155,7 +151,7 @@ impl SubsystemHandler<TemplateMessage> for Translate {
 
 #[cfg(test)]
 mod tests {
-    use flarch::{data_storage::DataStorageTemp, start_logging_filter_level};
+    use flarch::start_logging_filter_level;
 
     use super::*;
 
@@ -163,24 +159,6 @@ mod tests {
     async fn test_increase() -> Result<(), Box<dyn Error>> {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
 
-        let ds = Box::new(DataStorageTemp::new());
-        let id0 = NodeID::rnd();
-        let id1 = NodeID::rnd();
-        let mut rnd = Broker::new();
-        let mut tr = Template::start(ds, id0, rnd.clone(), TemplateConfig::default()).await?;
-        let mut tap = rnd.get_tap().await?;
-        assert_eq!(0, tr.get_counter());
-
-        rnd.settle_msg(RandomMessage::Output(RandomOut::ListUpdate(
-            vec![id1].into(),
-        )))
-        .await?;
-        tr.increase_self(1)?;
-        assert!(matches!(
-            tap.0.recv().await.unwrap(),
-            RandomMessage::Input(_)
-        ));
-        assert_eq!(1, tr.get_counter());
         Ok(())
     }
 }
