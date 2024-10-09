@@ -41,11 +41,11 @@ use std::{
     },
 };
 
-use flarch_macro::platform_async_trait;
 use futures::{future::BoxFuture, lock::Mutex};
 use thiserror::Error;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
+use flarch_macro::platform_async_trait;
 use crate::{nodeids::U256, tasks::spawn_local};
 
 #[derive(Debug, Error)]

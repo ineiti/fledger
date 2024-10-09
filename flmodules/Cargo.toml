@@ -45,6 +45,7 @@ reqwest = { version = "0.12", features = [
 ], default-features = false }
 bitflags = { version = "2", features = ["serde"] }
 num-bigint = { version = "0.4.6", features = ["serde"] }
+strum_macros = "0.26.4"
 
 [dev-dependencies]
 env_logger = "0.11"
