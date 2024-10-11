@@ -24,6 +24,11 @@ mode - requesting list of available events from other nodes.
 the signalling server.
 - `web_proxy` allows sending a http GET request to another node, using the other
 node as a proxy.
+- `overlay` is an intermediate layer that contains all messages to be implemented
+for current and future communication layers. 
+Currently it's implemented for `random_connections` and `network`.
+Future implementations might include a `dht_router` and a `mix_net` communication
+layer.
 
 # Adding your own modules
 

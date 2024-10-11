@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use flarch::nodeids::{NodeID, NodeIDs, U256};
 
-use crate::nodeconfig::NodeInfo;
+use crate::{nodeconfig::NodeInfo, overlay::messages::ModuleMessage};
 
 use super::core::RandomStorage;
 
@@ -11,12 +11,6 @@ use super::core::RandomStorage;
 pub enum NodeMessage {
     Module(ModuleMessage),
     DropConnection,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ModuleMessage {
-    pub module: String,
-    pub msg: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -40,8 +34,8 @@ pub enum RandomIn {
 pub enum RandomOut {
     ConnectNode(NodeID),
     DisconnectNode(NodeID),
-    ListUpdate(NodeIDs),
-    NodeInfoConnected(Vec<NodeInfo>),
+    NodeIDsConnected(NodeIDs),
+    NodeInfosConnected(Vec<NodeInfo>),
     NodeMessageToNetwork(NodeID, NodeMessage),
     NodeMessageFromNetwork(NodeID, ModuleMessage),
     Storage(RandomStorage),
@@ -113,7 +107,7 @@ impl RandomConnections {
                     );
                     vec![
                         RandomOut::DisconnectNode(dst),
-                        RandomOut::ListUpdate(self.storage.connected.get_nodes()),
+                        RandomOut::NodeIDsConnected(self.storage.connected.get_nodes()),
                     ]
                 }
             }
@@ -200,8 +194,8 @@ impl RandomConnections {
 
     fn update(&self) -> Vec<RandomOut> {
         vec![
-            RandomOut::ListUpdate(self.storage.connected.get_nodes()),
-            RandomOut::NodeInfoConnected(self.storage.get_connected_info()),
+            RandomOut::NodeIDsConnected(self.storage.connected.get_nodes()),
+            RandomOut::NodeInfosConnected(self.storage.get_connected_info()),
             RandomOut::Storage(self.storage.clone()),
         ]
     }

@@ -8,7 +8,7 @@ use flarch::{
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
 
-use crate::random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut};
+use crate::overlay::messages::{ModuleMessage, OverlayIn, OverlayMessage, OverlayOut};
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},
@@ -45,7 +45,7 @@ impl WebProxy {
     pub async fn start(
         mut ds: Box<dyn DataStorage + Send>,
         our_id: NodeID,
-        rc: Broker<RandomMessage>,
+        overlay: Broker<OverlayMessage>,
         config: WebProxyConfig,
     ) -> Result<Self, WebProxyError> {
         let str = ds.get(MODULE_NAME).unwrap_or("".into());
@@ -53,7 +53,7 @@ impl WebProxy {
         let mut web_proxy = Broker::new();
         let messages = WebProxyMessages::new(storage.clone(), config, our_id, web_proxy.clone())?;
 
-        Translate::start(web_proxy.clone(), rc, messages).await?;
+        Translate::start(web_proxy.clone(), overlay, messages).await?;
 
         let (tx, storage) = watch::channel(storage);
         let (mut tap, _) = web_proxy.get_tap().await?;
@@ -112,7 +112,7 @@ struct Translate {
 impl Translate {
     async fn start(
         mut web_proxy: Broker<WebProxyMessage>,
-        random: Broker<RandomMessage>,
+        overlay: Broker<OverlayMessage>,
         messages: WebProxyMessages,
     ) -> Result<(), WebProxyError> {
         web_proxy
@@ -120,21 +120,21 @@ impl Translate {
             .await?;
         web_proxy
             .link_bi(
-                random,
-                Box::new(Self::link_rnd_proxy),
-                Box::new(Self::link_proxy_rnd),
+                overlay,
+                Box::new(Self::link_overlay_proxy),
+                Box::new(Self::link_proxy_overlay),
             )
             .await?;
         Ok(())
     }
 
-    fn link_rnd_proxy(msg: RandomMessage) -> Option<WebProxyMessage> {
-        if let RandomMessage::Output(msg_out) = msg {
+    fn link_overlay_proxy(msg: OverlayMessage) -> Option<WebProxyMessage> {
+        if let OverlayMessage::Output(msg_out) = msg {
             match msg_out {
-                RandomOut::NodeInfoConnected(list) => {
+                OverlayOut::NodeInfosConnected(list) => {
                     Some(WebProxyIn::NodeInfoConnected(list).into())
                 }
-                RandomOut::NodeMessageFromNetwork(id, msg) => {
+                OverlayOut::NodeMessageFromNetwork(id, msg) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)
                             .ok()
@@ -150,10 +150,10 @@ impl Translate {
         }
     }
 
-    fn link_proxy_rnd(msg: WebProxyMessage) -> Option<RandomMessage> {
+    fn link_proxy_overlay(msg: WebProxyMessage) -> Option<OverlayMessage> {
         if let WebProxyMessage::Output(WebProxyOut::Node(id, msg_node)) = msg {
             Some(
-                RandomIn::NodeMessageToNetwork(
+                OverlayIn::NodeMessageToNetwork(
                     id,
                     ModuleMessage {
                         module: MODULE_NAME.into(),
@@ -214,8 +214,10 @@ mod tests {
         let (mut wp_tap, _) = wp_rnd.get_tap().await?;
 
         let list = vec![cl_in, wp_in];
-        cl_rnd.emit_msg(RandomMessage::Output(RandomOut::NodeInfoConnected(list.clone())))?;
-        wp_rnd.emit_msg(RandomMessage::Output(RandomOut::NodeInfoConnected(list)))?;
+        cl_rnd.emit_msg(OverlayMessage::Output(OverlayOut::NodeInfosConnected(
+            list.clone(),
+        )))?;
+        wp_rnd.emit_msg(OverlayMessage::Output(OverlayOut::NodeInfosConnected(list)))?;
 
         let (tx, mut rx) = channel(1);
         spawn_local(async move {
@@ -232,23 +234,23 @@ mod tests {
                 return Ok(());
             }
 
-            if let Ok(RandomMessage::Input(RandomIn::NodeMessageToNetwork(dst, msg))) =
+            if let Ok(OverlayMessage::Input(OverlayIn::NodeMessageToNetwork(dst, msg))) =
                 cl_tap.try_recv()
             {
                 log::debug!("Sending to WP: {msg:?}");
                 wp_rnd
-                    .emit_msg(RandomMessage::Output(RandomOut::NodeMessageFromNetwork(
+                    .emit_msg(OverlayMessage::Output(OverlayOut::NodeMessageFromNetwork(
                         dst, msg,
                     )))
                     .expect("sending to wp");
             }
 
-            if let Ok(RandomMessage::Input(RandomIn::NodeMessageToNetwork(dst, msg))) =
+            if let Ok(OverlayMessage::Input(OverlayIn::NodeMessageToNetwork(dst, msg))) =
                 wp_tap.try_recv()
             {
                 log::debug!("Sending to CL: {msg:?}");
                 cl_rnd
-                    .emit_msg(RandomMessage::Output(RandomOut::NodeMessageFromNetwork(
+                    .emit_msg(OverlayMessage::Output(OverlayOut::NodeMessageFromNetwork(
                         dst, msg,
                     )))
                     .expect("sending to wp");

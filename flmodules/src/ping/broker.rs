@@ -6,8 +6,7 @@ use flarch::{
 };
 
 use crate::{
-    random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
-    timer::TimerMessage,
+    overlay::messages::ModuleMessage, random_connections::messages::{RandomIn, RandomMessage, RandomOut}, timer::TimerMessage
 };
 
 use super::{
@@ -89,7 +88,7 @@ impl Translate {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
                 RandomOut::DisconnectNode(id) => Some(PingIn::DisconnectNode(id).into()),
-                RandomOut::ListUpdate(list) => Some(PingIn::NodeList(list.into()).into()),
+                RandomOut::NodeIDsConnected(list) => Some(PingIn::NodeList(list.into()).into()),
                 RandomOut::NodeMessageFromNetwork(id, msg) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)

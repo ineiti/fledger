@@ -2,7 +2,7 @@ use flarch::{data_storage::DataStorage, platform_async_trait, tasks::spawn_local
 use std::error::Error;
 use tokio::sync::watch;
 
-use crate::random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut};
+use crate::{overlay::messages::ModuleMessage, random_connections::messages::{RandomIn, RandomMessage, RandomOut}};
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::NodeID,
@@ -100,7 +100,9 @@ impl Translate {
     fn link_rnd_template(msg: RandomMessage) -> Option<TemplateMessage> {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
-                RandomOut::ListUpdate(list) => Some(TemplateIn::UpdateNodeList(list.into()).into()),
+                RandomOut::NodeIDsConnected(list) => {
+                    Some(TemplateIn::UpdateNodeList(list.into()).into())
+                }
                 RandomOut::NodeMessageFromNetwork(id, msg) => {
                     if msg.module == MODULE_NAME {
                         serde_yaml::from_str::<MessageNode>(&msg.msg)
@@ -171,7 +173,7 @@ mod tests {
         let mut tap = rnd.get_tap().await?;
         assert_eq!(0, tr.get_counter());
 
-        rnd.settle_msg(RandomMessage::Output(RandomOut::ListUpdate(
+        rnd.settle_msg(RandomMessage::Output(RandomOut::NodeIDsConnected(
             vec![id1].into(),
         )))
         .await?;
