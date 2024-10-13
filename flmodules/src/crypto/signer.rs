@@ -5,7 +5,10 @@ use thiserror::Error;
 use super::{
     entity::EntityID,
     signer_impl::{
-        key_pair_ed25519_from_bytes, key_pair_ed25519_new, key_pair_ml_dsa44_from_bytes, key_pair_ml_dsa44_new, key_pair_ml_dsa65_from_bytes, key_pair_ml_dsa65_new, key_pair_ml_dsa87_from_bytes, key_pair_ml_dsa87_new, verifier_ed25519_from_bytes, verifier_ml_dsa44_from_bytes, verifier_ml_dsa65_from_bytes, verifier_ml_dsa87_from_bytes
+        key_pair_ed25519_from_bytes, key_pair_ed25519_new, key_pair_ml_dsa44_from_bytes,
+        key_pair_ml_dsa44_new, key_pair_ml_dsa65_from_bytes, key_pair_ml_dsa65_new,
+        key_pair_ml_dsa87_from_bytes, key_pair_ml_dsa87_new, verifier_ed25519_from_bytes,
+        verifier_ml_dsa44_from_bytes, verifier_ml_dsa65_from_bytes, verifier_ml_dsa87_from_bytes,
     },
 };
 
@@ -42,7 +45,7 @@ impl Signer {
         }
     }
 
-    pub fn sign(&self, msg: &Bytes) -> Signature {
+    pub fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError> {
         self.signer.sign(msg)
     }
 
@@ -184,7 +187,7 @@ pub trait VerifierImpl {
 pub trait SignerImpl {
     fn to_bytes(&self) -> Bytes;
 
-    fn sign(&self, msg: &Bytes) -> Signature;
+    fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError>;
 }
 
 pub(crate) fn signer_from_bytes(st: SignatureType, b: &Bytes) -> Result<Signer, SignerError> {
@@ -227,9 +230,9 @@ mod test {
     fn test_sig(sig: SignatureType) -> Result<(), SignerError> {
         let signer = Signer::new(sig);
         let msg1 = Bytes::from("value1");
-        let signature1 = signer.sign(&msg1);
+        let signature1 = signer.sign(&msg1)?;
         let msg2 = Bytes::from("value2");
-        let signature2 = signer.sign(&msg2);
+        let signature2 = signer.sign(&msg2)?;
         signer.verifier().verify(&msg1, &signature1)?;
         signer.verifier().verify(&msg2, &signature2)?;
 

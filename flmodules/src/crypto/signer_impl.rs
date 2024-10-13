@@ -46,12 +46,13 @@ impl SignerImpl for SignerEd25519 {
         self.keypair.to_vec().into()
     }
 
-    fn sign(&self, msg: &Bytes) -> Signature {
-        self.keypair
+    fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError> {
+        Ok(self
+            .keypair
             .sk
             .sign(msg, Some(ed25519_compact::Noise::default()))
             .to_vec()
-            .into()
+            .into())
     }
 }
 pub struct VerifierEd25519 {
@@ -92,7 +93,9 @@ pub fn key_pair_ml_dsa44_new() -> (Box<dyn SignerImpl>, Box<dyn VerifierImpl>) {
     todo!()
 }
 
-pub fn key_pair_ml_dsa44_from_bytes(b: &Bytes) -> Result<(Box<dyn SignerImpl>, Box<dyn VerifierImpl>), SignerError> {
+pub fn key_pair_ml_dsa44_from_bytes(
+    b: &Bytes,
+) -> Result<(Box<dyn SignerImpl>, Box<dyn VerifierImpl>), SignerError> {
     todo!()
 }
 
@@ -107,7 +110,7 @@ impl SignerImpl for SignerMlDSA44 {
         todo!()
     }
 
-    fn sign(&self, msg: &Bytes) -> Signature {
+    fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError> {
         todo!()
     }
 }
@@ -139,14 +142,15 @@ pub fn key_pair_ml_dsa65_new() -> (Box<dyn SignerImpl>, Box<dyn VerifierImpl>) {
     todo!()
 }
 
-pub fn key_pair_ml_dsa65_from_bytes(b: &Bytes) -> Result<(Box<dyn SignerImpl>, Box<dyn VerifierImpl>), SignerError> {
+pub fn key_pair_ml_dsa65_from_bytes(
+    b: &Bytes,
+) -> Result<(Box<dyn SignerImpl>, Box<dyn VerifierImpl>), SignerError> {
     todo!()
 }
 
 pub fn verifier_ml_dsa65_from_bytes(b: &Bytes) -> Result<Box<dyn VerifierImpl>, SignerError> {
     todo!()
 }
-
 
 pub struct SignerMlDSA65 {}
 
@@ -155,7 +159,7 @@ impl SignerImpl for SignerMlDSA65 {
         todo!()
     }
 
-    fn sign(&self, msg: &Bytes) -> Signature {
+    fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError> {
         todo!()
     }
 }
@@ -187,14 +191,15 @@ pub fn key_pair_ml_dsa87_new() -> (Box<dyn SignerImpl>, Box<dyn VerifierImpl>) {
     todo!()
 }
 
-pub fn key_pair_ml_dsa87_from_bytes(b: &Bytes) -> Result<(Box<dyn SignerImpl>, Box<dyn VerifierImpl>), SignerError> {
+pub fn key_pair_ml_dsa87_from_bytes(
+    b: &Bytes,
+) -> Result<(Box<dyn SignerImpl>, Box<dyn VerifierImpl>), SignerError> {
     todo!()
 }
 
 pub fn verifier_ml_dsa87_from_bytes(b: &Bytes) -> Result<Box<dyn VerifierImpl>, SignerError> {
     todo!()
 }
-
 
 pub struct SignerMlDSA87 {}
 
@@ -203,7 +208,7 @@ impl SignerImpl for SignerMlDSA87 {
         todo!()
     }
 
-    fn sign(&self, msg: &Bytes) -> Signature {
+    fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError> {
         todo!()
     }
 }
