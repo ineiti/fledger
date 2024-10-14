@@ -8,10 +8,10 @@ use flarch::{
 
 use super::{
     core::{Category, Event, EventsStorage},
-    messages::{Config, GossipEvents, GossipIn, GossipMessage, GossipOut, MessageNode},
+    messages::{Config, GossipEvents, GossipIn, GossipMessage, GossipOut},
 };
 use crate::{
-    overlay::messages::ModuleMessage,
+    overlay::messages::NetworkWrapper,
     random_connections::messages::{RandomIn, RandomMessage, RandomOut},
     timer::TimerMessage,
 };
@@ -119,15 +119,9 @@ impl Translate {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
                 RandomOut::NodeIDsConnected(list) => Some(GossipIn::NodeList(list.into()).into()),
-                RandomOut::NodeMessageFromNetwork(id, msg) => {
-                    if msg.module == MODULE_NAME {
-                        serde_yaml::from_str::<MessageNode>(&msg.msg)
-                            .ok()
-                            .map(|msg_node| GossipIn::Node(id, msg_node).into())
-                    } else {
-                        None
-                    }
-                }
+                RandomOut::NodeMessageFromNetwork(id, msg) => msg
+                    .unwrap_yaml(MODULE_NAME)
+                    .map(|msg| GossipIn::Node(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -140,10 +134,7 @@ impl Translate {
             Some(
                 RandomIn::NodeMessageToNetwork(
                     id,
-                    ModuleMessage {
-                        module: MODULE_NAME.into(),
-                        msg: serde_yaml::to_string(&msg_node).unwrap(),
-                    },
+                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )
                 .into(),
             )
@@ -193,6 +184,7 @@ mod tests {
     use std::error::Error;
 
     use crate::gossip_events::core::{Category, Event};
+    use crate::gossip_events::messages::MessageNode;
     use flarch::nodeids::NodeID;
     use flarch::{start_logging, tasks::now};
 
@@ -226,10 +218,7 @@ mod tests {
             .settle_msg(
                 RandomOut::NodeMessageFromNetwork(
                     id2,
-                    ModuleMessage {
-                        module: MODULE_NAME.into(),
-                        msg: serde_yaml::to_string(&msg).unwrap(),
-                    },
+                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg).unwrap(),
                 )
                 .into(),
             )

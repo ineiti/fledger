@@ -8,7 +8,7 @@ use flarch::{
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
 
-use crate::overlay::messages::{ModuleMessage, OverlayIn, OverlayMessage, OverlayOut};
+use crate::overlay::messages::{NetworkWrapper, OverlayIn, OverlayMessage, OverlayOut};
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},
@@ -16,7 +16,7 @@ use flarch::{
 
 use super::{
     core::{Counters, WebProxyConfig, WebProxyStorage, WebProxyStorageSave},
-    messages::{MessageNode, WebProxyIn, WebProxyMessage, WebProxyMessages, WebProxyOut},
+    messages::{WebProxyIn, WebProxyMessage, WebProxyMessages, WebProxyOut},
     response::Response,
 };
 
@@ -134,15 +134,9 @@ impl Translate {
                 OverlayOut::NodeInfosConnected(list) => {
                     Some(WebProxyIn::NodeInfoConnected(list).into())
                 }
-                OverlayOut::NodeMessageFromNetwork(id, msg) => {
-                    if msg.module == MODULE_NAME {
-                        serde_yaml::from_str::<MessageNode>(&msg.msg)
-                            .ok()
-                            .map(|msg_node| WebProxyIn::Node(id, msg_node).into())
-                    } else {
-                        None
-                    }
-                }
+                OverlayOut::NetworkMapperFromNetwork(id, msg) => msg
+                    .unwrap_yaml(MODULE_NAME)
+                    .map(|msg| WebProxyIn::Node(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -153,12 +147,9 @@ impl Translate {
     fn link_proxy_overlay(msg: WebProxyMessage) -> Option<OverlayMessage> {
         if let WebProxyMessage::Output(WebProxyOut::Node(id, msg_node)) = msg {
             Some(
-                OverlayIn::NodeMessageToNetwork(
+                OverlayIn::NetworkWrapperToNetwork(
                     id,
-                    ModuleMessage {
-                        module: MODULE_NAME.into(),
-                        msg: serde_yaml::to_string(&msg_node).unwrap(),
-                    },
+                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )
                 .into(),
             )
@@ -234,23 +225,23 @@ mod tests {
                 return Ok(());
             }
 
-            if let Ok(OverlayMessage::Input(OverlayIn::NodeMessageToNetwork(dst, msg))) =
+            if let Ok(OverlayMessage::Input(OverlayIn::NetworkWrapperToNetwork(dst, msg))) =
                 cl_tap.try_recv()
             {
                 log::debug!("Sending to WP: {msg:?}");
                 wp_rnd
-                    .emit_msg(OverlayMessage::Output(OverlayOut::NodeMessageFromNetwork(
+                    .emit_msg(OverlayMessage::Output(OverlayOut::NetworkMapperFromNetwork(
                         dst, msg,
                     )))
                     .expect("sending to wp");
             }
 
-            if let Ok(OverlayMessage::Input(OverlayIn::NodeMessageToNetwork(dst, msg))) =
+            if let Ok(OverlayMessage::Input(OverlayIn::NetworkWrapperToNetwork(dst, msg))) =
                 wp_tap.try_recv()
             {
                 log::debug!("Sending to CL: {msg:?}");
                 cl_rnd
-                    .emit_msg(OverlayMessage::Output(OverlayOut::NodeMessageFromNetwork(
+                    .emit_msg(OverlayMessage::Output(OverlayOut::NetworkMapperFromNetwork(
                         dst, msg,
                     )))
                     .expect("sending to wp");

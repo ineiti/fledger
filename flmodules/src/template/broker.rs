@@ -2,7 +2,10 @@ use flarch::{data_storage::DataStorage, platform_async_trait, tasks::spawn_local
 use std::error::Error;
 use tokio::sync::watch;
 
-use crate::{overlay::messages::ModuleMessage, random_connections::messages::{RandomIn, RandomMessage, RandomOut}};
+use crate::{
+    overlay::messages::NetworkWrapper,
+    random_connections::messages::{RandomIn, RandomMessage, RandomOut},
+};
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::NodeID,
@@ -103,15 +106,9 @@ impl Translate {
                 RandomOut::NodeIDsConnected(list) => {
                     Some(TemplateIn::UpdateNodeList(list.into()).into())
                 }
-                RandomOut::NodeMessageFromNetwork(id, msg) => {
-                    if msg.module == MODULE_NAME {
-                        serde_yaml::from_str::<MessageNode>(&msg.msg)
-                            .ok()
-                            .map(|msg_node| TemplateIn::Node(id, msg_node).into())
-                    } else {
-                        None
-                    }
-                }
+                RandomOut::NodeMessageFromNetwork(id, msg) => msg
+                    .unwrap_yaml(MODULE_NAME)
+                    .map(|msg| TemplateIn::Node(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -124,10 +121,7 @@ impl Translate {
             Some(
                 RandomIn::NodeMessageToNetwork(
                     id,
-                    ModuleMessage {
-                        module: MODULE_NAME.into(),
-                        msg: serde_yaml::to_string(&msg_node).unwrap(),
-                    },
+                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )
                 .into(),
             )

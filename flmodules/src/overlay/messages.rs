@@ -1,10 +1,10 @@
 use flarch::nodeids::{NodeID, NodeIDs, U256};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::nodeconfig::NodeInfo;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ModuleMessage {
+pub struct NetworkWrapper {
     pub module: String,
     pub msg: String,
 }
@@ -18,7 +18,7 @@ pub enum OverlayMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum OverlayIn {
-    NodeMessageToNetwork(NodeID, ModuleMessage),
+    NetworkWrapperToNetwork(NodeID, NetworkWrapper),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -26,7 +26,7 @@ pub enum OverlayOut {
     NodeInfoAvailable(Vec<NodeInfo>),
     NodeIDsConnected(NodeIDs),
     NodeInfosConnected(Vec<NodeInfo>),
-    NodeMessageFromNetwork(NodeID, ModuleMessage),
+    NetworkMapperFromNetwork(NodeID, NetworkWrapper),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -51,5 +51,23 @@ impl From<OverlayIn> for OverlayMessage {
 impl From<OverlayInternal> for OverlayMessage {
     fn from(value: OverlayInternal) -> Self {
         OverlayMessage::Internal(value)
+    }
+}
+
+impl NetworkWrapper {
+    pub fn wrap_yaml<T: Serialize>(module: &str, msg: &T) -> Result<Self, serde_yaml::Error> {
+        Ok(Self {
+            module: module.into(),
+            msg: serde_yaml::to_string(msg)?,
+        })
+    }
+
+    pub fn unwrap_yaml<T: DeserializeOwned>(&self, module: &str) -> Option<T> {
+        if self.module == module {
+            if let Ok(msg) = serde_yaml::from_str(&self.msg) {
+                return Some(msg);
+            }
+        }
+        None
     }
 }

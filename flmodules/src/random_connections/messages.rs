@@ -3,13 +3,13 @@ use serde::{Deserialize, Serialize};
 
 use flarch::nodeids::{NodeID, NodeIDs, U256};
 
-use crate::{nodeconfig::NodeInfo, overlay::messages::ModuleMessage};
+use crate::{nodeconfig::NodeInfo, overlay::messages::NetworkWrapper};
 
 use super::core::RandomStorage;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NodeMessage {
-    Module(ModuleMessage),
+    Module(NetworkWrapper),
     DropConnection,
 }
 
@@ -26,7 +26,7 @@ pub enum RandomIn {
     NodeConnected(NodeID),
     NodeDisconnected(NodeID),
     NodeMessageFromNetwork(NodeID, NodeMessage),
-    NodeMessageToNetwork(NodeID, ModuleMessage),
+    NodeMessageToNetwork(NodeID, NetworkWrapper),
     Tick,
 }
 
@@ -37,7 +37,7 @@ pub enum RandomOut {
     NodeIDsConnected(NodeIDs),
     NodeInfosConnected(Vec<NodeInfo>),
     NodeMessageToNetwork(NodeID, NodeMessage),
-    NodeMessageFromNetwork(NodeID, ModuleMessage),
+    NodeMessageFromNetwork(NodeID, NetworkWrapper),
     Storage(RandomStorage),
 }
 

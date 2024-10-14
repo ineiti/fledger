@@ -33,7 +33,7 @@ impl OverlayRandom {
                             OverlayOut::NodeInfosConnected(infos)
                         }
                         RandomOut::NodeMessageFromNetwork(id, module_message) => {
-                            OverlayOut::NodeMessageFromNetwork(id, module_message)
+                            OverlayOut::NetworkMapperFromNetwork(id, module_message)
                         }
                         _ => return None,
                     };
@@ -44,7 +44,7 @@ impl OverlayRandom {
             Box::new(|msg| {
                 if let OverlayMessage::Input(input) = msg {
                     let ret = match input {
-                        OverlayIn::NodeMessageToNetwork(id, module_message) => {
+                        OverlayIn::NetworkWrapperToNetwork(id, module_message) => {
                             RandomIn::NodeMessageToNetwork(id, module_message)
                         }
                     };
@@ -91,7 +91,7 @@ impl OverlayDirect {
                     return match out {
                         NetworkOut::RcvNodeMessage(id, msg_str) => {
                             serde_yaml::from_str(&msg_str).ok().map(|module_message| {
-                                OverlayOut::NodeMessageFromNetwork(id, module_message).into()
+                                OverlayOut::NetworkMapperFromNetwork(id, module_message).into()
                             })
                         }
                         NetworkOut::RcvWSUpdateList(vec) => {
@@ -109,7 +109,7 @@ impl OverlayDirect {
             Box::new(|msg| {
                 if let OverlayMessage::Input(input) = msg {
                     let ret = match input {
-                        OverlayIn::NodeMessageToNetwork(id, module_message) => {
+                        OverlayIn::NetworkWrapperToNetwork(id, module_message) => {
                             if let Ok(msg_str) = serde_yaml::to_string(&module_message) {
                                 NetworkIn::SendNodeMessage(id, msg_str)
                             } else {
