@@ -2,15 +2,17 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    nodeids::{NodeID, U256}, platform_async_trait,
+    nodeids::{NodeID, U256},
+    platform_async_trait,
 };
 
 use super::{
     core::{Category, Event, EventsStorage},
-    messages::{Config, GossipEvents, GossipIn, GossipMessage, GossipOut, MessageNode},
+    messages::{Config, GossipEvents, GossipIn, GossipMessage, GossipOut},
 };
 use crate::{
-    random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
+    overlay::messages::NetworkWrapper,
+    random_connections::messages::{RandomIn, RandomMessage, RandomOut},
     timer::TimerMessage,
 };
 
@@ -23,7 +25,7 @@ pub struct GossipBroker {
     pub storage: EventsStorage,
     /// Represents the underlying broker.
     pub broker: Broker<GossipMessage>,
-    /// Is used to pass the EventsStorage structure from the Transalate to the GossipLink.
+    /// Is used to pass the EventsStorage structure from the Translate to the GossipLink.
     storage_rx: Receiver<EventsStorage>,
 }
 
@@ -116,16 +118,10 @@ impl Translate {
     fn link_rnd_gossip(msg: RandomMessage) -> Option<GossipMessage> {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
-                RandomOut::ListUpdate(list) => Some(GossipIn::NodeList(list.into()).into()),
-                RandomOut::NodeMessageFromNetwork(id, msg) => {
-                    if msg.module == MODULE_NAME {
-                        serde_yaml::from_str::<MessageNode>(&msg.msg)
-                            .ok()
-                            .map(|msg_node| GossipIn::Node(id, msg_node).into())
-                    } else {
-                        None
-                    }
-                }
+                RandomOut::NodeIDsConnected(list) => Some(GossipIn::NodeList(list.into()).into()),
+                RandomOut::NodeMessageFromNetwork(id, msg) => msg
+                    .unwrap_yaml(MODULE_NAME)
+                    .map(|msg| GossipIn::Node(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -138,10 +134,7 @@ impl Translate {
             Some(
                 RandomIn::NodeMessageToNetwork(
                     id,
-                    ModuleMessage {
-                        module: MODULE_NAME.into(),
-                        msg: serde_yaml::to_string(&msg_node).unwrap(),
-                    },
+                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )
                 .into(),
             )
@@ -191,6 +184,7 @@ mod tests {
     use std::error::Error;
 
     use crate::gossip_events::core::{Category, Event};
+    use crate::gossip_events::messages::MessageNode;
     use flarch::nodeids::NodeID;
     use flarch::{start_logging, tasks::now};
 
@@ -207,7 +201,7 @@ mod tests {
         let id2 = NodeID::rnd();
         let (tap_rnd, _) = broker_rnd.get_tap_sync().await?;
         broker_rnd
-            .settle_msg(RandomMessage::Output(RandomOut::ListUpdate(
+            .settle_msg(RandomMessage::Output(RandomOut::NodeIDsConnected(
                 vec![id2].into(),
             )))
             .await?;
@@ -224,10 +218,7 @@ mod tests {
             .settle_msg(
                 RandomOut::NodeMessageFromNetwork(
                     id2,
-                    ModuleMessage {
-                        module: MODULE_NAME.into(),
-                        msg: serde_yaml::to_string(&msg).unwrap(),
-                    },
+                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg).unwrap(),
                 )
                 .into(),
             )
