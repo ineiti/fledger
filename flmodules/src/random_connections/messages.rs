@@ -8,7 +8,7 @@ use crate::{nodeconfig::NodeInfo, overlay::messages::NetworkWrapper};
 use super::core::RandomStorage;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum NodeMessage {
+pub enum ModuleMessage {
     Module(NetworkWrapper),
     DropConnection,
 }
@@ -25,8 +25,8 @@ pub enum RandomIn {
     NodeFailure(NodeID),
     NodeConnected(NodeID),
     NodeDisconnected(NodeID),
-    NodeMessageFromNetwork(NodeID, NodeMessage),
-    NodeMessageToNetwork(NodeID, NetworkWrapper),
+    NodeCommFromNetwork(NodeID, ModuleMessage),
+    NetworkMapperToNetwork(NodeID, NetworkWrapper),
     Tick,
 }
 
@@ -36,8 +36,8 @@ pub enum RandomOut {
     DisconnectNode(NodeID),
     NodeIDsConnected(NodeIDs),
     NodeInfosConnected(Vec<NodeInfo>),
-    NodeMessageToNetwork(NodeID, NodeMessage),
-    NodeMessageFromNetwork(NodeID, NetworkWrapper),
+    NodeCommToNetwork(NodeID, ModuleMessage),
+    NetworkWrapperFromNetwork(NodeID, NetworkWrapper),
     Storage(RandomStorage),
 }
 
@@ -94,12 +94,12 @@ impl RandomConnections {
                     self.update(),
                 ])
             }
-            RandomIn::NodeMessageFromNetwork(id, node_msg) => self.network_msg(id, node_msg),
-            RandomIn::NodeMessageToNetwork(dst, msg) => {
+            RandomIn::NodeCommFromNetwork(id, node_msg) => self.network_msg(id, node_msg),
+            RandomIn::NetworkMapperToNetwork(dst, msg) => {
                 if self.storage.connected.contains(&dst) {
-                    vec![RandomOut::NodeMessageToNetwork(
+                    vec![RandomOut::NodeCommToNetwork(
                         dst,
-                        NodeMessage::Module(msg),
+                        ModuleMessage::Module(msg),
                     )]
                 } else {
                     log::warn!(
@@ -116,10 +116,10 @@ impl RandomConnections {
     }
 
     /// Processes one message from the network.
-    pub fn network_msg(&mut self, id: U256, msg: NodeMessage) -> Vec<RandomOut> {
+    pub fn network_msg(&mut self, id: U256, msg: ModuleMessage) -> Vec<RandomOut> {
         match msg {
-            NodeMessage::Module(msg_mod) => vec![RandomOut::NodeMessageFromNetwork(id, msg_mod)],
-            NodeMessage::DropConnection => {
+            ModuleMessage::Module(msg_mod) => vec![RandomOut::NetworkWrapperFromNetwork(id, msg_mod)],
+            ModuleMessage::DropConnection => {
                 self.storage.disconnect((&vec![id]).into());
                 concat([vec![RandomOut::DisconnectNode(id)], self.new_connection()])
             }
@@ -151,7 +151,7 @@ impl RandomConnections {
             .into_iter()
             .flat_map(|n| {
                 vec![
-                    RandomOut::NodeMessageToNetwork(n, NodeMessage::DropConnection),
+                    RandomOut::NodeCommToNetwork(n, ModuleMessage::DropConnection),
                     RandomOut::DisconnectNode(n),
                 ]
             })

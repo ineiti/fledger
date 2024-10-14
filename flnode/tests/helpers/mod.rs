@@ -66,7 +66,7 @@ impl NetworkSimul {
         for id in self.nodes.keys() {
             if let Some(broker) = self.node_brokers.get_mut(id) {
                 broker
-                    .settle_msg(NetworkOut::RcvWSUpdateList(list.clone()).into())
+                    .settle_msg(NetworkOut::NodeListFromWS(list.clone()).into())
                     .await?;
             }
         }
@@ -134,9 +134,9 @@ impl NetworkSimul {
                     (id_dst, NetworkOut::Connected(*id).into()),
                 ]
             }
-            NetworkMessage::Input(NetworkIn::SendNodeMessage(from_id, msg_str)) => vec![(
+            NetworkMessage::Input(NetworkIn::MessageToNode(from_id, msg_str)) => vec![(
                 from_id,
-                NetworkOut::RcvNodeMessage(id.clone(), msg_str).into(),
+                NetworkOut::MessageFromNode(id.clone(), msg_str).into(),
             )],
             NetworkMessage::WebRTC(WebRTCConnMessage::InputNC(
                 id_dst,

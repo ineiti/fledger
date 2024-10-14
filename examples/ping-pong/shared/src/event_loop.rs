@@ -59,10 +59,10 @@ fn update_list(
     net: &mut Broker<NetworkMessage>,
     nodes: &Vec<NodeInfo>,
 ) -> Result<(), BrokerError> {
-    net.emit_msg(NetworkMessage::Input(NetworkIn::SendWSUpdateListRequest))?;
+    net.emit_msg(NetworkMessage::Input(NetworkIn::WSUpdateListRequest))?;
     for node in nodes.iter() {
         if node.get_id() != id {
-            net.emit_msg(NetworkMessage::Input(NetworkIn::SendNodeMessage(
+            net.emit_msg(NetworkMessage::Input(NetworkIn::MessageToNode(
                 node.get_id(),
                 serde_json::to_string(&PPMessageNode::Ping).unwrap(),
             )))?;
@@ -79,18 +79,18 @@ fn new_msg(
 ) -> Result<Option<Vec<NodeInfo>>, BrokerError> {
     if let Some(NetworkMessage::Output(msg_tap)) = msg {
         match msg_tap {
-            NetworkOut::RcvNodeMessage(from, msg_net) => {
+            NetworkOut::MessageFromNode(from, msg_net) => {
                 if let Ok(msg) = serde_json::from_str::<PPMessageNode>(&msg_net) {
                     ret.emit_msg(PPMessage::FromNetwork(from, msg.clone()))?;
                     if msg == PPMessageNode::Ping {
-                        net.emit_msg(NetworkMessage::Input(NetworkIn::SendNodeMessage(
+                        net.emit_msg(NetworkMessage::Input(NetworkIn::MessageToNode(
                             from,
                             serde_json::to_string(&PPMessageNode::Pong).unwrap(),
                         )))?;
                     }
                 }
             }
-            NetworkOut::RcvWSUpdateList(list) => {
+            NetworkOut::NodeListFromWS(list) => {
                 ret.emit_msg(PPMessage::List(list.clone()))?;
                 return Ok(Some(list));
             }

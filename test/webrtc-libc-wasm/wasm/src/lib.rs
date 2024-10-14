@@ -40,12 +40,12 @@ async fn run_app() -> Result<(), StartError> {
         while let Ok(msg) = rx.try_recv() {
             if let NetworkMessage::Output(reply) = msg {
                 match reply {
-                    NetworkOut::RcvNodeMessage(id, msg_net) => {
+                    NetworkOut::MessageFromNode(id, msg_net) => {
                         log::info!("Got node message: {} / {:?}", id, msg_net);
                         net.remove_subsystem(tap_indx).await?;
                         return Ok(());
                     }
-                    NetworkOut::RcvWSUpdateList(list) => {
+                    NetworkOut::NodeListFromWS(list) => {
                         let other: Vec<NodeInfo> = list
                             .iter()
                             .filter(|n| n.get_id() != nc.info.get_id())
@@ -55,7 +55,7 @@ async fn run_app() -> Result<(), StartError> {
                         if other.len() > 0 {
                             net.emit_msg_dest(
                                 Destination::NoTap,
-                                NetworkIn::SendNodeMessage(
+                                NetworkIn::MessageToNode(
                                     other.get(0).unwrap().get_id(),
                                     "Hello from Rust wasm".to_string(),
                                 )
@@ -67,7 +67,7 @@ async fn run_app() -> Result<(), StartError> {
                 }
             }
         }
-        net.emit_msg(NetworkMessage::Input(NetworkIn::SendWSUpdateListRequest))?;
+        net.emit_msg(NetworkMessage::Input(NetworkIn::WSUpdateListRequest))?;
         wait_ms(1000).await;
     }
 }

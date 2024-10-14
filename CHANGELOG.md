@@ -16,6 +16,7 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - re-arranged file names in the flmodules section, to better fit with the `template` module
 - changed the names of the networking messages
 - added an `Overlay` module to abstract the network handling
+- more changes in names of the messages to remove ambiguities
 
 ## [0.8.0] - 2024-09-09
 

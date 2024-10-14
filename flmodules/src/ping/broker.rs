@@ -91,9 +91,9 @@ impl Translate {
             match msg_out {
                 RandomOut::DisconnectNode(id) => Some(PingIn::DisconnectNode(id).into()),
                 RandomOut::NodeIDsConnected(list) => Some(PingIn::NodeList(list.into()).into()),
-                RandomOut::NodeMessageFromNetwork(id, msg) => msg
+                RandomOut::NetworkWrapperFromNetwork(id, msg) => msg
                     .unwrap_yaml(MODULE_NAME)
-                    .map(|msg| PingIn::Message(id, msg).into()),
+                    .map(|msg| PingIn::FromNetwork(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -104,8 +104,8 @@ impl Translate {
     fn link_ping_rnd(msg: PingMessage) -> Option<RandomMessage> {
         if let PingMessage::Output(msg_out) = msg {
             match msg_out {
-                PingOut::Message(id, msg_node) => Some(
-                    RandomIn::NodeMessageToNetwork(
+                PingOut::ToNetwork(id, msg_node) => Some(
+                    RandomIn::NetworkMapperToNetwork(
                         id,
                         NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                     )

@@ -32,7 +32,7 @@ impl OverlayRandom {
                         RandomOut::NodeInfosConnected(infos) => {
                             OverlayOut::NodeInfosConnected(infos)
                         }
-                        RandomOut::NodeMessageFromNetwork(id, module_message) => {
+                        RandomOut::NetworkWrapperFromNetwork(id, module_message) => {
                             OverlayOut::NetworkMapperFromNetwork(id, module_message)
                         }
                         _ => return None,
@@ -45,7 +45,7 @@ impl OverlayRandom {
                 if let OverlayMessage::Input(input) = msg {
                     let ret = match input {
                         OverlayIn::NetworkWrapperToNetwork(id, module_message) => {
-                            RandomIn::NodeMessageToNetwork(id, module_message)
+                            RandomIn::NetworkMapperToNetwork(id, module_message)
                         }
                     };
                     return Some(RandomMessage::Input(ret));
@@ -89,12 +89,12 @@ impl OverlayDirect {
             Box::new(|msg| {
                 if let NetworkMessage::Output(out) = msg {
                     return match out {
-                        NetworkOut::RcvNodeMessage(id, msg_str) => {
+                        NetworkOut::MessageFromNode(id, msg_str) => {
                             serde_yaml::from_str(&msg_str).ok().map(|module_message| {
                                 OverlayOut::NetworkMapperFromNetwork(id, module_message).into()
                             })
                         }
-                        NetworkOut::RcvWSUpdateList(vec) => {
+                        NetworkOut::NodeListFromWS(vec) => {
                             Some(OverlayInternal::Available(vec).into())
                         }
                         NetworkOut::Connected(id) => Some(OverlayInternal::Connected(id).into()),
@@ -111,7 +111,7 @@ impl OverlayDirect {
                     let ret = match input {
                         OverlayIn::NetworkWrapperToNetwork(id, module_message) => {
                             if let Ok(msg_str) = serde_yaml::to_string(&module_message) {
-                                NetworkIn::SendNodeMessage(id, msg_str)
+                                NetworkIn::MessageToNode(id, msg_str)
                             } else {
                                 return None;
                             }

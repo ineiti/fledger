@@ -187,7 +187,7 @@ impl Node {
     /// Requests a list of all connected nodes
     pub async fn request_list(&mut self) -> Result<(), NodeError> {
         self.broker_net
-            .emit_msg(NetworkIn::SendWSUpdateListRequest.into())?;
+            .emit_msg(NetworkIn::WSUpdateListRequest.into())?;
         Ok(())
     }
 

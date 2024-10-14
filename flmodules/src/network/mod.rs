@@ -88,7 +88,7 @@
 //!     log::info!("Server id is {server_id:?}");
 //!     // This sends the message by setting up a connection using the signalling server.
 //!     // The client must already be running and be registered with the signalling server.
-//!     // Using `SendNodeMessage` will set up a connection using the signalling server, but
+//!     // Using `MessageToNode` will set up a connection using the signalling server, but
 //!     // in the best case, the signalling server will not be used anymore afterwards.
 //!     net.send_msg(server_id, "ping".into())?;
 //!
