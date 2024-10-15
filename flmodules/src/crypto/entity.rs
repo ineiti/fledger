@@ -2,6 +2,7 @@ use std::{collections::HashMap, io::Write};
 
 use bytes::Bytes;
 use flarch::nodeids::U256;
+use futures::executor::EnterError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -39,6 +40,12 @@ pub enum EntityError {
     SignatureError(#[from] SignerError),
     #[error("Not enough signatures present")]
     ThresholdNotReached,
+    #[error("Cannot have zero threshold")]
+    ZeroThreshold,
+    #[error("Not enough verifiers for this threshold")]
+    ThresholdAboveVerifiers,
+    #[error("Need at least one verifier")]
+    ZeroVerifiers,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -68,15 +75,25 @@ pub struct EntityHistoryV1 {
 pub type EntityID = U256;
 
 impl Entity {
-    pub fn new(entities: Vec<EntityVerifierV1>, threshold: usize) -> Self {
-        Entity::V1(EntityV1 {
+    pub fn new(entities: &[EntityVerifierV1], threshold: usize) -> Result<Self, EntityError> {
+        if threshold == 0 {
+            return Err(EntityError::ZeroThreshold);
+        }
+        if threshold > entities.len() {
+            return Err(EntityError::ThresholdAboveVerifiers);
+        }
+        if entities.len() == 0 {
+            return Err(EntityError::ZeroVerifiers);
+        }
+
+        Ok(Entity::V1(EntityV1 {
             initial: EntityHistoryV1 {
-                entities,
+                entities: entities.into(),
                 threshold,
                 sigs: None,
             },
             updates: vec![],
-        })
+        }))
     }
 
     pub fn get_id(&self) -> EntityID {
@@ -93,7 +110,7 @@ impl Entity {
 
     pub fn propose_signature(&self, msg: &Bytes) -> EntitySigCollect {
         EntitySigCollect::new(
-            self.entity_msg(msg),
+            self.entity_msg(self.version(), msg),
             self.latest()
                 .entities
                 .iter()
@@ -104,26 +121,42 @@ impl Entity {
     }
 
     pub fn verify(&self, sig: &EntitySignature, msg: &Bytes) -> Result<(), EntityError> {
-        self.latest().verify(sig, &self.entity_msg(msg))
+        self.latest()
+            .verify(sig, &self.entity_msg(self.version(), msg))
+    }
+
+    fn verify_raw(&self, sig: &EntitySignature, msg: &Bytes) -> Result<(), EntityError> {
+        self.latest()
+            .verify(sig, msg)
     }
 
     pub fn propose_evolve(
         &self,
         entities_new: &[EntityVerifierV1],
         threshold: usize,
-    ) -> EntitySigCollect {
-        self.latest().propose_evolve(entities_new, threshold)
+    ) -> Result<EntitySigCollect, EntityError> {
+        if threshold == 0 {
+            return Err(EntityError::ZeroThreshold);
+        }
+        if threshold > entities_new.len() {
+            return Err(EntityError::ThresholdAboveVerifiers);
+        }
+        if entities_new.len() == 0 {
+            return Err(EntityError::ZeroVerifiers);
+        }
+
+        Ok(self.propose_signature(&self.latest().propose_msg(entities_new, threshold)))
     }
 
     pub fn evolve(
         &mut self,
         sig: EntitySignature,
-        entities_new: Vec<EntityVerifierV1>,
+        entities_new: &[EntityVerifierV1],
         threshold: usize,
     ) -> Result<(), EntityError> {
-        self.verify(
+        self.verify_raw(
             &sig,
-            &self.propose_evolve(&entities_new, threshold).get_msg(),
+            &self.propose_evolve(entities_new, threshold)?.get_msg(),
         )?;
         let s = self.entity_mut();
         if let Some(last) = s.updates.last_mut() {
@@ -132,7 +165,7 @@ impl Entity {
             s.initial.sigs = Some(sig);
         }
         s.updates.push(EntityHistoryV1 {
-            entities: entities_new,
+            entities: entities_new.into(),
             threshold: s.initial.threshold,
             sigs: None,
         });
@@ -143,6 +176,7 @@ impl Entity {
         if id != self.get_id() {
             return Err(EntityError::WrongEntityID);
         }
+        let mut version = 0;
         for pair in [
             vec![&self.entity().initial],
             self.entity().updates.iter().collect(),
@@ -150,13 +184,15 @@ impl Entity {
         .concat()
         .windows(2)
         {
-            let msg = pair[0]
-                .propose_evolve(&pair[1].entities, pair[1].threshold)
-                .get_msg();
+            let msg = self.entity_msg(
+                version,
+                &pair[0].propose_msg(&pair[1].entities, pair[1].threshold),
+            );
             match &pair[0].sigs {
                 Some(sigs) => pair[0].verify(sigs, &msg)?,
                 None => return Err(EntityError::EvolveWrongSignature),
             }
+            version += 1;
         }
         Ok(())
     }
@@ -165,9 +201,9 @@ impl Entity {
         self.entity().updates.len()
     }
 
-    fn entity_msg(&self, msg: &Bytes) -> Bytes {
+    fn entity_msg(&self, version: usize, msg: &Bytes) -> Bytes {
         let mut hasher = Sha256::new();
-        hasher.update(&self.version().to_le_bytes());
+        hasher.update(version.to_le_bytes());
         hasher.update(&self.get_id().to_bytes());
         hasher.update(&msg);
         Bytes::from(hasher.finalize().to_vec())
@@ -219,12 +255,14 @@ impl EntityHistoryV1 {
         }
     }
 
-    pub fn propose_evolve(
-        &self,
-        entities_new: &[EntityVerifierV1],
-        threshold: usize,
-    ) -> EntitySigCollect {
-        todo!()
+    fn propose_msg(&self, entities_new: &[EntityVerifierV1], threshold: usize) -> Bytes {
+        let mut hasher = Sha256::new();
+        hasher.update(threshold.to_le_bytes());
+        for entity in entities_new {
+            hasher.update(&entity.get_id());
+        }
+
+        hasher.finalize().to_vec().into()
     }
 }
 
@@ -243,7 +281,7 @@ impl EntitySigCollect {
         }
     }
 
-    pub fn sign(&mut self, sign: Signer) -> Result<(), EntityError> {
+    pub fn sign(&mut self, sign: &Signer) -> Result<(), EntityError> {
         match self.signed.get_mut(&sign.get_id()) {
             Some(sig) => *sig = Some(EntitySignature::Single(sign.sign(&self.msg)?)),
             None => return Err(EntityError::WrongEntityID),
@@ -316,14 +354,19 @@ mod test {
 
     use super::*;
 
+    type TR = Result<(), Box<dyn Error>>;
+
     #[test]
-    fn test_simple() -> Result<(), Box<dyn Error>> {
+    fn test_simple() -> TR {
         let sig = Signer::new(SignatureType::Ed25519);
-        let ent = Entity::new(vec![sig.verifier().into()], 1);
+        assert!(Entity::new(&[], 1).is_err());
+        assert!(Entity::new(&[sig.verifier().into()], 0).is_err());
+        assert!(Entity::new(&[sig.verifier().into()], 2).is_err());
+        let ent = Entity::new(&[sig.verifier().into()], 1)?;
         let msg = Bytes::from("signature message");
         let mut sig_ent = ent.propose_signature(&msg);
         assert!(sig_ent.finalize().is_err());
-        sig_ent.sign(sig)?;
+        sig_ent.sign(&sig)?;
         let sig_ent_final = sig_ent.finalize()?;
         assert!(ent.verify(&sig_ent_final, &msg).is_ok());
         assert!(ent
@@ -334,9 +377,28 @@ mod test {
     }
 
     #[test]
-    fn test_evolve() -> Result<(), Box<dyn Error>> {
+    fn test_evolve() -> TR {
         let sig = Signer::new(SignatureType::Ed25519);
-        let ent = Entity::new(vec![sig.verifier().into()], 1);
+        let mut ent = Entity::new(&[sig.verifier().into()], 1)?;
+        let id = ent.get_id();
+        let sig2 = Signer::new(SignatureType::Ed25519);
+
+        let mut sig_evolve_propose = ent.propose_evolve(&[sig2.verifier().into()], 1)?;
+        assert!(sig_evolve_propose.finalize().is_err());
+        assert!(sig_evolve_propose.sign(&sig2).is_err());
+        assert!(sig_evolve_propose.sign(&sig).is_ok());
+        assert!(sig_evolve_propose.sign(&sig).is_ok());
+
+        let sig_evolve = sig_evolve_propose.finalize()?;
+        assert!(ent
+            .evolve(sig_evolve.clone(), &[sig.verifier().into()], 1)
+            .is_err());
+        assert!(ent
+            .evolve(sig_evolve.clone(), &[sig2.verifier().into()], 2)
+            .is_err());
+        ent.evolve(sig_evolve, &[sig2.verifier().into()], 1)?;
+        assert_eq!(1, ent.version());
+        assert_eq!(id, ent.get_id());
 
         Ok(())
     }
