@@ -46,6 +46,8 @@ pub enum EntityError {
     ThresholdAboveVerifiers,
     #[error("Need at least one verifier")]
     ZeroVerifiers,
+    #[error("Not the same evolution state")]
+    EvolutionState,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -146,6 +148,16 @@ impl Entity {
         }
 
         Ok(self.propose_signature(&self.latest().propose_msg(entities_new, threshold)))
+    }
+
+    /// When signing an EntitySigCollect for an evolution, this method allows to check whether the
+    /// proposed evolution is actually what the signer supposes it should be.
+    pub fn sign_evolve(&self, signer: &Signer, sig_coll: &mut EntitySigCollect, entities_new: &[EntityVerifierV1], threshold: usize) -> Result<(), EntityError>{
+        let msg = self.entity_msg(self.version(), &self.latest().propose_msg(entities_new, threshold));
+        if msg != sig_coll.msg {
+            return Err(EntityError::EvolutionState);
+        }
+        sig_coll.sign(signer)
     }
 
     pub fn evolve(
@@ -325,6 +337,12 @@ pub enum EntitySignature {
     Entity(HashMap<EntityID, EntitySignature>),
 }
 
+impl From<Signer> for EntityVerifierV1 {
+    fn from(value: Signer) -> Self {
+        Self::Verifier(value.verifier())
+    }
+}
+
 impl From<Verifier> for EntityVerifierV1 {
     fn from(value: Verifier) -> Self {
         Self::Verifier(value)
@@ -357,7 +375,7 @@ mod test {
     type TR = Result<(), Box<dyn Error>>;
 
     #[test]
-    fn test_simple() -> TR {
+    fn test_sig_single() -> TR {
         let sig = Signer::new(SignatureType::Ed25519);
         assert!(Entity::new(&[], 1).is_err());
         assert!(Entity::new(&[sig.verifier().into()], 0).is_err());
@@ -377,7 +395,26 @@ mod test {
     }
 
     #[test]
-    fn test_evolve() -> TR {
+    fn test_sig_threshold_1() -> TR {
+        let sig1 = Signer::new(SignatureType::Ed25519);
+        let sig2 = Signer::new(SignatureType::Ed25519);
+        let ent = Entity::new(&[sig1.verifier().into(), sig2.verifier().into()], 1)?;
+        let msg = Bytes::from("signature message");
+        let mut sig_ent = ent.propose_signature(&msg);
+        sig_ent.sign(&sig1)?;
+        let sig_ent_final = sig_ent.finalize()?;
+        assert!(ent.verify(&sig_ent_final, &msg).is_ok());
+
+        let mut sig_ent = ent.propose_signature(&msg);
+        sig_ent.sign(&sig2)?;
+        let sig_ent_final = sig_ent.finalize()?;
+        assert!(ent.verify(&sig_ent_final, &msg).is_ok());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_evolve_single() -> TR {
         let sig = Signer::new(SignatureType::Ed25519);
         let mut ent = Entity::new(&[sig.verifier().into()], 1)?;
         let id = ent.get_id();
