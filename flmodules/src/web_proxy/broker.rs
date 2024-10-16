@@ -136,7 +136,7 @@ impl Translate {
                 }
                 OverlayOut::NetworkMapperFromNetwork(id, msg) => msg
                     .unwrap_yaml(MODULE_NAME)
-                    .map(|msg| WebProxyIn::Node(id, msg).into()),
+                    .map(|msg| WebProxyIn::FromNetwork(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -145,7 +145,7 @@ impl Translate {
     }
 
     fn link_proxy_overlay(msg: WebProxyMessage) -> Option<OverlayMessage> {
-        if let WebProxyMessage::Output(WebProxyOut::Node(id, msg_node)) = msg {
+        if let WebProxyMessage::Output(WebProxyOut::ToNetwork(id, msg_node)) = msg {
             Some(
                 OverlayIn::NetworkWrapperToNetwork(
                     id,

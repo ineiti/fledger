@@ -8,7 +8,7 @@ use super::core::*;
 /// These are the messages which will be exchanged between the nodes for this
 /// module.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum MessageNode {
+pub enum ModuleMessage {
     Increase(u32),
     Counter(u32),
 }
@@ -24,13 +24,13 @@ pub enum TemplateMessage {
 /// The messages here represent all possible interactions with this module.
 #[derive(Debug, Clone)]
 pub enum TemplateIn {
-    Node(NodeID, MessageNode),
+    FromNetwork(NodeID, ModuleMessage),
     UpdateNodeList(NodeIDs),
 }
 
 #[derive(Debug, Clone)]
 pub enum TemplateOut {
-    Node(NodeID, MessageNode),
+    ToNetwork(NodeID, ModuleMessage),
     UpdateStorage(TemplateStorage),
 }
 
@@ -63,7 +63,7 @@ impl TemplateMessages {
         for msg in msgs {
             log::trace!("Got msg: {msg:?}");
             out.extend(match msg {
-                TemplateIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
+                TemplateIn::FromNetwork(src, node_msg) => self.process_node_message(src, node_msg),
                 TemplateIn::UpdateNodeList(ids) => self.node_list(ids),
             });
         }
@@ -72,9 +72,9 @@ impl TemplateMessages {
 
     /// Processes a node to node message and returns zero or more
     /// MessageOut.
-    pub fn process_node_message(&mut self, _src: NodeID, msg: MessageNode) -> Vec<TemplateOut> {
+    pub fn process_node_message(&mut self, _src: NodeID, msg: ModuleMessage) -> Vec<TemplateOut> {
         match msg {
-            MessageNode::Increase(c) => {
+            ModuleMessage::Increase(c) => {
                 // When increasing the counter, send 'self' counter to all other nodes.
                 // Also send a StorageUpdate message.
                 self.core.increase(c);
@@ -83,15 +83,15 @@ impl TemplateMessages {
                     .0
                     .iter()
                     .map(|id| {
-                        TemplateOut::Node(
+                        TemplateOut::ToNetwork(
                             id.clone(),
-                            MessageNode::Counter(self.core.storage.counter),
+                            ModuleMessage::Counter(self.core.storage.counter),
                         )
                     })
                     .chain(vec![TemplateOut::UpdateStorage(self.core.storage.clone())])
                     .collect();
             }
-            MessageNode::Counter(c) => log::info!("Got counter from {}: {}", _src, c),
+            ModuleMessage::Counter(c) => log::info!("Got counter from {}: {}", _src, c),
         }
         vec![]
     }
@@ -130,11 +130,11 @@ mod tests {
         let mut msg = TemplateMessages::new(storage, TemplateConfig::default(), id0)?;
         msg.process_messages(vec![TemplateIn::UpdateNodeList(ids).into()]);
         let ret =
-            msg.process_messages(vec![TemplateIn::Node(id1, MessageNode::Increase(2)).into()]);
+            msg.process_messages(vec![TemplateIn::FromNetwork(id1, ModuleMessage::Increase(2)).into()]);
         assert_eq!(2, ret.len());
         assert!(matches!(
             ret[0],
-            TemplateOut::Node(_, MessageNode::Counter(2))
+            TemplateOut::ToNetwork(_, ModuleMessage::Counter(2))
         ));
         assert!(matches!(
             ret[1],

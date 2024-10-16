@@ -73,16 +73,16 @@ impl NSHub {
     fn net_msg(&self, id: U256, net_msg: NetworkMessage) -> Vec<NSHubMessage> {
         if let NetworkMessage::Input(msg) = net_msg {
             match msg {
-                NetworkIn::SendNodeMessage(id_dst, msg_node) => {
+                NetworkIn::MessageToNode(id_dst, msg_node) => {
                     vec![NSHubMessage::ToClient(
                         id_dst,
-                        NetworkMessage::Output(NetworkOut::RcvNodeMessage(id, msg_node)),
+                        NetworkMessage::Output(NetworkOut::MessageFromNode(id, msg_node)),
                     )]
                 }
-                NetworkIn::SendWSUpdateListRequest => {
+                NetworkIn::WSUpdateListRequest => {
                     vec![NSHubMessage::ToClient(
                         id,
-                        NetworkMessage::Output(NetworkOut::RcvWSUpdateList(self.nodes.clone())),
+                        NetworkMessage::Output(NetworkOut::NodeListFromWS(self.nodes.clone())),
                     )]
                 }
                 _ => {

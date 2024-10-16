@@ -9,7 +9,7 @@ use flarch::{
 use crate::{
     network::messages::{NetworkIn, NetworkOut, NetworkMessage},
     random_connections::{
-        messages::{Config, NodeMessage, RandomConnections, RandomIn, RandomMessage, RandomOut},
+        messages::{Config, ModuleMessage, RandomConnections, RandomIn, RandomMessage, RandomOut},
         core::RandomStorage,
     },
     timer::TimerMessage,
@@ -82,12 +82,12 @@ impl Translate {
         Box::new(move |msg: NetworkMessage| {
             if let NetworkMessage::Output(msg_net) = msg {
                 match msg_net {
-                    NetworkOut::RcvNodeMessage(id, msg_str) => {
-                        if let Ok(msg_rnd) = serde_yaml::from_str::<NodeMessage>(&msg_str) {
-                            return Some(RandomIn::NodeMessageFromNetwork(id, msg_rnd).into());
+                    NetworkOut::MessageFromNode(id, msg_str) => {
+                        if let Ok(msg_rnd) = serde_yaml::from_str::<ModuleMessage>(&msg_str) {
+                            return Some(RandomIn::NodeCommFromNetwork(id, msg_rnd).into());
                         }
                     }
-                    NetworkOut::RcvWSUpdateList(list) => {
+                    NetworkOut::NodeListFromWS(list) => {
                         return Some(
                             RandomIn::NodeList(
                                 list.into_iter()
@@ -113,9 +113,9 @@ impl Translate {
             match msg_out {
                 RandomOut::ConnectNode(id) => return Some(NetworkIn::Connect(id).into()),
                 RandomOut::DisconnectNode(id) => return Some(NetworkIn::Disconnect(id).into()),
-                RandomOut::NodeMessageToNetwork(id, msg) => {
+                RandomOut::NodeCommToNetwork(id, msg) => {
                     let msg_str = serde_yaml::to_string(&msg).unwrap();
-                    return Some(NetworkIn::SendNodeMessage(id, msg_str).into());
+                    return Some(NetworkIn::MessageToNode(id, msg_str).into());
                 }
                 _ => {}
             }

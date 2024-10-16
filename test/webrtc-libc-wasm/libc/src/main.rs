@@ -39,7 +39,7 @@ async fn main() -> Result<(), MainError> {
 
     loop {
         let msg = tap.recv().await.expect("expected message");
-        if let NetworkMessage::Output(NetworkOut::RcvNodeMessage(id, msg_net)) = msg {
+        if let NetworkMessage::Output(NetworkOut::MessageFromNode(id, msg_net)) = msg {
             log::info!("Got message from other node: {}", msg_net);
             if msgs_rcv == 0 {
                 msgs_rcv += 1;
@@ -74,7 +74,7 @@ async fn spawn_node() -> Result<(NodeConfig, Broker<NetworkMessage>), MainError>
 }
 
 async fn send(src: &mut Broker<NetworkMessage>, id: U256, msg: &str) {
-    src.emit_msg(NetworkMessage::Input(NetworkIn::SendNodeMessage(
+    src.emit_msg(NetworkMessage::Input(NetworkIn::MessageToNode(
         id,
         msg.into(),
     )))
@@ -115,7 +115,7 @@ mod tests {
 
     async fn wait_msg(tap: &Receiver<NetworkMessage>, msg: &str) {
         for msg_net in tap {
-            if let NetworkMessage::Output(NetworkOut::RcvNodeMessage(_, nm)) = &msg_net {
+            if let NetworkMessage::Output(NetworkOut::MessageFromNode(_, nm)) = &msg_net {
                 if nm == msg {
                     break;
                 }

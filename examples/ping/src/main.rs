@@ -61,9 +61,9 @@ async fn ping() -> Result<(), BrokerError> {
             msg = net.recv() => {
                     match msg {
                         // Display the messages received
-                        NetworkOut::RcvNodeMessage(from, msg) => log::info!("Got message {msg:?} from node {from}"),
+                        NetworkOut::MessageFromNode(from, msg) => log::info!("Got message {msg:?} from node {from}"),
                         // If a new list is available, ping all nodes in the list
-                        NetworkOut::RcvWSUpdateList(list) => for node in list {
+                        NetworkOut::NodeListFromWS(list) => for node in list {
                             if node.get_id() != nc.info.get_id() {
                                 // Sends a text message to the 'node' if it's not ourselves
                                 net.send_msg(node.get_id(), "Ping".into())?
@@ -113,7 +113,7 @@ async fn client(server_id: &str) -> Result<(), BrokerError> {
     log::info!("Server id is {server_id:?}");
     // This sends the message by setting up a connection using the signalling server.
     // The client must already be running and be registered with the signalling server.
-    // Using `SendNodeMessage` will set up a connection using the signalling server, but
+    // Using `MessageToNode` will set up a connection using the signalling server, but
     // in the best case, the signalling server will not be used anymore afterwards.
     net.send_msg(server_id, "ping".into())?;
 

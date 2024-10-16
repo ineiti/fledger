@@ -19,7 +19,7 @@ use super::{
 
 /// Messages between different instances of this module.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum MessageNode {
+pub enum ModuleMessage {
     /// The request holds a random ID so that the reply can be mapped to the correct
     /// request.
     Request(U256, String),
@@ -39,7 +39,7 @@ pub enum WebProxyMessage {
 /// All possible calls TO this module.
 #[derive(Debug, Clone)]
 pub enum WebProxyIn {
-    Node(NodeID, MessageNode),
+    FromNetwork(NodeID, ModuleMessage),
     NodeInfoConnected(Vec<NodeInfo>),
     RequestGet(U256, String, Sender<Bytes>),
 }
@@ -47,7 +47,7 @@ pub enum WebProxyIn {
 /// All possible replies FROM this module.
 #[derive(Debug, Clone)]
 pub enum WebProxyOut {
-    Node(NodeID, MessageNode),
+    ToNetwork(NodeID, ModuleMessage),
     ResponseGet(NodeID, U256, ResponseHeader),
     UpdateStorage(WebProxyStorage),
 }
@@ -77,7 +77,7 @@ impl WebProxyMessages {
     pub fn process_messages(&mut self, msgs: Vec<WebProxyIn>) -> Vec<WebProxyOut> {
         msgs.into_iter()
             .map(|msg| match msg {
-                WebProxyIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
+                WebProxyIn::FromNetwork(src, node_msg) => self.process_node_message(src, node_msg),
                 WebProxyIn::NodeInfoConnected(ids) => self.node_list(ids),
                 WebProxyIn::RequestGet(rnd, url, tx) => self.request_get(rnd, url, tx),
             })
@@ -87,10 +87,10 @@ impl WebProxyMessages {
 
     /// Processes a node to node message and returns zero or more
     /// MessageOut.
-    pub fn process_node_message(&mut self, src: NodeID, msg: MessageNode) -> Vec<WebProxyOut> {
+    pub fn process_node_message(&mut self, src: NodeID, msg: ModuleMessage) -> Vec<WebProxyOut> {
         let mut out = match msg {
-            MessageNode::Request(nonce, request) => self.start_request(src, nonce, request),
-            MessageNode::Response(nonce, response) => self.handle_response(src, nonce, response),
+            ModuleMessage::Request(nonce, request) => self.start_request(src, nonce, request),
+            ModuleMessage::Response(nonce, response) => self.handle_response(src, nonce, response),
         };
         out.push(WebProxyOut::UpdateStorage(self.core.storage.clone()));
         out
@@ -111,7 +111,7 @@ impl WebProxyMessages {
 
     fn request_get(&mut self, rnd: U256, url: String, tx: Sender<Bytes>) -> Vec<WebProxyOut> {
         self.core.request_get(rnd, tx).map_or(vec![], |node| {
-            vec![WebProxyOut::Node(node, MessageNode::Request(rnd, url))]
+            vec![WebProxyOut::ToNetwork(node, ModuleMessage::Request(rnd, url))]
         })
     }
 
@@ -121,18 +121,18 @@ impl WebProxyMessages {
             match reqwest::get(request).await {
                 Ok(resp) => {
                     broker
-                        .emit_msg(WebProxyMessage::Output(WebProxyOut::Node(
+                        .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
                             src,
-                            MessageNode::Response(nonce, ResponseMessage::Header((&resp).into())),
+                            ModuleMessage::Response(nonce, ResponseMessage::Header((&resp).into())),
                         )))
                         .expect("sending header");
                     let mut stream = resp.bytes_stream().chunks(1024);
                     while let Some(chunks) = stream.next().await {
                         for chunk in chunks {
                             broker
-                                .emit_msg(WebProxyMessage::Output(WebProxyOut::Node(
+                                .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
                                     src,
-                                    MessageNode::Response(
+                                    ModuleMessage::Response(
                                         nonce,
                                         ResponseMessage::Body(chunk.expect("getting chunk")),
                                     ),
@@ -141,26 +141,26 @@ impl WebProxyMessages {
                         }
                     }
                     broker
-                        .emit_msg(WebProxyMessage::Output(WebProxyOut::Node(
+                        .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
                             src,
-                            MessageNode::Response(nonce, ResponseMessage::Done),
+                            ModuleMessage::Response(nonce, ResponseMessage::Done),
                         )))
                         .expect("sending done");
                 }
                 Err(e) => {
                     broker
-                        .emit_msg(WebProxyMessage::Output(WebProxyOut::Node(
+                        .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
                             src,
-                            MessageNode::Response(nonce, ResponseMessage::Error(e.to_string())),
+                            ModuleMessage::Response(nonce, ResponseMessage::Error(e.to_string())),
                         )))
                         .expect("Sending done message for");
                     return;
                 }
             }
             broker
-                .emit_msg(WebProxyMessage::Output(WebProxyOut::Node(
+                .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
                     src,
-                    MessageNode::Response(nonce, ResponseMessage::Done),
+                    ModuleMessage::Response(nonce, ResponseMessage::Done),
                 )))
                 .expect("Sending done message for");
         });

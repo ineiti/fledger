@@ -119,9 +119,9 @@ impl Translate {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
                 RandomOut::NodeIDsConnected(list) => Some(GossipIn::NodeList(list.into()).into()),
-                RandomOut::NodeMessageFromNetwork(id, msg) => msg
+                RandomOut::NetworkWrapperFromNetwork(id, msg) => msg
                     .unwrap_yaml(MODULE_NAME)
-                    .map(|msg| GossipIn::Node(id, msg).into()),
+                    .map(|msg| GossipIn::FromNetwork(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -130,9 +130,9 @@ impl Translate {
     }
 
     fn link_gossip_rnd(msg: GossipMessage) -> Option<RandomMessage> {
-        if let GossipMessage::Output(GossipOut::Node(id, msg_node)) = msg {
+        if let GossipMessage::Output(GossipOut::ToNetwork(id, msg_node)) = msg {
             Some(
-                RandomIn::NodeMessageToNetwork(
+                RandomIn::NetworkMapperToNetwork(
                     id,
                     NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )
@@ -184,7 +184,7 @@ mod tests {
     use std::error::Error;
 
     use crate::gossip_events::core::{Category, Event};
-    use crate::gossip_events::messages::MessageNode;
+    use crate::gossip_events::messages::ModuleMessage;
     use flarch::nodeids::NodeID;
     use flarch::{start_logging, tasks::now};
 
@@ -213,10 +213,10 @@ mod tests {
             created: now(),
             msg: "test_msg".into(),
         };
-        let msg = MessageNode::Events(vec![event.clone()]);
+        let msg = ModuleMessage::Events(vec![event.clone()]);
         broker_rnd
             .settle_msg(
-                RandomOut::NodeMessageFromNetwork(
+                RandomOut::NetworkWrapperFromNetwork(
                     id2,
                     NetworkWrapper::wrap_yaml(MODULE_NAME, &msg).unwrap(),
                 )
@@ -233,11 +233,11 @@ mod tests {
 
     fn assert_msg_reid(tap: &Receiver<RandomMessage>, id2: &NodeID) -> Result<(), Box<dyn Error>> {
         for msg in tap.try_iter() {
-            if let RandomMessage::Input(RandomIn::NodeMessageToNetwork(id, msg_mod)) = msg {
+            if let RandomMessage::Input(RandomIn::NetworkMapperToNetwork(id, msg_mod)) = msg {
                 assert_eq!(id2, &id);
                 assert_eq!(MODULE_NAME.to_string(), msg_mod.module);
                 let msg_yaml = serde_yaml::from_str(&msg_mod.msg)?;
-                assert_eq!(MessageNode::RequestEventIDs, msg_yaml);
+                assert_eq!(ModuleMessage::RequestEventIDs, msg_yaml);
             } else {
                 assert!(false);
             }

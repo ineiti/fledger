@@ -13,7 +13,7 @@ use flarch::{
 
 use super::{
     core::{TemplateConfig, TemplateStorage, TemplateStorageSave},
-    messages::{MessageNode, TemplateIn, TemplateMessage, TemplateMessages, TemplateOut},
+    messages::{ModuleMessage, TemplateIn, TemplateMessage, TemplateMessages, TemplateOut},
 };
 
 const MODULE_NAME: &str = "Template";
@@ -67,7 +67,7 @@ impl Template {
 
     pub fn increase_self(&mut self, counter: u32) -> Result<(), BrokerError> {
         self.broker
-            .emit_msg(TemplateIn::Node(self.our_id, MessageNode::Increase(counter)).into())
+            .emit_msg(TemplateIn::FromNetwork(self.our_id, ModuleMessage::Increase(counter)).into())
     }
 
     pub fn get_counter(&self) -> u32 {
@@ -106,9 +106,9 @@ impl Translate {
                 RandomOut::NodeIDsConnected(list) => {
                     Some(TemplateIn::UpdateNodeList(list.into()).into())
                 }
-                RandomOut::NodeMessageFromNetwork(id, msg) => msg
+                RandomOut::NetworkWrapperFromNetwork(id, msg) => msg
                     .unwrap_yaml(MODULE_NAME)
-                    .map(|msg| TemplateIn::Node(id, msg).into()),
+                    .map(|msg| TemplateIn::FromNetwork(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -117,9 +117,9 @@ impl Translate {
     }
 
     fn link_template_rnd(msg: TemplateMessage) -> Option<RandomMessage> {
-        if let TemplateMessage::Output(TemplateOut::Node(id, msg_node)) = msg {
+        if let TemplateMessage::Output(TemplateOut::ToNetwork(id, msg_node)) = msg {
             Some(
-                RandomIn::NodeMessageToNetwork(
+                RandomIn::NetworkMapperToNetwork(
                     id,
                     NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )
