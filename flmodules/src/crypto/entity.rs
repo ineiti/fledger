@@ -1,8 +1,7 @@
-use std::{collections::HashMap, io::Write};
+use std::collections::HashMap;
 
 use bytes::Bytes;
 use flarch::nodeids::U256;
-use futures::executor::EnterError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -128,8 +127,7 @@ impl Entity {
     }
 
     fn verify_raw(&self, sig: &EntitySignature, msg: &Bytes) -> Result<(), EntityError> {
-        self.latest()
-            .verify(sig, msg)
+        self.latest().verify(sig, msg)
     }
 
     pub fn propose_evolve(
@@ -152,8 +150,17 @@ impl Entity {
 
     /// When signing an EntitySigCollect for an evolution, this method allows to check whether the
     /// proposed evolution is actually what the signer supposes it should be.
-    pub fn sign_evolve(&self, signer: &Signer, sig_coll: &mut EntitySigCollect, entities_new: &[EntityVerifierV1], threshold: usize) -> Result<(), EntityError>{
-        let msg = self.entity_msg(self.version(), &self.latest().propose_msg(entities_new, threshold));
+    pub fn sign_evolve(
+        &self,
+        signer: &Signer,
+        sig_coll: &mut EntitySigCollect,
+        entities_new: &[EntityVerifierV1],
+        threshold: usize,
+    ) -> Result<(), EntityError> {
+        let msg = self.entity_msg(
+            self.version(),
+            &self.latest().propose_msg(entities_new, threshold),
+        );
         if msg != sig_coll.msg {
             return Err(EntityError::EvolutionState);
         }
@@ -263,7 +270,10 @@ impl EntityHistoryV1 {
                     Err(EntityError::SignatureWrongEntity)
                 }
             }
-            EntitySignature::Entity(esigs) => todo!(),
+            EntitySignature::Entity(_esigs) => {
+                // esigs.iter().filter(|esig| esig.1)
+                Ok(())
+            },
         }
     }
 

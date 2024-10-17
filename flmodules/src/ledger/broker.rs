@@ -2,7 +2,10 @@ use flarch::{data_storage::DataStorage, platform_async_trait, tasks::spawn_local
 use std::error::Error;
 use tokio::sync::watch;
 
-use crate::random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut};
+use crate::{
+    overlay::messages::NetworkWrapper,
+    random_connections::messages::{RandomIn, RandomMessage, RandomOut},
+};
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::NodeID,
@@ -10,7 +13,7 @@ use flarch::{
 
 use super::{
     core::{LedgerConfig, LedgerStorage, LedgerStorageSave},
-    messages::{LedgerIn, LedgerMessage, LedgerMessages, LedgerOut, MessageNode},
+    messages::{LedgerIn, LedgerMessage, LedgerMessages, LedgerOut},
 };
 
 const MODULE_NAME: &str = "Ledger";
@@ -40,8 +43,7 @@ impl Ledger {
         let (mut tap, _) = broker.get_tap().await?;
         spawn_local(async move {
             loop {
-                if let Some(LedgerMessage::Output(LedgerOut::UpdateStorage(sto))) =
-                    tap.recv().await
+                if let Some(LedgerMessage::Output(LedgerOut::UpdateStorage(sto))) = tap.recv().await
                 {
                     tx.send(sto.clone()).expect("updated storage");
                     if let Ok(val) = sto.to_yaml() {
@@ -96,16 +98,12 @@ impl Translate {
     fn link_rnd_template(msg: RandomMessage) -> Option<LedgerMessage> {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
-                RandomOut::ListUpdate(list) => Some(LedgerIn::UpdateNodeList(list.into()).into()),
-                RandomOut::NodeMessageFromNetwork(id, msg) => {
-                    if msg.module == MODULE_NAME {
-                        serde_yaml::from_str::<MessageNode>(&msg.msg)
-                            .ok()
-                            .map(|msg_node| LedgerIn::Node(id, msg_node).into())
-                    } else {
-                        None
-                    }
+                RandomOut::NodeIDsConnected(list) => {
+                    Some(LedgerIn::UpdateNodeList(list.into()).into())
                 }
+                RandomOut::NetworkWrapperFromNetwork(id, msg) => msg
+                    .unwrap_yaml(MODULE_NAME)
+                    .map(|msg| LedgerIn::Node(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -116,12 +114,9 @@ impl Translate {
     fn link_template_rnd(msg: LedgerMessage) -> Option<RandomMessage> {
         if let LedgerMessage::Output(LedgerOut::Node(id, msg_node)) = msg {
             Some(
-                RandomIn::NodeMessageToNetwork(
+                RandomIn::NetworkMapperToNetwork(
                     id,
-                    ModuleMessage {
-                        module: MODULE_NAME.into(),
-                        msg: serde_yaml::to_string(&msg_node).unwrap(),
-                    },
+                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )
                 .into(),
             )
