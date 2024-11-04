@@ -9,6 +9,7 @@ bitflags! {
         const ENABLE_PING = 0x8;
         const ENABLE_WEBPROXY = 0x10;
         const ENABLE_WEBPROXY_REQUESTS = 0x20;
+        const ENABLE_LOOPIX = 0x40;
     }
 }
 

@@ -15,10 +15,18 @@ use flmodules::{
         broker::GossipBroker,
         core::{self, Category, Event},
         messages::{GossipIn, GossipMessage},
-    }, network::messages::{NetworkError, NetworkIn, NetworkMessage}, nodeconfig::{ConfigError, NodeConfig, NodeInfo}, overlay::broker::OverlayRandom, ping::{broker::PingBroker, messages::PingConfig}, random_connections::broker::RandomBroker, timer::{TimerBroker, TimerMessage}, web_proxy::{
+    },
+    network::messages::{NetworkError, NetworkIn, NetworkMessage},
+    nodeconfig::{ConfigError, NodeConfig, NodeInfo},
+    overlay::broker::random::OverlayRandom,
+    ping::{broker::PingBroker, messages::PingConfig},
+    random_connections::broker::RandomBroker,
+    timer::{TimerBroker, TimerMessage},
+    web_proxy::{
         broker::{WebProxy, WebProxyError},
         core::WebProxyConfig,
-    }, Modules
+    },
+    Modules,
 };
 
 use crate::stat::StatBroker;
