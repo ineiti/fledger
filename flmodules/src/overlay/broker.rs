@@ -33,7 +33,7 @@ impl OverlayRandom {
                             OverlayOut::NodeInfosConnected(infos)
                         }
                         RandomOut::NetworkWrapperFromNetwork(id, module_message) => {
-                            OverlayOut::NetworkMapperFromNetwork(id, module_message)
+                            OverlayOut::NetworkWrapperFromNetwork(id, module_message)
                         }
                         _ => return None,
                     };
@@ -91,7 +91,7 @@ impl OverlayDirect {
                     return match out {
                         NetworkOut::MessageFromNode(id, msg_str) => {
                             serde_yaml::from_str(&msg_str).ok().map(|module_message| {
-                                OverlayOut::NetworkMapperFromNetwork(id, module_message).into()
+                                OverlayOut::NetworkWrapperFromNetwork(id, module_message).into()
                             })
                         }
                         NetworkOut::NodeListFromWS(vec) => {
