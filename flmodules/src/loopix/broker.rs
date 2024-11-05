@@ -69,8 +69,10 @@ impl LoopixBroker {
             Sender<(NodeID, Delay, Sphinx)>,
             Receiver<(NodeID, Delay, Sphinx)>,
         ) = channel(100);
-        let (overlay_sender, _overlay_receiver): (Sender<NetworkWrapper>, Receiver<NetworkWrapper>) =
-            channel(100);
+        let (overlay_sender, _overlay_receiver): (
+            Sender<NetworkWrapper>,
+            Receiver<NetworkWrapper>,
+        ) = channel(100);
 
         let loopix_messages = LoopixMessages::new(
             node_type.arc_clone(),
@@ -316,7 +318,7 @@ mod tests {
     use flarch::broker::Broker;
 
     #[tokio::test]
-    async fn create_broker() {
+    async fn create_broker() -> Result<(), BrokerError> {
         let path_length = 2;
 
         // set up network
@@ -350,7 +352,8 @@ mod tests {
         let overlay = Broker::<OverlayMessage>::new();
         let network = Broker::<NetworkMessage>::new();
 
-        let result = LoopixBroker::start(overlay, network, config).await;
-        assert!(result.is_ok());
+        let _loopix_broker = LoopixBroker::start(overlay, network, config).await?;
+        
+        Ok(())
     }
 }

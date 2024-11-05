@@ -4,6 +4,10 @@ use crate::loopix::messages::{LoopixIn, LoopixMessage, LoopixOut};
 
 use super::super::messages::{OverlayIn, OverlayMessage, OverlayOut};
 
+/**
+ * This uses the Loopix-module to offer an anonymous and privacy-preserving
+ * communication through the nodes.
+ */
 pub struct OverlayLoopix {
     pub broker: Broker<OverlayMessage>,
 }
@@ -30,6 +34,9 @@ impl OverlayLoopix {
             let ret = match out {
                 LoopixOut::NodeIDsConnected(node_ids) => OverlayOut::NodeIDsConnected(node_ids),
                 LoopixOut::NodeInfosConnected(infos) => OverlayOut::NodeInfosConnected(infos),
+                LoopixOut::NodeInfoAvailable(availables) => {
+                    OverlayOut::NodeInfoAvailable(availables)
+                }
                 LoopixOut::OverlayReply(node_id, module_msg) => {
                     OverlayOut::NetworkWrapperFromNetwork(node_id, module_msg)
                 }
