@@ -134,7 +134,7 @@ impl Translate {
                 OverlayOut::NodeInfosConnected(list) => {
                     Some(WebProxyIn::NodeInfoConnected(list).into())
                 }
-                OverlayOut::NetworkWrapperFromNetwork(id, msg) => msg
+                OverlayOut::NetworkMapperFromNetwork(id, msg) => msg
                     .unwrap_yaml(MODULE_NAME)
                     .map(|msg| WebProxyIn::FromNetwork(id, msg).into()),
                 _ => None,
@@ -230,7 +230,7 @@ mod tests {
             {
                 log::debug!("Sending to WP: {msg:?}");
                 wp_rnd
-                    .emit_msg(OverlayMessage::Output(OverlayOut::NetworkWrapperFromNetwork(
+                    .emit_msg(OverlayMessage::Output(OverlayOut::NetworkMapperFromNetwork(
                         dst, msg,
                     )))
                     .expect("sending to wp");
@@ -241,7 +241,7 @@ mod tests {
             {
                 log::debug!("Sending to CL: {msg:?}");
                 cl_rnd
-                    .emit_msg(OverlayMessage::Output(OverlayOut::NetworkWrapperFromNetwork(
+                    .emit_msg(OverlayMessage::Output(OverlayOut::NetworkMapperFromNetwork(
                         dst, msg,
                     )))
                     .expect("sending to wp");
