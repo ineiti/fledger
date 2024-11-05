@@ -26,7 +26,7 @@ pub enum OverlayOut {
     NodeInfoAvailable(Vec<NodeInfo>),
     NodeIDsConnected(NodeIDs),
     NodeInfosConnected(Vec<NodeInfo>),
-    NetworkMapperFromNetwork(NodeID, NetworkWrapper),
+    NetworkWrapperFromNetwork(NodeID, NetworkWrapper),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
