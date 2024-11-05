@@ -132,7 +132,7 @@ impl Translate {
     fn link_gossip_rnd(msg: GossipMessage) -> Option<RandomMessage> {
         if let GossipMessage::Output(GossipOut::ToNetwork(id, msg_node)) = msg {
             Some(
-                RandomIn::NetworkMapperToNetwork(
+                RandomIn::NetworkWrapperToNetwork(
                     id,
                     NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )
@@ -233,7 +233,7 @@ mod tests {
 
     fn assert_msg_reid(tap: &Receiver<RandomMessage>, id2: &NodeID) -> Result<(), Box<dyn Error>> {
         for msg in tap.try_iter() {
-            if let RandomMessage::Input(RandomIn::NetworkMapperToNetwork(id, msg_mod)) = msg {
+            if let RandomMessage::Input(RandomIn::NetworkWrapperToNetwork(id, msg_mod)) = msg {
                 assert_eq!(id2, &id);
                 assert_eq!(MODULE_NAME.to_string(), msg_mod.module);
                 let msg_yaml = serde_yaml::from_str(&msg_mod.msg)?;

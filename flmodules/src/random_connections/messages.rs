@@ -26,7 +26,7 @@ pub enum RandomIn {
     NodeConnected(NodeID),
     NodeDisconnected(NodeID),
     NodeCommFromNetwork(NodeID, ModuleMessage),
-    NetworkMapperToNetwork(NodeID, NetworkWrapper),
+    NetworkWrapperToNetwork(NodeID, NetworkWrapper),
     Tick,
 }
 
@@ -95,7 +95,7 @@ impl RandomConnections {
                 ])
             }
             RandomIn::NodeCommFromNetwork(id, node_msg) => self.network_msg(id, node_msg),
-            RandomIn::NetworkMapperToNetwork(dst, msg) => {
+            RandomIn::NetworkWrapperToNetwork(dst, msg) => {
                 if self.storage.connected.contains(&dst) {
                     vec![RandomOut::NodeCommToNetwork(
                         dst,

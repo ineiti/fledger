@@ -119,7 +119,7 @@ impl Translate {
     fn link_template_rnd(msg: TemplateMessage) -> Option<RandomMessage> {
         if let TemplateMessage::Output(TemplateOut::ToNetwork(id, msg_node)) = msg {
             Some(
-                RandomIn::NetworkMapperToNetwork(
+                RandomIn::NetworkWrapperToNetwork(
                     id,
                     NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )
