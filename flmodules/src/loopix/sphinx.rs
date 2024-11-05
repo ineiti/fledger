@@ -1,13 +1,24 @@
-use sphinx_packet::SphinxPacket;
+use sphinx_packet::{header::delays::Delay, route::{Destination, Node}, SphinxPacket};
 use serde::{Deserialize, Serialize};
 use flarch::nodeids::NodeID;
 use sphinx_packet::route::{NodeAddressBytes, DestinationAddressBytes};
-
+use x25519_dalek::PublicKey;
 
 #[derive(Serialize, Deserialize)]
 pub struct Sphinx {
     #[serde(serialize_with = "serialize_sphinx_packet", deserialize_with = "deserialize_sphinx_packet")]
     pub inner: SphinxPacket,
+}
+
+impl Default for Sphinx {
+    fn default() -> Self {
+        let message = Vec::<u8>::from("hello world".as_bytes());
+        let surb_identifier = [0u8; 16];
+        let destination = Destination {address: destination_address_from_node_id(NodeID::from(1)), identifier: surb_identifier};
+        let route = vec![Node {address: node_address_from_node_id(NodeID::from(1)), pub_key: PublicKey::from([0; 32])}];
+        let delays = vec![Delay::new_from_nanos(1)];
+        Sphinx { inner: SphinxPacket::new(message, &route, &destination, &delays).unwrap() }
+    }
 }
 
 impl std::fmt::Debug for Sphinx {

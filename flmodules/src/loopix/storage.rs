@@ -1,11 +1,12 @@
+use std::collections::HashMap;
+use sphinx_packet::header::delays::Delay;
+use x25519_dalek::{PublicKey, StaticSecret};
+use tokio::sync::RwLock;
+use std::sync::Arc;
+use std::collections::HashSet;
 use crate::loopix::sphinx::Sphinx;
 use flarch::nodeids::{NodeID, NodeIDs};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use x25519_dalek::{PublicKey, StaticSecret};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum LoopixStorageSave {
@@ -93,11 +94,12 @@ impl ClientStorage {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ProviderStorage {
     clients: HashSet<NodeID>,
-    client_messages: HashMap<NodeID, Vec<Sphinx>>,
+    #[serde(serialize_with = "serialize_client_messages", deserialize_with = "deserialize_client_messages")]
+    client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>,
 }
 
 impl ProviderStorage {
-    pub fn new(clients: HashSet<NodeID>, client_messages: HashMap<NodeID, Vec<Sphinx>>) -> Self {
+    pub fn new(clients: HashSet<NodeID>, client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>) -> Self {
         ProviderStorage {
             clients,
             client_messages,
@@ -241,7 +243,7 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn get_client_messages(&self, node_id: NodeID) -> Vec<Sphinx> {
+    pub async fn get_client_messages(&self, node_id: NodeID) -> Vec<(Delay, Sphinx)> {
         if let Some(storage) = self.provider_storage.read().await.as_ref() {
             storage
                 .client_messages
@@ -253,13 +255,13 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn add_client_message(&self, client_id: NodeID, new_message: Sphinx) {
+    pub async fn add_client_message(&self, client_id: NodeID, delay: Delay, sphinx: Sphinx) {
         if let Some(storage) = &mut *self.provider_storage.write().await {
             storage
                 .client_messages
                 .entry(client_id)
                 .or_insert(Vec::new())
-                .push(new_message);
+                .push((delay, sphinx));
         } else {
             panic!("Provider storage not found");
         }
@@ -461,6 +463,55 @@ impl std::fmt::Debug for LoopixStorage {
 // endregion: Derived functions
 
 // region: Serde functions
+#[derive(Serialize, Deserialize)]
+struct SerializableMessage {
+    delay: [u8; 8],
+    sphinx: Sphinx, 
+}
+pub fn serialize_client_messages<S>(messages: &HashMap<NodeID, Vec<(Delay, Sphinx)>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let serializable_messages: HashMap<_, Vec<_>> = messages
+        .iter()
+        .map(|(node_id, messages)| {
+            let serialized_messages: Vec<_> = messages
+                .iter()
+                .map(|(delay, sphinx)| SerializableMessage {
+                    delay: delay.to_bytes(),
+                    sphinx: sphinx.clone(),
+                })
+                .collect();
+            (node_id.clone(), serialized_messages)
+        })
+        .collect();
+
+    serializable_messages.serialize(serializer)
+}
+
+pub fn deserialize_client_messages<'de, D>(deserializer: D) -> Result<HashMap<NodeID, Vec<(Delay, Sphinx)>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let serializable_messages: HashMap<NodeID, Vec<SerializableMessage>> = HashMap::deserialize(deserializer)?;
+    
+    let messages: HashMap<_, Vec<_>> = serializable_messages
+        .into_iter()
+        .map(|(node_id, messages)| {
+            let deserialized_messages = messages
+                .into_iter()
+                .map(|msg| {
+                    let delay = Delay::from_bytes(msg.delay);
+                    Ok((delay, msg.sphinx))
+                })
+                .collect::<Result<_, D::Error>>()?;
+            Ok((node_id, deserialized_messages))
+        })
+        .collect::<Result<_, D::Error>>()?;
+
+    Ok(messages)
+}
+
 pub fn serialize_public_key<S>(key: &PublicKey, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
@@ -614,5 +665,26 @@ mod tests {
             serde_yaml::from_str(&serialized).expect("Failed to deserialize");
 
         assert_eq!(original_storage, deserialized);
+    }
+
+    #[tokio::test]
+    async fn test_client_messages_serde() {
+        let (public_key, private_key) = LoopixStorage::generate_key_pair();
+        let provider_storage = ProviderStorage::default_with_path_length(4, 3);
+
+        let loopix_storage = LoopixStorage::default_with_path_length(4, 3, private_key, public_key, None, Some(provider_storage));
+
+        loopix_storage.add_client_message(NodeID::from(1), Delay::new_from_nanos(1), Sphinx::default()).await;
+
+        let provider_storage = loopix_storage.provider_storage.read().await;
+
+        let updated_provider_storage = provider_storage.clone().unwrap();
+
+        println!("Provider Storage: {:?}", updated_provider_storage);
+
+        let serialized = serde_yaml::to_string(&updated_provider_storage).expect("Failed to serialize");
+        let deserialized: ProviderStorage = serde_yaml::from_str(&serialized).expect("Failed to deserialize");
+
+        assert_eq!(updated_provider_storage, deserialized);
     }
 }

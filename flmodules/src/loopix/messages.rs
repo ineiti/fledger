@@ -15,7 +15,7 @@ use super::storage::LoopixStorage;
 use super::{
     client::Client,
     core::*,
-    mixnode::{Mixnode, MixnodeInterface},
+    mixnode::Mixnode,
     provider::Provider,
     sphinx::*,
 };
@@ -64,7 +64,7 @@ pub enum LoopixOut {
 pub struct LoopixMessages {
     pub role: NodeType,
     pub network_sender: Sender<(NodeID, Delay, Sphinx)>,
-    pub overlay_sender: Sender<NetworkWrapper>,
+    pub overlay_sender: Sender<(NodeID, NetworkWrapper)>,
 }
 
 impl Clone for LoopixMessages {
@@ -80,8 +80,8 @@ impl Clone for LoopixMessages {
 impl LoopixMessages {
     pub fn new(
         node_type: NodeType,
-        network_sender: Sender<(NodeID, Delay, Sphinx)>,
-        overlay_sender: Sender<NetworkWrapper>,
+        network_sender: Sender<(NodeID, Delay, Sphinx)>,    
+        overlay_sender: Sender<(NodeID, NetworkWrapper) >, 
     ) -> Self {
         Self {
             role: node_type,
@@ -167,7 +167,21 @@ impl LoopixMessages {
                 // Check if the final destination matches our ID
                 let dest = node_id_from_destination_address(destination);
                 if dest == self.role.get_our_id().await {
-                    self.role.process_final_hop(dest, surb_id, payload).await;
+                    let (source, msg, messages) = self.role.process_final_hop(dest, surb_id, payload).await;
+                    if let Some(msg) = msg {
+                        self.overlay_sender
+                            .send((source, msg))
+                            .await
+                            .expect("while sending message");
+                    }
+                    if let Some(messages) = messages {
+                        for (delay, sphinx) in messages {
+                                self.network_sender
+                                .send((source, delay, sphinx))
+                                .await
+                                .expect("while sending message");
+                        }
+                    }
                 } else {
                     log::warn!("Received a FinalHop packet not intended for this node");
                 }
@@ -224,6 +238,23 @@ impl LoopixCore for NodeType {
             NodeType::Provider(provider) => LoopixCore::create_loop_message(provider).await,
         }
     }
+
+    async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
+        match self {
+            NodeType::Client(client) => client.process_final_hop(destination, surb_id, payload).await,
+            NodeType::Mixnode(mixnode) => LoopixCore::process_final_hop(mixnode, destination, surb_id, payload).await,
+            NodeType::Provider(provider) => LoopixCore::process_final_hop(provider, destination, surb_id, payload).await,
+        }
+    }
+
+    async fn process_forward_hop(&self, next_packet: Box<SphinxPacket>, next_node: NodeID, delay: Delay) -> (NodeID, Delay, Option<Sphinx>) {
+        match self {
+            NodeType::Client(_) => panic!("Client does not implement process_forward_hop"),
+            NodeType::Mixnode(mixnode) => LoopixCore::process_forward_hop(mixnode, next_packet, next_node, delay).await,
+            NodeType::Provider(provider) => LoopixCore::process_forward_hop(provider, next_packet, next_node, delay).await,
+        }
+    }
+
 }
 
 impl NodeType {
@@ -294,39 +325,6 @@ impl NodeType {
             NodeType::Client(client) => client.process_overlay_message(node_id, message).await,
             NodeType::Mixnode(_) => panic!("Mixnode does not implement process_overlay_message"),
             NodeType::Provider(_) => panic!("Provider does not implement process_overlay_message"),
-        }
-    }
-
-    async fn process_forward_hop(
-        &self,
-        next_packet: Box<SphinxPacket>,
-        next_address: NodeID,
-        delay: Delay,
-    ) -> (NodeID, Delay, Option<Sphinx>) {
-        match self {
-            NodeType::Mixnode(mixnode) => {
-                mixnode
-                    .process_forward_hop(next_packet, next_address, delay)
-                    .await
-            }
-            NodeType::Provider(provider) => {
-                provider
-                    .process_forward_hop(next_packet, next_address, delay)
-                    .await
-            }
-            NodeType::Client(_) => panic!("Client does not implement process_forward_hop"),
-        }
-    }
-
-    async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) {
-        match self {
-            NodeType::Client(client) => {
-                client
-                    .process_final_hop(destination, surb_id, payload)
-                    .await
-            }
-            NodeType::Mixnode(_) => panic!("Mixnode does not implement process_final_hop"),
-            NodeType::Provider(_) => panic!("Provider does not implement process_final_hop"),
         }
     }
 }

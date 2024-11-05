@@ -69,7 +69,7 @@ impl LoopixBroker {
             Sender<(NodeID, Delay, Sphinx)>,
             Receiver<(NodeID, Delay, Sphinx)>,
         ) = channel(100);
-        let (overlay_sender, _overlay_receiver): (Sender<NetworkWrapper>, Receiver<NetworkWrapper>) =
+        let (overlay_sender, overlay_receiver): (Sender<(NodeID, NetworkWrapper)>, Receiver<(NodeID, NetworkWrapper)>) =
             channel(100);
 
         let loopix_messages = LoopixMessages::new(
@@ -80,15 +80,17 @@ impl LoopixBroker {
 
         broker
             .add_subsystem(Subsystem::Handler(Box::new(LoopixTranslate {
-                _overlay: overlay,
+                _overlay: overlay.clone(),
                 _network: network.clone(),
                 _loopix_messages: loopix_messages.clone(),
             })))
             .await?;
 
         // Threads for all nodes
-        Self::start_receiver_thread(loopix_messages.clone(), network.clone(), network_receiver);
-
+        Self::start_network_send_thread(loopix_messages.clone(), network.clone(), network_receiver);
+        
+        Self::start_overlay_send_thread(overlay.clone(), overlay_receiver);
+        
         Self::start_loop_message_thread(loopix_messages.clone());
 
         Self::start_drop_message_thread(loopix_messages.clone());
@@ -165,11 +167,19 @@ impl LoopixBroker {
         });
     }
 
-    pub fn start_receiver_thread(
-        loopix_messages: LoopixMessages,
-        mut network: Broker<NetworkMessage>,
-        mut receiver: Receiver<(NodeID, Delay, Sphinx)>,
-    ) {
+    pub fn start_overlay_send_thread(mut overlay: Broker<OverlayMessage>, mut receiver: Receiver<(NodeID, NetworkWrapper)>) {
+        tokio::spawn(async move {
+            loop {
+                if let Some((node_id, wrapper)) = receiver.recv().await {
+                    if let Err(e) = overlay.emit_msg(OverlayOut::NetworkWrapperFromNetwork(node_id, wrapper).into()) {
+                        log::error!("Error emitting overlay message: {e:?}");
+                    }
+                }
+            }
+        });
+    }
+
+    pub fn start_network_send_thread(loopix_messages: LoopixMessages, mut network: Broker<NetworkMessage>, mut receiver: Receiver<(NodeID, Delay, Sphinx)>) {
         tokio::spawn(async move {
             let mut sphinx_messages: Vec<(NodeID, Duration, Sphinx)> = Vec::new();
             let payload_rate =

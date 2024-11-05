@@ -10,6 +10,7 @@ use crate::loopix::{
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
 use rand::seq::SliceRandom;
+use sphinx_packet::payload::Payload;
 use sphinx_packet::{header::delays::Delay, packet::*};
 
 use crate::overlay::messages::NetworkWrapper;
@@ -28,6 +29,8 @@ pub trait MixnodeInterface: LoopixCore {
         next_address: NodeID,
         delay: Delay,
     ) -> (NodeID, Delay, Option<Sphinx>);
+
+    async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>);
 
     async fn create_loop_message(&self) -> (NodeID, Sphinx) {
         let providers = self.get_storage().get_providers().await;
@@ -114,6 +117,14 @@ impl LoopixCore for Mixnode {
     async fn create_drop_message(&self) -> (NodeID, Sphinx) {
         MixnodeInterface::create_drop_message(self).await
     }
+
+    async fn process_forward_hop(&self, next_packet: Box<SphinxPacket>, next_address: NodeID, delay: Delay) -> (NodeID, Delay, Option<Sphinx>) {
+        MixnodeInterface::process_forward_hop(self, next_packet, next_address, delay).await
+    }
+
+    async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
+        MixnodeInterface::process_final_hop(self, destination, surb_id, payload).await
+    }
 }
 
 #[async_trait]
@@ -128,5 +139,45 @@ impl MixnodeInterface for Mixnode {
             inner: *next_packet,
         };
         (next_node, delay, Some(sphinx.clone()))
+    }
+
+    async fn process_final_hop(
+        &self,
+        destination: NodeID,
+        _surb_id: [u8; 16],
+        payload: Payload,
+    ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
+        
+        if destination != self.get_our_id().await {
+            log::info!("Final hop received, but we're not the destination");
+            return (destination, None, None);
+        }
+
+        let plaintext = payload.recover_plaintext().unwrap();
+        let plaintext_str = std::str::from_utf8(&plaintext).unwrap();
+
+        if let Ok(module_message) = serde_yaml::from_str::<NetworkWrapper>(plaintext_str) {
+            if module_message.module == MODULE_NAME {
+                if let Ok(message) = serde_yaml::from_str::<MessageType>(&module_message.msg) {
+                    match message {
+                        MessageType::Payload(_, _) => { log::error!("Mixnode shouldn't receive payloads!"); (destination, None, None) },
+                        MessageType::PullRequest(_) => { log::error!("Mixnode shouldn't receive pull requests!"); (destination, None, None) },
+                        MessageType::SubscriptionRequest(_) => { log::error!("Mixnode shouldn't receive subscription requests!"); (destination, None, None) },
+                        MessageType::Drop => { log::info!("Mixnode received drop"); (destination, None, None) },
+                        MessageType::Loop => { log::info!("Mixnode received loop"); (destination, None, None) },
+                        MessageType::Dummy => { log::error!("Mixnode shouldn't receive dummy messages!"); (destination, None, None) },
+                    }
+                } else {
+                    log::error!("Received message in wrong format");
+                    (destination, None, None)
+                }
+            } else {
+                log::error!("Received message from module that is not Loopix: {:?}", module_message.module);
+                (destination, None, None)
+            }
+        } else {
+            log::error!("Could not recover plaintext");
+            (destination, None, None)
+        }
     }
 }

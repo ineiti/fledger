@@ -9,7 +9,9 @@ use crate::overlay::messages::NetworkWrapper;
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
 use rand::seq::SliceRandom;
+use sphinx_packet::header::delays::Delay;
 use sphinx_packet::payload::Payload;
+use sphinx_packet::SphinxPacket;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Client {
@@ -95,20 +97,59 @@ impl LoopixCore for Client {
         let (_, sphinx) = self.create_sphinx_packet(*random_provider, msg, &route);
         (*random_provider, sphinx)
     }
+
+    async fn process_final_hop(
+        &self,
+        destination: NodeID,
+        _surb_id: [u8; 16],
+        payload: Payload,
+    ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
+
+        if destination != self.get_our_id().await {
+            log::info!("Final hop received, but we're not the destination");
+            return (destination, None, None);
+        }
+
+        let plaintext = payload.recover_plaintext().unwrap();
+        let plaintext_str = std::str::from_utf8(&plaintext).unwrap();
+
+        if let Ok(module_message) = serde_yaml::from_str::<NetworkWrapper>(plaintext_str) {
+            if module_message.module == MODULE_NAME {
+                if let Ok(message) = serde_yaml::from_str::<MessageType>(&module_message.msg) {
+                    match message {
+                        MessageType::Payload(source, msg) => {
+                            (source, Some(msg), None)
+                        }
+                        MessageType::PullRequest(_) => { log::error!("Client shouldn't receive pull requests!"); (destination, None, None) },
+                        MessageType::SubscriptionRequest(_) => { log::error!("Client shouldn't receive subscription requests!"); (destination, None, None) },
+                        MessageType::Drop => { log::info!("Client received drop"); (destination, None, None) },
+                        MessageType::Loop => { log::info!("Client received loop"); (destination, None, None) },
+                        MessageType::Dummy => { log::info!("Client received dummy"); (destination, None, None) },
+                    }
+                } else {
+                    log::error!("Received message in wrong format");
+                    (destination, None, None)
+                }
+            } else {
+                log::error!("Received message from module that is not Loopix: {:?}", module_message.module);
+                (destination, None, None)
+            }
+        } else {
+            log::error!("Could not recover plaintext");
+            (destination, None, None)
+        }
+    }
+
+    async fn process_forward_hop(
+        &self,
+        _next_packet: Box<SphinxPacket>,
+        next_address: NodeID,
+        delay: Delay,
+    ) -> (NodeID, Delay, Option<Sphinx>) {
+        log::error!("Client shouldn't receive forward hops");
+        (next_address, delay, None)
+    }
 }
-
-// pub trait ClientInterface {
-//     async fn register_provider(&mut self, provider: NodeID);
-//     async fn get_provider(&self) -> Option<NodeID>;
-
-//     async fn create_pull_message(&self) -> (NodeID, Sphinx);
-//     async fn create_subscribe_message(&self) -> (NodeID, Sphinx);
-//     async fn create_payload_message(
-//         &self,
-//         destination: NodeID,
-//         msg: NetworkWrapper,
-//     ) -> (NodeID, Sphinx);
-// }
 
 impl Client {
     pub async fn register_provider(&mut self, provider: NodeID) {
@@ -234,14 +275,6 @@ impl Client {
         (*dst_provider, sphinx)
     }
 
-    pub async fn process_final_hop(
-        &self,
-        _destination: NodeID,
-        _surb_id: [u8; 16],
-        _payload: Payload,
-    ) {
-        todo!("Client hasnt implemented process_final_hop yet")
-    }
 }
 
 #[cfg(test)]

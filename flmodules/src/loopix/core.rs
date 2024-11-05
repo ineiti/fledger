@@ -1,7 +1,8 @@
 use crate::overlay::messages::NetworkWrapper;
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
-use sphinx_packet::header::delays::generate_from_average_duration;
+use sphinx_packet::header::delays::{generate_from_average_duration, Delay};
+use sphinx_packet::payload::Payload;
 use sphinx_packet::route::{Destination, Node, NodeAddressBytes};
 use sphinx_packet::{ProcessedPacket, SphinxPacket};
 use std::time::Duration;
@@ -26,6 +27,9 @@ pub trait LoopixCore {
     async fn create_loop_message(&self) -> (NodeID, Sphinx);
     async fn create_drop_message(&self) -> (NodeID, Sphinx);
 
+    async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>);
+    async fn process_forward_hop(&self, next_packet: Box<SphinxPacket>, next_address: NodeID, delay: Delay) -> (NodeID, Delay, Option<Sphinx>);
+    
     fn create_sphinx_packet(
         &self,
         dest: NodeID,
@@ -116,6 +120,7 @@ mod tests {
     use crate::loopix::messages::MessageType;
     use crate::loopix::sphinx::node_id_from_destination_address;
     use crate::loopix::sphinx::node_id_from_node_address;
+    use sphinx_packet::payload::Payload;
     use sphinx_packet::{packet::*, route::*};
     use std::collections::HashMap;
     use x25519_dalek::{PublicKey, StaticSecret};
@@ -146,6 +151,24 @@ mod tests {
         }
 
         async fn create_drop_message(&self) -> (NodeID, Sphinx) {
+            todo!()
+        }
+
+        async fn process_final_hop(
+            &self,
+            _destination: NodeID,
+            _surb_id: [u8; 16],
+            _payload: Payload,
+        ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
+            todo!()
+        }
+
+        async fn process_forward_hop(
+            &self,
+            _next_packet: Box<SphinxPacket>,
+            _next_address: NodeID,
+            _delay: Delay,
+        ) -> (NodeID, Delay, Option<Sphinx>) {
             todo!()
         }
     }
