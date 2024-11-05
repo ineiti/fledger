@@ -1,7 +1,6 @@
-use std::collections::HashMap;
+use crate::loopix::storage::{ClientStorage, LoopixStorage, ProviderStorage};
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey, StaticSecret};
-use crate::loopix::storage::{LoopixStorage, ClientStorage, ProviderStorage};
 
 //////////////////////////////////////// ROLE ENUM ////////////////////////////////////////
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -10,7 +9,6 @@ pub enum LoopixRole {
     Provider,
     Client,
 }
-
 
 //////////////////////////////////////// Loopix Config ////////////////////////////////////////
 #[derive(Debug, Clone, PartialEq)]
@@ -47,22 +45,44 @@ impl LoopixConfig {
         }
     }
 
-    pub fn default_with_path_length(role: LoopixRole, our_node_id: u32, path_length: usize, private_key: StaticSecret, public_key: PublicKey) -> Self {
+    pub fn default_with_path_length(
+        role: LoopixRole,
+        our_node_id: u32,
+        path_length: usize,
+        private_key: StaticSecret,
+        public_key: PublicKey,
+    ) -> Self {
         let client_storage = match role {
-            LoopixRole::Client => Some(ClientStorage::default_with_path_length(our_node_id, path_length)),
+            LoopixRole::Client => Some(ClientStorage::default_with_path_length(
+                our_node_id,
+                path_length,
+            )),
             _ => None,
         };
 
         let provider_storage = match role {
-            LoopixRole::Provider => Some(ProviderStorage::default_with_path_length(our_node_id, path_length)),
+            LoopixRole::Provider => Some(ProviderStorage::default_with_path_length(
+                our_node_id,
+                path_length,
+            )),
             _ => None,
         };
 
-        if (client_storage.is_none() && provider_storage.is_none()) && (role == LoopixRole::Mixnode) && our_node_id < (path_length * 2) as u32 {
+        if (client_storage.is_none() && provider_storage.is_none())
+            && (role == LoopixRole::Mixnode)
+            && our_node_id < (path_length * 2) as u32
+        {
             panic!("Our node id must be between the path length and 2 times the path length");
         }
 
-        let storage = LoopixStorage::default_with_path_length(our_node_id, path_length, private_key, public_key, client_storage, provider_storage);
+        let storage = LoopixStorage::default_with_path_length(
+            our_node_id,
+            path_length,
+            private_key,
+            public_key,
+            client_storage,
+            provider_storage,
+        );
 
         LoopixConfig::new_default(role, path_length, storage)
     }
@@ -82,7 +102,8 @@ pub struct CoreConfig {
 }
 
 impl CoreConfig {
-    pub fn default_mixnode(path_length: usize) -> Self { // TODO: change these values
+    pub fn default_mixnode(path_length: usize) -> Self {
+        // TODO: change these values
         CoreConfig {
             lambda_loop: 10.0,
             lambda_drop: 10.0,
@@ -141,11 +162,11 @@ impl CoreConfig {
     pub fn lambda_loop(&self) -> f64 {
         self.lambda_loop
     }
-    
+
     pub fn lambda_drop(&self) -> f64 {
         self.lambda_drop
     }
-    
+
     pub fn lambda_payload(&self) -> f64 {
         self.lambda_payload
     }
@@ -170,4 +191,3 @@ impl CoreConfig {
         self.max_retrieve
     }
 }
-

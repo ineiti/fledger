@@ -9,10 +9,7 @@ use crate::{
     loopix::messages::{LoopixIn, LoopixMessage, LoopixOut},
     network::messages::{NetworkIn, NetworkMessage, NetworkOut},
     nodeconfig::NodeInfo,
-    overlay::messages::NetworkWrapper,
-    ping::messages::PingMessage,
     random_connections::messages::{RandomIn, RandomMessage, RandomOut},
-    web_proxy::messages::WebProxyMessage,
 };
 
 pub struct OverlayRandom {}

@@ -1,21 +1,18 @@
-use std::sync::Arc;
 use crate::loopix::broker::MODULE_NAME;
 
-use crate::loopix::{config::CoreConfig, core::LoopixCore, messages::{MessageType}, sphinx::{node_id_from_node_address, Sphinx}, storage::LoopixStorage};
+use crate::loopix::{
+    config::CoreConfig,
+    core::LoopixCore,
+    messages::MessageType,
+    sphinx::{node_id_from_node_address, Sphinx},
+    storage::LoopixStorage,
+};
+use async_trait::async_trait;
 use flarch::nodeids::NodeID;
 use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
-use super::messages::{LoopixMessage, LoopixOut};
-use sphinx_packet::{
-    header::delays::Delay,
-    packet::*,
-    payload::*,
-    route::*,
-};
+use sphinx_packet::{header::delays::Delay, packet::*};
 
-
-use crate::{network::messages::NetworkIn, overlay::messages::NetworkWrapper};
-
+use crate::overlay::messages::NetworkWrapper;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Mixnode {
@@ -23,23 +20,38 @@ pub struct Mixnode {
     config: CoreConfig,
 }
 
+#[async_trait]
 pub trait MixnodeInterface: LoopixCore {
-
-    async fn process_forward_hop(&self, next_packet: Box<SphinxPacket>, next_address: NodeID, delay: Delay) -> (NodeID, Delay, Option<Sphinx>);
+    async fn process_forward_hop(
+        &self,
+        next_packet: Box<SphinxPacket>,
+        next_address: NodeID,
+        delay: Delay,
+    ) -> (NodeID, Delay, Option<Sphinx>);
 
     async fn create_loop_message(&self) -> (NodeID, Sphinx) {
         let providers = self.get_storage().get_providers().await;
         let our_id = self.get_our_id().await;
-        
+
         // pick random provider
         let random_provider = providers.choose(&mut rand::thread_rng()).unwrap();
 
         // create route
-        let route = self.create_route(self.get_config().path_length(), None, Some(*random_provider), Some(our_id)).await;
-        
+        let route = self
+            .create_route(
+                self.get_config().path_length(),
+                None,
+                Some(*random_provider),
+                Some(our_id),
+            )
+            .await;
+
         // create the networkmessage
         let loop_msg = serde_json::to_string(&MessageType::Loop).unwrap();
-        let msg = NetworkWrapper{ module: MODULE_NAME.into(), msg: loop_msg};
+        let msg = NetworkWrapper {
+            module: MODULE_NAME.into(),
+            msg: loop_msg,
+        };
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(our_id, msg, &route);
@@ -48,16 +60,26 @@ pub trait MixnodeInterface: LoopixCore {
 
     async fn create_drop_message(&self) -> (NodeID, Sphinx) {
         let providers = self.get_storage().get_providers().await;
-        
+
         // pick random provider
         let random_provider = providers.choose(&mut rand::thread_rng()).unwrap();
 
         // create route
-        let route = self.create_route(self.get_config().path_length(), None, Some(*random_provider), None).await;
+        let route = self
+            .create_route(
+                self.get_config().path_length(),
+                None,
+                Some(*random_provider),
+                None,
+            )
+            .await;
 
         // create the networkmessage
         let drop_msg = serde_json::to_string(&MessageType::Drop).unwrap();
-        let msg = NetworkWrapper{ module: MODULE_NAME.into(), msg: drop_msg};
+        let msg = NetworkWrapper {
+            module: MODULE_NAME.into(),
+            msg: drop_msg,
+        };
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(*random_provider, msg, &route);
@@ -67,13 +89,11 @@ pub trait MixnodeInterface: LoopixCore {
 
 impl Mixnode {
     pub fn new(storage: LoopixStorage, config: CoreConfig) -> Self {
-        Self {
-            storage,
-            config
-        }
+        Self { storage, config }
     }
 }
 
+#[async_trait]
 impl LoopixCore for Mixnode {
     fn get_storage(&self) -> &LoopixStorage {
         &self.storage
@@ -96,9 +116,17 @@ impl LoopixCore for Mixnode {
     }
 }
 
+#[async_trait]
 impl MixnodeInterface for Mixnode {
-    async fn process_forward_hop(&self, next_packet: Box<SphinxPacket>, next_node: NodeID, delay: Delay) -> (NodeID, Delay, Option<Sphinx>) {
-        let sphinx = &Sphinx { inner: *next_packet };
+    async fn process_forward_hop(
+        &self,
+        next_packet: Box<SphinxPacket>,
+        next_node: NodeID,
+        delay: Delay,
+    ) -> (NodeID, Delay, Option<Sphinx>) {
+        let sphinx = &Sphinx {
+            inner: *next_packet,
+        };
         (next_node, delay, Some(sphinx.clone()))
     }
 }

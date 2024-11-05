@@ -1,12 +1,11 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use flarch::nodeids::{NodeID, NodeIDs};
-use sha2::digest::crypto_common::rand_core::le;
-use x25519_dalek::{PublicKey, StaticSecret};
-use tokio::sync::RwLock;
-use std::sync::Arc;
-use std::collections::HashSet;
 use crate::loopix::sphinx::Sphinx;
+use flarch::nodeids::{NodeID, NodeIDs};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use x25519_dalek::{PublicKey, StaticSecret};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum LoopixStorageSave {
@@ -28,13 +27,22 @@ impl LoopixStorageSave {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct NetworkStorage {
     node_id: NodeID,
-    #[serde(serialize_with = "serialize_static_secret", deserialize_with = "deserialize_static_secret")]
+    #[serde(
+        serialize_with = "serialize_static_secret",
+        deserialize_with = "deserialize_static_secret"
+    )]
     private_key: StaticSecret,
-    #[serde(serialize_with = "serialize_public_key", deserialize_with = "deserialize_public_key")]
+    #[serde(
+        serialize_with = "serialize_public_key",
+        deserialize_with = "deserialize_public_key"
+    )]
     public_key: PublicKey,
     mixes: Vec<Vec<NodeID>>,
     providers: Vec<NodeID>,
-    #[serde(serialize_with = "serialize_node_public_keys", deserialize_with = "deserialize_node_public_keys")]
+    #[serde(
+        serialize_with = "serialize_node_public_keys",
+        deserialize_with = "deserialize_node_public_keys"
+    )]
     node_public_keys: HashMap<NodeID, PublicKey>,
 }
 
@@ -51,7 +59,10 @@ pub struct ClientStorage {
 }
 
 impl ClientStorage {
-    pub fn new(our_provider: Option<NodeID>, client_to_provider_map: HashMap<NodeID, NodeID>) -> Self {
+    pub fn new(
+        our_provider: Option<NodeID>,
+        client_to_provider_map: HashMap<NodeID, NodeID>,
+    ) -> Self {
         ClientStorage {
             our_provider,
             client_to_provider_map,
@@ -67,7 +78,10 @@ impl ClientStorage {
 
         let mut client_to_provider_map = HashMap::new();
         for i in 0..path_length {
-            client_to_provider_map.insert(NodeID::from(i as u32), NodeID::from((i + path_length) as u32));
+            client_to_provider_map.insert(
+                NodeID::from(i as u32),
+                NodeID::from((i + path_length) as u32),
+            );
         }
         ClientStorage {
             our_provider,
@@ -185,13 +199,11 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn update_client_provider_mapping(
-        &self,
-        client_id: NodeID,
-        new_provider_id: NodeID,
-    ) {
+    pub async fn update_client_provider_mapping(&self, client_id: NodeID, new_provider_id: NodeID) {
         if let Some(storage) = &mut *self.client_storage.write().await {
-            storage.client_to_provider_map.insert(client_id, new_provider_id);
+            storage
+                .client_to_provider_map
+                .insert(client_id, new_provider_id);
         } else {
             panic!("Client storage not found");
         }
@@ -231,7 +243,11 @@ impl LoopixStorage {
 
     pub async fn get_client_messages(&self, node_id: NodeID) -> Vec<Sphinx> {
         if let Some(storage) = self.provider_storage.read().await.as_ref() {
-            storage.client_messages.get(&node_id).cloned().unwrap_or_default()
+            storage
+                .client_messages
+                .get(&node_id)
+                .cloned()
+                .unwrap_or_default()
         } else {
             panic!("Provider storage not found");
         }
@@ -239,12 +255,15 @@ impl LoopixStorage {
 
     pub async fn add_client_message(&self, client_id: NodeID, new_message: Sphinx) {
         if let Some(storage) = &mut *self.provider_storage.write().await {
-            storage.client_messages.entry(client_id).or_insert(Vec::new()).push(new_message);
+            storage
+                .client_messages
+                .entry(client_id)
+                .or_insert(Vec::new())
+                .push(new_message);
         } else {
             panic!("Provider storage not found");
         }
     }
-
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -275,7 +294,7 @@ impl<'de> Deserialize<'de> for LoopixStorage {
         D: serde::Deserializer<'de>,
     {
         let serde_struct = SerializableLoopixStorage::deserialize(deserializer)?;
-        
+
         Ok(LoopixStorage {
             network_storage: Arc::new(RwLock::new(serde_struct.network_storage)),
             client_storage: Arc::new(RwLock::new(serde_struct.client_storage)),
@@ -358,18 +377,27 @@ impl LoopixStorage {
     }
 
     /// default testing storage with a given path length
-    /// 
+    ///
     /// given path_length 3:
     /// 0 to 3 are reserved for clients
     /// 3 to 6 are providers
     /// 6 to 14 are mixes
-    pub fn default_with_path_length(node_id: u32, path_length: usize, private_key: StaticSecret, public_key: PublicKey, client_storage: Option<ClientStorage>, provider_storage: Option<ProviderStorage>) -> Self {
+    pub fn default_with_path_length(
+        node_id: u32,
+        path_length: usize,
+        private_key: StaticSecret,
+        public_key: PublicKey,
+        client_storage: Option<ClientStorage>,
+        provider_storage: Option<ProviderStorage>,
+    ) -> Self {
         //provider generation
         let providers = NodeIDs::new_range(path_length as u32, (path_length * 2) as u32).to_vec();
 
         //mix generation
         let mut mixes = Vec::new();
-        for i in (path_length * 2..path_length * 2 + path_length * path_length).step_by(path_length as usize) {
+        for i in (path_length * 2..path_length * 2 + path_length * path_length)
+            .step_by(path_length as usize)
+        {
             mixes.push(NodeIDs::new_range(i as u32, (i + path_length) as u32).to_vec());
         }
 
@@ -386,7 +414,6 @@ impl LoopixStorage {
             provider_storage: Arc::new(RwLock::new(provider_storage)),
         }
     }
-
 }
 
 // region: Derived functions
@@ -402,7 +429,8 @@ impl PartialEq for LoopixStorage {
         let other_provider_storage = other.provider_storage.blocking_read();
 
         self_network_storage.node_id == other_network_storage.node_id
-            && self_network_storage.private_key.to_bytes() == other_network_storage.private_key.to_bytes()
+            && self_network_storage.private_key.to_bytes()
+                == other_network_storage.private_key.to_bytes()
             && self_network_storage.public_key == other_network_storage.public_key
             && self_network_storage.mixes == other_network_storage.mixes
             && self_network_storage.providers == other_network_storage.providers
@@ -541,7 +569,10 @@ mod tests {
         let client_storage = ClientStorage::default_with_path_length(our_node_id, path_length);
 
         println!("Our Provider: {:?}", client_storage.our_provider);
-        println!("Client to Provider Map: {:?}", client_storage.client_to_provider_map);
+        println!(
+            "Client to Provider Map: {:?}",
+            client_storage.client_to_provider_map
+        );
     }
 
     #[test]
@@ -563,7 +594,10 @@ mod tests {
         let mut node_public_keys = HashMap::new();
         node_public_keys.insert(NodeID::from(1), public_key);
 
-        let client_storage = Some(ClientStorage::default_with_path_length(node_id, path_length));
+        let client_storage = Some(ClientStorage::default_with_path_length(
+            node_id,
+            path_length,
+        ));
         let provider_storage = None;
 
         let original_storage = LoopixStorage::default_with_path_length(
@@ -576,9 +610,9 @@ mod tests {
         );
 
         let serialized = serde_yaml::to_string(&original_storage).expect("Failed to serialize");
-        let deserialized: LoopixStorage = serde_yaml::from_str(&serialized).expect("Failed to deserialize");
+        let deserialized: LoopixStorage =
+            serde_yaml::from_str(&serialized).expect("Failed to deserialize");
 
         assert_eq!(original_storage, deserialized);
     }
 }
-
