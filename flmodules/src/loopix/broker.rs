@@ -107,6 +107,8 @@ impl LoopixBroker {
             _ => {}
         }
 
+        // TODO send `OverlayOut::NodeInfosConnected` to overlay
+
         Ok(broker)
     }
 
@@ -115,8 +117,6 @@ impl LoopixBroker {
             OverlayMessage::Input(OverlayIn::NetworkWrapperToNetwork(node_id, wrapper)) => {
                 Some(LoopixIn::OverlayRequest(node_id, wrapper).into())
             }
-
-            //TODO other overlay messages
             _ => None,
         }
     }
@@ -131,10 +131,17 @@ impl LoopixBroker {
     }
 
     fn to_overlay(msg: LoopixMessage) -> Option<OverlayMessage> {
-        if let LoopixMessage::Output(LoopixOut::OverlayReply(destination, module_msg)) = msg {
-            return Some(OverlayOut::NetworkWrapperFromNetwork(destination, module_msg).into());
+        match msg {
+            LoopixMessage::Output(LoopixOut::OverlayReply(destination, module_msg)) => 
+                Some(OverlayOut::NetworkWrapperFromNetwork(destination, module_msg).into()),
+            LoopixMessage::Output(LoopixOut::NodeInfosConnected(node_infos)) => 
+                Some(OverlayOut::NodeInfoAvailable(node_infos).into()),
+            LoopixMessage::Output(LoopixOut::NodeIDsConnected(node_ids)) => 
+                Some(OverlayOut::NodeIDsConnected(node_ids).into()),
+            LoopixMessage::Output(LoopixOut::NodeInfoAvailable(node_infos)) => 
+                Some(OverlayOut::NodeInfoAvailable(node_infos).into()),
+            _ => None,
         }
-        None
     }
 
     fn to_network(msg: LoopixMessage) -> Option<NetworkMessage> {
