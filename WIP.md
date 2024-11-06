@@ -1,7 +1,6 @@
 # Work in progress
 
 ## Current high-level goal
-- Clean up and make ready for semester student project
 
 ## Current concrete goal
 
@@ -14,7 +13,7 @@
   - Easy simulation 
     - w/o network
     - local network
-    - network with bw and delay
+    - network with bw and delay -> on Deterlab
 
 ## Bugs
 
@@ -32,6 +31,15 @@
 - serde_yaml is deprecated
   - use serde_yaml_ng with singleton_map_recursive
 - use matchbox from https://github.com/johanhelsing/matchbox
+- rewrite the flmodules/src/*/broker.rs :
+  - the returned broker should only represent the actual i/o messages
+  - add an internal message enum to separate them from the outside messages
+  - think how the `Overlay` (should be renamed to `Adapter` or so) can be
+  redone. One possibility is to have the network module using a good
+  `NetworkMessage` which includes the `NetworkWrapper` and can also be used
+  by `Random` and `Loopix`.
+    - Question: how to handle special messages then? Like asking to reshuffle
+    connections in `random` or accessing the providers in `loopix`?
 - Clean up broker / network:
   - Remove `Destination::{All,Others,This}` - Test it
     only `Destination::All` is ever used
