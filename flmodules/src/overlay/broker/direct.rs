@@ -6,7 +6,6 @@ use flarch::{
 
 use super::super::messages::{OverlayIn, OverlayInternal, OverlayMessage, OverlayOut};
 use crate::{
-    loopix::messages::{LoopixIn, LoopixMessage, LoopixOut},
     network::messages::{NetworkIn, NetworkMessage, NetworkOut},
     nodeconfig::NodeInfo,
 };
@@ -137,54 +136,6 @@ impl SubsystemHandler<OverlayMessage> for OverlayDirect {
         } else {
             vec![]
         }
-    }
-}
-
-pub struct OverlayLoopix {
-    pub broker: Broker<OverlayMessage>,
-}
-
-impl OverlayLoopix {
-    pub async fn start(
-        loopix: Broker<LoopixMessage>,
-    ) -> Result<Broker<OverlayMessage>, BrokerError> {
-        let mut broker = Broker::new();
-
-        broker
-            .link_bi(
-                loopix.clone(),
-                Box::new(Self::from_loopix),
-                Box::new(Self::to_loopix),
-            )
-            .await?;
-
-        Ok(broker)
-    }
-
-    fn from_loopix(msg: LoopixMessage) -> Option<OverlayMessage> {
-        if let LoopixMessage::Output(out) = msg {
-            let ret = match out {
-                LoopixOut::NodeIDsConnected(node_ids) => OverlayOut::NodeIDsConnected(node_ids),
-                LoopixOut::NodeInfosConnected(infos) => OverlayOut::NodeInfosConnected(infos),
-                LoopixOut::OverlayReply(node_id, module_msg) => {
-                    OverlayOut::NetworkWrapperFromNetwork(node_id, module_msg)
-                }
-                _ => return None,
-            };
-            return Some(ret.into());
-        }
-        None
-    }
-
-    fn to_loopix(msg: OverlayMessage) -> Option<LoopixMessage> {
-        if let OverlayMessage::Input(input) = msg {
-            match input {
-                OverlayIn::NetworkWrapperToNetwork(node_id, wrapper) => {
-                    return Some(LoopixIn::OverlayRequest(node_id, wrapper).into());
-                }
-            }
-        }
-        None
     }
 }
 

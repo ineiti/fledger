@@ -1,50 +1,84 @@
-use flarch::start_logging;
+use std::error::Error;
+
+use flarch::{broker::Broker, start_logging, tasks::now};
 mod helpers;
-use flmodules::Modules;
+use flmodules::{
+    gossip_events::core::{Category, Event},
+    loopix::{broker::LoopixBroker, testing::LoopixSetup},
+    Modules,
+};
 use helpers::*;
 
-async fn proxy_nodes_n(nbr_nodes: usize) -> Result<(), NetworkError> {
+/**
+ * A more realistic test using the real nodes.
+ * 1. it sets up the nodes without loopix
+ * 2. one node creates a configuration for all the nodes (including the private
+ * keys...)
+ * 3. this node puts the configuration in the gossip-module
+ * 4. once all nodes got the configuration, every node initializes its
+ * loopix-module with the received configuraion.
+ */
+async fn proxy_nodes_n(path_length: usize) -> Result<(), Box<dyn Error>> {
+    // Setting up nodes with randon IDs.
+    let nbr_nodes = path_length * (path_length + 2);
     let mut net = NetworkSimul::new();
     log::info!("Creating {nbr_nodes} nodes");
-    net.add_nodes(Modules::ENABLE_LOOPIX, nbr_nodes).await?;
+    net.add_nodes(Modules::all(), nbr_nodes).await?;
     net.process(5).await;
     log::info!("Sent a total of {} messages", net.messages);
 
-    log::info!("Verify for full connection of all nodes");
-    let mut nodes_to_visit = vec![*net.nodes.keys().next().unwrap()];
-    let mut nodes_visited = vec![];
-
-    while !nodes_to_visit.is_empty() {
-        let id = nodes_to_visit.pop().unwrap();
-        if nodes_visited.contains(&id) {
-            continue;
-        }
-        nodes_visited.push(id);
-        let node = net.nodes.get_mut(&id).unwrap();
-        node.node.update();
-        let nd = node.node.random.as_ref().unwrap().storage.clone();
-        for n in nd.connected.0 {
-            if nodes_to_visit.contains(&n.id) || nodes_visited.contains(&n.id) {
-                continue;
-            }
-            nodes_to_visit.push(n.id);
+    // Create the global configuration and propagate it with the gossip-module.
+    let loopix_setup = LoopixSetup::new(2).await?;
+    if let Some((k, v)) = net.nodes.iter_mut().next() {
+        if let Some(g) = v.node.gossip.as_mut() {
+            let event = Event {
+                category: Category::TextMessage,
+                src: *k,
+                created: now(),
+                msg: serde_yaml::to_string(&loopix_setup)?,
+            };
+            g.add_event(event).await?;
         }
     }
-    assert_eq!(nbr_nodes, nodes_visited.len());
+    // Run the network until all messages are propagated.
+    net.process(2 * path_length).await;
+
+    // Suppose every node has the configuration now and can initialize its loopix
+    // module.
+    for (_id, v) in net.nodes.iter_mut() {
+        let setup: LoopixSetup = serde_yaml::from_str(
+            &v.node
+                .gossip
+                .as_ref()
+                .unwrap()
+                .events(Category::TextMessage)
+                .first()
+                .unwrap()
+                .msg,
+        )?;
+        // This is my configuration-wrapper. Of course the nodes should have a way to get their role.
+        // The role choice could be done in step 2 where one node creates the global configuration.
+        let config = setup
+            .get_config(0, flmodules::loopix::config::LoopixRole::Client)
+            .await?;
+        v.node.loopix =
+            Some(LoopixBroker::start(Broker::new(), v.node.broker_net.clone(), config).await?);
+    }
+
+    // Now do some webProxy stuff while the network runs.
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
-    async fn connect_nodes() -> Result<(), NetworkError> {
+    async fn connect_nodes() -> Result<(), Box<dyn Error>> {
         start_logging();
 
-        for n in &[2, 3, 4, 5, 10, 20, 50, 100] {
-            proxy_nodes_n(*n).await?;
-        }
+        proxy_nodes_n(4).await?;
         Ok(())
     }
 }
