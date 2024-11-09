@@ -15,10 +15,19 @@ use flmodules::{
         broker::GossipBroker,
         core::{self, Category, Event},
         messages::{GossipIn, GossipMessage},
-    }, network::messages::{NetworkError, NetworkIn, NetworkMessage}, nodeconfig::{ConfigError, NodeConfig, NodeInfo}, overlay::broker::OverlayRandom, ping::{broker::PingBroker, messages::PingConfig}, random_connections::broker::RandomBroker, timer::{TimerBroker, TimerMessage}, web_proxy::{
+    },
+    loopix::messages::LoopixMessage,
+    network::messages::{NetworkError, NetworkIn, NetworkMessage},
+    nodeconfig::{ConfigError, NodeConfig, NodeInfo},
+    overlay::broker::{direct::OverlayDirect, random::OverlayRandom},
+    ping::{broker::PingBroker, messages::PingConfig},
+    random_connections::broker::RandomBroker,
+    timer::{TimerBroker, TimerMessage},
+    web_proxy::{
         broker::{WebProxy, WebProxyError},
         core::WebProxyConfig,
-    }, Modules
+    },
+    Modules,
 };
 
 use crate::stat::StatBroker;
@@ -63,6 +72,8 @@ pub struct Node {
     pub ping: Option<PingBroker>,
     /// Answers GET requests from another node
     pub webproxy: Option<WebProxy>,
+    /// Create a mix-network for anonymous communication
+    pub loopix: Option<Broker<LoopixMessage>>,
 }
 
 const STORAGE_GOSSIP_EVENTS: &str = "gossip_events";
@@ -89,7 +100,8 @@ impl Node {
         let mut random = None;
         let mut gossip = None;
         let mut ping = None;
-        let mut webproxy = None;
+        let loopix = None;
+        let mut overlay = OverlayDirect::start(broker_net.clone()).await?;
         if modules.contains(Modules::ENABLE_RAND) {
             let rnd = RandomBroker::start(id, broker_net.clone()).await?;
             if modules.contains(Modules::ENABLE_GOSSIP) {
@@ -104,19 +116,27 @@ impl Node {
             if modules.contains(Modules::ENABLE_PING) {
                 ping = Some(PingBroker::start(PingConfig::default(), rnd.broker.clone()).await?);
             }
-            if modules.contains(Modules::ENABLE_WEBPROXY) {
-                webproxy = Some(
-                    WebProxy::start(
-                        storage.clone(),
-                        id,
-                        OverlayRandom::start(rnd.broker.clone()).await?,
-                        WebProxyConfig::default(),
-                    )
-                    .await?,
-                );
-            }
+            overlay = OverlayRandom::start(rnd.broker.clone()).await?;
             random = Some(rnd);
         }
+        // This needs the `config`, which is not availble yet.
+        // if modules.contains(Modules::ENABLE_LOOPIX) {
+        //     loopix = Some(LoopixBroker::start(Broker::new(), broker_net.clone(), config).await?);
+        //     overlay = OverlayLoopix::start(loopix.unwrap().clone()).await?;
+        // }
+        let webproxy = if modules.contains(Modules::ENABLE_WEBPROXY) {
+            Some(
+                WebProxy::start(
+                    storage.clone(),
+                    id,
+                    overlay.clone(),
+                    WebProxyConfig::default(),
+                )
+                .await?,
+            )
+        } else {
+            None
+        };
         let stat = if modules.contains(Modules::ENABLE_STAT) {
             Some(StatBroker::start(broker_net.clone()).await?)
         } else {
@@ -132,6 +152,7 @@ impl Node {
             gossip,
             ping,
             webproxy,
+            loopix,
         };
         node.add_timer(TimerBroker::start().await?).await;
         Ok(node)

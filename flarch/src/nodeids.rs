@@ -91,6 +91,31 @@ impl From<GenericArray<u8, U32>> for U256 {
     }
 }
 
+impl From<u64> for U256 {
+    fn from(value: u64) -> Self {
+        let mut bytes = [0u8; 32];
+        bytes[24..].copy_from_slice(&value.to_be_bytes());
+        U256 { 0: bytes }
+    }
+}
+
+
+impl From<u32> for U256 {
+    fn from(value: u32) -> Self {
+        let mut bytes = [0u8; 32];
+        bytes[28..].copy_from_slice(&value.to_be_bytes());
+        U256 { 0: bytes }
+    }
+}
+
+impl From<i32> for U256 {
+    fn from(value: i32) -> Self {
+        let mut bytes = [0u8; 32];
+        bytes[28..].copy_from_slice(&value.to_be_bytes());
+        U256 { 0: bytes }
+    }
+}
+
 impl From<[u8; 32]> for U256 {
     fn from(b: [u8; 32]) -> Self {
         U256 { 0: b }
@@ -121,6 +146,22 @@ impl NodeIDs {
             ret.0.push(NodeID::rnd())
         }
         ret
+    }
+
+    /// Returns a NodeIDs from 'from'(included) to 'to'(excluded)
+    pub fn new_range(from: u32, to: u32) -> Self {
+        let mut ret = NodeIDs { 0: vec![] };
+        for i in from..to {
+            let mut bytes = [0u8; 32];
+            bytes[28..].copy_from_slice(&i.to_be_bytes());
+            ret.0.push(NodeID::from(bytes));
+        }
+        ret
+    }
+
+    /// Returns NodeIDs as a Vec<NodeID>
+    pub fn to_vec(&self) -> Vec<NodeID> {
+        self.0.clone()
     }
 
     // Returns an empty NodeIDs
