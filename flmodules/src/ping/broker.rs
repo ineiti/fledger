@@ -105,7 +105,7 @@ impl Translate {
         if let PingMessage::Output(msg_out) = msg {
             match msg_out {
                 PingOut::ToNetwork(id, msg_node) => Some(
-                    RandomIn::NetworkWrapperToNetwork(
+                    RandomIn::NetworkMapperToNetwork(
                         id,
                         NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                     )

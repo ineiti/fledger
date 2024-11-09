@@ -37,5 +37,3 @@ tokio = "1"
 
 [dev-dependencies]
 env_logger = "0.11"
-flmodules = {path = "../flmodules", version = "0.8", features = ["testing"]}
-

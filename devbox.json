@@ -33,9 +33,6 @@
       "test": [
         "make cargo_test"
       ],
-      "code": [
-        "code --user-data-dir .vscode --profile fledger ."
-      ],
       "fledger": [
         "cd cli && cargo run -p fledger"
       ]
