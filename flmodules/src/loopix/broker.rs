@@ -264,6 +264,7 @@ impl SubsystemHandler<LoopixMessage> for LoopixTranslate {
                 LoopixMessage::Output(output) => {
                     match output {
                         LoopixOut::SphinxToNetwork(node_id, sphinx) => {
+                            log::info!("Sending sphinx to network: {}", serde_yaml::to_string(&sphinx).unwrap());
                             self.network.emit_msg(NetworkIn::MessageToNode(node_id, serde_yaml::to_string(&sphinx).unwrap()).into()).unwrap();
                         }
                         _ => {}
@@ -278,17 +279,18 @@ impl SubsystemHandler<LoopixMessage> for LoopixTranslate {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
     use crate::loopix::config::{LoopixConfig, LoopixRole};
+    use crate::loopix::messages::MessageType;
+    use crate::loopix::sphinx::{destination_address_from_node_id, node_address_from_node_id};
     use crate::loopix::storage::LoopixStorage;
     use crate::network::messages::NetworkMessage;
-    // use crate::overlay::messages::OverlayMessage;
     use flarch::broker::Broker;
+    use sphinx_packet::route::{Destination, Node};
+    use sphinx_packet::SphinxPacket;
+    use std::collections::HashMap;
 
-    #[tokio::test]
-    async fn create_broker() -> Result<(), BrokerError> {
+    async fn setup_network() -> Result<(Broker<LoopixMessage>, LoopixStorage, Broker<NetworkMessage>), BrokerError> {
         let path_length = 2;
 
         // set up network
@@ -302,7 +304,7 @@ mod tests {
             node_key_pairs.insert(node_id, (public_key, private_key));
         }
 
-        let node_id = 1;
+        let node_id = 0;
         let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
         let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
 
@@ -319,11 +321,144 @@ mod tests {
             .set_node_public_keys(node_public_keys)
             .await;
 
-        // let overlay = Broker::<OverlayMessage>::new();
+        let network = Broker::<NetworkMessage>::new();
+        let loopix_storage = config.storage_config.arc_clone();
+        
+        let loopix_broker = LoopixBroker::start(network.clone(), config).await?;
+
+        Ok((loopix_broker, loopix_storage, network))
+    }
+
+    #[tokio::test]
+    async fn create_broker() -> Result<(), BrokerError> {
+        let path_length = 2;
+
+        // set up network
+        let mut node_public_keys = HashMap::new();
+        let mut node_key_pairs = HashMap::new();
+
+        for mix in 0..path_length * path_length + path_length + path_length {
+            let node_id = NodeID::from(mix as u32);
+            let (public_key, private_key) = LoopixStorage::generate_key_pair();
+            node_public_keys.insert(node_id, public_key);
+            node_key_pairs.insert(node_id, (public_key, private_key));
+        }
+
+        let node_id = 0;
+        let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
+        let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
+
+        let config = LoopixConfig::default_with_path_length(
+            LoopixRole::Client,
+            node_id,
+            path_length,
+            private_key.clone(),
+            public_key.clone(),
+        );
+
+        config
+            .storage_config
+            .set_node_public_keys(node_public_keys)
+            .await;
+
         let network = Broker::<NetworkMessage>::new();
 
         let _loopix_broker = LoopixBroker::start(network, config).await?;
         
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_broker_sends_message() -> Result<(), BrokerError> {
+        let (loopix_broker, _, network) = setup_network().await?;
+
+        // Send a test message
+        let test_node_id = NodeID::from(1);
+        let sphinx_packet = Sphinx::default();
+        loopix_broker.clone().emit_msg(LoopixMessage::Output(LoopixOut::SphinxToNetwork(test_node_id, sphinx_packet.clone()))).unwrap();
+
+        // Verify the message was processed and sent to the network
+        let (mut tap, _) = network.clone().get_tap().await?;
+        if let NetworkMessage::Input(NetworkIn::MessageToNode(node_id, msg)) = tap.recv().await.unwrap() {
+            assert_eq!(node_id, test_node_id);
+            assert_eq!(msg, serde_yaml::to_string(&sphinx_packet).unwrap());
+        } else {
+            panic!("Message not processed by LoopixBroker");
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_broker_receives_overlay_request() -> Result<(), BrokerError> {
+        let (loopix_broker, storage, network) = setup_network().await?;
+
+        let client_to_provider_map = storage.get_client_to_provider_map().await;
+        println!("Client to provider map: {:?}", client_to_provider_map);
+        // Simulate sending an overlay request to the LoopixBroker
+        let test_node_id = NodeID::from(1);
+        let network_wrapper = NetworkWrapper{module: "loopix".to_string(), msg: "test".to_string()};
+        loopix_broker.clone().emit_msg(LoopixMessage::Input(LoopixIn::OverlayRequest(test_node_id, network_wrapper.clone()))).unwrap();
+
+        // Verify the message was processed and sent to the network
+        let (mut tap, _) = network.clone().get_tap().await?;
+        if let NetworkMessage::Input(NetworkIn::MessageToNode(next_node_id, msg)) = tap.recv().await.unwrap() {
+            let our_provider = storage.get_our_provider().await.unwrap();
+            assert_eq!(next_node_id, our_provider);
+
+            let _ = serde_yaml::from_str::<Sphinx>(&msg).unwrap();
+
+        } else {
+            assert!(false, "Message not processed by LoopixBroker");
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_broker_receives_network_message() -> Result<(), BrokerError> {
+        let (loopix_broker, storage, _) = setup_network().await?;
+
+        //create sphinx packet
+        let drop_msg = serde_yaml::to_string(&MessageType::Drop).unwrap();
+        let msg = NetworkWrapper {
+            module: MODULE_NAME.into(),
+            msg: drop_msg,
+        };
+        let our_node_id = storage.get_our_id().await;
+        let public_key = storage.get_public_key().await;
+
+        let surb_identifier = [0u8; 16];
+        let destination = Destination {address: destination_address_from_node_id(our_node_id), identifier: surb_identifier};
+        let route = vec![Node {address: node_address_from_node_id(our_node_id), pub_key: public_key}];
+        let delays = vec![Delay::new_from_nanos(1)];
+        let message_vec = serde_yaml::to_string(&msg).unwrap().as_bytes().to_vec();
+        let sphinx_packet = SphinxPacket::new(message_vec, &route, &destination, &delays).unwrap();
+        
+        // Simulate sending an network message to the LoopixBroker
+        loopix_broker.clone().emit_msg(LoopixMessage::Input(LoopixIn::SphinxFromNetwork(Sphinx{inner: sphinx_packet}))).unwrap();
+
+        // TODO check the logs?
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_send_queue_threads() -> Result<(), BrokerError> {
+        let (_, _, network) = setup_network().await?;
+
+        tokio::time::sleep(Duration::from_secs(10)).await;
+
+        let (mut tap, _) = network.clone().get_tap().await?;
+        for _ in 0..3 {
+            if let Some(msg) = tap.recv().await {
+                println!("{:?}", msg);
+            } else {
+                panic!("Network should receive dummy and drop messages");
+            }
+        }
+
+        Ok(())
+    }
+
 }

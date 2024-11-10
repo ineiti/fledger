@@ -348,6 +348,14 @@ impl LoopixStorage {
         }
     }
 
+    pub fn arc_clone(&self) -> Self {
+        LoopixStorage {
+            network_storage: Arc::clone(&self.network_storage),
+            client_storage: Arc::clone(&self.client_storage),
+            provider_storage: Arc::clone(&self.provider_storage),
+        }
+    }
+
     pub fn new_with_key_generation(
         node_id: NodeID,
         mixes: Vec<Vec<NodeID>>,
