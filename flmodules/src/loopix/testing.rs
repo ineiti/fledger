@@ -48,7 +48,7 @@ impl LoopixNode {
         let net = Broker::new();
         let overlay = Broker::new();
         Ok(Self {
-            loopix: LoopixBroker::start(overlay.clone(), net.clone(), loopix_cfg).await?,
+            loopix: LoopixBroker::start(net.clone(), loopix_cfg).await?,
             config,
             net,
             overlay,
