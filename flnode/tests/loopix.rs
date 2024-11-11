@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use flarch::{broker::Broker, start_logging, tasks::now};
+use flarch::{start_logging, tasks::now};
 mod helpers;
 use flmodules::{
     gossip_events::core::{Category, Event},
@@ -45,7 +45,7 @@ async fn proxy_nodes_n(path_length: usize) -> Result<(), Box<dyn Error>> {
 
     // Suppose every node has the configuration now and can initialize its loopix
     // module.
-    for (_id, v) in net.nodes.iter_mut() {
+    for (id, v) in net.nodes.iter_mut() {
         let setup: LoopixSetup = serde_yaml::from_str(
             &v.node
                 .gossip
@@ -59,10 +59,10 @@ async fn proxy_nodes_n(path_length: usize) -> Result<(), Box<dyn Error>> {
         // This is my configuration-wrapper. Of course the nodes should have a way to get their role.
         // The role choice could be done in step 2 where one node creates the global configuration.
         let config = setup
-            .get_config(0, flmodules::loopix::config::LoopixRole::Client)
+            .get_config(*id, flmodules::loopix::config::LoopixRole::Client)
             .await?;
         v.node.loopix =
-            Some(LoopixBroker::start(Broker::new(), v.node.broker_net.clone(), config).await?);
+            Some(LoopixBroker::start(v.node.broker_net.clone(), config).await?);
     }
 
     // Now do some webProxy stuff while the network runs.

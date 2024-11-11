@@ -288,23 +288,16 @@ mod tests {
     use flarch::broker::Broker;
     use sphinx_packet::route::{Destination, Node};
     use sphinx_packet::SphinxPacket;
-    use std::collections::HashMap;
+    use tokio::time::{timeout, Duration};
+    use crate::loopix::testing::LoopixSetup;
 
     async fn setup_network() -> Result<(Broker<LoopixMessage>, LoopixStorage, Broker<NetworkMessage>), BrokerError> {
         let path_length = 2;
+        
+        let (all_nodes, node_public_keys, node_key_pairs) = LoopixSetup::create_nodes_and_keys(path_length);
 
-        // set up network
-        let mut node_public_keys = HashMap::new();
-        let mut node_key_pairs = HashMap::new();
-
-        for mix in 0..path_length * path_length + path_length + path_length {
-            let node_id = NodeID::from(mix as u32);
-            let (public_key, private_key) = LoopixStorage::generate_key_pair();
-            node_public_keys.insert(node_id, public_key);
-            node_key_pairs.insert(node_id, (public_key, private_key));
-        }
-
-        let node_id = 0;
+        // get our node info
+        let node_id = all_nodes.iter().next().unwrap().get_id();
         let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
         let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
 
@@ -314,6 +307,7 @@ mod tests {
             path_length,
             private_key.clone(),
             public_key.clone(),
+            all_nodes.clone(),
         );
 
         config
@@ -333,18 +327,10 @@ mod tests {
     async fn create_broker() -> Result<(), BrokerError> {
         let path_length = 2;
 
-        // set up network
-        let mut node_public_keys = HashMap::new();
-        let mut node_key_pairs = HashMap::new();
+        let (all_nodes, node_public_keys, node_key_pairs) = LoopixSetup::create_nodes_and_keys(path_length);
 
-        for mix in 0..path_length * path_length + path_length + path_length {
-            let node_id = NodeID::from(mix as u32);
-            let (public_key, private_key) = LoopixStorage::generate_key_pair();
-            node_public_keys.insert(node_id, public_key);
-            node_key_pairs.insert(node_id, (public_key, private_key));
-        }
-
-        let node_id = 0;
+        // take first path length from nodeinfos
+        let node_id = all_nodes.clone().into_iter().take(path_length).next().unwrap().get_id(); // take a random client
         let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
         let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
 
@@ -354,6 +340,7 @@ mod tests {
             path_length,
             private_key.clone(),
             public_key.clone(),
+            all_nodes.clone(),
         );
 
         config
@@ -379,7 +366,7 @@ mod tests {
 
         // Verify the message was processed and sent to the network
         let (mut tap, _) = network.clone().get_tap().await?;
-        if let NetworkMessage::Input(NetworkIn::MessageToNode(node_id, msg)) = tap.recv().await.unwrap() {
+        if let Ok(Some(NetworkMessage::Input(NetworkIn::MessageToNode(node_id, msg)))) = timeout(Duration::from_secs(10), tap.recv()).await {
             assert_eq!(node_id, test_node_id);
             assert_eq!(msg, serde_yaml::to_string(&sphinx_packet).unwrap());
         } else {
@@ -402,7 +389,7 @@ mod tests {
 
         // Verify the message was processed and sent to the network
         let (mut tap, _) = network.clone().get_tap().await?;
-        if let NetworkMessage::Input(NetworkIn::MessageToNode(next_node_id, msg)) = tap.recv().await.unwrap() {
+        if let Ok(Some(NetworkMessage::Input(NetworkIn::MessageToNode(next_node_id, msg)))) = timeout(Duration::from_secs(10), tap.recv()).await {
             let our_provider = storage.get_our_provider().await.unwrap();
             assert_eq!(next_node_id, our_provider);
 
@@ -451,7 +438,7 @@ mod tests {
 
         let (mut tap, _) = network.clone().get_tap().await?;
         for _ in 0..3 {
-            if let Some(msg) = tap.recv().await {
+            if let Ok(Some(msg)) = timeout(Duration::from_secs(10), tap.recv()).await {
                 println!("{:?}", msg);
             } else {
                 panic!("Network should receive dummy and drop messages");

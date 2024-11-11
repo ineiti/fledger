@@ -8,7 +8,6 @@ use crate::loopix::sphinx::Sphinx;
 use crate::overlay::messages::NetworkWrapper;
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
-use rand::seq::SliceRandom;
 use sphinx_packet::header::delays::Delay;
 use sphinx_packet::payload::Payload;
 use sphinx_packet::SphinxPacket;
@@ -70,8 +69,7 @@ impl LoopixCore for Client {
     /// Packet with a random provider as destination (drop)
     async fn create_drop_message(&self) -> (NodeID, Sphinx) {
         // pick random provider
-        let providers = self.get_storage().get_providers().await;
-        let random_provider = providers.choose(&mut rand::thread_rng()).unwrap();
+        let random_provider = self.get_storage().get_random_provider().await;
 
         // get our provider
         let our_provider = self.get_our_provider().await;
@@ -82,7 +80,7 @@ impl LoopixCore for Client {
                 self.get_config().path_length(),
                 our_provider,
                 None,
-                Some(*random_provider),
+                Some(random_provider),
             )
             .await;
 
@@ -94,8 +92,8 @@ impl LoopixCore for Client {
         };
 
         // create sphinx packet
-        let (_, sphinx) = self.create_sphinx_packet(*random_provider, msg, &route);
-        (*random_provider, sphinx)
+        let (_, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
+        (random_provider, sphinx)
     }
 
     async fn process_final_hop(
@@ -179,12 +177,7 @@ impl Client {
         let provider = match self.get_our_provider().await {
             Some(provider) => provider,
             None => {
-                let providers = self.get_storage().get_providers().await;
-                if providers.is_empty() {
-                    log::error!("No providers available");
-                    return (our_id, None);
-                }
-                *providers.choose(&mut rand::thread_rng()).unwrap()
+                self.get_storage().get_random_provider().await
             }
         };
 
@@ -210,8 +203,7 @@ impl Client {
         let provider = match self.get_our_provider().await {
             Some(provider) => provider,
             None => {
-                let providers = self.get_storage().get_providers().await;
-                *providers.choose(&mut rand::thread_rng()).unwrap()
+                self.get_storage().get_random_provider().await
             }
         };
 
@@ -281,25 +273,17 @@ impl Client {
 mod tests {
     use crate::loopix::config::LoopixConfig;
     use crate::loopix::config::LoopixRole;
-    use flarch::nodeids::NodeIDs;
-    use std::collections::HashMap;
+    use crate::loopix::testing::LoopixSetup;
+    use crate::nodeconfig::NodeInfo;
 
     use super::*;
 
-    async fn setup() -> (Client, u32, usize) {
+    async fn setup() -> (Client, Vec<NodeInfo>, usize) {
         let path_length = 2;
-        let mut node_public_keys = HashMap::new();
-        let mut node_key_pairs = HashMap::new();
+        let (all_nodes, node_public_keys, node_key_pairs) = LoopixSetup::create_nodes_and_keys(path_length);
 
-        for mix in 0..path_length * path_length + path_length {
-            for node_id in NodeIDs::new_range(mix as u32, (mix + path_length) as u32).to_vec() {
-                let (public_key, private_key) = LoopixStorage::generate_key_pair();
-                node_public_keys.insert(node_id, public_key);
-                node_key_pairs.insert(node_id, (public_key, private_key));
-            }
-        }
-
-        let node_id = 0;
+        // get our node info
+        let node_id = all_nodes.iter().next().unwrap().get_id();
         let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
         let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
 
@@ -309,6 +293,7 @@ mod tests {
             path_length,
             private_key.clone(),
             public_key.clone(),
+            all_nodes.clone(),
         );
 
         config
@@ -318,30 +303,31 @@ mod tests {
 
         (
             Client::new(config.storage_config, config.core_config),
-            node_id,
+            all_nodes.clone(),
             path_length,
         )
     }
 
     #[tokio::test]
     async fn get_provider() {
-        let (client, node_id, path_length) = setup().await;
+        let (client, nodes, path_length) = setup().await;
+        let node_id = client.get_our_id().await;
+        let our_id_index = nodes.iter().position(|node| node.get_id() == node_id).unwrap();
         assert_eq!(
             client.get_our_provider().await,
-            Some(NodeID::from(node_id + path_length as u32))
+            Some(NodeID::from(nodes[our_id_index + path_length].get_id()))
         );
     }
 
     #[tokio::test]
     async fn register_provider() {
-        let (mut client, _, path_length) = setup().await;
-        let new_provider =
-            path_length as u32 + rand::random::<u32>() % (path_length * 2 - path_length) as u32;
+        let (mut client, nodes, path_length) = setup().await;
+        let new_provider = nodes[path_length].get_id();
         println!("New provider ID: {}", new_provider);
-        client.register_provider(NodeID::from(new_provider)).await;
+        client.register_provider(new_provider).await;
         assert_eq!(
             client.get_our_provider().await,
-            Some(NodeID::from(new_provider))
+            Some(new_provider)
         );
     }
 }

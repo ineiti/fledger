@@ -8,13 +8,14 @@ use crate::{
         storage::LoopixStorage,
     },
     network::messages::{NetworkIn, NetworkMessage, NetworkOut},
-    nodeconfig::NodeConfig,
+    nodeconfig::{NodeConfig, NodeInfo},
     overlay::{broker::loopix::OverlayLoopix, messages::OverlayMessage},
     web_proxy::{
         broker::{WebProxy, WebProxyError},
         core::WebProxyConfig,
     },
 };
+use ed25519_compact::{KeyPair, Seed};
 use flarch::{
     broker::{Broker, BrokerError},
     data_storage::DataStorageTemp,
@@ -68,7 +69,8 @@ impl LoopixNode {
 pub struct LoopixSetup {
     pub node_public_keys: HashMap<NodeID, PublicKey>,
     pub node_key_pairs: HashMap<NodeID, (PublicKey, StaticSecret)>,
-    pub path_length: u32,
+    pub path_length: usize,
+    pub all_nodes: Vec<NodeInfo>,
     #[serde(skip_serializing, skip_deserializing, default)]
     pub clients: Vec<LoopixNode>,
     #[serde(skip_serializing, skip_deserializing, default)]
@@ -78,55 +80,67 @@ pub struct LoopixSetup {
 }
 
 impl LoopixSetup {
-    pub async fn new(path_length: u32) -> Result<Self, BrokerError> {
-        // set up network
-        let mut node_public_keys = HashMap::new();
-        let mut node_key_pairs = HashMap::new();
+    pub async fn new(path_length: usize) -> Result<Self, BrokerError> {
 
-        for mix in 0..path_length * path_length + path_length + path_length {
-            let node_id = NodeID::from(mix);
-            let (public_key, private_key) = LoopixStorage::generate_key_pair();
-            node_public_keys.insert(node_id, public_key);
-            node_key_pairs.insert(node_id, (public_key, private_key));
-        }
+        let (node_infos, node_public_keys, node_key_pairs) = Self::create_nodes_and_keys(path_length);
 
         let mut setup = Self {
             node_public_keys,
             node_key_pairs,
             path_length,
+            all_nodes: node_infos,
             clients: vec![],
             mixers: vec![],
             providers: vec![],
         };
 
-        // TODO: correct attribution of NodeIDs to client|mixer|provider
-        // TODO: using u32 as NodeID is very confusing and will not work in a real setup!
-        setup.clients = setup.get_nodes(0..path_length, LoopixRole::Client).await?;
+        setup.clients = setup
+            .get_nodes(0..path_length, LoopixRole::Client)
+            .await?;
         setup.providers = setup
             .get_nodes(path_length..2 * path_length, LoopixRole::Provider)
             .await?;
         setup.mixers = setup
-            .get_nodes(2 * path_length..4 * path_length, LoopixRole::Mixnode)
+            .get_nodes(2 * path_length..path_length * path_length, LoopixRole::Mixnode)
             .await?;
 
         Ok(setup)
     }
 
+    pub fn create_nodes_and_keys(path_length: usize) -> (Vec<NodeInfo>, HashMap<NodeID, PublicKey>, HashMap<NodeID, (PublicKey, StaticSecret)>) {
+        let mut node_infos = Vec::new();
+        let mut node_public_keys = HashMap::new();
+        let mut node_key_pairs = HashMap::new();
+
+        for _ in 0..path_length * path_length + path_length * 2 {
+            let keypair = KeyPair::from_seed(Seed::default());
+            let new_node = NodeInfo::new(keypair.pk);
+            let node_id = new_node.get_id();
+            node_infos.push(new_node);
+
+            let (public_key, private_key) = LoopixStorage::generate_key_pair();
+            node_public_keys.insert(node_id, public_key);
+            node_key_pairs.insert(node_id, (public_key, private_key));
+        }
+
+        (node_infos, node_public_keys, node_key_pairs)
+    }
+
     pub async fn get_nodes(
         &self,
-        range: Range<u32>,
+        range: Range<usize>,
         role: LoopixRole,
     ) -> Result<Vec<LoopixNode>, BrokerError> {
         let mut ret = vec![];
-        for id in range {
-            ret.push(self.get_node(id, role.clone()).await?);
+        for i in range {
+            ret.push(self.get_node(self.all_nodes[i].get_id(), role.clone()).await?);
         }
         Ok(ret)
     }
 
     pub async fn get_node(
         &self,
-        node_id: u32,
+        node_id: NodeID,
         role: LoopixRole,
     ) -> Result<LoopixNode, BrokerError> {
         LoopixNode::new(self.get_config(node_id, role).await?).await
@@ -134,11 +148,11 @@ impl LoopixSetup {
 
     pub async fn get_config(
         &self,
-        node_id: u32,
+        node_id: NodeID,
         role: LoopixRole,
     ) -> Result<LoopixConfig, BrokerError> {
-        let private_key = &self.node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
-        let public_key = &self.node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
+        let private_key = &self.node_key_pairs.get(&node_id).unwrap().1;
+        let public_key = &self.node_key_pairs.get(&node_id).unwrap().0;
 
         let config = LoopixConfig::default_with_path_length(
             role,
@@ -146,6 +160,7 @@ impl LoopixSetup {
             self.path_length as usize,
             private_key.clone(),
             public_key.clone(),
+            self.all_nodes.clone(),
         );
 
         config

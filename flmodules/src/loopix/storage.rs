@@ -1,11 +1,12 @@
 use std::collections::HashMap;
+use rand::seq::IteratorRandom;
 use sphinx_packet::header::delays::Delay;
 use x25519_dalek::{PublicKey, StaticSecret};
 use tokio::sync::RwLock;
 use std::sync::Arc;
 use std::collections::HashSet;
-use crate::loopix::sphinx::Sphinx;
-use flarch::nodeids::{NodeID, NodeIDs};
+use crate::{loopix::sphinx::Sphinx, nodeconfig::NodeInfo};
+use flarch::nodeids::NodeID;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -39,7 +40,7 @@ pub struct NetworkStorage {
     )]
     public_key: PublicKey,
     mixes: Vec<Vec<NodeID>>,
-    providers: Vec<NodeID>,
+    providers: HashSet<NodeID>,
     #[serde(
         serialize_with = "serialize_node_public_keys",
         deserialize_with = "deserialize_node_public_keys"
@@ -56,35 +57,44 @@ impl NetworkStorage {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ClientStorage {
     our_provider: Option<NodeID>,
+    clients: HashSet<NodeInfo>,
     client_to_provider_map: HashMap<NodeID, NodeID>,
 }
 
 impl ClientStorage {
     pub fn new(
         our_provider: Option<NodeID>,
+        clients: HashSet<NodeInfo>,
         client_to_provider_map: HashMap<NodeID, NodeID>,
     ) -> Self {
         ClientStorage {
+            clients,
             our_provider,
             client_to_provider_map,
         }
     }
 
-    /// given path_length 3: our node either 0, 1, or 2
-    pub fn default_with_path_length(our_node_id: u32, path_length: usize) -> Self {
-        if our_node_id >= path_length as u32 {
-            panic!("Our node id must be less than the path length");
-        }
-        let our_provider = Some(NodeID::from(our_node_id + path_length as u32));
+    /// Client IDs are chosen randomly
+    pub fn default_with_path_length(our_node_id: NodeID, all_nodes: Vec<NodeInfo>, path_length: usize) -> Self {
+        let mut our_provider: Option<NodeID> = None;
 
-        let mut client_to_provider_map = HashMap::new();
+        let mut client_to_provider_map: HashMap<NodeID, NodeID> = HashMap::new();
+        let mut clients = HashSet::new();
+
         for i in 0..path_length {
-            client_to_provider_map.insert(
-                NodeID::from(i as u32),
-                NodeID::from((i + path_length) as u32),
-            );
+            let client = all_nodes.get(i).unwrap().get_id();
+            let provider = all_nodes.get(i + path_length).unwrap().get_id();
+
+            if client == our_node_id {
+                our_provider = Some(provider);
+            } else {
+                clients.insert(all_nodes.get(i).unwrap().clone());
+                client_to_provider_map.insert(client, provider);
+            }
         }
+
         ClientStorage {
+            clients,
             our_provider,
             client_to_provider_map,
         }
@@ -93,37 +103,31 @@ impl ClientStorage {
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ProviderStorage {
-    clients: HashSet<NodeID>,
+    subscribed_clients: HashSet<NodeID>,
     #[serde(serialize_with = "serialize_client_messages", deserialize_with = "deserialize_client_messages")]
     client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>,
 }
 
 impl ProviderStorage {
-    pub fn new(clients: HashSet<NodeID>, client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>) -> Self {
+    pub fn new(subscribed_clients: HashSet<NodeID>, client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>) -> Self {
         ProviderStorage {
-            clients,
+            subscribed_clients,
             client_messages,
         }
     }
 
     pub fn default() -> Self {
         ProviderStorage {
-            clients: HashSet::new(),
+            subscribed_clients: HashSet::new(),
             client_messages: HashMap::new(),
         }
     }
 
     /// given path_length 3: our node either 3, 4, or 5
-    pub fn default_with_path_length(our_node_id: u32, path_length: usize) -> Self {
-        if our_node_id < path_length as u32 || our_node_id >= (path_length * 2) as u32 {
-            panic!("Our node id must be between the path length and 2 times the path length");
-        }
-
-        let mut clients = HashSet::new();
-        clients.insert(NodeID::from(our_node_id - path_length as u32));
+    pub fn default_with_path_length(clients: HashSet<NodeID>) -> Self {
 
         ProviderStorage {
-            clients,
+            subscribed_clients: clients,
             client_messages: HashMap::new(),
         }
     }
@@ -136,10 +140,17 @@ pub struct LoopixStorage {
 }
 
 impl LoopixStorage {
-    // TODO figure out how to serialize this
-    // pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
-    //     serde_yaml::to_string::<LoopixStorageSave>(&LoopixStorageSave::V1((*self).clone()))
-    // }
+    pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
+        serde_yaml::to_string::<LoopixStorageSave>(&LoopixStorageSave::V1((*self).clone()))
+    }
+
+    pub async fn get_random_provider(&self) -> NodeID {
+        let storage = self.network_storage.read().await;
+        if storage.providers.is_empty() {
+            panic!("No providers available");
+        }
+        storage.providers.iter().choose(&mut rand::thread_rng()).unwrap().clone()
+    }
 
     pub async fn get_our_id(&self) -> NodeID {
         self.network_storage.read().await.node_id.clone()
@@ -161,11 +172,11 @@ impl LoopixStorage {
         self.network_storage.write().await.mixes = new_mixes;
     }
 
-    pub async fn get_providers(&self) -> Vec<NodeID> {
+    pub async fn get_providers(&self) -> HashSet<NodeID> {
         self.network_storage.read().await.providers.clone()
     }
 
-    pub async fn set_providers(&self, new_providers: Vec<NodeID>) {
+    pub async fn set_providers(&self, new_providers: HashSet<NodeID>) {
         self.network_storage.write().await.providers = new_providers;
     }
 
@@ -219,25 +230,57 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn get_clients(&self) -> HashSet<NodeID> {
-        if let Some(storage) = self.provider_storage.read().await.as_ref() {
+    pub async fn get_clients_in_network(&self) -> HashSet<NodeInfo> {
+        if let Some(storage) = self.client_storage.read().await.as_ref() {
             storage.clients.clone()
         } else {
-            panic!("Provider storage not found");
+            panic!("Client storage not found");
         }
     }
 
-    pub async fn add_client(&self, client_id: NodeID) {
-        if let Some(storage) = &mut *self.provider_storage.write().await {
-            storage.clients.insert(client_id);
+    pub async fn set_clients_in_network(&self, clients: HashSet<NodeInfo>) {
+        if let Some(storage) = &mut *self.client_storage.write().await {
+            storage.clients = clients;
+        } else {
+            panic!("Client storage not found");
+        }
+    }
+
+    pub async fn add_client_in_network(&self, client: NodeInfo) {
+        if let Some(storage) = &mut *self.client_storage.write().await {
+            storage.clients.insert(client);
+        } else {
+            panic!("Client storage not found");
+        }
+    }
+
+    pub async fn remove_client_in_network(&self, client: NodeInfo) {
+        if let Some(storage) = &mut *self.client_storage.write().await {
+            storage.clients.remove(&client);
+        } else {
+            panic!("Client storage not found");
+        }
+    }
+
+    pub async fn get_subscribed_clients(&self) -> HashSet<NodeID> {
+        if let Some(storage) = self.provider_storage.read().await.as_ref() {
+            storage.subscribed_clients.clone()
         } else {
             panic!("Provider storage not found");
         }
     }
 
-    pub async fn set_clients(&self, new_clients: HashSet<NodeID>) {
+    pub async fn add_subscribed_client(&self, client_id: NodeID) {
         if let Some(storage) = &mut *self.provider_storage.write().await {
-            storage.clients = new_clients;
+            storage.subscribed_clients.insert(client_id);
+        } else {
+            panic!("Provider storage not found");
+        }
+    }
+
+    pub async fn set_subscribed_clients(&self, new_clients: HashSet<NodeID>) {
+        if let Some(storage) = &mut *self.provider_storage.write().await {
+            storage.subscribed_clients = new_clients;
         } else {
             panic!("Provider storage not found");
         }
@@ -314,7 +357,7 @@ impl Default for LoopixStorage {
                 private_key,
                 public_key,
                 mixes: Vec::new(),
-                providers: Vec::new(),
+                providers: HashSet::new(),
                 node_public_keys: HashMap::new(),
             })),
             client_storage: Arc::new(RwLock::new(Option::None)),
@@ -329,7 +372,7 @@ impl LoopixStorage {
         private_key: StaticSecret,
         public_key: PublicKey,
         mixes: Vec<Vec<NodeID>>,
-        providers: Vec<NodeID>,
+        providers: HashSet<NodeID>,
         node_public_keys: HashMap<NodeID, PublicKey>,
         client_storage: Option<ClientStorage>,
         provider_storage: Option<ProviderStorage>,
@@ -359,7 +402,7 @@ impl LoopixStorage {
     pub fn new_with_key_generation(
         node_id: NodeID,
         mixes: Vec<Vec<NodeID>>,
-        providers: Vec<NodeID>,
+        providers: HashSet<NodeID>,
         node_public_keys: HashMap<NodeID, PublicKey>,
         client_storage: Option<ClientStorage>,
         provider_storage: Option<ProviderStorage>,
@@ -389,26 +432,37 @@ impl LoopixStorage {
     /// default testing storage with a given path length
     ///
     /// given path_length 3:
-    /// 0 to 3 are reserved for clients
-    /// 3 to 6 are providers
-    /// 6 to 14 are mixes
+    /// first 0 to 3 indices of all_nodes are reserved for clients,
+    /// next 3 to 6 are providers,
+    /// next 6 to 14 are mixes.
     pub fn default_with_path_length(
-        node_id: u32,
+        node_id: NodeID,
         path_length: usize,
         private_key: StaticSecret,
         public_key: PublicKey,
         client_storage: Option<ClientStorage>,
         provider_storage: Option<ProviderStorage>,
+        all_nodes: Vec<NodeInfo>,
     ) -> Self {
         //provider generation
-        let providers = NodeIDs::new_range(path_length as u32, (path_length * 2) as u32).to_vec();
-
-        //mix generation
+        let provider_infos = all_nodes.iter().skip(path_length).take(path_length).collect::<Vec<&NodeInfo>>();
+        
+        let mut providers = HashSet::from_iter(provider_infos.iter().map(|node| node.get_id()));
+        if providers.contains(&node_id) {
+            providers.remove(&node_id);
+        }
+        
+        // mix generation
+        let mix_infos = all_nodes.iter().skip(path_length * 2);
         let mut mixes = Vec::new();
-        for i in (path_length * 2..path_length * 2 + path_length * path_length)
-            .step_by(path_length as usize)
-        {
-            mixes.push(NodeIDs::new_range(i as u32, (i + path_length) as u32).to_vec());
+        for i in 0..path_length {
+            mixes.push(mix_infos.clone().skip(i * path_length).take(path_length).collect::<Vec<&NodeInfo>>().iter().map(|node| node.get_id()).collect::<Vec<NodeID>>());
+        }
+
+        for mix_layer in &mut mixes {
+            if let Some(index) = mix_layer.iter().position(|&r| r == node_id) {
+                mix_layer.remove(index);
+            }
         }
 
         LoopixStorage {
@@ -594,15 +648,19 @@ impl Clone for LoopixStorage {
 
 #[cfg(test)]
 mod tests {
+    use crate::loopix::testing::LoopixSetup;
+
     use super::*;
 
     #[tokio::test]
     async fn test_default_with_path_length() {
         let path_length = 3;
-        let node_id = 1;
         let client_storage = None;
         let provider_storage = None;
 
+        let (all_nodes, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
+
+        let node_id = all_nodes.iter().next().unwrap().get_id();
         let (public_key, private_key) = LoopixStorage::generate_key_pair();
 
         let storage = LoopixStorage::default_with_path_length(
@@ -612,6 +670,7 @@ mod tests {
             public_key,
             client_storage,
             provider_storage,
+            all_nodes,
         );
 
         let network_storage = storage.network_storage.read().await;
@@ -622,10 +681,13 @@ mod tests {
 
     #[test]
     fn test_client_storage_default_with_path_length() {
-        let our_node_id = 1;
         let path_length = 3;
 
-        let client_storage = ClientStorage::default_with_path_length(our_node_id, path_length);
+        let (all_nodes, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
+
+        let our_node_id = all_nodes[0].get_id();
+
+        let client_storage = ClientStorage::default_with_path_length(our_node_id, all_nodes, path_length);
 
         println!("Our Provider: {:?}", client_storage.our_provider);
         println!(
@@ -636,25 +698,34 @@ mod tests {
 
     #[test]
     fn test_provider_storage_default_with_path_length() {
-        let our_node_id = 4;
         let path_length = 3;
 
-        let provider_storage = ProviderStorage::default_with_path_length(our_node_id, path_length);
+        let (all_nodes, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
-        println!("Clients: {:?}", provider_storage.clients);
+        let clients = all_nodes
+            .clone()
+            .into_iter()
+            .skip(path_length)
+            .take(path_length)
+            .collect::<Vec<NodeInfo>>();
+
+        let provider_storage = ProviderStorage::default_with_path_length(HashSet::from_iter(clients.iter().map(|node| node.get_id())));
+
+        println!("Clients: {:?}", provider_storage.subscribed_clients);
     }
 
     #[test]
     fn test_loopix_storage_serde() {
-        let path_length = 3;
-        let node_id = 1;
-        let (public_key, private_key) = LoopixStorage::generate_key_pair();
+        let path_length = 3;    
 
-        let mut node_public_keys = HashMap::new();
-        node_public_keys.insert(NodeID::from(1), public_key);
+        let (all_nodes, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
+
+        let node_id = all_nodes.clone().into_iter().next().unwrap().get_id();
+        let (public_key, private_key) = LoopixStorage::generate_key_pair();
 
         let client_storage = Some(ClientStorage::default_with_path_length(
             node_id,
+            all_nodes.clone(),
             path_length,
         ));
         let provider_storage = None;
@@ -666,6 +737,7 @@ mod tests {
             public_key,
             client_storage,
             provider_storage,
+            all_nodes.clone(),
         );
 
         let serialized = serde_yaml::to_string(&original_storage).expect("Failed to serialize");
@@ -677,10 +749,31 @@ mod tests {
 
     #[tokio::test]
     async fn test_client_messages_serde() {
-        let (public_key, private_key) = LoopixStorage::generate_key_pair();
-        let provider_storage = ProviderStorage::default_with_path_length(4, 3);
+        let path_length = 3;
 
-        let loopix_storage = LoopixStorage::default_with_path_length(4, 3, private_key, public_key, None, Some(provider_storage));
+        let (all_nodes, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
+
+        let node_id = all_nodes.clone().into_iter().next().unwrap().get_id();
+        let (public_key, private_key) = LoopixStorage::generate_key_pair();
+
+        let clients = all_nodes
+            .clone()
+            .into_iter()
+            .skip(path_length)
+            .take(path_length)
+            .collect::<Vec<NodeInfo>>();
+
+        let provider_storage = ProviderStorage::default_with_path_length(HashSet::from_iter(clients.iter().map(|node| node.get_id())));
+
+        let loopix_storage = LoopixStorage::default_with_path_length(
+            node_id,
+            path_length,
+            private_key,
+            public_key,
+            None,
+            Some(provider_storage),
+            all_nodes.clone(),
+        );
 
         loopix_storage.add_client_message(NodeID::from(1), Delay::new_from_nanos(1), Sphinx::default()).await;
 

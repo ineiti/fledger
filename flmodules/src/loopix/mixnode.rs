@@ -9,7 +9,6 @@ use crate::loopix::{
 };
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
-use rand::seq::SliceRandom;
 use sphinx_packet::payload::Payload;
 use sphinx_packet::{header::delays::Delay, packet::*};
 
@@ -37,7 +36,7 @@ pub trait MixnodeInterface: LoopixCore {
         let our_id = self.get_our_id().await;
 
         // pick random provider
-        let random_provider = providers.choose(&mut rand::thread_rng()).unwrap();
+        let random_provider = providers.iter().next().unwrap();
 
         // create route
         let route = self
@@ -62,17 +61,14 @@ pub trait MixnodeInterface: LoopixCore {
     }
 
     async fn create_drop_message(&self) -> (NodeID, Sphinx) {
-        let providers = self.get_storage().get_providers().await;
-
-        // pick random provider
-        let random_provider = providers.choose(&mut rand::thread_rng()).unwrap();
+        let random_provider = self.get_storage().get_random_provider().await;
 
         // create route
         let route = self
             .create_route(
                 self.get_config().path_length(),
                 None,
-                Some(*random_provider),
+                Some(random_provider),
                 None,
             )
             .await;
@@ -85,7 +81,7 @@ pub trait MixnodeInterface: LoopixCore {
         };
 
         // create sphinx packet
-        let (next_node, sphinx) = self.create_sphinx_packet(*random_provider, msg, &route);
+        let (next_node, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
         (node_id_from_node_address(next_node.address), sphinx)
     }
 }

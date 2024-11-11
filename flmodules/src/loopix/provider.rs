@@ -69,7 +69,7 @@ impl LoopixCore for Provider {
                             (destination, None, Some(messages))
                         },
                         MessageType::SubscriptionRequest(client_id) => {
-                            self.get_storage().add_client(client_id).await;
+                            self.get_storage().add_subscribed_client(client_id).await;
                             log::info!("Provider received subscription request from client: {:?}", client_id);
                             (destination, None, None)
                         },
@@ -97,7 +97,7 @@ impl LoopixCore for Provider {
         next_node: NodeID,
         delay: Delay,
     ) -> (NodeID, Delay, Option<Sphinx>) {
-        if self.get_storage().get_clients().await.contains(&next_node) {
+        if self.get_storage().get_subscribed_clients().await.contains(&next_node) {
             let sphinx = &Sphinx {
                 inner: *next_packet,
             };
@@ -143,7 +143,7 @@ impl Provider {
     }
 
     pub async fn subscribe_client(&self, client_id: NodeID) {
-        self.get_storage().add_client(client_id).await;
+        self.get_storage().add_subscribed_client(client_id).await;
     }
 
     pub async fn get_client_messages(&self, client_id: NodeID) -> Vec<(Delay, Sphinx)> {

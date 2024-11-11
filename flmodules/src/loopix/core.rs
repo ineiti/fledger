@@ -123,6 +123,7 @@ mod tests {
     use sphinx_packet::payload::Payload;
     use sphinx_packet::{packet::*, route::*};
     use std::collections::HashMap;
+    use crate::loopix::testing::LoopixSetup;
     use x25519_dalek::{PublicKey, StaticSecret};
 
     use super::*;
@@ -179,26 +180,20 @@ mod tests {
         usize,
     ) {
         let path_length = 2;
-        let mut node_public_keys = HashMap::new();
-        let mut node_key_pairs = HashMap::new();
+        let (all_nodes, node_public_keys, node_key_pairs) = LoopixSetup::create_nodes_and_keys(path_length);
 
-        for mix in 0..path_length * path_length + path_length + path_length {
-            let node_id = NodeID::from(mix as u32);
-            let (public_key, private_key) = LoopixStorage::generate_key_pair();
-            node_public_keys.insert(node_id, public_key);
-            node_key_pairs.insert(node_id, (public_key, private_key));
-        }
-
-        let node_id = 5;
+        // get our node info
+        let node_id = all_nodes.iter().next().unwrap().get_id();
         let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
         let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
 
         let config = LoopixConfig::default_with_path_length(
-            LoopixRole::Mixnode,
+            LoopixRole::Client,
             node_id,
             path_length,
             private_key.clone(),
             public_key.clone(),
+            all_nodes,
         );
 
         let core = MockLoopixCore {
