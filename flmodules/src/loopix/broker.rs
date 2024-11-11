@@ -97,7 +97,9 @@ impl LoopixBroker {
             _ => {}
         }
 
-        // TODO send `OverlayOut::NodeInfosConnected` to overlay
+        // emit node infos connectedrole
+        let node_infos = loopix_messages.role.get_connected_nodes().await;
+        broker.emit_msg(LoopixOut::NodeInfosConnected(node_infos).into()).unwrap();
 
         Ok(broker)
     }

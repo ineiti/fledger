@@ -57,14 +57,14 @@ impl NetworkStorage {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ClientStorage {
     our_provider: Option<NodeID>,
-    clients: HashSet<NodeInfo>,
+    clients: Vec<NodeInfo>,
     client_to_provider_map: HashMap<NodeID, NodeID>,
 }
 
 impl ClientStorage {
     pub fn new(
         our_provider: Option<NodeID>,
-        clients: HashSet<NodeInfo>,
+        clients: Vec<NodeInfo>,
         client_to_provider_map: HashMap<NodeID, NodeID>,
     ) -> Self {
         ClientStorage {
@@ -79,7 +79,7 @@ impl ClientStorage {
         let mut our_provider: Option<NodeID> = None;
 
         let mut client_to_provider_map: HashMap<NodeID, NodeID> = HashMap::new();
-        let mut clients = HashSet::new();
+        let mut clients = Vec::new();
 
         for i in 0..path_length {
             let client = all_nodes.get(i).unwrap().get_id();
@@ -88,7 +88,7 @@ impl ClientStorage {
             if client == our_node_id {
                 our_provider = Some(provider);
             } else {
-                clients.insert(all_nodes.get(i).unwrap().clone());
+                clients.push(all_nodes.get(i).unwrap().clone());
                 client_to_provider_map.insert(client, provider);
             }
         }
@@ -230,7 +230,7 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn get_clients_in_network(&self) -> HashSet<NodeInfo> {
+    pub async fn get_clients_in_network(&self) -> Vec<NodeInfo> {
         if let Some(storage) = self.client_storage.read().await.as_ref() {
             storage.clients.clone()
         } else {
@@ -238,7 +238,7 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn set_clients_in_network(&self, clients: HashSet<NodeInfo>) {
+    pub async fn set_clients_in_network(&self, clients: Vec<NodeInfo>) {
         if let Some(storage) = &mut *self.client_storage.write().await {
             storage.clients = clients;
         } else {
@@ -248,7 +248,7 @@ impl LoopixStorage {
 
     pub async fn add_client_in_network(&self, client: NodeInfo) {
         if let Some(storage) = &mut *self.client_storage.write().await {
-            storage.clients.insert(client);
+            storage.clients.push(client);
         } else {
             panic!("Client storage not found");
         }
@@ -256,7 +256,7 @@ impl LoopixStorage {
 
     pub async fn remove_client_in_network(&self, client: NodeInfo) {
         if let Some(storage) = &mut *self.client_storage.write().await {
-            storage.clients.remove(&client);
+            storage.clients.retain(|c| c.get_id() != client.get_id());
         } else {
             panic!("Client storage not found");
         }

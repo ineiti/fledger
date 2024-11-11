@@ -316,6 +316,14 @@ impl NodeType {
         }
     }
 
+    pub async fn get_connected_nodes(&self) -> Vec<NodeInfo> {
+        match self {
+            NodeType::Client(client) => client.get_storage().get_clients_in_network().await,
+            NodeType::Mixnode(_) => Vec::new(),
+            NodeType::Provider(_) => Vec::new(),
+        }
+    }
+
     async fn process_overlay_message(
         &self,
         node_id: NodeID,
