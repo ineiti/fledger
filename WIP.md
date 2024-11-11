@@ -2,18 +2,107 @@
 
 ## Current high-level goal
 
+- Store a webpage in fledger
+
 ## Current concrete goal
+
+- Data Storage (DS)
+  - Has
+    - 0..n Blobs
+
+- Blob
+  - Has
+    - Data
+    - Parents
+
+- Node
+  - Has
+    - 1..n root-Domains: can be modified by the user
+    - Configuration:
+      - Mana-Condition
+
+- Ledger
+  - Has
+    - List of nodes who participate
+  - Creates
+    - Proofs for pointing to data
+    - Global State
+  - Uses DHT to store Mana for nodes
+  - Uses DHT to store global state of Ledger
+
+- Ledger - Proof
+  - Has
+    - Flo
+    - Signature of nodes
+
+- Ledger - Global State
+  
+- Mana
+  - Has
+    - Type
+
+- DHT
+  - Uses Mana and Domains to prioritize storage
+  - Will only accept a restricted list of Flo-IDs as root parents and refuse
+    to store Flos with other or missing root parents.
+
+- Domain
+  - Has
+    - Ledger?
+    - DHT?
+    - 0..n sub-Domains
+
+- Fledger Object (Flo)
+  - Has
+    - ID = H(Type | ACE_0 | Updates_0)
+    - Type: (Domain, DHT, Ledger, Mana, Blob)
+    - ACE
+    - 1..n Updates
+
+- Flo - Updates
+  - Has
+    - Time
+    - Data | ACE: replaces previous Data or ACE
+    - Proof of condition: will probably need to include all the parents
+      ACEs, or at least a proof from the Ledger that all is OK
+
+- Flo - Access Control Element (ACE)
+  - Actions: modify, owner.
+  - Has
+    - Parent_Flo-ID?: if given, will impose it's ACE Action/Conditions on all its children.
+      The Action/Conditions from all the parents must be fulfilled for a proof
+      to be accepted for a given Action.
+      How can this be changed?
+    - 1..n Rules:
+      - Action
+        - Flo_type:action - will be imposed on all children
+        - action - only for the Flo-ID
+      - Condition
+        - Signature (given one or more public keys, and/or)
+        - Ledger States (time, other Flos)
+        - Mana (type of Mana, owner of Mana)
+        - Delegation (its own Flo type)
+
+### User-facing
+
+1. Store configuration of node
+  1. Rename node
+  2. Show last updated nodes
+
+### DHT_storage
+
+1. Store up to 1MB of data
+2. Delete oldest/farthest data
+
+### Ledger
+
+1. Create simple DAG storage
+2. Store global state in DHT
+3. Store mana of node in DHT
 
 # TODO
 
 ## Features
-
-- Needed for semester project:
-  - Import library for html serving with callbacks for loading of elements
-  - Easy simulation 
-    - w/o network
-    - local network
-    - network with bw and delay -> on Deterlab
 
 ## Bugs
 
@@ -49,8 +138,6 @@
     Again, two years later, no idea...
 
 ## Reaching out
-
-- Sign up for dev6
 
 # Dates
 
