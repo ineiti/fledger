@@ -30,12 +30,13 @@ use serde::{Deserialize, Serialize};
  */
 #[tokio::test]
 async fn test_loopix() -> Result<(), Box<dyn Error>> {
+    start_logging_filter_level(vec![], log::LevelFilter::Debug);
+
     let mut loopix_setup = LoopixSetup::new(2).await?;
     let mut network = NetworkSimul::new();
     network.add_nodes(loopix_setup.clients.clone()).await?;
     network.add_nodes(loopix_setup.mixers.clone()).await?;
     network.add_nodes(loopix_setup.providers.clone()).await?;
-    start_logging_filter_level(vec![], log::LevelFilter::Debug);
 
     let stop = network.process_loop();
 
