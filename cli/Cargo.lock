@@ -933,9 +933,12 @@ dependencies = [
  "flmodules",
  "flnode",
  "log",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "webrtc-util",
+ "x25519-dalek",
 ]
 
 [[package]]
