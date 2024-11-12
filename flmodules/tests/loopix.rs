@@ -8,7 +8,6 @@ use flmodules::{
     overlay::messages::{NetworkWrapper, OverlayIn, OverlayMessage},
 };
 use serde::{Deserialize, Serialize};
-use tokio::time::timeout;
 
 /**
  * This test sets up a number of Loopix nodes: clients, mixers, and providers.
@@ -36,17 +35,18 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
     network.add_nodes(loopix_setup.clients.clone()).await?;
     network.add_nodes(loopix_setup.mixers.clone()).await?;
     network.add_nodes(loopix_setup.providers.clone()).await?;
-    start_logging_filter_level(vec![], log::LevelFilter::Trace);
+    start_logging_filter_level(vec![], log::LevelFilter::Debug);
 
     let stop = network.process_loop();
 
     // I wouldn't start with the proxy :)
     if false {
         let mut proxy_src = ProxyBroker::new(loopix_setup.clients[0].loopix.clone()).await?;
-        let proxy_dst = ProxyBroker::new(loopix_setup.providers[0].loopix.clone()).await?;
+        let proxy_dst = ProxyBroker::new(loopix_setup.clients[1].loopix.clone()).await?;
 
         proxy_src.proxy.get("https://fledg.re").await?;
         println!("Ids for proxies: ${} / ${}", proxy_src.id, proxy_dst.id);
+
     }
 
     if true {
@@ -64,10 +64,10 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
                 )?,
             )))?;
 
-        tokio::time::sleep(Duration::from_secs(30)).await;
+        tokio::time::sleep(Duration::from_secs(15)).await;
 
         let (mut tap, _) = loopix_setup.clients[1].net.get_tap().await?;
-        if let Ok(Some(NetworkMessage::Input(NetworkIn::MessageToNode(_node_id, msg)))) = timeout(Duration::from_secs(1), tap.recv()).await {
+        if let NetworkMessage::Input(NetworkIn::MessageToNode(_node_id, msg)) = tap.recv().await.ok_or("Error receiving message")? {
             let _ = serde_yaml::from_str::<Sphinx>(&msg).unwrap();
         }
 

@@ -65,16 +65,16 @@ impl LoopixCore for Provider {
                         MessageType::Payload(_, _) => { log::error!("Provider shouldn't receive payloads!"); (destination, None, None) },
                         MessageType::PullRequest(client_id) => { 
                             let messages = self.create_pull_reply(client_id).await;
-                            log::info!("Provider received pull request from client: {:?}", client_id);
+                            log::trace!("Provider received pull request from client: {:?}", client_id);
                             (destination, None, Some(messages))
                         },
                         MessageType::SubscriptionRequest(client_id) => {
                             self.get_storage().add_subscribed_client(client_id).await;
-                            log::info!("Provider received subscription request from client: {:?}", client_id);
+                            log::trace!("Provider received subscription request from client: {:?}", client_id);
                             (destination, None, None)
                         },
-                        MessageType::Drop => { log::info!("Provider received drop"); (destination, None, None) },
-                        MessageType::Loop => { log::info!("Provider received loop"); (destination, None, None) },
+                        MessageType::Drop => { log::trace!("Provider received drop"); (destination, None, None) },
+                        MessageType::Loop => { log::trace!("Provider received loop"); (destination, None, None) },
                         MessageType::Dummy => { log::error!("Provider shouldn't receive dummy messages!"); (destination, None, None) },
                     }
                 } else {

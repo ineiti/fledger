@@ -59,9 +59,9 @@ impl LoopixBroker {
         let (network_sender, network_receiver): (
             Sender<(NodeID, Delay, Sphinx)>,
             Receiver<(NodeID, Delay, Sphinx)>,
-        ) = channel(100);
+        ) = channel(200);
         let (overlay_sender, overlay_receiver): (Sender<(NodeID, NetworkWrapper)>, Receiver<(NodeID, NetworkWrapper)>) =
-            channel(100);
+            channel(200);
 
         let loopix_messages = LoopixMessages::new(
             node_type.arc_clone(),
