@@ -54,6 +54,7 @@ impl LoopixCore for Client {
             .await;
 
         // create the networkmessage
+        
         let loop_msg = serde_yaml::to_string(&MessageType::Loop).unwrap();
         let msg = NetworkWrapper {
             module: MODULE_NAME.into(),
@@ -101,11 +102,11 @@ impl LoopixCore for Client {
         destination: NodeID,
         _surb_id: [u8; 16],
         payload: Payload,
-    ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
+    ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>, Option<MessageType>) {
 
         if destination != self.get_our_id().await {
             log::info!("Final hop received, but we're not the destination");
-            return (destination, None, None);
+            return (destination, None, None, None);
         }
 
         let plaintext = payload.recover_plaintext().unwrap();
@@ -114,38 +115,39 @@ impl LoopixCore for Client {
         if let Ok(module_message) = serde_yaml::from_str::<NetworkWrapper>(plaintext_str) {
             if module_message.module == MODULE_NAME {
                 if let Ok(message) = serde_yaml::from_str::<MessageType>(&module_message.msg) {
-                    match message {
+                    match message.clone() {
                         MessageType::Payload(source, msg) => {
-                            (source, Some(msg), None)
+                            (source, Some(msg), None, Some(message))
                         }
-                        MessageType::PullRequest(_) => { log::error!("Client shouldn't receive pull requests!"); (destination, None, None) },
-                        MessageType::SubscriptionRequest(_) => { log::error!("Client shouldn't receive subscription requests!"); (destination, None, None) },
-                        MessageType::Drop => { log::info!("Client received drop"); (destination, None, None) },
-                        MessageType::Loop => { log::info!("Client received loop"); (destination, None, None) },
-                        MessageType::Dummy => { log::info!("Client received dummy"); (destination, None, None) },
+                        MessageType::PullRequest(_) => { log::error!("Client shouldn't receive pull requests!"); (destination, None, None, Some(message)) },
+                        MessageType::SubscriptionRequest(_) => { log::error!("Client shouldn't receive subscription requests!"); (destination, None, None, Some(message)) },
+                        MessageType::Drop => { log::info!("Client received drop"); (destination, None, None, Some(message)) },
+                        MessageType::Loop => { log::info!("Client received loop"); (destination, None, None, Some(message)) },
+                        MessageType::Dummy => { log::info!("Client received dummy"); (destination, None, None, Some(message)) },
                     }
                 } else {
                     log::error!("Received message in wrong format");
-                    (destination, None, None)
+                    (destination, None, None, None)
                 }
             } else {
                 log::error!("Received message from module that is not Loopix: {:?}", module_message.module);
-                (destination, None, None)
+                (destination, None, None, None)
             }
         } else {
             log::error!("Could not recover plaintext");
-            (destination, None, None)
+            (destination, None, None, None)
         }
     }
 
     async fn process_forward_hop(
         &self,
         _next_packet: Box<SphinxPacket>,
-        next_address: NodeID,
+        _next_address: NodeID,
         delay: Delay,
     ) -> (NodeID, Delay, Option<Sphinx>) {
         log::error!("Client shouldn't receive forward hops");
-        (next_address, delay, None)
+        let our_id = self.get_our_id().await;
+        (our_id, delay, None)
     }
 }
 

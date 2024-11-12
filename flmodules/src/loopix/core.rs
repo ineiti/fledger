@@ -13,6 +13,8 @@ use crate::loopix::storage::LoopixStorage;
 
 use rand::prelude::SliceRandom;
 
+use super::messages::MessageType;
+
 #[async_trait]
 pub trait LoopixCore {
     fn get_config(&self) -> &CoreConfig;
@@ -27,7 +29,7 @@ pub trait LoopixCore {
     async fn create_loop_message(&self) -> (NodeID, Sphinx);
     async fn create_drop_message(&self) -> (NodeID, Sphinx);
 
-    async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>);
+    async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>, Option<MessageType>);
     async fn process_forward_hop(&self, next_packet: Box<SphinxPacket>, next_address: NodeID, delay: Delay) -> (NodeID, Delay, Option<Sphinx>);
     
     fn create_sphinx_packet(
@@ -160,7 +162,7 @@ mod tests {
             _destination: NodeID,
             _surb_id: [u8; 16],
             _payload: Payload,
-        ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
+        ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>, Option<MessageType>) {
             todo!()
         }
 

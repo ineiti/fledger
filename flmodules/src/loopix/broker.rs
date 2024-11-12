@@ -108,10 +108,10 @@ impl LoopixBroker {
     }
 
     fn from_network(msg: NetworkMessage) -> Option<LoopixMessage> {
-        if let NetworkMessage::Output(NetworkOut::MessageFromNode(_node_id, message)) = msg {
+        if let NetworkMessage::Output(NetworkOut::MessageFromNode(node_id, message)) = msg {
             // TODO: probably node_id should be used somewhere.
             let sphinx_packet: Sphinx = serde_yaml::from_str(&message).unwrap();
-            return Some(LoopixIn::SphinxFromNetwork(sphinx_packet).into());
+            return Some(LoopixIn::SphinxFromNetwork(node_id, sphinx_packet).into());
         }
         None
     }
@@ -484,13 +484,14 @@ mod tests {
         let delays = vec![Delay::new_from_nanos(1)];
         let message_vec = serde_yaml::to_string(&msg).unwrap().as_bytes().to_vec();
         let sphinx_packet = SphinxPacket::new(message_vec, &route, &destination, &delays).unwrap();
+        let sphinx = Sphinx {
+            inner: sphinx_packet,
+        };
 
         // Simulate sending an network message to the LoopixBroker
         loopix_broker
             .clone()
-            .emit_msg(LoopixMessage::Input(LoopixIn::SphinxFromNetwork(Sphinx {
-                inner: sphinx_packet,
-            })))
+            .emit_msg(LoopixMessage::Input(LoopixIn::SphinxFromNetwork(NodeID::rnd(), sphinx)))
             .unwrap();
 
         Ok(())

@@ -51,11 +51,11 @@ impl LoopixCore for Mixnode {
         destination: NodeID,
         _surb_id: [u8; 16],
         payload: Payload,
-    ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
+    ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>, Option<MessageType>) {
         
         if destination != self.get_our_id().await {
             log::info!("Final hop received, but we're not the destination");
-            return (destination, None, None);
+            return (destination, None, None, None);
         }
 
         let plaintext = payload.recover_plaintext().unwrap();
@@ -65,24 +65,24 @@ impl LoopixCore for Mixnode {
             if module_message.module == MODULE_NAME {
                 if let Ok(message) = serde_yaml::from_str::<MessageType>(&module_message.msg) {
                     match message {
-                        MessageType::Payload(_, _) => { log::error!("Mixnode shouldn't receive payloads!"); (destination, None, None) },
-                        MessageType::PullRequest(_) => { log::error!("Mixnode shouldn't receive pull requests!"); (destination, None, None) },
-                        MessageType::SubscriptionRequest(_) => { log::error!("Mixnode shouldn't receive subscription requests!"); (destination, None, None) },
-                        MessageType::Drop => { log::info!("Mixnode received drop"); (destination, None, None) },
-                        MessageType::Loop => { log::info!("Mixnode received loop"); (destination, None, None) },
-                        MessageType::Dummy => { log::error!("Mixnode shouldn't receive dummy messages!"); (destination, None, None) },
+                        MessageType::Payload(_, _) => { log::error!("Mixnode shouldn't receive payloads!"); (destination, None, None, Some(message)) },
+                        MessageType::PullRequest(_) => { log::error!("Mixnode shouldn't receive pull requests!"); (destination, None, None, Some(message)) },
+                        MessageType::SubscriptionRequest(_) => { log::error!("Mixnode shouldn't receive subscription requests!"); (destination, None, None, Some(message)) },
+                        MessageType::Drop => { log::info!("Mixnode received drop"); (destination, None, None, Some(message)) },
+                        MessageType::Loop => { log::info!("Mixnode received loop"); (destination, None, None, Some(message)) },
+                        MessageType::Dummy => { log::error!("Mixnode shouldn't receive dummy messages!"); (destination, None, None, Some(message)) },
                     }
                 } else {
                     log::error!("Received message in wrong format");
-                    (destination, None, None)
+                    (destination, None, None, None)
                 }
             } else {
                 log::error!("Received message from module that is not Loopix: {:?}", module_message.module);
-                (destination, None, None)
+                (destination, None, None, None)
             }
         } else {
             log::error!("Could not recover plaintext");
-            (destination, None, None)
+            (destination, None, None, None)
         }
     }
 

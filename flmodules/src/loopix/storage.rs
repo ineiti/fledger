@@ -9,6 +9,8 @@ use crate::{loopix::sphinx::Sphinx, nodeconfig::NodeInfo};
 use flarch::nodeids::NodeID;
 use serde::{Deserialize, Serialize};
 
+use super::messages::MessageType;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum LoopixStorageSave {
     V1(LoopixStorage),
@@ -46,6 +48,8 @@ pub struct NetworkStorage {
         deserialize_with = "deserialize_node_public_keys"
     )]
     node_public_keys: HashMap<NodeID, PublicKey>,
+    forwarded_messages: Vec<(NodeID, NodeID)>,
+    received_messages: Vec<(NodeID, NodeID, MessageType)> // origin, relayed by, Message
 }
 
 impl NetworkStorage {
@@ -186,6 +190,22 @@ impl LoopixStorage {
 
     pub async fn set_node_public_keys(&self, new_keys: HashMap<NodeID, PublicKey>) {
         self.network_storage.write().await.node_public_keys = new_keys;
+    }
+
+    pub async fn get_forwarded_messages(&self) -> Vec<(NodeID, NodeID)> {
+        self.network_storage.read().await.forwarded_messages.clone()
+    }
+
+    pub async fn add_forwarded_messages(&self, new_messages: Vec<(NodeID, NodeID)>) {
+        self.network_storage.write().await.forwarded_messages.extend(new_messages);
+    }
+
+    pub async fn get_received_messages(&self) -> Vec<(NodeID, NodeID, MessageType)> {
+        self.network_storage.read().await.received_messages.clone()
+    }
+
+    pub async fn add_received_messages(&self, new_messages: Vec<(NodeID, NodeID, MessageType)>) {
+        self.network_storage.write().await.received_messages.extend(new_messages);
     }
 
     pub async fn get_our_provider(&self) -> Option<NodeID> {
@@ -359,6 +379,8 @@ impl Default for LoopixStorage {
                 mixes: Vec::new(),
                 providers: HashSet::new(),
                 node_public_keys: HashMap::new(),
+                forwarded_messages: Vec::new(),
+                received_messages: Vec::new(),
             })),
             client_storage: Arc::new(RwLock::new(Option::None)),
             provider_storage: Arc::new(RwLock::new(Option::None)),
@@ -385,6 +407,8 @@ impl LoopixStorage {
                 mixes,
                 providers,
                 node_public_keys,
+                forwarded_messages: Vec::new(),
+                received_messages: Vec::new(),
             })),
             client_storage: Arc::new(RwLock::new(client_storage)),
             provider_storage: Arc::new(RwLock::new(provider_storage)),
@@ -392,6 +416,14 @@ impl LoopixStorage {
     }
 
     pub fn arc_clone(&self) -> Self {
+        LoopixStorage {
+            network_storage: Arc::clone(&self.network_storage),
+            client_storage: Arc::clone(&self.client_storage),
+            provider_storage: Arc::clone(&self.provider_storage),
+        }
+    }
+
+    pub async fn arc_clone_async(&self) -> Self {
         LoopixStorage {
             network_storage: Arc::clone(&self.network_storage),
             client_storage: Arc::clone(&self.client_storage),
@@ -416,6 +448,8 @@ impl LoopixStorage {
                 mixes,
                 providers,
                 node_public_keys,
+                forwarded_messages: Vec::new(),
+                received_messages: Vec::new(),
             })),
             client_storage: Arc::new(RwLock::new(client_storage)),
             provider_storage: Arc::new(RwLock::new(provider_storage)),
@@ -473,6 +507,8 @@ impl LoopixStorage {
                 mixes,
                 providers,
                 node_public_keys: HashMap::new(),
+                forwarded_messages: Vec::new(),
+                received_messages: Vec::new(),
             })),
             client_storage: Arc::new(RwLock::new(client_storage)),
             provider_storage: Arc::new(RwLock::new(provider_storage)),

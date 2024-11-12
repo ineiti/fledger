@@ -32,8 +32,8 @@ pub enum LoopixMessage {
 pub enum LoopixIn {
     // message from overlay: needs to be put in a sphinx packet
     OverlayRequest(NodeID, NetworkWrapper),
-    // packet in sphinx format, from other nodes
-    SphinxFromNetwork(Sphinx),
+    // packet in sphinx format, from other nodes (NodeID is source node)
+    SphinxFromNetwork(NodeID, Sphinx),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,7 +102,7 @@ impl LoopixMessages {
                 log::trace!("OverlayRequest with node_id {} and message {:?}", node_id, message);
                 self.process_overlay_message(node_id, message).await
             }
-            LoopixIn::SphinxFromNetwork(sphinx) => self.process_sphinx_packet(sphinx).await,
+            LoopixIn::SphinxFromNetwork(node_id, sphinx) => self.process_sphinx_packet(node_id, sphinx).await,
         }
     }
 
@@ -148,7 +148,7 @@ impl LoopixMessages {
             .expect("while sending message");
     }
 
-    async fn process_sphinx_packet(&self, sphinx_packet: Sphinx) {
+    async fn process_sphinx_packet(&self, node_id: NodeID, sphinx_packet: Sphinx) {
         let processed = self.role.process_sphinx_packet(sphinx_packet).await;
         match processed {
             ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
@@ -157,6 +157,8 @@ impl LoopixMessages {
                     .role
                     .process_forward_hop(next_packet, next_node_id, delay)
                     .await;
+                self.role.get_storage().add_forwarded_messages(vec![(node_id, next_node_id)]).await; // from node_id to next_node_id
+
                 if let Some(sphinx) = sphinx {
                     self.network_sender
                         .send((next_node_id, next_delay, sphinx))
@@ -167,24 +169,26 @@ impl LoopixMessages {
             ProcessedPacket::FinalHop(destination, surb_id, payload) => {
                 // Check if the final destination matches our ID
                 let dest = node_id_from_destination_address(destination);
-                if dest == self.role.get_our_id().await {
-                    let (source, msg, messages) = self.role.process_final_hop(dest, surb_id, payload).await;
-                    if let Some(msg) = msg {
-                        self.overlay_sender
-                            .send((source, msg))
+
+                let (source, msg, messages, message_type) = self.role.process_final_hop(dest, surb_id, payload).await;
+
+                if let Some(message_type) = message_type {
+                    self.role.get_storage().add_received_messages(vec![(source, dest, message_type)]).await;
+                }
+
+                if let Some(msg) = msg {
+                    self.overlay_sender
+                        .send((source, msg))
+                        .await
+                        .expect("while sending message");
+                }
+                if let Some(messages) = messages {
+                    for (delay, sphinx) in messages {
+                            self.network_sender
+                            .send((source, delay, sphinx))
                             .await
                             .expect("while sending message");
                     }
-                    if let Some(messages) = messages {
-                        for (delay, sphinx) in messages {
-                                self.network_sender
-                                .send((source, delay, sphinx))
-                                .await
-                                .expect("while sending message");
-                        }
-                    }
-                } else {
-                    log::warn!("Received a FinalHop packet not intended for this node");
                 }
             }
         }
@@ -240,7 +244,7 @@ impl LoopixCore for NodeType {
         }
     }
 
-    async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
+    async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>, Option<MessageType>) {
         match self {
             NodeType::Client(client) => client.process_final_hop(destination, surb_id, payload).await,
             NodeType::Mixnode(mixnode) =>  mixnode.process_final_hop(destination, surb_id, payload).await,
@@ -255,7 +259,7 @@ impl LoopixCore for NodeType {
         delay: Delay,
     ) -> (NodeID, Delay, Option<Sphinx>) {
         match self {
-            NodeType::Client(_) => panic!("Client does not implement process_forward_hop"),
+            NodeType::Client(client) => client.process_forward_hop(next_packet, next_node, delay).await,
             NodeType::Mixnode(mixnode) => {
                 mixnode.process_forward_hop(next_packet, next_node, delay).await
             }

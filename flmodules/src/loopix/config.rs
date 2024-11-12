@@ -119,6 +119,7 @@ pub struct CoreConfig {
     lambda_loop_mix: f64,
     time_pull: f64,
     max_retrieve: usize,
+    pad_length: usize
 }
 
 impl CoreConfig {
@@ -131,8 +132,9 @@ impl CoreConfig {
             path_length,
             mean_delay: 0.001, // mean delay (1ms)
             lambda_loop_mix: 10.0, // loop mix rate (10 times per minute)
-            time_pull: 10.0, // time pull (10 second)
+            time_pull: 3.0, // time pull (3 second)
             max_retrieve: 0, // messages sent to client per pull request
+            pad_length: 150, // dummy, drop, loop messages are padded
         }
     }
 
@@ -146,6 +148,7 @@ impl CoreConfig {
             lambda_loop_mix: 10.0,
             time_pull: 0.0,
             max_retrieve: 0,
+            pad_length: 150,
         }
     }
 
@@ -159,6 +162,7 @@ impl CoreConfig {
             lambda_loop_mix: 0.0,
             time_pull: 0.0,
             max_retrieve: 0,
+            pad_length: 150,
         }
     }
 }
@@ -174,6 +178,7 @@ impl Default for CoreConfig {
             lambda_loop_mix: 10.0,
             time_pull: 10.0,
             max_retrieve: 10,
+            pad_length: 150,
         }
     }
 }
@@ -209,5 +214,9 @@ impl CoreConfig {
 
     pub fn max_retrieve(&self) -> usize {
         self.max_retrieve
+    }
+
+    pub fn pad_length(&self) -> usize {
+        self.pad_length
     }
 }
