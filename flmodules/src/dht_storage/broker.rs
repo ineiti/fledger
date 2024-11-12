@@ -3,8 +3,7 @@ use std::error::Error;
 use tokio::sync::watch;
 
 use crate::{
-    overlay::messages::NetworkWrapper,
-    random_connections::messages::{RandomIn, RandomMessage, RandomOut},
+    flo::dht::DHTStorageConfig, overlay::messages::NetworkWrapper, random_connections::messages::{RandomIn, RandomMessage, RandomOut}
 };
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
@@ -12,43 +11,43 @@ use flarch::{
 };
 
 use super::{
-    core::{TemplateConfig, TemplateStorage, TemplateStorageSave},
-    messages::{MessageNode, TemplateIn, TemplateMessage, TemplateMessages, TemplateOut},
+    core::{DHTStorageBucket, DHTStorageStorageSave},
+    messages::{MessageNode, DHTStorageIn, DHTStorageMessage, DHTStorageMessages, DHTStorageOut},
 };
 
-const MODULE_NAME: &str = "Template";
+const MODULE_NAME: &str = "DHTStorage";
 
-/// This links the Template module with other modules, so that
+/// This links the DHTStorage module with other modules, so that
 /// all messages are correctly translated from one to the other.
 /// For this example, it uses the RandomConnections module to communicate
 /// with other nodes.
 ///
-/// The [Template] holds the [Translate] and offers convenience methods
-/// to interact with [Translate] and [TemplateMessage].
-pub struct Template {
+/// The [DHTStorage] holds the [Translate] and offers convenience methods
+/// to interact with [Translate] and [DHTStorageMessage].
+pub struct DHTStorage {
     /// Represents the underlying broker.
-    pub broker: Broker<TemplateMessage>,
+    pub broker: Broker<DHTStorageMessage>,
     our_id: NodeID,
-    storage: watch::Receiver<TemplateStorage>,
+    storage: watch::Receiver<DHTStorageBucket>,
 }
 
-impl Template {
+impl DHTStorage {
     pub async fn start(
         mut ds: Box<dyn DataStorage + Send>,
         our_id: NodeID,
         rc: Broker<RandomMessage>,
-        config: TemplateConfig,
+        config: DHTStorageConfig,
     ) -> Result<Self, Box<dyn Error>> {
         let str = ds.get(MODULE_NAME).unwrap_or("".into());
-        let storage = TemplateStorageSave::from_str(&str).unwrap_or_default();
-        let messages = TemplateMessages::new(storage.clone(), config, our_id)?;
+        let storage = DHTStorageStorageSave::from_str(&str).unwrap_or_default();
+        let messages = DHTStorageMessages::new(storage.clone(), config, our_id)?;
         let mut broker = Translate::start(rc, messages).await?;
 
         let (tx, storage) = watch::channel(storage);
         let (mut tap, _) = broker.get_tap().await?;
         spawn_local(async move {
             loop {
-                if let Some(TemplateMessage::Output(TemplateOut::UpdateStorage(sto))) =
+                if let Some(DHTStorageMessage::Output(DHTStorageOut::UpdateStorage(sto))) =
                     tap.recv().await
                 {
                     tx.send(sto.clone()).expect("updated storage");
@@ -58,57 +57,48 @@ impl Template {
                 }
             }
         });
-        Ok(Template {
+        Ok(DHTStorage {
             broker,
             our_id,
             storage,
         })
     }
-
-    pub fn increase_self(&mut self, counter: u32) -> Result<(), BrokerError> {
-        self.broker
-            .emit_msg(TemplateIn::Node(self.our_id, MessageNode::Increase(counter)).into())
-    }
-
-    pub fn get_counter(&self) -> u32 {
-        self.storage.borrow().counter
-    }
 }
 
-/// Translates the messages to/from the RandomMessage and calls `TemplateMessages.processMessages`.
+/// Translates the messages to/from the RandomMessage and calls `DHTStorageMessages.processMessages`.
 struct Translate {
-    messages: TemplateMessages,
+    messages: DHTStorageMessages,
 }
 
 impl Translate {
     async fn start(
         random: Broker<RandomMessage>,
-        messages: TemplateMessages,
-    ) -> Result<Broker<TemplateMessage>, Box<dyn Error>> {
-        let mut template = Broker::new();
+        messages: DHTStorageMessages,
+    ) -> Result<Broker<DHTStorageMessage>, Box<dyn Error>> {
+        let mut dht_storage = Broker::new();
 
-        template
+        dht_storage
             .add_subsystem(Subsystem::Handler(Box::new(Translate { messages })))
             .await?;
-        template
+        dht_storage
             .link_bi(
                 random,
-                Box::new(Self::link_rnd_template),
-                Box::new(Self::link_template_rnd),
+                Box::new(Self::link_rnd_dhtstorage),
+                Box::new(Self::link_dhtstorage_rnd),
             )
             .await?;
-        Ok(template)
+        Ok(dht_storage)
     }
 
-    fn link_rnd_template(msg: RandomMessage) -> Option<TemplateMessage> {
+    fn link_rnd_dhtstorage(msg: RandomMessage) -> Option<DHTStorageMessage> {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
                 RandomOut::NodeIDsConnected(list) => {
-                    Some(TemplateIn::UpdateNodeList(list.into()).into())
+                    Some(DHTStorageIn::UpdateNodeList(list.into()).into())
                 }
                 RandomOut::NetworkWrapperFromNetwork(id, msg) => msg
                     .unwrap_yaml(MODULE_NAME)
-                    .map(|msg| TemplateIn::Node(id, msg).into()),
+                    .map(|msg| DHTStorageIn::Node(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -116,10 +106,10 @@ impl Translate {
         }
     }
 
-    fn link_template_rnd(msg: TemplateMessage) -> Option<RandomMessage> {
-        if let TemplateMessage::Output(TemplateOut::Node(id, msg_node)) = msg {
+    fn link_dhtstorage_rnd(msg: DHTStorageMessage) -> Option<RandomMessage> {
+        if let DHTStorageMessage::Output(DHTStorageOut::Node(id, msg_node)) = msg {
             Some(
-                RandomIn::NetworkMapperToNetwork(
+                RandomIn::NetworkWrapperToNetwork(
                     id,
                     NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )
@@ -132,13 +122,13 @@ impl Translate {
 }
 
 #[platform_async_trait()]
-impl SubsystemHandler<TemplateMessage> for Translate {
-    async fn messages(&mut self, msgs: Vec<TemplateMessage>) -> Vec<TemplateMessage> {
+impl SubsystemHandler<DHTStorageMessage> for Translate {
+    async fn messages(&mut self, msgs: Vec<DHTStorageMessage>) -> Vec<DHTStorageMessage> {
         let msgs_in = msgs
             .into_iter()
             .filter_map(|msg| match msg {
-                TemplateMessage::Input(msg_in) => Some(msg_in),
-                TemplateMessage::Output(_) => None,
+                DHTStorageMessage::Input(msg_in) => Some(msg_in),
+                DHTStorageMessage::Output(_) => None,
             })
             .collect();
         self.messages
@@ -163,20 +153,20 @@ mod tests {
         let id0 = NodeID::rnd();
         let id1 = NodeID::rnd();
         let mut rnd = Broker::new();
-        let mut tr = Template::start(ds, id0, rnd.clone(), TemplateConfig::default()).await?;
+        let mut tr = DHTStorage::start(ds, id0, rnd.clone(), DHTStorageConfig::default()).await?;
         let mut tap = rnd.get_tap().await?;
-        assert_eq!(0, tr.get_counter());
+        // assert_eq!(0, tr.get_counter());
 
-        rnd.settle_msg(RandomMessage::Output(RandomOut::NodeIDsConnected(
-            vec![id1].into(),
-        )))
-        .await?;
-        tr.increase_self(1)?;
-        assert!(matches!(
-            tap.0.recv().await.unwrap(),
-            RandomMessage::Input(_)
-        ));
-        assert_eq!(1, tr.get_counter());
+        // rnd.settle_msg(RandomMessage::Output(RandomOut::NodeIDsConnected(
+        //     vec![id1].into(),
+        // )))
+        // .await?;
+        // tr.increase_self(1)?;
+        // assert!(matches!(
+        //     tap.0.recv().await.unwrap(),
+        //     RandomMessage::Input(_)
+        // ));
+        // assert_eq!(1, tr.get_counter());
         Ok(())
     }
 }

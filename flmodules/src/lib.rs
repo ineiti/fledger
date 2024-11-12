@@ -13,7 +13,9 @@ bitflags! {
 }
 
 pub mod crypto;
+pub mod dht_routing;
 pub mod dht_storage;
+pub mod flo;
 pub mod gossip_events;
 pub mod ledger;
 pub mod network;

@@ -15,9 +15,8 @@ pub enum ParseError {
 }
 
 /// Nicely formatted 256 bit structure
-// #[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde_as]
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct U256(#[serde_as(as = "Hex")] [u8; 32]);
 
 impl fmt::Display for U256 {

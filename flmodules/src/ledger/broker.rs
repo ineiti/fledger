@@ -114,7 +114,7 @@ impl Translate {
     fn link_template_rnd(msg: LedgerMessage) -> Option<RandomMessage> {
         if let LedgerMessage::Output(LedgerOut::Node(id, msg_node)) = msg {
             Some(
-                RandomIn::NetworkMapperToNetwork(
+                RandomIn::NetworkWrapperToNetwork(
                     id,
                     NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                 )

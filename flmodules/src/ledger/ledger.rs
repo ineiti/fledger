@@ -30,7 +30,7 @@ impl LedgerInstance {
     }
 
     pub fn add_vertex(&mut self, vx: Vertex) {
-        for tx in self.dag.add_vertex(vx) {}
+        for _tx in self.dag.add_vertex(vx) {}
     }
 }
 
@@ -41,23 +41,23 @@ impl DAG {
         Self {}
     }
 
-    pub fn commit(&mut self, txs: Vec<Transaction>) -> Vertex {
+    pub fn commit(&mut self, _txs: Vec<Transaction>) -> Vertex {
         todo!()
     }
 
-    pub fn add_vertex(&mut self, vx: Vertex) -> Vec<Transaction> {
+    pub fn add_vertex(&mut self, _vx: Vertex) -> Vec<Transaction> {
         todo!()
     }
 }
 
 pub struct Vertex {
-    owner: NodeID,
-    backlinks: Vec<VertexID>,
-    transactions: Vec<Transaction>,
-    signature: Bytes,
+    pub owner: NodeID,
+    pub backlinks: Vec<VertexID>,
+    pub transactions: Vec<Transaction>,
+    pub signature: Bytes,
     // The ID of the block is its hash, and this is a cache for
     // premature optimization.
-    cache_id: Option<VertexID>,
+    pub cache_id: Option<VertexID>,
 }
 
 pub type VertexID = U256;

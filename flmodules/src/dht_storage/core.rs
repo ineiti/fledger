@@ -1,35 +1,37 @@
+use std::collections::HashMap;
+
+use flarch::nodeids::U256;
 use serde::{Deserialize, Serialize};
 
-/// Whatever hardcoded config you want to pass to your module.
-/// It must have a default option.
+use crate::flo::dht::{DHTFlo, DHTStorageConfig};
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct TemplateConfig {
-    multiplier: u32,
+pub struct FloMeta {
+    pub id: U256,
+    pub size: u64,
 }
 
-impl Default for TemplateConfig {
+impl Default for DHTStorageConfig {
     fn default() -> Self {
-        Self { multiplier: 1 }
+        Self {
+            over_provide: 1.,
+            max_space: 100_000,
+        }
     }
 }
 
-/// The TemplateCore structure holds a configuration and the storage
+/// The DHTStorageCore structure holds a configuration and the storage
 /// needed to persist over reloads of the node.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct TemplateCore {
-    pub storage: TemplateStorage,
-    pub config: TemplateConfig,
+pub struct DHTStorageCore {
+    pub storage: DHTStorageBucket,
+    pub config: DHTStorageConfig,
 }
 
-impl TemplateCore {
-    /// Initializes a new TemplateCore.
-    pub fn new(storage: TemplateStorage, config: TemplateConfig) -> Self {
+impl DHTStorageCore {
+    /// Initializes a new DHTStorageCore.
+    pub fn new(storage: DHTStorageBucket, config: DHTStorageConfig) -> Self {
         Self { storage, config }
-    }
-
-    // Here are the different methods to interact with this module.
-    pub fn increase(&mut self, i: u32) {
-        self.storage.counter += i * self.config.multiplier;
     }
 }
 
@@ -38,44 +40,38 @@ impl TemplateCore {
 /// This allows to update to the latest version, supposing that new fields can be filled
 /// with default values.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum TemplateStorageSave {
-    V1(TemplateStorage),
+pub enum DHTStorageStorageSave {
+    V1(DHTStorageBucket),
 }
 
-impl TemplateStorageSave {
-    pub fn from_str(data: &str) -> Result<TemplateStorage, serde_yaml::Error> {
-        return Ok(serde_yaml::from_str::<TemplateStorageSave>(data)?.to_latest());
+impl DHTStorageStorageSave {
+    pub fn from_str(data: &str) -> Result<DHTStorageBucket, serde_yaml::Error> {
+        return Ok(serde_yaml::from_str::<DHTStorageStorageSave>(data)?.to_latest());
     }
 
-    fn to_latest(self) -> TemplateStorage {
+    fn to_latest(self) -> DHTStorageBucket {
         match self {
-            TemplateStorageSave::V1(es) => es,
+            DHTStorageStorageSave::V1(es) => es,
         }
     }
 }
 
 /// If you want to add a new version and the current version is `x`, do the
 /// following:
-/// - copy `TemplateStorage` to a struct called `TemplateStorageVx`
-/// - change the `TemplateStorage` to include your new fields
-/// - change the `TemplateStorageSave` to include the new version:
+/// - copy `DHTStorageStorage` to a struct called `DHTStorageStorageVx`
+/// - change the `DHTStorageStorage` to include your new fields
+/// - change the `DHTStorageStorageSave` to include the new version:
 ///   - add a `Vx` to the name of the structure of the `Vx` enum
-///   - add a `V(x+1)` enum pointing to `TemplateStorage`
-/// - adapt `TemplateStorageSave::to_latest` to go from `Vx` to `V(x+1)`
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct TemplateStorage {
-    pub counter: u32,
+///   - add a `V(x+1)` enum pointing to `DHTStorageStorage`
+/// - adapt `DHTStorageStorageSave::to_latest` to go from `Vx` to `V(x+1)`
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+pub struct DHTStorageBucket {
+    pub flos: HashMap<U256, DHTFlo>,
 }
 
-impl TemplateStorage {
+impl DHTStorageBucket {
     pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
-        serde_yaml::to_string::<TemplateStorageSave>(&TemplateStorageSave::V1(self.clone()))
-    }
-}
-
-impl Default for TemplateStorage {
-    fn default() -> Self {
-        Self { counter: 0 }
+        serde_yaml::to_string::<DHTStorageStorageSave>(&DHTStorageStorageSave::V1(self.clone()))
     }
 }
 
@@ -89,17 +85,7 @@ mod tests {
 
     #[test]
     fn test_increase() -> Result<(), Box<dyn Error>> {
-        let mut tc = TemplateCore::new(TemplateStorage::default(), TemplateConfig::default());
-        tc.increase(1);
-        assert_eq!(1, tc.storage.counter);
-
-        tc.increase(2);
-        assert_eq!(3, tc.storage.counter);
-
-        tc.config.multiplier = 2;
-        tc.increase(1);
-        assert_eq!(5, tc.storage.counter);
-        
+        let mut tc = DHTStorageCore::new(DHTStorageBucket::default(), DHTStorageConfig::default());
         Ok(())
     }
 }

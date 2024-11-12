@@ -1,3 +1,5 @@
+use std::fmt;
+
 use bytes::Bytes;
 use serde::{ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
@@ -84,6 +86,17 @@ pub enum SignatureType {
     MlDsa87,
 }
 
+impl fmt::Debug for SignatureType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ed25519 => write!(f, "Ed25519"),
+            Self::MlDsa44 => write!(f, "MlDsa44"),
+            Self::MlDsa65 => write!(f, "MlDsa65"),
+            Self::MlDsa87 => write!(f, "MlDsa87"),
+        }
+    }
+}
+
 pub type Signature = Bytes;
 
 impl Serialize for Verifier {
@@ -102,6 +115,12 @@ impl Serialize for Verifier {
 impl Clone for Verifier {
     fn clone(&self) -> Self {
         verifier_from_bytes(self.sig, &self.verifier.to_bytes()).unwrap()
+    }
+}
+
+impl fmt::Debug for Verifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Verifier").field("sig", &self.sig).field("verifier_id", &self.verifier.get_id()).finish()
     }
 }
 

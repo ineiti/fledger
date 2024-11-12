@@ -94,12 +94,12 @@ pub fn key_pair_ml_dsa44_new() -> (Box<dyn SignerImpl>, Box<dyn VerifierImpl>) {
 }
 
 pub fn key_pair_ml_dsa44_from_bytes(
-    b: &Bytes,
+    _b: &Bytes,
 ) -> Result<(Box<dyn SignerImpl>, Box<dyn VerifierImpl>), SignerError> {
     todo!()
 }
 
-pub fn verifier_ml_dsa44_from_bytes(b: &Bytes) -> Result<Box<dyn VerifierImpl>, SignerError> {
+pub fn verifier_ml_dsa44_from_bytes(_b: &Bytes) -> Result<Box<dyn VerifierImpl>, SignerError> {
     todo!()
 }
 
@@ -110,7 +110,7 @@ impl SignerImpl for SignerMlDSA44 {
         todo!()
     }
 
-    fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError> {
+    fn sign(&self, _msg: &Bytes) -> Result<Signature, SignerError> {
         todo!()
     }
 }
@@ -121,7 +121,7 @@ impl VerifierImpl for VerifierMlDSA44 {
         todo!()
     }
 
-    fn verify(&self, msg: &Bytes, sig: &Signature) -> Result<(), SignerError> {
+    fn verify(&self, _msg: &Bytes, _sig: &Signature) -> Result<(), SignerError> {
         todo!()
     }
 
@@ -143,12 +143,12 @@ pub fn key_pair_ml_dsa65_new() -> (Box<dyn SignerImpl>, Box<dyn VerifierImpl>) {
 }
 
 pub fn key_pair_ml_dsa65_from_bytes(
-    b: &Bytes,
+    _b: &Bytes,
 ) -> Result<(Box<dyn SignerImpl>, Box<dyn VerifierImpl>), SignerError> {
     todo!()
 }
 
-pub fn verifier_ml_dsa65_from_bytes(b: &Bytes) -> Result<Box<dyn VerifierImpl>, SignerError> {
+pub fn verifier_ml_dsa65_from_bytes(_b: &Bytes) -> Result<Box<dyn VerifierImpl>, SignerError> {
     todo!()
 }
 
@@ -159,7 +159,7 @@ impl SignerImpl for SignerMlDSA65 {
         todo!()
     }
 
-    fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError> {
+    fn sign(&self, _msg: &Bytes) -> Result<Signature, SignerError> {
         todo!()
     }
 }
@@ -170,7 +170,7 @@ impl VerifierImpl for VerifierMlDSA65 {
         todo!()
     }
 
-    fn verify(&self, msg: &Bytes, sig: &Signature) -> Result<(), SignerError> {
+    fn verify(&self, _msg: &Bytes, _sig: &Signature) -> Result<(), SignerError> {
         todo!()
     }
 
@@ -192,12 +192,12 @@ pub fn key_pair_ml_dsa87_new() -> (Box<dyn SignerImpl>, Box<dyn VerifierImpl>) {
 }
 
 pub fn key_pair_ml_dsa87_from_bytes(
-    b: &Bytes,
+    _b: &Bytes,
 ) -> Result<(Box<dyn SignerImpl>, Box<dyn VerifierImpl>), SignerError> {
     todo!()
 }
 
-pub fn verifier_ml_dsa87_from_bytes(b: &Bytes) -> Result<Box<dyn VerifierImpl>, SignerError> {
+pub fn verifier_ml_dsa87_from_bytes(_b: &Bytes) -> Result<Box<dyn VerifierImpl>, SignerError> {
     todo!()
 }
 
@@ -208,7 +208,7 @@ impl SignerImpl for SignerMlDSA87 {
         todo!()
     }
 
-    fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError> {
+    fn sign(&self, _msg: &Bytes) -> Result<Signature, SignerError> {
         todo!()
     }
 }
@@ -219,7 +219,7 @@ impl VerifierImpl for VerifierMlDSA87 {
         todo!()
     }
 
-    fn verify(&self, msg: &Bytes, sig: &Signature) -> Result<(), SignerError> {
+    fn verify(&self, _msg: &Bytes, _sig: &Signature) -> Result<(), SignerError> {
         todo!()
     }
 
