@@ -3,9 +3,7 @@ use std::error::Error;
 use flarch::{start_logging, tasks::now};
 mod helpers;
 use flmodules::{
-    gossip_events::core::{Category, Event},
-    loopix::{broker::LoopixBroker, testing::LoopixSetup},
-    Modules,
+    gossip_events::core::{Category, Event}, loopix::{broker::LoopixBroker, testing::LoopixSetup}, overlay::broker::loopix::OverlayLoopix, web_proxy::{broker::WebProxy, core::WebProxyConfig}, Modules
 };
 use helpers::*;
 
@@ -63,9 +61,12 @@ async fn proxy_nodes_n(path_length: usize) -> Result<(), Box<dyn Error>> {
             .await?;
         v.node.loopix =
             Some(LoopixBroker::start(v.node.broker_net.clone(), config).await?);
+            // 
+            // v.node.webproxy = Some(WebProxy::start(v.node.storage, *id, OverlayLoopix::start(v.node.loopix.unwrap().clone()), WebProxyConfig::default()).await?);
     }
 
     // Now do some webProxy stuff while the network runs.
+    // net.nodes.clients[1].webproxy.get("google.com");
 
     Ok(())
 }

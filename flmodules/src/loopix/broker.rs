@@ -162,6 +162,8 @@ impl LoopixBroker {
                 Duration::from_secs_f64(loopix_messages.role.get_config().lambda_payload());
 
             loop {
+                log::trace!("Started network send thread with {:?} rate!", payload_rate);
+
                 // Wait for send delay
                 tokio::time::sleep(payload_rate).await;
 
@@ -174,6 +176,8 @@ impl LoopixBroker {
                 if let Some((node_id, delay, sphinx)) = receiver.recv().await {
                     sphinx_messages.push((node_id, delay.to_duration(), sphinx));
                 }
+
+                log::trace!("length of queue {}", sphinx_messages.len());
 
                 // Sort messages by remaining delay
                 sphinx_messages.sort_by_key(|&(_, delay, _)| delay); // TODO technically this is not the protocol
@@ -266,7 +270,6 @@ impl SubsystemHandler<LoopixMessage> for LoopixTranslate {
                 LoopixMessage::Output(output) => {
                     match output {
                         LoopixOut::SphinxToNetwork(node_id, sphinx) => {
-                            log::info!("Sending sphinx to network: {}", serde_yaml::to_string(&sphinx).unwrap());
                             self.network.emit_msg(NetworkIn::MessageToNode(node_id, serde_yaml::to_string(&sphinx).unwrap()).into()).unwrap();
                         }
                         _ => {}
@@ -296,12 +299,12 @@ mod tests {
     async fn setup_network() -> Result<(Broker<LoopixMessage>, LoopixStorage, Broker<NetworkMessage>), BrokerError> {
         let path_length = 2;
         
-        let (all_nodes, node_public_keys, node_key_pairs) = LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, node_public_keys, loopix_key_pairs, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
         // get our node info
         let node_id = all_nodes.iter().next().unwrap().get_id();
-        let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
-        let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
+        let private_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
+        let public_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
 
         let config = LoopixConfig::default_with_path_length(
             LoopixRole::Client,
@@ -329,12 +332,12 @@ mod tests {
     async fn create_broker() -> Result<(), BrokerError> {
         let path_length = 2;
 
-        let (all_nodes, node_public_keys, node_key_pairs) = LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, node_public_keys, loopix_key_pairs, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
         // take first path length from nodeinfos
         let node_id = all_nodes.clone().into_iter().take(path_length).next().unwrap().get_id(); // take a random client
-        let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
-        let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
+        let private_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
+        let public_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
 
         let config = LoopixConfig::default_with_path_length(
             LoopixRole::Client,

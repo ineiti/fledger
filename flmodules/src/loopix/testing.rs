@@ -15,7 +15,6 @@ use crate::{
         core::WebProxyConfig,
     },
 };
-use ed25519_compact::{KeyPair, Seed};
 use flarch::{
     broker::{Broker, BrokerError},
     data_storage::DataStorageTemp,
@@ -44,12 +43,12 @@ pub struct LoopixNode {
 }
 
 impl LoopixNode {
-    pub async fn new(loopix_cfg: LoopixConfig) -> Result<Self, BrokerError> {
-        let config = NodeConfig::new();
+    pub async fn new(loopix_cfg: LoopixConfig, config: NodeConfig) -> Result<Self, BrokerError> {
         let net = Broker::new();
-        let overlay = Broker::new();
+        let loopix = LoopixBroker::start(net.clone(), loopix_cfg).await?;
+        let overlay = OverlayLoopix::start(loopix.clone()).await?;
         Ok(Self {
-            loopix: LoopixBroker::start(net.clone(), loopix_cfg).await?,
+            loopix,
             config,
             net,
             overlay,
@@ -68,7 +67,8 @@ impl LoopixNode {
 #[derive(Serialize, Deserialize)]
 pub struct LoopixSetup {
     pub node_public_keys: HashMap<NodeID, PublicKey>,
-    pub node_key_pairs: HashMap<NodeID, (PublicKey, StaticSecret)>,
+    pub loopix_key_pairs: HashMap<NodeID, (PublicKey, StaticSecret)>,
+    pub node_configs: HashMap<NodeID, NodeConfig>,
     pub path_length: usize,
     pub all_nodes: Vec<NodeInfo>,
     #[serde(skip_serializing, skip_deserializing, default)]
@@ -82,11 +82,12 @@ pub struct LoopixSetup {
 impl LoopixSetup {
     pub async fn new(path_length: usize) -> Result<Self, BrokerError> {
 
-        let (node_infos, node_public_keys, node_key_pairs) = Self::create_nodes_and_keys(path_length);
+        let (node_infos, node_public_keys, loopix_key_pairs, node_configs) = Self::create_nodes_and_keys(path_length);
 
         let mut setup = Self {
             node_public_keys,
-            node_key_pairs,
+            loopix_key_pairs,
+            node_configs,
             path_length,
             all_nodes: node_infos,
             clients: vec![],
@@ -107,23 +108,25 @@ impl LoopixSetup {
         Ok(setup)
     }
 
-    pub fn create_nodes_and_keys(path_length: usize) -> (Vec<NodeInfo>, HashMap<NodeID, PublicKey>, HashMap<NodeID, (PublicKey, StaticSecret)>) {
+    pub fn create_nodes_and_keys(path_length: usize) -> (Vec<NodeInfo>, HashMap<NodeID, PublicKey>, HashMap<NodeID, (PublicKey, StaticSecret)>, HashMap<NodeID, NodeConfig>) {
         let mut node_infos = Vec::new();
         let mut node_public_keys = HashMap::new();
-        let mut node_key_pairs = HashMap::new();
+        let mut loopix_key_pairs = HashMap::new();
+        let mut node_configs = HashMap::new();
 
         for _ in 0..path_length * path_length + path_length * 2 {
-            let keypair = KeyPair::from_seed(Seed::default());
-            let new_node = NodeInfo::new(keypair.pk);
-            let node_id = new_node.get_id();
-            node_infos.push(new_node);
+            let node_config = NodeConfig::new();
+            let node_id = node_config.clone().info.get_id();
+
+            node_infos.push(node_config.clone().info);
+            node_configs.insert(node_id, node_config.clone());
 
             let (public_key, private_key) = LoopixStorage::generate_key_pair();
             node_public_keys.insert(node_id, public_key);
-            node_key_pairs.insert(node_id, (public_key, private_key));
+            loopix_key_pairs.insert(node_id, (public_key, private_key));
         }
 
-        (node_infos, node_public_keys, node_key_pairs)
+        (node_infos, node_public_keys, loopix_key_pairs, node_configs)
     }
 
     pub async fn get_nodes(
@@ -143,7 +146,8 @@ impl LoopixSetup {
         node_id: NodeID,
         role: LoopixRole,
     ) -> Result<LoopixNode, BrokerError> {
-        LoopixNode::new(self.get_config(node_id, role).await?).await
+        let loopix_cfg = self.get_config(node_id, role).await?;
+        LoopixNode::new(loopix_cfg, self.node_configs.get(&node_id).unwrap().clone()).await
     }
 
     pub async fn get_config(
@@ -151,8 +155,8 @@ impl LoopixSetup {
         node_id: NodeID,
         role: LoopixRole,
     ) -> Result<LoopixConfig, BrokerError> {
-        let private_key = &self.node_key_pairs.get(&node_id).unwrap().1;
-        let public_key = &self.node_key_pairs.get(&node_id).unwrap().0;
+        let private_key = &self.loopix_key_pairs.get(&node_id).unwrap().1;
+        let public_key = &self.loopix_key_pairs.get(&node_id).unwrap().0;
 
         let config = LoopixConfig::default_with_path_length(
             role,

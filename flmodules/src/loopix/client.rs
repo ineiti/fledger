@@ -229,6 +229,11 @@ impl Client {
         message: NetworkWrapper,
     ) -> (NodeID, Sphinx) {
         let (next_node, sphinx) = self.create_payload_message(node_id, message).await;
+        log::trace!("Next node: {:?}", next_node);
+        log::trace!("Destination: {:?}", node_id);
+        let our_id = self.get_our_id().await;
+        let our_provider = self.get_our_provider().await;
+        log::trace!("Our ID: {:?}, Our Provider: {:?}", our_id, our_provider);
         (next_node, sphinx)
     }
 
@@ -264,7 +269,7 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(destination, network_msg, &route);
-        (*dst_provider, sphinx)
+        (our_provider.unwrap(), sphinx)
     }
 
 }
@@ -280,12 +285,12 @@ mod tests {
 
     async fn setup() -> (Client, Vec<NodeInfo>, usize) {
         let path_length = 2;
-        let (all_nodes, node_public_keys, node_key_pairs) = LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, node_public_keys, loopix_key_pairs, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
         // get our node info
         let node_id = all_nodes.iter().next().unwrap().get_id();
-        let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
-        let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
+        let private_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
+        let public_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
 
         let config = LoopixConfig::default_with_path_length(
             LoopixRole::Client,

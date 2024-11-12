@@ -1,5 +1,7 @@
 use std::error::Error;
 
+use flarch::{start_logging_filter_level, tasks::wait_ms};
+use flmodules::network::messages::{NetworkIn, NetworkMessage};
 #[cfg(test)]
 use flmodules::{
     loopix::testing::{LoopixSetup, NetworkSimul, ProxyBroker},
@@ -33,6 +35,8 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
     network.add_nodes(loopix_setup.clients.clone()).await?;
     network.add_nodes(loopix_setup.mixers.clone()).await?;
     network.add_nodes(loopix_setup.providers.clone()).await?;
+    start_logging_filter_level(vec![], log::LevelFilter::Trace);
+
     let stop = network.process_loop();
 
     // I wouldn't start with the proxy :)
@@ -46,7 +50,7 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
 
     if true {
         // Send a message from a client node to a provider:
-        let id_dst = loopix_setup.providers[0].config.info.get_id();
+        let id_dst = loopix_setup.clients[1].config.info.get_id();
         loopix_setup.clients[0]
             .overlay
             .emit_msg(OverlayMessage::Input(OverlayIn::NetworkWrapperToNetwork(
@@ -59,6 +63,19 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
                 )?,
             )))?;
         // Do something to look if the message arrived
+        wait_ms(60000).await;
+
+
+        // let (mut tap, _) = loopix_setup.clients[1].net.get_tap().await?;
+        // if let Ok(Some(NetworkMessage::Input(NetworkIn::MessageToNode(next_node_id, msg)))) = timeout(Duration::from_secs(30), tap.recv()).await {
+        //     let our_provider = storage.get_our_provider().await.unwrap();
+        //     assert_eq!(next_node_id, our_provider);
+
+        //     let _ = serde_yaml::from_str::<Sphinx>(&msg).unwrap();
+
+        // }      
+        
+
         assert!(false);
     }
 

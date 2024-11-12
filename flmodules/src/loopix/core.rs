@@ -180,12 +180,12 @@ mod tests {
         usize,
     ) {
         let path_length = 2;
-        let (all_nodes, node_public_keys, node_key_pairs) = LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, node_public_keys, loopix_key_pairs, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
         // get our node info
         let node_id = all_nodes.iter().next().unwrap().get_id();
-        let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
-        let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
+        let private_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
+        let public_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
 
         let config = LoopixConfig::default_with_path_length(
             LoopixRole::Client,
@@ -205,12 +205,12 @@ mod tests {
             .set_node_public_keys(node_public_keys)
             .await;
 
-        (core, node_key_pairs, path_length)
+        (core, loopix_key_pairs, path_length)
     }
 
     #[tokio::test]
     async fn test_create_route() {
-        let (core, node_key_pairs, _path_length) = setup().await;
+        let (core, loopix_key_pairs, _path_length) = setup().await;
 
         let our_id = core.get_our_id().await;
 
@@ -223,13 +223,13 @@ mod tests {
             NodeAddressBytes::from_bytes(our_id.to_bytes())
         );
 
-        let public_key = node_key_pairs.get(&our_id).unwrap().0;
+        let public_key = loopix_key_pairs.get(&our_id).unwrap().0;
         assert_eq!(public_key, route[0].pub_key);
     }
 
     #[tokio::test]
     async fn test_sphinx_packet_simple() {
-        let (core, node_key_pairs, _) = setup().await;
+        let (core, loopix_key_pairs, _) = setup().await;
 
         let our_id = core.get_our_id().await;
         let storage = core.get_storage();
@@ -237,7 +237,7 @@ mod tests {
 
         assert_eq!(
             private_key.as_bytes(),
-            node_key_pairs.get(&our_id).unwrap().1.as_bytes()
+            loopix_key_pairs.get(&our_id).unwrap().1.as_bytes()
         );
 
         // just create a packet with one layer of encryption
@@ -284,7 +284,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sphinx_packet_3_layers() {
-        let (core, node_key_pairs, _) = setup().await;
+        let (core, loopix_key_pairs, _) = setup().await;
 
         let our_id = core.get_our_id().await;
         let storage = core.get_storage();
@@ -292,7 +292,7 @@ mod tests {
 
         assert_eq!(
             private_key.as_bytes(),
-            node_key_pairs.get(&our_id).unwrap().1.as_bytes()
+            loopix_key_pairs.get(&our_id).unwrap().1.as_bytes()
         );
 
         // just create a packet with one layer of encryption
@@ -310,7 +310,7 @@ mod tests {
         let mut packet_bytes = sphinx.inner.to_bytes();
         for (index, node) in route.iter().enumerate() {
             let node_id = node_id_from_node_address(node.address);
-            let node_secret_key = &node_key_pairs.get(&node_id).unwrap().1;
+            let node_secret_key = &loopix_key_pairs.get(&node_id).unwrap().1;
             let packet = SphinxPacket::from_bytes(&packet_bytes).unwrap();
             let processed = packet.process(node_secret_key).unwrap();
 

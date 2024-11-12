@@ -99,6 +99,7 @@ impl LoopixMessages {
     async fn process_message(&self, msg: LoopixIn) {
         match msg {
             LoopixIn::OverlayRequest(node_id, message) => {
+                log::trace!("OverlayRequest with node_id {} and message {:?}", node_id, message);
                 self.process_overlay_message(node_id, message).await
             }
             LoopixIn::SphinxFromNetwork(sphinx) => self.process_sphinx_packet(sphinx).await,

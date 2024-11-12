@@ -153,7 +153,7 @@ impl CoreConfig {
         CoreConfig {
             lambda_loop: 20.0,
             lambda_drop: 20.0,
-            lambda_payload: 20.0,
+            lambda_payload: 5.0,
             path_length,
             mean_delay: 0.003,
             lambda_loop_mix: 20.0,
@@ -178,6 +178,8 @@ impl Default for CoreConfig {
     }
 }
 
+const multiplier: f64 = 0.01;
+
 impl CoreConfig {
     pub fn lambda_loop(&self) -> f64 {
         self.lambda_loop
@@ -188,7 +190,7 @@ impl CoreConfig {
     }
 
     pub fn lambda_payload(&self) -> f64 {
-        self.lambda_payload
+        self.lambda_payload*multiplier
     }
 
     pub fn path_length(&self) -> usize {
@@ -196,15 +198,15 @@ impl CoreConfig {
     }
 
     pub fn mean_delay(&self) -> f64 {
-        self.mean_delay
+        self.mean_delay*multiplier
     }
 
     pub fn lambda_loop_mix(&self) -> f64 {
-        self.lambda_loop_mix
+        self.lambda_loop_mix*multiplier
     }
 
     pub fn time_pull(&self) -> f64 {
-        self.time_pull
+        self.time_pull*multiplier
     }
 
     pub fn max_retrieve(&self) -> usize {

@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD, Engine};
 use sphinx_packet::{header::delays::Delay, route::{Destination, Node}, SphinxPacket};
 use serde::{Deserialize, Serialize};
 use flarch::nodeids::NodeID;
@@ -34,14 +35,16 @@ where
     S: serde::Serializer,
 {
     let bytes = sphinx_packet.to_bytes();
-    serializer.serialize_bytes(&bytes)
+    let base64_encoded = STANDARD.encode(&bytes);
+    serializer.serialize_str(&base64_encoded)
 }
 
 pub fn deserialize_sphinx_packet<'de, D>(deserializer: D) -> std::result::Result<SphinxPacket, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let bytes = Vec::<u8>::deserialize(deserializer)?;
+    let base64_encoded = String::deserialize(deserializer)?;
+    let bytes = STANDARD.decode(&base64_encoded).map_err(serde::de::Error::custom)?;
     SphinxPacket::from_bytes(&bytes).map_err(serde::de::Error::custom)
 }
 

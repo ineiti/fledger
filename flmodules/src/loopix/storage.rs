@@ -658,7 +658,7 @@ mod tests {
         let client_storage = None;
         let provider_storage = None;
 
-        let (all_nodes, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, _, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
         let node_id = all_nodes.iter().next().unwrap().get_id();
         let (public_key, private_key) = LoopixStorage::generate_key_pair();
@@ -683,7 +683,7 @@ mod tests {
     fn test_client_storage_default_with_path_length() {
         let path_length = 3;
 
-        let (all_nodes, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, _, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
         let our_node_id = all_nodes[0].get_id();
 
@@ -700,7 +700,7 @@ mod tests {
     fn test_provider_storage_default_with_path_length() {
         let path_length = 3;
 
-        let (all_nodes, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, _, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
         let clients = all_nodes
             .clone()
@@ -718,7 +718,7 @@ mod tests {
     fn test_loopix_storage_serde() {
         let path_length = 3;    
 
-        let (all_nodes, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, _, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
         let node_id = all_nodes.clone().into_iter().next().unwrap().get_id();
         let (public_key, private_key) = LoopixStorage::generate_key_pair();
@@ -751,7 +751,7 @@ mod tests {
     async fn test_client_messages_serde() {
         let path_length = 3;
 
-        let (all_nodes, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, _, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
         let node_id = all_nodes.clone().into_iter().next().unwrap().get_id();
         let (public_key, private_key) = LoopixStorage::generate_key_pair();
