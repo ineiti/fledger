@@ -24,9 +24,7 @@ impl Default for Sphinx {
 
 impl std::fmt::Debug for Sphinx {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Sphinx")
-            .field("header", &self.inner.header)
-            .finish()
+        f.write_str(&serde_json::to_string(&self).unwrap())
     }
 }
 

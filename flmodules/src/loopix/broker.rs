@@ -122,22 +122,22 @@ impl LoopixBroker {
     }
 
     pub fn start_loop_message_thread(loopix_messages: LoopixMessages) {
-        let loop_rate = Duration::from_secs_f64(loopix_messages.role.get_config().lambda_loop());
+        let wait_before_send = Duration::from_secs_f64(60.0 / loopix_messages.role.get_config().lambda_loop());
 
         tokio::spawn(async move {
             loop {
-                tokio::time::sleep(loop_rate).await;
+                tokio::time::sleep(wait_before_send).await;
                 loopix_messages.send_loop_message().await;
             }
         });
     }
 
     pub fn start_drop_message_thread(loopix_messages: LoopixMessages) {
-        let drop_rate = Duration::from_secs_f64(loopix_messages.role.get_config().lambda_drop());
+        let wait_before_send = Duration::from_secs_f64(60.0 / loopix_messages.role.get_config().lambda_drop());
 
         tokio::spawn(async move {
             loop {
-                tokio::time::sleep(drop_rate).await;
+                tokio::time::sleep(wait_before_send).await;
                 loopix_messages.send_drop_message().await;
             }
         });
@@ -158,18 +158,26 @@ impl LoopixBroker {
     pub fn start_network_send_thread(loopix_messages: LoopixMessages, mut broker: Broker<LoopixMessage>, mut receiver: Receiver<(NodeID, Delay, Sphinx)>) {
         tokio::spawn(async move {
             let mut sphinx_messages: Vec<(NodeID, Duration, Sphinx)> = Vec::new();
-            let payload_rate =
-                Duration::from_secs_f64(loopix_messages.role.get_config().lambda_payload());
+            let wait_before_send = match loopix_messages.role {
+                NodeType::Client(_) => {
+                    log::trace!("this is wait before send {}", 60.0 / loopix_messages.role.get_config().lambda_payload());
+                    Duration::from_secs_f64(60.0 / loopix_messages.role.get_config().lambda_payload())
+                }
+                NodeType::Provider(_) | NodeType::Mixnode(_) => {
+                    log::trace!("this is wait before send {}", 60.0 / loopix_messages.role.get_config().lambda_loop_mix());
+                    Duration::from_secs_f64(60.0 / loopix_messages.role.get_config().lambda_loop_mix())
+                }
+            };
 
             loop {
-                log::trace!("Started network send thread with {:?} rate!", payload_rate);
+                log::trace!("Started network send thread with {:?} rate!", wait_before_send);
 
                 // Wait for send delay
-                tokio::time::sleep(payload_rate).await;
+                tokio::time::sleep(wait_before_send).await;
 
                 // Subtract the wait duration from all message delays
                 for (_, delay, _) in &mut sphinx_messages {
-                    *delay = delay.saturating_sub(payload_rate);
+                    *delay = delay.saturating_sub(wait_before_send);
                 }
 
                 // Receive new messages
@@ -291,12 +299,15 @@ mod tests {
     use crate::loopix::storage::LoopixStorage;
     use crate::network::messages::NetworkMessage;
     use flarch::broker::Broker;
+    use flarch::start_logging_filter_level;
     use sphinx_packet::route::{Destination, Node};
     use sphinx_packet::SphinxPacket;
     use tokio::time::{timeout, Duration};
     use crate::loopix::testing::LoopixSetup;
 
     async fn setup_network() -> Result<(Broker<LoopixMessage>, LoopixStorage, Broker<NetworkMessage>), BrokerError> {
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+
         let path_length = 2;
         
         let (all_nodes, node_public_keys, loopix_key_pairs, _) = LoopixSetup::create_nodes_and_keys(path_length);
@@ -430,8 +441,6 @@ mod tests {
         // Simulate sending an network message to the LoopixBroker
         loopix_broker.clone().emit_msg(LoopixMessage::Input(LoopixIn::SphinxFromNetwork(Sphinx{inner: sphinx_packet}))).unwrap();
 
-        // TODO check the logs?
-
         Ok(())
     }
 
@@ -443,7 +452,7 @@ mod tests {
 
         let (mut tap, _) = network.clone().get_tap().await?;
         for _ in 0..3 {
-            if let Ok(Some(msg)) = timeout(Duration::from_secs(10), tap.recv()).await {
+            if let Ok(Some(msg)) = timeout(Duration::from_secs(6), tap.recv()).await {
                 println!("{:?}", msg);
             } else {
                 panic!("Network should receive dummy and drop messages");

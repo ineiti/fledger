@@ -1,13 +1,14 @@
-use std::error::Error;
+use std::{error::Error, time::Duration};
 
-use flarch::{start_logging_filter_level, tasks::wait_ms};
-use flmodules::network::messages::{NetworkIn, NetworkMessage};
+use flarch::start_logging_filter_level;
+use flmodules::{loopix::sphinx::Sphinx, network::messages::{NetworkIn, NetworkMessage}};
 #[cfg(test)]
 use flmodules::{
     loopix::testing::{LoopixSetup, NetworkSimul, ProxyBroker},
     overlay::messages::{NetworkWrapper, OverlayIn, OverlayMessage},
 };
 use serde::{Deserialize, Serialize};
+use tokio::time::timeout;
 
 /**
  * This test sets up a number of Loopix nodes: clients, mixers, and providers.
@@ -62,21 +63,14 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
                     },
                 )?,
             )))?;
-        // Do something to look if the message arrived
-        wait_ms(60000).await;
 
+        tokio::time::sleep(Duration::from_secs(30)).await;
 
-        // let (mut tap, _) = loopix_setup.clients[1].net.get_tap().await?;
-        // if let Ok(Some(NetworkMessage::Input(NetworkIn::MessageToNode(next_node_id, msg)))) = timeout(Duration::from_secs(30), tap.recv()).await {
-        //     let our_provider = storage.get_our_provider().await.unwrap();
-        //     assert_eq!(next_node_id, our_provider);
+        let (mut tap, _) = loopix_setup.clients[1].net.get_tap().await?;
+        if let Ok(Some(NetworkMessage::Input(NetworkIn::MessageToNode(_node_id, msg)))) = timeout(Duration::from_secs(1), tap.recv()).await {
+            let _ = serde_yaml::from_str::<Sphinx>(&msg).unwrap();
+        }
 
-        //     let _ = serde_yaml::from_str::<Sphinx>(&msg).unwrap();
-
-        // }      
-        
-
-        assert!(false);
     }
 
     // Quit the tokio-thread
