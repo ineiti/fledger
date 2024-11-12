@@ -243,16 +243,25 @@ impl LoopixCore for NodeType {
     async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
         match self {
             NodeType::Client(client) => client.process_final_hop(destination, surb_id, payload).await,
-            NodeType::Mixnode(mixnode) => LoopixCore::process_final_hop(mixnode, destination, surb_id, payload).await,
-            NodeType::Provider(provider) => LoopixCore::process_final_hop(provider, destination, surb_id, payload).await,
+            NodeType::Mixnode(mixnode) =>  mixnode.process_final_hop(destination, surb_id, payload).await,
+            NodeType::Provider(provider) =>  provider.process_final_hop(destination, surb_id, payload).await,
         }
     }
 
-    async fn process_forward_hop(&self, next_packet: Box<SphinxPacket>, next_node: NodeID, delay: Delay) -> (NodeID, Delay, Option<Sphinx>) {
+    async fn process_forward_hop(
+        &self,
+        next_packet: Box<SphinxPacket>,
+        next_node: NodeID,
+        delay: Delay,
+    ) -> (NodeID, Delay, Option<Sphinx>) {
         match self {
             NodeType::Client(_) => panic!("Client does not implement process_forward_hop"),
-            NodeType::Mixnode(mixnode) => LoopixCore::process_forward_hop(mixnode, next_packet, next_node, delay).await,
-            NodeType::Provider(provider) => LoopixCore::process_forward_hop(provider, next_packet, next_node, delay).await,
+            NodeType::Mixnode(mixnode) => {
+                mixnode.process_forward_hop(next_packet, next_node, delay).await
+            }
+            NodeType::Provider(provider) => {
+                provider.process_forward_hop(next_packet, next_node, delay).await
+            }
         }
     }
 

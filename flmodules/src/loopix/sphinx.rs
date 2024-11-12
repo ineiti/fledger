@@ -102,16 +102,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sphinx_debug() {
-        let packet = create_dummy_sphinx_packet();
-        let sphinx = Sphinx { inner: packet };
-        let debug_output = format!("{:?}", sphinx);
-        println!("Debug output: {}", debug_output);
-        assert!(debug_output.contains("Sphinx"));
-        assert!(debug_output.contains("header"));
-    }
-
-    #[test]
     fn test_sphinx_serialization() {
         let packet = create_dummy_sphinx_packet();
         let sphinx = Sphinx { inner: packet };

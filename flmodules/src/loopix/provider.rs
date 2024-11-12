@@ -6,7 +6,6 @@ use crate::loopix::broker::MODULE_NAME;
 use crate::loopix::config::CoreConfig;
 use crate::loopix::core::LoopixCore;
 use crate::loopix::messages::MessageType;
-use crate::loopix::mixnode::MixnodeInterface;
 use crate::loopix::sphinx::Sphinx;
 use crate::loopix::storage::LoopixStorage;
 use async_trait::async_trait;
@@ -14,6 +13,8 @@ use flarch::nodeids::NodeID;
 use sphinx_packet::header::delays::{generate_from_average_duration, Delay};
 use sphinx_packet::payload::Payload;
 use sphinx_packet::SphinxPacket;
+
+use super::sphinx::node_id_from_node_address;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Provider {
@@ -35,12 +36,61 @@ impl LoopixCore for Provider {
         self.storage.get_our_id().await
     }
 
+
+    // THIS IS COPY PASTED FROM MIXNODE, I JUST DON'T KNOW HOW TO DO TRAITS IN RUST
     async fn create_loop_message(&self) -> (NodeID, Sphinx) {
-        MixnodeInterface::create_loop_message(self).await
+        let providers = self.get_storage().get_providers().await;
+        let our_id = self.get_our_id().await;
+
+        // pick random provider
+        let random_provider = providers.iter().next().unwrap();
+
+        // create route
+        let route = self
+            .create_route(
+                self.get_config().path_length(),
+                None,
+                Some(*random_provider),
+                Some(our_id),
+            )
+            .await;
+
+        // create the networkmessage
+        let loop_msg = serde_json::to_string(&MessageType::Loop).unwrap();
+        let msg = NetworkWrapper {
+            module: MODULE_NAME.into(),
+            msg: loop_msg,
+        };
+
+        // create sphinx packet
+        let (next_node, sphinx) = self.create_sphinx_packet(our_id, msg, &route);
+        (node_id_from_node_address(next_node.address), sphinx)
     }
 
+    // THIS IS COPY PASTED FROM MIXNODE, I JUST DON'T KNOW HOW TO DO TRAITS IN RUST
     async fn create_drop_message(&self) -> (NodeID, Sphinx) {
-        MixnodeInterface::create_drop_message(self).await
+        let random_provider = self.get_storage().get_random_provider().await;
+
+        // create route
+        let route = self
+            .create_route(
+                self.get_config().path_length(),
+                None,
+                Some(random_provider),
+                None,
+            )
+            .await;
+
+        // create the networkmessage
+        let drop_msg = serde_json::to_string(&MessageType::Drop).unwrap();
+        let msg = NetworkWrapper {
+            module: MODULE_NAME.into(),
+            msg: drop_msg,
+        };
+
+        // create sphinx packet
+        let (next_node, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
+        (node_id_from_node_address(next_node.address), sphinx)
     }
 
     async fn process_final_hop(
@@ -102,39 +152,16 @@ impl LoopixCore for Provider {
                 inner: *next_packet,
             };
             self.store_client_message(next_node, delay, sphinx.clone()).await;
-            (next_node, delay, Some(sphinx.clone()))
+            (next_node, delay, None)
         } else {
-            Box::pin(MixnodeInterface::process_forward_hop(
-                self,
-                next_packet,
-                next_node,
-                delay,
-            ))
-            .await // TODO I have no idea what box pin is, compiler said to do it
+            // THIS IS COPY PASTED FROM MIXNODE, I JUST DON'T KNOW HOW TO DO TRAITS IN RUST
+            let sphinx = &Sphinx {
+                inner: *next_packet,
+            };
+            (next_node, delay, Some(sphinx.clone()))
         }
     }
 
-}
-
-#[async_trait]
-impl MixnodeInterface for Provider {
-    async fn process_forward_hop(
-        &self,
-        next_packet: Box<SphinxPacket>,
-        next_node: NodeID,
-        delay: Delay,
-    ) -> (NodeID, Delay, Option<Sphinx>) {
-        LoopixCore::process_forward_hop(self, next_packet, next_node, delay).await
-    }
-
-    async fn process_final_hop(
-        &self,
-        destination: NodeID,
-        surb_id: [u8; 16],
-        payload: Payload,
-    ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>) {
-        LoopixCore::process_final_hop(self, destination, surb_id, payload).await
-    }
 }
 
 impl Provider {
