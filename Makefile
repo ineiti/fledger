@@ -4,7 +4,7 @@ CARGOS := cli/{fledger,flsignal} flarch flarch_macro flbrowser \
 MAKE_TESTS := test/{webrtc-libc-wasm,signal-fledger} examples/ping-pong
 CRATES := flarch_macro flarch flmodules flnode
 SHELL := /bin/bash
-PKILL = @ps aux | grep "$1" | grep -v grep | awk '{print $$2}' | xargs -r kill
+PKILL = @ps aux | grep "$1" | grep -v grep | grep -v Visual | awk '{print $$2}' | xargs -r kill
 
 cargo_check:
 	for c in ${CARGOS}; do \
