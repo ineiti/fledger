@@ -187,10 +187,10 @@ impl LoopixSetup {
     pub async fn print_all_messages(&self, print_full_id: bool) {
         println!();
         println!();
+        println!("\n{:*<300}", "");
         println!("Network Configurations:");
         println!("Number of mixes, providers, clients: {:?}, {:?}, {:?}", self.mixers.len(), self.providers.len(), self.clients.len());
         println!("{:<30} {:<30} {:<30}", "Clients", "Mixers", "Providers");
-        println!("{:-<90}", "");
 
         for i in 0..self.mixers.len() {
             let default_id = NodeID::from(0u32);
@@ -199,15 +199,23 @@ impl LoopixSetup {
             let provider_id = self.providers.get(i).map(|node| node.config.info.get_id()).unwrap_or(default_id);
             println!("{:<30} {:<30} {:<30}", client_id, mixer_id, provider_id);
         }
+        println!("\n{:*<300}", "");
+
 
         for node in self.clients.iter() {
+            println!("\n{:*<300}", "");
             self.print_node_messages(node, "Client", print_full_id).await;
+            println!("\n{:*<300}", "");
         }
         for node in self.mixers.iter() {
+            println!("\n{:*<300}", "");
             self.print_node_messages(node, "Mixer", print_full_id).await;
+            println!("\n{:*<300}", "");
         }
         for node in self.providers.iter() {
+            println!("\n{:*<300}", "");
             self.print_node_messages(node, "Provider", print_full_id).await;
+            println!("\n{:*<300}", "");
         }
     }
 
@@ -229,37 +237,50 @@ impl LoopixSetup {
         println!();
 
         println!("\nForwarded Messages:");
-        println!("{:<60} {:<20}", "From -> To", "Message Type");
-        println!("{:-<80}", "");
+        println!("{:<10} {:<60} {:<20}", "Count", "From -> To", "Message Type");
+        println!("{:-<300}", "");
 
+        let mut forwarded_count = HashMap::new();
         for (from, to) in forwarded_messages {
-            println!("{:<60} {:<20}", format!("{:x} -> {:x}", from, to), "N/A");
+            *forwarded_count.entry((from, to)).or_insert(0) += 1;
+        }
+        for ((from, to), count) in forwarded_count {
+            println!("{:<10} {:<60} {:<20}", count, format!("{:x} -> {:x}", from, to), "N/A");
         }
 
         println!("\nReceived Messages:");
-        println!("{:<60} {:<20}", "Origin -> Relayed By", "Message Type");
-        println!("{:-<80}", "");
+        println!("{:<10} {:<20} {:<20}", "Count", "Origin -> Relayed By", "Message Type");
+        println!("{:-<300}", "");
 
+        let mut received_count = HashMap::new();
         for (origin, relay, message_type) in received_messages {
-            println!("{:<60} {:<20}", format!("{:x} -> {:x}", origin, relay), format!("{:?}", message_type));
+            *received_count.entry((origin, relay, message_type)).or_insert(0) += 1;
+        }
+        for ((origin, relay, message_type), count) in received_count {
+            println!("{:<10} {:<20} {:<20}", count, format!("{:x} -> {:x}", origin, relay), format!("{:?}", message_type));
         }
 
         println!("\nSent Messages:");
-        println!("{:<60} {:<20}", "Route", "Message Type");
-        println!("{:-<80}", "");
+        println!("{:<10} {:<100} {:<60}", "Count", "Message Type", "Route");
+        println!("{:-<300}", "");
+
+        let mut sent_count = HashMap::new();
         for (route, message_type) in sent_messages {
             let short_route: Vec<String> = route
                 .iter()
                 .map(|node_id| format!("{:x}", node_id))
                 .collect::<Vec<String>>();
-            println!("{:<60} {:<20}", format!("[{}]", short_route.join(", ")), format!("{:?}", message_type));
+            *sent_count.entry((short_route, message_type)).or_insert(0) += 1;
+        }
+        for ((short_route, message_type), count) in sent_count {
+            println!("{:<10} {:<100} {:<60}", count, format!("{:?}", message_type), format!("[{}]", short_route.join(", ")));
         }
 
         if role == "Provider" {
             let client_messages = node.storage.get_all_client_messages().await;
             println!("\nClient Messages:");
             println!("{:<60} {:<20}", "Client ID", "Message Type");
-            println!("{:-<80}", "");
+            println!("{:-<300}", "");
             for (client_id, messages) in client_messages {
                 for sphinx in messages {
                     println!("{:<60} {:<20}", format!("{:x}", client_id), format!("{:?}", sphinx));
@@ -308,7 +329,7 @@ impl NetworkSimul {
         for (id_tx, id_rx, msg) in msgs.iter() {
             if let Some((broker, _)) = self.nodes.get_mut(&id_rx) {
                 // This is for debugging and can be removed
-                println!("NetworkOut: {id_tx}->{id_rx}: {msg}");
+                // println!("NetworkOut: {id_tx}->{id_rx}: {msg}");
                 broker.emit_msg(NetworkMessage::Output(NetworkOut::MessageFromNode(
                     id_tx.clone(),
                     msg.clone(),
@@ -328,7 +349,7 @@ impl NetworkSimul {
                     Ok(msgs) => {
                         if msgs == 0 {
                             // Wait for 100 ms if no messages got passed.
-                            wait_ms(100).await;
+                            wait_ms(20).await;
                         }
                     }
                     Err(e) => println!("Error while processing network: {e:?}"),

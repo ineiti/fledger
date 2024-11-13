@@ -389,7 +389,7 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn get_client_messages(&self, node_id: NodeID) -> Vec<(Sphinx)> {
+    pub async fn get_client_messages(&self, node_id: NodeID) -> Vec<Sphinx> {
         if let Some(storage) = self.provider_storage.read().await.as_ref() {
             storage
                 .client_messages

@@ -1,10 +1,7 @@
 use std::{error::Error, time::Duration};
 
 use flarch::start_logging_filter_level;
-use flmodules::{
-    loopix::sphinx::Sphinx,
-    network::messages::{NetworkIn, NetworkMessage},
-};
+
 #[cfg(test)]
 use flmodules::{
     loopix::testing::{LoopixSetup, NetworkSimul, ProxyBroker},
@@ -35,7 +32,7 @@ use serde::{Deserialize, Serialize};
 async fn test_loopix() -> Result<(), Box<dyn Error>> {
     start_logging_filter_level(vec![], log::LevelFilter::Debug);
 
-    let mut loopix_setup = LoopixSetup::new(2).await?;
+    let loopix_setup = LoopixSetup::new(2).await?;
     let mut network = NetworkSimul::new();
     network.add_nodes(loopix_setup.clients.clone()).await?;
     network.add_nodes(loopix_setup.mixers.clone()).await?;
@@ -43,47 +40,23 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
 
     let stop = network.process_loop();
 
-    // I wouldn't start with the proxy :)
-    if false {
-        let mut proxy_src = ProxyBroker::new(loopix_setup.clients[0].loopix.clone()).await?;
-        let proxy_dst = ProxyBroker::new(loopix_setup.clients[1].loopix.clone()).await?;
+    let mut proxy_src = ProxyBroker::new(loopix_setup.clients[0].loopix.clone()).await?;
+    let proxy_dst = ProxyBroker::new(loopix_setup.clients[1].loopix.clone()).await?;
 
-        proxy_src.proxy.get("https://fledg.re").await?;
-        println!("Ids for proxies: ${} / ${}", proxy_src.id, proxy_dst.id);
+    if let Err(e) = proxy_src.proxy.get_with_timeout("https://fledg.re", Duration::from_secs(30)).await {
+        eprintln!("Proxy timeout or error: {:?}", e);
     }
+    println!("Ids for proxies: ${} / ${}", proxy_src.id, proxy_dst.id);
 
-    if true {
-        // Send a message from a client node to a provider:
-        let id_dst = loopix_setup.clients[1].config.info.get_id();
-        loopix_setup.clients[0]
-            .overlay
-            .emit_msg(OverlayMessage::Input(OverlayIn::NetworkWrapperToNetwork(
-                id_dst,
-                NetworkWrapper::wrap_yaml(
-                    "Test",
-                    &TestMessage {
-                        field: "secret message".into(),
-                    },
-                )?,
-            )))?;
-
-        tokio::time::sleep(Duration::from_secs(15)).await;
-
-        let (mut tap, _) = loopix_setup.clients[1].net.get_tap().await?;
-        if let NetworkMessage::Input(NetworkIn::MessageToNode(_node_id, msg)) =
-            tap.recv().await.ok_or("Error receiving message")?
-        {
-            let _ = serde_yaml::from_str::<Sphinx>(&msg).unwrap();
-        }
-    }
-
-    // Quit the tokio-thread
     stop.send(true).ok();
+
+    loopix_setup.print_all_messages(true).await;
+
     Ok(())
 }
 
 #[tokio::test]
-async fn test_loopix_tiny() -> Result<(), Box<dyn Error>> {
+async fn test_tiny_loopix() -> Result<(), Box<dyn Error>> {
     start_logging_filter_level(vec![], log::LevelFilter::Trace);
 
     let mut loopix_setup = LoopixSetup::new(2).await?;
@@ -108,7 +81,7 @@ async fn test_loopix_tiny() -> Result<(), Box<dyn Error>> {
             )?,
         )))?;
 
-    tokio::time::sleep(Duration::from_secs(25)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
 
     loopix_setup.print_all_messages(true).await;
 

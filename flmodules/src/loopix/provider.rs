@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::time::Duration;
 
 use crate::overlay::messages::NetworkWrapper;
 
@@ -11,7 +10,7 @@ use crate::loopix::sphinx::Sphinx;
 use crate::loopix::storage::LoopixStorage;
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
-use sphinx_packet::header::delays::{generate_from_average_duration, Delay};
+use sphinx_packet::header::delays::Delay;
 use sphinx_packet::payload::Payload;
 use sphinx_packet::SphinxPacket;
 
@@ -223,7 +222,7 @@ impl Provider {
         self.get_storage().add_subscribed_client(client_id).await;
     }
 
-    pub async fn get_client_messages(&self, client_id: NodeID) -> Vec<(Sphinx)> {
+    pub async fn get_client_messages(&self, client_id: NodeID) -> Vec<Sphinx> {
         self.get_storage().get_client_messages(client_id).await
     }
 

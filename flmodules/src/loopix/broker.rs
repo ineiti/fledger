@@ -288,6 +288,7 @@ impl LoopixBroker {
                         //     log::error!("Error emitting drop message: {e:?}");
                         // }
                         // log::trace!("{} emitted a drop message to node {}", our_id, node_id);
+                        // TODO uncomment
                     }
                 }
 
@@ -316,21 +317,21 @@ impl LoopixBroker {
         log::debug!("Subscribe request rate: {:?}", pull_request_rate);
 
         tokio::spawn(async move {
-            // loop { TODO uncomment
-            // subscribe message
-            let (node_id, sphinx) = loopix_messages.create_subscribe_message().await;
+            loop {
+                // subscribe message
+                let (node_id, sphinx) = loopix_messages.create_subscribe_message().await;
 
-            // serialize and send
-            let msg = serde_yaml::to_string(&sphinx).unwrap();
-            if let Err(e) = network.emit_msg(NetworkIn::MessageToNode(node_id, msg).into()) {
-                log::error!("Failed to emit subscribe message: {:?}", e);
-            } else {
-                log::info!("Successfully emitted subscribe message to node {}", node_id);
+                // serialize and send
+                let msg = serde_yaml::to_string(&sphinx).unwrap();
+                if let Err(e) = network.emit_msg(NetworkIn::MessageToNode(node_id, msg).into()) {
+                    log::error!("Failed to emit subscribe message: {:?}", e);
+                } else {
+                    log::info!("Successfully emitted subscribe message to node {}", node_id);
+                }
+
+                // wait
+                tokio::time::sleep(pull_request_rate).await;
             }
-
-            // wait
-            tokio::time::sleep(pull_request_rate).await;
-            // }
         });
     }
 

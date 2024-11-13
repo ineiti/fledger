@@ -31,7 +31,7 @@ pub enum LoopixIn {
     SphinxFromNetwork(NodeID, Sphinx),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum MessageType {
     Payload(NodeID, NetworkWrapper), // NodeID: Source
     Drop,
