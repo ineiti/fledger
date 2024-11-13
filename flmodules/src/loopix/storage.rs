@@ -117,18 +117,18 @@ impl ClientStorage {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ProviderStorage {
     subscribed_clients: HashSet<NodeID>,
-    #[serde(
-        serialize_with = "serialize_client_messages",
-        deserialize_with = "deserialize_client_messages"
-    )]
-    client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>,
+    // #[serde(
+    //     serialize_with = "serialize_client_messages",
+    //     deserialize_with = "deserialize_client_messages"
+    // )]
+    client_messages: HashMap<NodeID, Vec<Sphinx>>,
     client_message_index: HashMap<NodeID, usize>,
 }
 
 impl ProviderStorage {
     pub fn new(
         subscribed_clients: HashSet<NodeID>,
-        client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>
+        client_messages: HashMap<NodeID, Vec<Sphinx>>,
     ) -> Self {
         ProviderStorage {
             subscribed_clients,
@@ -381,7 +381,7 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn get_all_client_messages(&self) -> HashMap<NodeID, Vec<(Delay, Sphinx)>> {
+    pub async fn get_all_client_messages(&self) -> HashMap<NodeID, Vec<Sphinx>> {
         if let Some(storage) = self.provider_storage.read().await.as_ref() {
             storage.client_messages.clone()
         } else {
@@ -389,7 +389,7 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn get_client_messages(&self, node_id: NodeID) -> Vec<(Delay, Sphinx)> {
+    pub async fn get_client_messages(&self, node_id: NodeID) -> Vec<(Sphinx)> {
         if let Some(storage) = self.provider_storage.read().await.as_ref() {
             storage
                 .client_messages
@@ -401,13 +401,13 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn add_client_message(&self, client_id: NodeID, delay: Delay, sphinx: Sphinx) {
+    pub async fn add_client_message(&self, client_id: NodeID, sphinx: Sphinx) {
         if let Some(storage) = &mut *self.provider_storage.write().await {
             storage
                 .client_messages
                 .entry(client_id)
                 .or_insert(Vec::new())
-                .push((delay, sphinx));
+                .push(sphinx);
         } else {
             panic!("Provider storage not found");
         }
@@ -907,7 +907,7 @@ mod tests {
         );
 
         loopix_storage
-            .add_client_message(NodeID::from(1), Delay::new_from_nanos(1), Sphinx::default())
+            .add_client_message(NodeID::from(1), Sphinx::default())
             .await;
 
         let provider_storage = loopix_storage.provider_storage.read().await;

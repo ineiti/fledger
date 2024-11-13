@@ -113,7 +113,7 @@ impl LoopixCore for Client {
     ) -> (
         NodeID,
         Option<NetworkWrapper>,
-        Option<Vec<(Delay, Sphinx)>>,
+        Option<(NodeID, Vec<Sphinx>)>,
         Option<MessageType>,
     ) {
         if destination != self.get_our_id().await {

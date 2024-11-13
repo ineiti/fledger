@@ -38,7 +38,7 @@ pub trait LoopixCore {
     ) -> (
         NodeID,
         Option<NetworkWrapper>,
-        Option<Vec<(Delay, Sphinx)>>,
+        Option<(NodeID, Vec<Sphinx>)>,
         Option<MessageType>,
     );
     async fn process_forward_hop(
@@ -181,7 +181,7 @@ mod tests {
         ) -> (
             NodeID,
             Option<NetworkWrapper>,
-            Option<Vec<(Delay, Sphinx)>>,
+            Option<(NodeID, Vec<Sphinx>)>,
             Option<MessageType>,
         ) {
             todo!()

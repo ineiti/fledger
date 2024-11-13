@@ -107,7 +107,7 @@ impl LoopixCore for Provider {
     ) -> (
         NodeID,
         Option<NetworkWrapper>,
-        Option<Vec<(Delay, Sphinx)>>,
+        Option<(NodeID, Vec<Sphinx>)>,
         Option<MessageType>,
     ) {
         if destination != self.get_our_id().await {
@@ -186,8 +186,7 @@ impl LoopixCore for Provider {
             let sphinx = &Sphinx {
                 inner: *next_packet,
             };
-            self.store_client_message(next_node, delay, sphinx.clone())
-                .await;
+            self.store_client_message(next_node, sphinx.clone()).await;
 
             (next_node, delay, None)
         } else {
@@ -224,17 +223,15 @@ impl Provider {
         self.get_storage().add_subscribed_client(client_id).await;
     }
 
-    pub async fn get_client_messages(&self, client_id: NodeID) -> Vec<(Delay, Sphinx)> {
+    pub async fn get_client_messages(&self, client_id: NodeID) -> Vec<(Sphinx)> {
         self.get_storage().get_client_messages(client_id).await
     }
 
-    pub async fn store_client_message(&self, client_id: NodeID, delay: Delay, message: Sphinx) {
-        self.get_storage()
-            .add_client_message(client_id, delay, message)
-            .await
+    pub async fn store_client_message(&self, client_id: NodeID, message: Sphinx) {
+        self.get_storage().add_client_message(client_id, message).await
     }
 
-    pub async fn create_dummy_message(&self, client_id: NodeID) -> (Delay, Sphinx) {
+    pub async fn create_dummy_message(&self, client_id: NodeID) -> Sphinx {
         // create route
         let route = self.create_route(0, None, None, Some(client_id)).await;
 
@@ -249,16 +246,14 @@ impl Provider {
         let (_, sphinx) = self.create_sphinx_packet(client_id, msg, &route);
 
         // create delay
-        let mean_delay = Duration::from_millis(self.get_config().mean_delay());
-        let delay = generate_from_average_duration(1, mean_delay);
         self.storage
             .add_sent_message(route, MessageType::Dummy)
             .await;
 
-        (delay[0], sphinx)
+        sphinx
     }
 
-    pub async fn create_pull_reply(&self, client_id: NodeID) -> Vec<(Delay, Sphinx)> {
+    pub async fn create_pull_reply(&self, client_id: NodeID) -> (NodeID, Vec<Sphinx>) {
         // get max send amount and messages
         log::trace!("Creating pull reply for client: {}", client_id);
         let max_retrieve = self.get_config().max_retrieve();
@@ -283,10 +278,10 @@ impl Provider {
 
         // pad vec if not enough messages
         for _ in messages_to_send.len()..max_retrieve {
-            let (delay, sphinx) = self.create_dummy_message(client_id).await;
-            messages_to_send.push((delay, sphinx));
+            let sphinx = self.create_dummy_message(client_id).await;
+            messages_to_send.push(sphinx);
         }
 
-        messages_to_send
+        (client_id, messages_to_send)
     }
 }

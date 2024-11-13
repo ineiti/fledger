@@ -261,7 +261,7 @@ impl LoopixSetup {
             println!("{:<60} {:<20}", "Client ID", "Message Type");
             println!("{:-<80}", "");
             for (client_id, messages) in client_messages {
-                for (_delay, sphinx) in messages {
+                for sphinx in messages {
                     println!("{:<60} {:<20}", format!("{:x}", client_id), format!("{:?}", sphinx));
                 }
             }

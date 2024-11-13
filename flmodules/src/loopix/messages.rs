@@ -102,13 +102,17 @@ impl LoopixMessages {
         }
     }
 
-    pub async fn process_messages(&mut self, msgs: Vec<LoopixIn>) {
+    pub async fn process_messages(&mut self, msgs: Vec<LoopixIn>) -> Vec<(NodeID, Sphinx)> {
+        let mut sphinx_messages: Vec<(NodeID, Sphinx)> = Vec::new();
         for msg in msgs {
-            self.process_message(msg).await;
+            if let Some((node_id, messages)) = self.process_message(msg).await {
+                messages.into_iter().for_each(|s| sphinx_messages.push((node_id, s)));
+            }
         }
+        sphinx_messages
     }
 
-    async fn process_message(&self, msg: LoopixIn) {
+    async fn process_message(&self, msg: LoopixIn) -> Option<(NodeID, Vec<Sphinx>)> {
         match msg {
             LoopixIn::OverlayRequest(node_id, message) => {
                 log::trace!(
@@ -117,7 +121,8 @@ impl LoopixMessages {
                     node_id,
                     message
                 );
-                self.process_overlay_message(node_id, message).await
+                self.process_overlay_message(node_id, message).await;
+                None
             }
             LoopixIn::SphinxFromNetwork(node_id, sphinx) => {
                 log::trace!(
@@ -181,7 +186,7 @@ impl LoopixMessages {
             .expect("while sending overlay message to network");
     }
 
-    async fn process_sphinx_packet(&self, node_id: NodeID, sphinx_packet: Sphinx) {
+    async fn process_sphinx_packet(&self, node_id: NodeID, sphinx_packet: Sphinx) -> Option<(NodeID, Vec<Sphinx>)> {
         let processed = self.role.process_sphinx_packet(sphinx_packet.clone()).await;
         match processed {
             ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
@@ -210,6 +215,7 @@ impl LoopixMessages {
                 } else {
                     log::debug!("No message to forward to {}", next_node_id);
                 }
+                None
             }
             ProcessedPacket::FinalHop(destination, surb_id, payload) => {
                 log::trace!(
@@ -241,19 +247,15 @@ impl LoopixMessages {
                         .await
                         .expect("while sending message");
                 }
-                if let Some(messages) = messages {
+                if let Some((node_id, messages)) = messages {
                     log::debug!(
                         "Final hop was a pull request: {} -> {}",
-                        source,
-                        dest
+                        node_id,
+                        messages.len()
                     );
-                    log::debug!("Sending {} messages back to {}", messages.len(), source);
-                    for (delay, sphinx) in messages {
-                        self.network_sender
-                            .send((source, delay, sphinx))
-                            .await
-                            .expect("while sending message");
-                    }
+                    Some((node_id, messages))
+                } else {
+                    None
                 }
             }
         }
@@ -317,7 +319,7 @@ impl LoopixCore for NodeType {
     ) -> (
         NodeID,
         Option<NetworkWrapper>,
-        Option<Vec<(Delay, Sphinx)>>,
+        Option<(NodeID, Vec<Sphinx>)>,
         Option<MessageType>,
     ) {
         match self {

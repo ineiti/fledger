@@ -372,7 +372,12 @@ impl SubsystemHandler<LoopixMessage> for LoopixTranslate {
     async fn messages(&mut self, msgs: Vec<LoopixMessage>) -> Vec<LoopixMessage> {
         for msg in msgs {
             if let LoopixMessage::Input(input) = msg {
-                self.loopix_messages.process_messages(vec![input]).await;
+                let sphinx_messages = self.loopix_messages.process_messages(vec![input]).await;
+                let mut messages = Vec::new();
+                for (node_id, sphinx) in sphinx_messages {  
+                    messages.push(LoopixMessage::Output(LoopixOut::SphinxToNetwork(node_id, sphinx)));
+                }
+                return messages;
             }
         }
         vec![]
