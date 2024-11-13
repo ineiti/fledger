@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use flarch::nodeids::NodeID;
 use sphinx_packet::route::{NodeAddressBytes, DestinationAddressBytes};
 use x25519_dalek::PublicKey;
+use sha2::{Sha256, Digest};
 
 #[derive(Serialize, Deserialize)]
 pub struct Sphinx {
@@ -24,7 +25,11 @@ impl Default for Sphinx {
 
 impl std::fmt::Debug for Sphinx {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&serde_json::to_string(&self).unwrap())
+        let serialized = serde_json::to_string(&self).unwrap();
+        let mut hasher = Sha256::new();
+        hasher.update(serialized);
+        let hash_result = hasher.finalize();
+        write!(f, "{:x}", hash_result)
     }
 }
 

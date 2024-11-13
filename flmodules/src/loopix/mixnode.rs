@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::loopix::broker::MODULE_NAME;
 
 use crate::loopix::{
@@ -14,15 +16,15 @@ use sphinx_packet::{header::delays::Delay, packet::*};
 
 use crate::overlay::messages::NetworkWrapper;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Mixnode {
-    storage: LoopixStorage,
+    storage: Arc<LoopixStorage>,
     config: CoreConfig,
 }
 
 #[async_trait]
 impl LoopixCore for Mixnode {
-    fn get_storage(&self) -> &LoopixStorage {
+    fn get_storage(&self) -> &Arc<LoopixStorage> {
         &self.storage
     }
 
@@ -112,6 +114,7 @@ impl LoopixCore for Mixnode {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(our_id, msg, &route);
+        self.storage.add_sent_message(route, MessageType::Loop).await;
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
@@ -137,12 +140,22 @@ impl LoopixCore for Mixnode {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
+        self.storage.add_sent_message(route, MessageType::Drop).await;
         (node_id_from_node_address(next_node.address), sphinx)
     }
 }
 
 impl Mixnode {
-    pub fn new(storage: LoopixStorage, config: CoreConfig) -> Self {
+    pub fn new(storage: Arc<LoopixStorage>, config: CoreConfig) -> Self {
         Self { storage, config }
+    }
+
+    pub async fn async_clone(&self) -> Self {
+        let storage_clone = Arc::new(self.storage.async_clone().await);
+
+        Mixnode {
+            storage: storage_clone,
+            config: self.config.clone(),
+        }
     }
 }

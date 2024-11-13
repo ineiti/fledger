@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::overlay::messages::NetworkWrapper;
@@ -16,9 +17,9 @@ use sphinx_packet::SphinxPacket;
 
 use super::sphinx::node_id_from_node_address;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Provider {
-    storage: LoopixStorage,
+    storage: Arc<LoopixStorage>,
     config: CoreConfig,
 }
 
@@ -28,7 +29,7 @@ impl LoopixCore for Provider {
         &self.config
     }
 
-    fn get_storage(&self) -> &LoopixStorage {
+    fn get_storage(&self) -> &Arc<LoopixStorage> {
         &self.storage
     }
 
@@ -64,6 +65,7 @@ impl LoopixCore for Provider {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(our_id, msg, &route);
+        self.storage.add_sent_message(route, MessageType::Loop).await;
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
@@ -90,6 +92,7 @@ impl LoopixCore for Provider {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
+        self.storage.add_sent_message(route, MessageType::Drop).await;
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
@@ -165,8 +168,17 @@ impl LoopixCore for Provider {
 }
 
 impl Provider {
-    pub fn new(storage: LoopixStorage, config: CoreConfig) -> Self {
+    pub fn new(storage: Arc<LoopixStorage>, config: CoreConfig) -> Self {
         Self { storage, config }
+    }
+
+    pub async fn async_clone(&self) -> Self {
+        let storage_clone = Arc::new(self.storage.async_clone().await);
+
+        Provider {
+            storage: storage_clone,
+            config: self.config.clone(),
+        }
     }
 
     pub async fn subscribe_client(&self, client_id: NodeID) {
@@ -200,6 +212,7 @@ impl Provider {
         // create delay
         let mean_delay = Duration::from_secs_f64(self.get_config().mean_delay());
         let delay = generate_from_average_duration(1, mean_delay);
+        self.storage.add_sent_message(route, MessageType::Dummy).await;
 
         (delay[0], sphinx)
     }

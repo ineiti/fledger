@@ -1,6 +1,6 @@
 use flarch::nodeids::NodeID;
 use sphinx_packet::header::delays::Delay;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use flarch::{
@@ -20,20 +20,21 @@ use super::{
     messages::{LoopixIn, LoopixMessage, LoopixMessages, LoopixOut, NodeType},
     mixnode::Mixnode,
     provider::Provider,
-    sphinx::Sphinx,
+    sphinx::Sphinx, storage::LoopixStorage,
 };
 
 pub const MODULE_NAME: &str = "Loopix";
 
 pub struct LoopixBroker {
     pub broker: Broker<LoopixMessage>,
+    pub storage: Arc<LoopixStorage>,
 }
 
 impl LoopixBroker {
     pub async fn start(
         network: Broker<NetworkMessage>,
         config: LoopixConfig,
-    ) -> Result<Broker<LoopixMessage>, BrokerError> {
+    ) -> Result<LoopixBroker, BrokerError> {
         let mut broker = Broker::new();
 
         broker
@@ -44,15 +45,17 @@ impl LoopixBroker {
             )
             .await?;
 
+        let storage = Arc::new(config.storage_config);
+
         let node_type = match config.role {
             LoopixRole::Client => {
-                NodeType::Client(Client::new(config.storage_config, config.core_config))
+                NodeType::Client(Client::new(Arc::clone(&storage), config.core_config))
             }
             LoopixRole::Provider => {
-                NodeType::Provider(Provider::new(config.storage_config, config.core_config))
+                NodeType::Provider(Provider::new(Arc::clone(&storage), config.core_config))
             }
             LoopixRole::Mixnode => {
-                NodeType::Mixnode(Mixnode::new(config.storage_config, config.core_config))
+                NodeType::Mixnode(Mixnode::new(Arc::clone(&storage), config.core_config))
             }
         };
 
@@ -104,7 +107,7 @@ impl LoopixBroker {
             .emit_msg(LoopixOut::NodeInfosConnected(node_infos).into())
             .unwrap();
 
-        Ok(broker)
+        Ok(LoopixBroker { broker, storage: Arc::clone(&storage) })
     }
 
     fn from_network(msg: NetworkMessage) -> Option<LoopixMessage> {
@@ -128,6 +131,8 @@ impl LoopixBroker {
         let wait_before_send =
             Duration::from_secs_f64(60.0 / loopix_messages.role.get_config().lambda_loop());
 
+        log::debug!("Loop message rate: {:?}", wait_before_send);
+
         tokio::spawn(async move {
             loop {
                 tokio::time::sleep(wait_before_send).await;
@@ -139,6 +144,8 @@ impl LoopixBroker {
     pub fn start_drop_message_thread(loopix_messages: LoopixMessages) {
         let wait_before_send =
             Duration::from_secs_f64(60.0 / loopix_messages.role.get_config().lambda_drop());
+
+        log::debug!("Drop message rate: {:?}", wait_before_send);
 
         tokio::spawn(async move {
             loop {
@@ -174,7 +181,7 @@ impl LoopixBroker {
             let mut sphinx_messages: Vec<(NodeID, Duration, Sphinx)> = Vec::new();
             let wait_before_send = match loopix_messages.role {
                 NodeType::Client(_) => {
-                    log::trace!(
+                    log::debug!(
                         "this is wait before send {}",
                         60.0 / loopix_messages.role.get_config().lambda_payload()
                     );
@@ -183,7 +190,7 @@ impl LoopixBroker {
                     )
                 }
                 NodeType::Provider(_) | NodeType::Mixnode(_) => {
-                    log::trace!(
+                    log::debug!(
                         "this is wait before send {}",
                         60.0 / loopix_messages.role.get_config().lambda_loop_mix()
                     );
@@ -194,7 +201,7 @@ impl LoopixBroker {
             };
 
             loop {
-                log::trace!(
+                log::debug!(
                     "Started network send thread with {:?} rate!",
                     wait_before_send
                 );
@@ -247,8 +254,10 @@ impl LoopixBroker {
         let pull_request_rate =
             Duration::from_secs_f64(loopix_messages.role.get_config().time_pull());
 
+        log::debug!("Subscribe request rate: {:?}", pull_request_rate);
+
         tokio::spawn(async move {
-            loop {
+            // loop { TODO uncomment
                 // subscribe message
                 let (node_id, sphinx) = loopix_messages.create_subscribe_message().await;
 
@@ -260,13 +269,15 @@ impl LoopixBroker {
 
                 // wait
                 tokio::time::sleep(pull_request_rate).await;
-            }
+            // }
         });
     }
 
     pub fn client_pull_loop(loopix_messages: LoopixMessages, mut network: Broker<NetworkMessage>) {
         let pull_request_rate =
             Duration::from_secs_f64(loopix_messages.role.get_config().time_pull());
+
+        log::debug!("Pull request rate: {:?}", pull_request_rate);
 
         tokio::spawn(async move {
             loop {
@@ -320,7 +331,7 @@ mod tests {
     use tokio::time::{timeout, Duration};
 
     async fn setup_network(
-    ) -> Result<(Broker<LoopixMessage>, LoopixStorage, Broker<NetworkMessage>), BrokerError> {
+    ) -> Result<(Broker<LoopixMessage>, Arc<LoopixStorage>, Broker<NetworkMessage>), BrokerError> {
         start_logging_filter_level(vec![], log::LevelFilter::Trace);
 
         let path_length = 2;
@@ -348,11 +359,10 @@ mod tests {
             .await;
 
         let network = Broker::<NetworkMessage>::new();
-        let loopix_storage = config.storage_config.arc_clone();
 
         let loopix_broker = LoopixBroker::start(network.clone(), config).await?;
 
-        Ok((loopix_broker, loopix_storage, network))
+        Ok((loopix_broker.broker, Arc::clone(&loopix_broker.storage), network))
     }
 
     #[tokio::test]

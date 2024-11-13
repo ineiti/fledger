@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::time::Duration;
+use std::fmt;
 
 use async_trait::async_trait;
 use sphinx_packet::header::delays::generate_from_average_duration;
@@ -44,6 +45,24 @@ pub enum MessageType {
     Dummy,
     PullRequest(NodeID),
     SubscriptionRequest(NodeID),
+}
+
+impl fmt::Display for MessageType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MessageType::Payload(node_id, payload) => write!(f, "Payload({}, {:?})", format_node_id(node_id), payload),
+            MessageType::Drop => write!(f, "Drop"),
+            MessageType::Loop => write!(f, "Loop"),
+            MessageType::Dummy => write!(f, "Dummy"),
+            MessageType::PullRequest(node_id) => write!(f, "PullRequest({})", format_node_id(node_id)),
+            MessageType::SubscriptionRequest(node_id) => write!(f, "SubscriptionRequest({})", format_node_id(node_id)),
+        }
+    }
+}
+
+pub fn format_node_id(node_id: &NodeID) -> String {
+    let full_id = node_id.to_string();
+    full_id.split('-').next().unwrap_or("").to_string()
 }
 
 #[derive(Debug, Clone)]
@@ -212,7 +231,7 @@ impl LoopixCore for NodeType {
         }
     }
 
-    fn get_storage(&self) -> &LoopixStorage {
+    fn get_storage(&self) -> &Arc<LoopixStorage> {
         match self {
             NodeType::Client(client) => client.get_storage(),
             NodeType::Mixnode(mixnode) => mixnode.get_storage(),
@@ -272,43 +291,21 @@ impl LoopixCore for NodeType {
 }
 
 impl NodeType {
-    /// Clones the arc of the storage and creates a new NodeType
     pub fn arc_clone(&self) -> Self {
         match self {
             NodeType::Client(client) => {
                 let storage = client.get_storage();
-                let network_storage = Arc::clone(&storage.network_storage);
-                let client_storage = Arc::clone(&storage.client_storage);
-                let provider_storage = Arc::clone(&storage.provider_storage);
-                let loopix_storage = LoopixStorage {
-                    network_storage,
-                    client_storage,
-                    provider_storage,
-                };
+                let loopix_storage = Arc::clone(&storage);
                 NodeType::Client(Client::new(loopix_storage, client.get_config().clone()))
             }
             NodeType::Mixnode(mixnode) => {
                 let storage = mixnode.get_storage();
-                let network_storage = Arc::clone(&storage.network_storage);
-                let client_storage = Arc::clone(&storage.client_storage);
-                let provider_storage = Arc::clone(&storage.provider_storage);
-                let loopix_storage = LoopixStorage {
-                    network_storage,
-                    client_storage,
-                    provider_storage,
-                };
+                let loopix_storage = Arc::clone(&storage);
                 NodeType::Mixnode(Mixnode::new(loopix_storage, mixnode.get_config().clone()))
             }
             NodeType::Provider(provider) => {
                 let storage = provider.get_storage();
-                let network_storage = Arc::clone(&storage.network_storage);
-                let client_storage = Arc::clone(&storage.client_storage);
-                let provider_storage = Arc::clone(&storage.provider_storage);
-                let loopix_storage = LoopixStorage {
-                    network_storage,
-                    client_storage,
-                    provider_storage,
-                };
+                let loopix_storage = Arc::clone(&storage);
                 NodeType::Provider(Provider::new(loopix_storage, provider.get_config().clone()))
             }
         }

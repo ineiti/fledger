@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, sync::Arc};
 
 use flarch::{start_logging, tasks::now};
 mod helpers;
@@ -61,7 +61,8 @@ async fn proxy_nodes_n(path_length: usize) -> Result<(), Box<dyn Error>> {
         let config = setup
             .get_config(*id, flmodules::loopix::config::LoopixRole::Client)
             .await?;
-        v.node.loopix = Some(LoopixBroker::start(v.node.broker_net.clone(), config).await?);
+        let loopix_broker = LoopixBroker::start(v.node.broker_net.clone(), config).await?;
+        v.node.loopix = Some(loopix_broker.broker);
         //
         // v.node.webproxy = Some(WebProxy::start(v.node.storage, *id, OverlayLoopix::start(v.node.loopix.unwrap().clone()), WebProxyConfig::default()).await?);
     }

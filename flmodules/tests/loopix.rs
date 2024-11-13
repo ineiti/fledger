@@ -81,7 +81,7 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn test_loopix_tiny() -> Result<(), Box<dyn Error>> {
-    start_logging_filter_level(vec![], log::LevelFilter::Debug);
+    start_logging_filter_level(vec![], log::LevelFilter::Trace);
 
     let mut loopix_setup = LoopixSetup::new(2).await?;
     let mut network = NetworkSimul::new();
@@ -91,37 +91,27 @@ async fn test_loopix_tiny() -> Result<(), Box<dyn Error>> {
 
     let stop = network.process_loop();
 
-    if true {
-        // Send a message from a client node to a provider:
-        let id_dst = loopix_setup.clients[1].config.info.get_id();
-        loopix_setup.clients[0]
-            .overlay
-            .emit_msg(OverlayMessage::Input(OverlayIn::NetworkWrapperToNetwork(
-                id_dst,
-                NetworkWrapper::wrap_yaml(
-                    "Test",
-                    &TestMessage {
-                        field: "secret message".into(),
-                    },
-                )?,
-            )))?;
+    // Send a message from a client node to a provider:
+    let id_dst = loopix_setup.clients[1].config.info.get_id();
+    loopix_setup.clients[0]
+        .overlay
+        .emit_msg(OverlayMessage::Input(OverlayIn::NetworkWrapperToNetwork(
+            id_dst,
+            NetworkWrapper::wrap_yaml(
+                "Test",
+                &TestMessage {
+                    field: "secret message".into(),
+                },
+            )?,
+        )))?;
 
-        tokio::time::sleep(Duration::from_secs(15)).await;
-
-        // let received_messages = loopix_setup.clients[1].storage.get_received_messages().await;
-        // for (source, dest, message_type) in received_messages {
-        //     println!("Received message from {} to {} with type {:?}", source, dest, message_type);
-        // }
-
-        // let forwarded_messages = loopix_setup.clients[1].storage.get_forwarded_messages().await;
-        // for (source, dest) in forwarded_messages {
-        //     println!("Forwarded message from {} to {}", source, dest);
-        // }
-
-    }
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     // Quit the tokio-thread
     stop.send(true).ok();
+
+    loopix_setup.print_all_messages().await;
+
     Ok(())
 }
 

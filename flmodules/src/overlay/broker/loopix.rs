@@ -61,6 +61,7 @@ impl OverlayLoopix {
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
     use std::time::Duration;
 
     use flarch::{nodeids::NodeID, start_logging_filter_level};
@@ -75,7 +76,7 @@ mod test {
     use super::*;
     use crate::loopix::testing::LoopixSetup;
 
-    async fn setup_network() -> Result<(Broker<LoopixMessage>, LoopixStorage, Broker<NetworkMessage>), BrokerError> {
+    async fn setup_network() -> Result<(Broker<LoopixMessage>, Arc<LoopixStorage>, Broker<NetworkMessage>), BrokerError> {
         let path_length = 2;
         
         let (all_nodes, node_public_keys, loopix_key_pairs, _) = LoopixSetup::create_nodes_and_keys(path_length);
@@ -100,11 +101,10 @@ mod test {
             .await;
 
         let network = Broker::<NetworkMessage>::new();
-        let loopix_storage = config.storage_config.arc_clone();
         
         let loopix_broker = LoopixBroker::start(network.clone(), config).await?;
 
-        Ok((loopix_broker, loopix_storage, network))
+        Ok((loopix_broker.broker, Arc::clone(&loopix_broker.storage), network))
     }
 
     fn _check_msgs(msgs: Vec<OverlayMessage>, available: &[NodeInfo], connected: &[NodeInfo]) {
@@ -165,15 +165,44 @@ mod test {
 
         // Verify the message was processed and sent to the network
         let (mut tap, _) = network.clone().get_tap().await?;
-        if let Ok(Some(NetworkMessage::Input(NetworkIn::MessageToNode(node_id, msg)))) =
+        if let Ok(Some(NetworkMessage::Input(NetworkIn::MessageToNode(node_id, _msg)))) =
             timeout(Duration::from_secs(10), tap.recv()).await
         {
             let provider = storage.get_our_provider().await.unwrap();
-            log::info!("Received message from network: {:?} to node: {:?}", msg, node_id);
-            log::info!("Provider: {:?}", provider);
+            // log::info!("Received message from network: {:?} to node: {:?}", msg, node_id);
+            // log::info!("Provider: {:?}", provider);
             assert_eq!(node_id, provider);
         } else {
             panic!("Message not processed by LoopixBroker");
+        }
+
+        let received_messages = storage.get_received_messages().await;
+        log::info!("Received messages: {:?}", received_messages.len());
+        for (source, dest, message_type) in received_messages {
+            log::info!("Received message from {} to {} with type {:?}", source, dest, message_type);
+        }
+    
+        let forwarded_messages = storage.get_forwarded_messages().await;
+        log::info!("Forwarded messages: {:?}", forwarded_messages.len());
+        for (source, dest) in forwarded_messages {
+            log::info!("Forwarded message from {} to {}", source, dest);
+        }
+
+        let sent_messages = storage.get_sent_messages().await;
+        log::info!("Sent messages: {:?}", sent_messages.len());
+
+        println!("{:<60} {:<20}", "Route", "Message Type");
+        println!("{:-<80}", "");
+
+        for (route, message_type) in sent_messages {
+            let route_str = format!("{:?}", route);
+            let short_route: Vec<String> = route_str
+                .trim_matches(|c| c == '[' || c == ']')
+                .split(", ")
+                .map(|node_id| node_id.split('-').next().unwrap_or(node_id).to_string())
+                .collect();
+            let formatted_route = format!("[{}]", short_route.join(", "));
+            println!("{:<60} {:<20}", formatted_route, format!("{:?}", message_type));
         }
 
         Ok(())

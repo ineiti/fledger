@@ -1,10 +1,10 @@
-use std::{collections::HashMap, ops::Range};
+use std::{collections::HashMap, ops::Range, sync::Arc};
 
 use crate::{
     loopix::{
         broker::LoopixBroker,
         config::{LoopixConfig, LoopixRole},
-        messages::LoopixMessage,
+        messages::{LoopixMessage, format_node_id},
         storage::LoopixStorage,
     },
     network::messages::{NetworkIn, NetworkMessage, NetworkOut},
@@ -40,15 +40,18 @@ pub struct LoopixNode {
     pub overlay: Broker<OverlayMessage>,
     // This one should not be used from the outside.
     pub loopix: Broker<LoopixMessage>,
+    pub storage: Arc<LoopixStorage>,
 }
 
 impl LoopixNode {
     pub async fn new(loopix_cfg: LoopixConfig, config: NodeConfig) -> Result<Self, BrokerError> {
         let net = Broker::new();
-        let loopix = LoopixBroker::start(net.clone(), loopix_cfg).await?;
-        let overlay = OverlayLoopix::start(loopix.clone()).await?;
+        let loopix_broker = LoopixBroker::start(net.clone(), loopix_cfg).await?;
+
+        let overlay = OverlayLoopix::start(loopix_broker.broker.clone()).await?;
         Ok(Self {
-            loopix,
+            loopix: loopix_broker.broker,
+            storage: loopix_broker.storage,
             config,
             net,
             overlay,
@@ -174,6 +177,71 @@ impl LoopixSetup {
 
         Ok(config)
     }
+
+    pub async fn print_all_messages(&self) {
+        for node in self.clients.iter() {
+            self.print_node_messages(node, "Client").await;
+        }
+        for node in self.mixers.iter() {
+            self.print_node_messages(node, "Mixer").await;
+        }
+        for node in self.providers.iter() {
+            self.print_node_messages(node, "Provider").await;
+        }
+    }
+
+    async fn print_node_messages(&self, node: &LoopixNode, role: &str) {
+        println!();
+        println!();
+        
+        let node_id = node.config.info.get_id();
+        let formatted_node_id = format_node_id(&node_id);
+        log::info!("Node: {formatted_node_id} ({role})");
+
+        let received_messages = node.storage.get_received_messages().await;
+        log::info!("Received messages: {:?}", received_messages.len());
+
+        let forwarded_messages = node.storage.get_forwarded_messages().await;
+        log::info!("Forwarded messages: {:?}", forwarded_messages.len());
+
+        let sent_messages = node.storage.get_sent_messages().await;
+        log::info!("Sent messages: {:?}", sent_messages.len());
+
+        println!();
+        println!("{formatted_node_id} with {role} role:");
+
+        println!("\nForwarded Messages:");
+        println!("{:<60} {:<20}", "From -> To", "Message Type");
+        println!("{:-<80}", "");
+
+        for (from, to) in forwarded_messages {
+            let formatted_from = format_node_id(&from);
+            let formatted_to = format_node_id(&to);
+            println!("{:<60} {:<20}", format!("{formatted_from} -> {formatted_to}"), "N/A");
+        }
+
+        println!("\nReceived Messages:");
+        println!("{:<60} {:<20}", "Origin -> Relayed By", "Message Type");
+        println!("{:-<80}", "");
+
+        for (origin, relay, message_type) in received_messages {
+            let formatted_origin = format_node_id(&origin);
+            let formatted_relay = format_node_id(&relay);
+            println!("{:<60} {:<20}", format!("{formatted_origin} -> {formatted_relay}"), format!("{}", message_type));
+        }
+
+        println!("\nSent Messages:");
+        println!("{:<60} {:<20}", "Route", "Message Type");
+        println!("{:-<80}", "");
+        for (route, message_type) in sent_messages {
+            let short_route: Vec<String> = route
+                .iter()
+                .map(|node_id| format_node_id(node_id))
+                .collect();
+            let formatted_route = format!("[{}]", short_route.join(", "));
+            println!("{:<60} {:<20}", formatted_route, format!("{}", message_type));
+        }
+    }
 }
 
 /**
@@ -247,6 +315,7 @@ impl NetworkSimul {
         });
         tx
     }
+
 }
 
 /**

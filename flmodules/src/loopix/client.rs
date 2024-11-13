@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::loopix::config::CoreConfig;
 use crate::loopix::core::LoopixCore;
 use crate::loopix::storage::LoopixStorage;
@@ -12,15 +14,16 @@ use sphinx_packet::header::delays::Delay;
 use sphinx_packet::payload::Payload;
 use sphinx_packet::SphinxPacket;
 
-#[derive(Debug, Clone, PartialEq)]
+
+#[derive(Debug, PartialEq)]
 pub struct Client {
-    storage: LoopixStorage,
+    storage: Arc<LoopixStorage>,
     config: CoreConfig,
 }
 
 impl Client {
-    pub fn new(storage: LoopixStorage, config: CoreConfig) -> Self {
-        Client { storage, config }
+    pub fn new(storage: Arc<LoopixStorage>, config: CoreConfig) -> Self {
+        Client {storage, config }
     }
 }
 
@@ -30,7 +33,7 @@ impl LoopixCore for Client {
         &self.config
     }
 
-    fn get_storage(&self) -> &LoopixStorage {
+    fn get_storage(&self) -> &Arc<LoopixStorage> {
         &self.storage
     }
 
@@ -64,6 +67,7 @@ impl LoopixCore for Client {
         // create sphinx packet
         let our_provider = self.get_our_provider().await.unwrap();
         let (_, sphinx) = self.create_sphinx_packet(our_provider, msg, &route);
+        self.storage.add_sent_message(route, MessageType::Loop).await;
         (our_provider, sphinx)
     }
 
@@ -94,6 +98,7 @@ impl LoopixCore for Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
+        self.storage.add_sent_message(route, MessageType::Drop).await;
         (random_provider, sphinx)
     }
 
@@ -152,6 +157,15 @@ impl LoopixCore for Client {
 }
 
 impl Client {
+    pub async fn async_clone(&self) -> Self {
+        let storage_clone = Arc::new(self.storage.async_clone().await);
+
+        Client {
+            storage: storage_clone,
+            config: self.config.clone(),
+        }
+    }
+
     pub async fn register_provider(&mut self, provider: NodeID) {
         // get IDs
         let our_id = self.get_storage().get_our_id().await;
@@ -195,6 +209,7 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(provider, msg, &route);
+        self.storage.add_sent_message(route, MessageType::PullRequest(our_id)).await;
         (provider, Some(sphinx))
     }
 
@@ -222,6 +237,7 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(provider, msg, &route);
+        self.storage.add_sent_message(route, MessageType::SubscriptionRequest(our_id)).await;
         (provider, sphinx)
     }
 
@@ -263,7 +279,7 @@ impl Client {
             .await;
 
         // create payload message
-        let payload_msg = serde_yaml::to_string(&MessageType::Payload(our_id, msg)).unwrap();
+        let payload_msg = serde_yaml::to_string(&MessageType::Payload(our_id, msg.clone())).unwrap();
         let network_msg = NetworkWrapper {
             module: MODULE_NAME.into(),
             msg: payload_msg,
@@ -271,6 +287,7 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(destination, network_msg, &route);
+        self.storage.add_sent_message(route, MessageType::Payload(our_id, msg)).await;
         (our_provider.unwrap(), sphinx)
     }
 
@@ -278,6 +295,9 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
+    use ed25519_compact::KeyPair;
+    use ed25519_compact::Seed;
+
     use crate::loopix::config::LoopixConfig;
     use crate::loopix::config::LoopixRole;
     use crate::loopix::testing::LoopixSetup;
@@ -309,7 +329,7 @@ mod tests {
             .await;
 
         (
-            Client::new(config.storage_config, config.core_config),
+            Client::new(Arc::new(config.storage_config), config.core_config),
             all_nodes.clone(),
             path_length,
         )
@@ -337,4 +357,28 @@ mod tests {
             Some(new_provider)
         );
     }
+
+    #[tokio::test]
+    async fn test_deep_clone_storage() {
+        let (client1, _, _) = setup().await;
+    
+        let client2: Client = client1.async_clone().await;
+
+        let keypair = KeyPair::from_seed(Seed::default());
+        client1
+            .get_storage()
+            .add_client_in_network(NodeInfo::new(keypair.pk))
+            .await;
+    
+        let ptr1 = Arc::as_ptr(&client1.get_storage());
+        let ptr2 = Arc::as_ptr(&client2.get_storage());
+    
+        assert_ne!(
+            ptr1, ptr2,
+            "The cloned client's storage should not point to the same memory address as the original"
+        );
+    }
+    
+    
+    
 }

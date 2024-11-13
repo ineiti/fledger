@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use rand::seq::IteratorRandom;
-use sphinx_packet::header::delays::Delay;
+use sphinx_packet::{header::delays::Delay, route::Node};
 use x25519_dalek::{PublicKey, StaticSecret};
 use tokio::sync::RwLock;
 use std::sync::Arc;
@@ -9,7 +9,7 @@ use crate::{loopix::sphinx::Sphinx, nodeconfig::NodeInfo};
 use flarch::nodeids::NodeID;
 use serde::{Deserialize, Serialize};
 
-use super::messages::MessageType;
+use super::{messages::MessageType, sphinx::node_id_from_node_address};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum LoopixStorageSave {
@@ -48,8 +48,13 @@ pub struct NetworkStorage {
         deserialize_with = "deserialize_node_public_keys"
     )]
     node_public_keys: HashMap<NodeID, PublicKey>,
-    forwarded_messages: Vec<(NodeID, NodeID)>,
-    received_messages: Vec<(NodeID, NodeID, MessageType)> // origin, relayed by, Message
+
+    #[serde(skip)]
+    forwarded_messages: Vec<(NodeID, NodeID)>, // from, to
+    #[serde(skip)]
+    received_messages: Vec<(NodeID, NodeID, MessageType)>, // origin, relayed by, Message
+    #[serde(skip)]
+    sent_messages: Vec<(Vec<NodeID>, MessageType)>, // route and the message
 }
 
 impl NetworkStorage {
@@ -148,6 +153,18 @@ impl LoopixStorage {
         serde_yaml::to_string::<LoopixStorageSave>(&LoopixStorageSave::V1((*self).clone()))
     }
 
+    pub async fn async_clone(&self) -> Self {
+        let network_storage = self.network_storage.read().await.clone();
+        let client_storage = self.client_storage.read().await.clone();
+        let provider_storage = self.provider_storage.read().await.clone();
+
+        LoopixStorage {
+            network_storage: Arc::new(tokio::sync::RwLock::new(network_storage)),
+            client_storage: Arc::new(tokio::sync::RwLock::new(client_storage)),
+            provider_storage: Arc::new(tokio::sync::RwLock::new(provider_storage)),
+        }
+    }
+
     pub async fn get_random_provider(&self) -> NodeID {
         let storage = self.network_storage.read().await;
         if storage.providers.is_empty() {
@@ -207,6 +224,18 @@ impl LoopixStorage {
     pub async fn add_received_messages(&self, new_messages: Vec<(NodeID, NodeID, MessageType)>) {
         self.network_storage.write().await.received_messages.extend(new_messages);
     }
+
+    pub async fn get_sent_messages(&self) -> Vec<(Vec<NodeID>, MessageType)> {
+        self.network_storage.read().await.sent_messages.clone()
+    }
+
+    pub async fn add_sent_message(&self, route: Vec<Node>, message_type: MessageType) {
+        let route_ids: Vec<NodeID> = route
+            .iter()
+            .map(|node| node_id_from_node_address(node.address))
+            .collect();
+        self.network_storage.write().await.sent_messages.push((route_ids, message_type));
+    }   
 
     pub async fn get_our_provider(&self) -> Option<NodeID> {
         if let Some(storage) = self.client_storage.read().await.as_ref() {
@@ -381,6 +410,7 @@ impl Default for LoopixStorage {
                 node_public_keys: HashMap::new(),
                 forwarded_messages: Vec::new(),
                 received_messages: Vec::new(),
+                sent_messages: Vec::new(),
             })),
             client_storage: Arc::new(RwLock::new(Option::None)),
             provider_storage: Arc::new(RwLock::new(Option::None)),
@@ -409,25 +439,10 @@ impl LoopixStorage {
                 node_public_keys,
                 forwarded_messages: Vec::new(),
                 received_messages: Vec::new(),
+                sent_messages: Vec::new(),
             })),
             client_storage: Arc::new(RwLock::new(client_storage)),
             provider_storage: Arc::new(RwLock::new(provider_storage)),
-        }
-    }
-
-    pub fn arc_clone(&self) -> Self {
-        LoopixStorage {
-            network_storage: Arc::clone(&self.network_storage),
-            client_storage: Arc::clone(&self.client_storage),
-            provider_storage: Arc::clone(&self.provider_storage),
-        }
-    }
-
-    pub async fn arc_clone_async(&self) -> Self {
-        LoopixStorage {
-            network_storage: Arc::clone(&self.network_storage),
-            client_storage: Arc::clone(&self.client_storage),
-            provider_storage: Arc::clone(&self.provider_storage),
         }
     }
 
@@ -450,6 +465,7 @@ impl LoopixStorage {
                 node_public_keys,
                 forwarded_messages: Vec::new(),
                 received_messages: Vec::new(),
+                sent_messages: Vec::new(),
             })),
             client_storage: Arc::new(RwLock::new(client_storage)),
             provider_storage: Arc::new(RwLock::new(provider_storage)),
@@ -509,6 +525,7 @@ impl LoopixStorage {
                 node_public_keys: HashMap::new(),
                 forwarded_messages: Vec::new(),
                 received_messages: Vec::new(),
+                sent_messages: Vec::new(),
             })),
             client_storage: Arc::new(RwLock::new(client_storage)),
             provider_storage: Arc::new(RwLock::new(provider_storage)),

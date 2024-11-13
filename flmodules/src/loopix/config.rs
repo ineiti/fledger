@@ -132,7 +132,7 @@ impl CoreConfig {
             path_length,
             mean_delay: 0.001, // mean delay (1ms)
             lambda_loop_mix: 10.0, // loop mix rate (10 times per minute)
-            time_pull: 3.0, // time pull (3 second)
+            time_pull: 0.0, // time pull (3 second)
             max_retrieve: 0, // messages sent to client per pull request
             pad_length: 150, // dummy, drop, loop messages are padded
         }
@@ -160,7 +160,7 @@ impl CoreConfig {
             path_length,
             mean_delay: 0.001,
             lambda_loop_mix: 0.0,
-            time_pull: 0.0,
+            time_pull: 3.0,
             max_retrieve: 0,
             pad_length: 150,
         }

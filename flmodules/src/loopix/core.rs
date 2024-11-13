@@ -10,6 +10,7 @@ use std::time::Duration;
 use crate::loopix::config::CoreConfig;
 use crate::loopix::sphinx::{destination_address_from_node_id, Sphinx};
 use crate::loopix::storage::LoopixStorage;
+use std::sync::Arc;
 
 use rand::prelude::SliceRandom;
 
@@ -18,7 +19,7 @@ use super::messages::MessageType;
 #[async_trait]
 pub trait LoopixCore {
     fn get_config(&self) -> &CoreConfig;
-    fn get_storage(&self) -> &LoopixStorage;
+    fn get_storage(&self) -> &Arc<LoopixStorage>;
     async fn get_our_id(&self) -> NodeID;
 
     async fn process_sphinx_packet(&self, sphinx_packet: Sphinx) -> ProcessedPacket {
@@ -132,7 +133,7 @@ mod tests {
 
     struct MockLoopixCore {
         config: CoreConfig,
-        storage: LoopixStorage,
+        storage: Arc<LoopixStorage>,
     }
 
     #[async_trait]
@@ -141,7 +142,7 @@ mod tests {
             &self.config
         }
 
-        fn get_storage(&self) -> &LoopixStorage {
+        fn get_storage(&self) -> &Arc<LoopixStorage> {
             &self.storage
         }
 
@@ -200,7 +201,7 @@ mod tests {
 
         let core = MockLoopixCore {
             config: config.core_config,
-            storage: config.storage_config,
+            storage: Arc::new(config.storage_config),
         };
 
         core.get_storage()
