@@ -146,7 +146,7 @@ impl LoopixSimul {
             log::info!(
                 "Node {} going to state {:?}",
                 node.node_config.info.name,
-                self
+                new_state
             );
         }
 
@@ -184,7 +184,7 @@ impl LSRoot {
                 let path_len = *n;
                 let nodes = (path_len + 2) * path_len;
                 let mut node_infos = node.nodes_online().unwrap();
-                node_infos.push(node.node_config.info.clone());
+                node_infos.insert(0, node.node_config.info.clone());
                 log::info!("Found {} of {} nodes", node_infos.len(), nodes);
                 if node_infos.len() == nodes {
                     let setup = LoopixSetup::new(path_len, node_infos);
@@ -198,19 +198,19 @@ impl LSRoot {
                             msg: serde_json::to_string(&setup).expect("serializing to string"),
                         })
                         .await?;
-                    return Ok(LSRoot::WaitConfig(path_len).into());
+                    return Ok(LSRoot::WaitConfig(nodes).into());
                 }
             }
             LSRoot::WaitConfig(n) => {
-                if node
+                let node_configured = node
                     .gossip
                     .as_ref()
                     .unwrap()
                     .storage
                     .events(Category::LoopixConfig)
-                    .len()
-                    == *n
-                {
+                    .len();
+                log::info!("Root sees {} configured nodes", node_configured);
+                if node_configured + 1 == *n {
                     LoopixSetup::node_config(node).await?;
                     return Ok(LSRoot::SendProxyRequest(i + 8).into());
                 }
@@ -223,7 +223,7 @@ impl LSRoot {
                         .webproxy
                         .as_mut()
                         .unwrap()
-                        .get("https://fledg.re")
+                        .get("https://ipinfo.io")
                         .await
                     {
                         Ok(mut res) => match res.text().await {
@@ -254,6 +254,18 @@ impl LSChild {
         match self {
             LSChild::WaitConfig => {
                 if LoopixSetup::node_config(_node).await? {
+                    log::info!("{} got setup", _node.node_config.info.name);
+                    _node
+                        .gossip
+                        .as_mut()
+                        .unwrap()
+                        .add_event(Event {
+                            category: Category::LoopixConfig,
+                            src: _node.node_config.info.get_id(),
+                            created: now(),
+                            msg: "Setup done".into(),
+                        })
+                        .await?;
                     return Ok(LSChild::ProxyReady.into());
                 }
             }
@@ -281,21 +293,25 @@ impl LoopixSetup {
     pub async fn node_config(node: &mut Node) -> Result<bool, BrokerError> {
         let events = node.gossip.as_ref().unwrap().events(Category::LoopixSetup);
         if let Some(event) = events.get(0) {
-            let setup = serde_json::from_str::<LoopixSetup>(&event.msg)
-                .expect("deserializing loopix setup");
-            let our_id = node.node_config.info.get_id();
-            let (loopix, overlay) = setup.get_brokers(our_id, node.broker_net.clone()).await?;
-            node.loopix = Some(loopix);
-            node.webproxy = Some(
-                WebProxy::start(
-                    node.storage.clone(),
-                    our_id,
-                    overlay,
-                    WebProxyConfig::default(),
-                )
-                .await
-                .expect("Starting new WebProxy"),
-            );
+            // DEBUG: if you set this to 'false', loopix will not be setup, and you'll just see
+            // how the rest of the system sets up.
+            if true {
+                let setup = serde_json::from_str::<LoopixSetup>(&event.msg)
+                    .expect("deserializing loopix setup");
+                let our_id = node.node_config.info.get_id();
+                let (loopix, overlay) = setup.get_brokers(our_id, node.broker_net.clone()).await?;
+                node.loopix = Some(loopix);
+                node.webproxy = Some(
+                    WebProxy::start(
+                        node.storage.clone(),
+                        our_id,
+                        overlay,
+                        WebProxyConfig::default(),
+                    )
+                    .await
+                    .expect("Starting new WebProxy"),
+                );
+            }
             return Ok(true);
         }
         Ok(false)
@@ -344,10 +360,10 @@ impl LoopixSetup {
             .expect("node_id in list");
         let role = if pos < self.path_length {
             LoopixRole::Client
-        } else if pos < (self.path_length + 1) * self.path_length {
-            LoopixRole::Mixnode
-        } else {
+        } else if pos < self.path_length * 2 {
             LoopixRole::Provider
+        } else {
+            LoopixRole::Mixnode
         };
         let config = self.get_config(node_id, role).await?;
         let loopix_broker = LoopixBroker::start(net, config).await?;
