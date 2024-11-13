@@ -4,7 +4,7 @@ use crate::{
     loopix::{
         broker::LoopixBroker,
         config::{LoopixConfig, LoopixRole},
-        messages::{LoopixMessage, format_node_id},
+        messages::LoopixMessage,
         storage::LoopixStorage,
     },
     network::messages::{NetworkIn, NetworkMessage, NetworkOut},
@@ -87,6 +87,8 @@ impl LoopixSetup {
 
         let (node_infos, node_public_keys, loopix_key_pairs, node_configs) = Self::create_nodes_and_keys(path_length);
 
+        log::info!("Node configs: {:?}", node_configs.len());
+
         let mut setup = Self {
             node_public_keys,
             loopix_key_pairs,
@@ -105,8 +107,10 @@ impl LoopixSetup {
             .get_nodes(path_length..2 * path_length, LoopixRole::Provider)
             .await?;
         setup.mixers = setup
-            .get_nodes(2 * path_length..path_length * path_length, LoopixRole::Mixnode)
+            .get_nodes(2 * path_length..(path_length * path_length + path_length * 2), LoopixRole::Mixnode)
             .await?;
+
+        // log::info!("Number of mixes, providers, clients: {:?}, {:?}, {:?}", setup.mixers.len(), setup.providers.len(), setup.clients.len());
 
         Ok(setup)
     }
@@ -138,7 +142,9 @@ impl LoopixSetup {
         role: LoopixRole,
     ) -> Result<Vec<LoopixNode>, BrokerError> {
         let mut ret = vec![];
+        // log::info!("Getting nodes for range: {:?} and role: {:?}", range, role);
         for i in range {
+            // log::info!("i: {} and getting node: {:?}", i, self.all_nodes[i].get_id());
             ret.push(self.get_node(self.all_nodes[i].get_id(), role.clone()).await?);
         }
         Ok(ret)
@@ -178,46 +184,56 @@ impl LoopixSetup {
         Ok(config)
     }
 
-    pub async fn print_all_messages(&self) {
+    pub async fn print_all_messages(&self, print_full_id: bool) {
+        println!();
+        println!();
+        println!("Network Configurations:");
+        println!("Number of mixes, providers, clients: {:?}, {:?}, {:?}", self.mixers.len(), self.providers.len(), self.clients.len());
+        println!("{:<30} {:<30} {:<30}", "Clients", "Mixers", "Providers");
+        println!("{:-<90}", "");
+
+        for i in 0..self.mixers.len() {
+            let default_id = NodeID::from(0u32);
+            let client_id = self.clients.get(i).map(|node| node.config.info.get_id()).unwrap_or(default_id);
+            let mixer_id = self.mixers.get(i).map(|node| node.config.info.get_id()).unwrap_or(default_id);
+            let provider_id = self.providers.get(i).map(|node| node.config.info.get_id()).unwrap_or(default_id);
+            println!("{:<30} {:<30} {:<30}", client_id, mixer_id, provider_id);
+        }
+
         for node in self.clients.iter() {
-            self.print_node_messages(node, "Client").await;
+            self.print_node_messages(node, "Client", print_full_id).await;
         }
         for node in self.mixers.iter() {
-            self.print_node_messages(node, "Mixer").await;
+            self.print_node_messages(node, "Mixer", print_full_id).await;
         }
         for node in self.providers.iter() {
-            self.print_node_messages(node, "Provider").await;
+            self.print_node_messages(node, "Provider", print_full_id).await;
         }
     }
 
-    async fn print_node_messages(&self, node: &LoopixNode, role: &str) {
-        println!();
+    async fn print_node_messages(&self, node: &LoopixNode, role: &str, _print_full_id: bool) {
         println!();
         
         let node_id = node.config.info.get_id();
-        let formatted_node_id = format_node_id(&node_id);
-        log::info!("Node: {formatted_node_id} ({role})");
+        println!("Node: {:x} ({role})", node_id);
 
         let received_messages = node.storage.get_received_messages().await;
-        log::info!("Received messages: {:?}", received_messages.len());
+        println!("Received messages: {:?}", received_messages.len());
 
         let forwarded_messages = node.storage.get_forwarded_messages().await;
-        log::info!("Forwarded messages: {:?}", forwarded_messages.len());
+        println!("Forwarded messages: {:?}", forwarded_messages.len());
 
         let sent_messages = node.storage.get_sent_messages().await;
-        log::info!("Sent messages: {:?}", sent_messages.len());
+        println!("Sent messages: {:?}", sent_messages.len());
 
         println!();
-        println!("{formatted_node_id} with {role} role:");
 
         println!("\nForwarded Messages:");
         println!("{:<60} {:<20}", "From -> To", "Message Type");
         println!("{:-<80}", "");
 
         for (from, to) in forwarded_messages {
-            let formatted_from = format_node_id(&from);
-            let formatted_to = format_node_id(&to);
-            println!("{:<60} {:<20}", format!("{formatted_from} -> {formatted_to}"), "N/A");
+            println!("{:<60} {:<20}", format!("{:x} -> {:x}", from, to), "N/A");
         }
 
         println!("\nReceived Messages:");
@@ -225,9 +241,7 @@ impl LoopixSetup {
         println!("{:-<80}", "");
 
         for (origin, relay, message_type) in received_messages {
-            let formatted_origin = format_node_id(&origin);
-            let formatted_relay = format_node_id(&relay);
-            println!("{:<60} {:<20}", format!("{formatted_origin} -> {formatted_relay}"), format!("{}", message_type));
+            println!("{:<60} {:<20}", format!("{:x} -> {:x}", origin, relay), format!("{:?}", message_type));
         }
 
         println!("\nSent Messages:");
@@ -236,12 +250,12 @@ impl LoopixSetup {
         for (route, message_type) in sent_messages {
             let short_route: Vec<String> = route
                 .iter()
-                .map(|node_id| format_node_id(node_id))
-                .collect();
-            let formatted_route = format!("[{}]", short_route.join(", "));
-            println!("{:<60} {:<20}", formatted_route, format!("{}", message_type));
+                .map(|node_id| format!("{:x}", node_id))
+                .collect::<Vec<String>>();
+            println!("{:<60} {:<20}", format!("[{}]", short_route.join(", ")), format!("{:?}", message_type));
         }
     }
+    
 }
 
 /**
@@ -282,7 +296,7 @@ impl NetworkSimul {
         for (id_tx, id_rx, msg) in msgs.iter() {
             if let Some((broker, _)) = self.nodes.get_mut(&id_rx) {
                 // This is for debugging and can be removed
-                println!("{id_tx}->{id_rx}: {msg}");
+                // println!("{id_tx}->{id_rx}: {msg}");
                 broker.emit_msg(NetworkMessage::Output(NetworkOut::MessageFromNode(
                     id_tx.clone(),
                     msg.clone(),

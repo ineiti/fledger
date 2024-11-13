@@ -110,7 +110,7 @@ async fn test_loopix_tiny() -> Result<(), Box<dyn Error>> {
     // Quit the tokio-thread
     stop.send(true).ok();
 
-    loopix_setup.print_all_messages().await;
+    loopix_setup.print_all_messages(true).await;
 
     Ok(())
 }

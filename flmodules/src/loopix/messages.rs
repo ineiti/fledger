@@ -50,19 +50,14 @@ pub enum MessageType {
 impl fmt::Display for MessageType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MessageType::Payload(node_id, payload) => write!(f, "Payload({}, {:?})", format_node_id(node_id), payload),
+            MessageType::Payload(node_id, payload) => write!(f, "Payload({}, {:?})", node_id, payload),
             MessageType::Drop => write!(f, "Drop"),
             MessageType::Loop => write!(f, "Loop"),
             MessageType::Dummy => write!(f, "Dummy"),
-            MessageType::PullRequest(node_id) => write!(f, "PullRequest({})", format_node_id(node_id)),
-            MessageType::SubscriptionRequest(node_id) => write!(f, "SubscriptionRequest({})", format_node_id(node_id)),
+            MessageType::PullRequest(node_id) => write!(f, "PullRequest({})", node_id),
+            MessageType::SubscriptionRequest(node_id) => write!(f, "SubscriptionRequest({})", node_id),
         }
     }
-}
-
-pub fn format_node_id(node_id: &NodeID) -> String {
-    let full_id = node_id.to_string();
-    full_id.split('-').next().unwrap_or("").to_string()
 }
 
 #[derive(Debug, Clone)]
@@ -131,7 +126,7 @@ impl LoopixMessages {
 
     pub async fn send_drop_message(&self) {
         let (node_id, sphinx) = self.create_drop_message().await;
-        let mean_delay = Duration::from_secs_f64(self.role.get_config().mean_delay());
+        let mean_delay = Duration::from_millis(self.role.get_config().mean_delay());
         let delay = generate_from_average_duration(1, mean_delay);
         self.network_sender
             .send((node_id, delay[0], sphinx))
@@ -141,7 +136,7 @@ impl LoopixMessages {
 
     pub async fn send_loop_message(&self) {
         let (node_id, sphinx) = self.role.create_loop_message().await;
-        let mean_delay = Duration::from_secs_f64(self.role.get_config().mean_delay());
+        let mean_delay = Duration::from_millis(self.role.get_config().mean_delay());
         let delay = generate_from_average_duration(1, mean_delay);
         self.network_sender
             .send((node_id, delay[0], sphinx))
@@ -159,12 +154,13 @@ impl LoopixMessages {
 
     async fn process_overlay_message(&self, node_id: NodeID, message: NetworkWrapper) {
         let (next_node, sphinx) = self.role.process_overlay_message(node_id, message).await;
-        let mean_delay = Duration::from_secs_f64(self.role.get_config().mean_delay());
+        let mean_delay = Duration::from_millis(self.role.get_config().mean_delay());
         let delay = generate_from_average_duration(1, mean_delay);
+        log::trace!("Overlay message to {:?}, with delay {:?}", next_node, delay[0]);
         self.network_sender
             .send((next_node, delay[0], sphinx))
             .await
-            .expect("while sending message");
+            .expect("while sending overlay message to network");
     }
 
     async fn process_sphinx_packet(&self, node_id: NodeID, sphinx_packet: Sphinx) {

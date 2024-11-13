@@ -40,7 +40,7 @@ pub trait LoopixCore {
         route: &[Node],
     ) -> (Node, Sphinx) {
         // delays
-        let mean_delay = Duration::from_secs_f64(self.get_config().mean_delay());
+        let mean_delay = Duration::from_millis(self.get_config().mean_delay());
         let delays = generate_from_average_duration(route.len(), mean_delay);
 
         // destination

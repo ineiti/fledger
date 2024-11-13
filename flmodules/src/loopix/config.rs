@@ -116,7 +116,7 @@ pub struct CoreConfig {
     lambda_drop: f64,
     lambda_payload: f64,
     path_length: usize,
-    mean_delay: f64,
+    mean_delay: u64,
     lambda_loop_mix: f64,
     time_pull: f64,
     max_retrieve: usize,
@@ -127,12 +127,14 @@ impl CoreConfig {
     pub fn default_mixnode(path_length: usize) -> Self {
         // TODO: change these values
         CoreConfig {
-            lambda_loop: 10.0, // loop rate (10 times per minute)
-            lambda_drop: 10.0, // drop rate (10 times per minute)
+            lambda_loop: 0.0, // loop rate (10 times per minute)
+            // lambda_loop: 10.0, // loop rate (10 times per minute)
+            lambda_drop: 0.0, // drop rate (10 times per minute)
+            // lambda_drop: 10.0, // drop rate (10 times per minute)
             lambda_payload: 0.0, // payload rate (0 times per minute)
             path_length,
-            mean_delay: 0.001, // mean delay (1ms)
-            lambda_loop_mix: 10.0, // loop mix rate (10 times per minute)
+            mean_delay: 1, // mean delay (1ms)
+            lambda_loop_mix: 60.0, // loop mix rate (10 times per minute)
             time_pull: 0.0, // time pull (3 second)
             max_retrieve: 0, // messages sent to client per pull request
             pad_length: 150, // dummy, drop, loop messages are padded
@@ -141,12 +143,14 @@ impl CoreConfig {
 
     pub fn default_provider(path_length: usize) -> Self {
         CoreConfig {
-            lambda_loop: 10.0,
-            lambda_drop: 10.0,
+            // lambda_loop: 10.0,
+            lambda_loop: 0.0,
+            // lambda_drop: 10.0,
+            lambda_drop: 0.0,
             lambda_payload: 0.0,
             path_length,
-            mean_delay: 0.001,
-            lambda_loop_mix: 10.0,
+            mean_delay: 1,
+            lambda_loop_mix: 60.0,
             time_pull: 0.0,
             max_retrieve: 0,
             pad_length: 150,
@@ -155,11 +159,13 @@ impl CoreConfig {
 
     pub fn default_client(path_length: usize) -> Self {
         CoreConfig {
-            lambda_loop: 10.0,
-            lambda_drop: 10.0,
-            lambda_payload: 10.0,
+            lambda_loop: 0.0,
+            // lambda_loop: 10.0,
+            // lambda_drop: 10.0,
+            lambda_drop: 0.0,
+            lambda_payload: 60.0,
             path_length,
-            mean_delay: 0.001,
+            mean_delay: 1,
             lambda_loop_mix: 0.0,
             time_pull: 3.0,
             max_retrieve: 0,
@@ -171,13 +177,13 @@ impl CoreConfig {
 impl Default for CoreConfig {
     fn default() -> Self {
         CoreConfig {
-            lambda_loop: 10.0,
-            lambda_drop: 10.0,
-            lambda_payload: 10.0,
+            lambda_loop: 60.0,
+            lambda_drop: 60.0,
+            lambda_payload: 60.0,
             path_length: 3,
-            mean_delay: 0.001,
-            lambda_loop_mix: 10.0,
-            time_pull: 10.0,
+            mean_delay: 1,
+            lambda_loop_mix: 60.0,
+            time_pull: 3.0,
             max_retrieve: 10,
             pad_length: 150,
         }
@@ -201,7 +207,7 @@ impl CoreConfig {
         self.path_length as usize
     }
 
-    pub fn mean_delay(&self) -> f64 {
+    pub fn mean_delay(&self) -> u64 {
         self.mean_delay
     }
 

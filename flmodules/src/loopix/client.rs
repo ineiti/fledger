@@ -247,11 +247,6 @@ impl Client {
         message: NetworkWrapper,
     ) -> (NodeID, Sphinx) {
         let (next_node, sphinx) = self.create_payload_message(node_id, message).await;
-        log::trace!("Next node: {:?}", next_node);
-        log::trace!("Destination: {:?}", node_id);
-        let our_id = self.get_our_id().await;
-        let our_provider = self.get_our_provider().await;
-        log::trace!("Our ID: {:?}, Our Provider: {:?}", our_id, our_provider);
         (next_node, sphinx)
     }
 
@@ -295,17 +290,24 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use ed25519_compact::KeyPair;
     use ed25519_compact::Seed;
+    use sphinx_packet::ProcessedPacket;
+    use x25519_dalek::PublicKey;
+    use x25519_dalek::StaticSecret;
 
     use crate::loopix::config::LoopixConfig;
     use crate::loopix::config::LoopixRole;
+    use crate::loopix::sphinx::node_id_from_destination_address;
+    use crate::loopix::sphinx::node_id_from_node_address;
     use crate::loopix::testing::LoopixSetup;
     use crate::nodeconfig::NodeInfo;
 
     use super::*;
 
-    async fn setup() -> (Client, Vec<NodeInfo>, usize) {
+    async fn setup() -> (Client, Vec<NodeInfo>, usize, HashMap<NodeID, (PublicKey, StaticSecret)>, Vec<NodeInfo>) {
         let path_length = 2;
         let (all_nodes, node_public_keys, loopix_key_pairs, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
@@ -332,12 +334,14 @@ mod tests {
             Client::new(Arc::new(config.storage_config), config.core_config),
             all_nodes.clone(),
             path_length,
+            loopix_key_pairs,
+            all_nodes.clone(),
         )
     }
 
     #[tokio::test]
     async fn get_provider() {
-        let (client, nodes, path_length) = setup().await;
+        let (client, nodes, path_length, _, _) = setup().await;
         let node_id = client.get_our_id().await;
         let our_id_index = nodes.iter().position(|node| node.get_id() == node_id).unwrap();
         assert_eq!(
@@ -348,9 +352,9 @@ mod tests {
 
     #[tokio::test]
     async fn register_provider() {
-        let (mut client, nodes, path_length) = setup().await;
+        let (mut client, nodes, path_length, _, _) = setup().await;
         let new_provider = nodes[path_length].get_id();
-        println!("New provider ID: {}", new_provider);
+        // println!("New provider ID: {}", new_provider);
         client.register_provider(new_provider).await;
         assert_eq!(
             client.get_our_provider().await,
@@ -360,7 +364,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_deep_clone_storage() {
-        let (client1, _, _) = setup().await;
+        let (client1, _, _, _, _) = setup().await;
     
         let client2: Client = client1.async_clone().await;
 
@@ -378,6 +382,73 @@ mod tests {
             "The cloned client's storage should not point to the same memory address as the original"
         );
     }
+
+    #[tokio::test]
+    async fn test_create_payload_message() {
+        let (client, _nodes, _path_length, key_pairs, _all_nodes) = setup().await;
+
+
+        let dst_client = client.get_storage().get_clients_in_network().await;
+
+        println!("Dst client: {:?}", dst_client);
+
+        let (_next_node, sphinx) = 
+            client.create_payload_message(dst_client[0].get_id(),
+            NetworkWrapper {
+                module: MODULE_NAME.into(),
+                msg: serde_yaml::to_string(&MessageType::Dummy).unwrap(),
+            }).await;
+
+        let sent_msg = client.get_storage().get_sent_messages().await;
+        println!("Sent messages: {:?}", sent_msg);
+
+        let (route, _msg) = sent_msg[0].clone();
+
+        let mut sphinx_packet = sphinx.clone();
+
+        let mut next_node = route[0];
+
+        for node_id in route {
+            println!("Node ID: {}", node_id);
+            assert_eq!(next_node, node_id);
+            let key_pair = key_pairs.get(&node_id).unwrap();
+            let static_secret = &key_pair.1;
+
+            let processed = sphinx_packet.clone().inner.process(&static_secret).unwrap();
+
+            match processed {
+                ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
+                    sphinx_packet = Sphinx{ inner: *next_packet };
+                    next_node = node_id_from_node_address(next_address);
+                }
+                ProcessedPacket::FinalHop(destination, _, payload) => {
+                    // Check if the final destination matches our ID
+                    let dest = node_id_from_destination_address(destination);
+                    if dest == node_id {
+                        // Recover the network wrapper
+                        if let Ok(module_message) = serde_yaml::from_str::<NetworkWrapper>(
+                            std::str::from_utf8(&payload.recover_plaintext().unwrap()).unwrap(),
+                        ) {
+                            // check module name
+                            assert_eq!(module_message.module, MODULE_NAME);
+    
+                            let msg = serde_yaml::from_str::<MessageType>(&module_message.msg).unwrap();
+                            match msg {
+                                MessageType::Payload(_, _) => assert!(true),
+                                _ => assert!(false),
+                            }
+
+                        } else {
+                            assert!(false);
+                        }
+                    } else {
+                        assert!(false);
+                    }
+                }
+            }
+
+        }
+    }   
     
     
     

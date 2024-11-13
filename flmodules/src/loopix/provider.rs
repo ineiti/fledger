@@ -210,7 +210,7 @@ impl Provider {
         let (_, sphinx) = self.create_sphinx_packet(client_id, msg, &route);
 
         // create delay
-        let mean_delay = Duration::from_secs_f64(self.get_config().mean_delay());
+        let mean_delay = Duration::from_millis(self.get_config().mean_delay());
         let delay = generate_from_average_duration(1, mean_delay);
         self.storage.add_sent_message(route, MessageType::Dummy).await;
 

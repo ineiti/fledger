@@ -128,6 +128,11 @@ impl LoopixBroker {
     }
 
     pub fn start_loop_message_thread(loopix_messages: LoopixMessages) {
+        if loopix_messages.role.get_config().lambda_loop() == 0.0 {
+            log::trace!("Loop message rate: 0.0, skipping thread");
+            return;
+        }
+
         let wait_before_send =
             Duration::from_secs_f64(60.0 / loopix_messages.role.get_config().lambda_loop());
 
@@ -142,6 +147,11 @@ impl LoopixBroker {
     }
 
     pub fn start_drop_message_thread(loopix_messages: LoopixMessages) {
+        if loopix_messages.role.get_config().lambda_drop() == 0.0 {
+            log::trace!("Drop message rate: 0.0, skipping thread");
+            return;
+        }
+
         let wait_before_send =
             Duration::from_secs_f64(60.0 / loopix_messages.role.get_config().lambda_drop());
 
@@ -201,37 +211,36 @@ impl LoopixBroker {
             };
 
             loop {
+
+                let our_id = loopix_messages.role.get_our_id().await;
+
                 log::debug!(
-                    "Started network send thread with {:?} rate!",
-                    wait_before_send
+                    "{}: Started network send thread with {:?} rate! The mean delay is {:?} and in duration {:?}",
+                    our_id,
+                    wait_before_send,
+                    loopix_messages.role.get_config().mean_delay(),
+                    Duration::from_millis(loopix_messages.role.get_config().mean_delay()),
                 );
-
-                // Wait for send delay
-                tokio::time::sleep(wait_before_send).await;
-
-                // Subtract the wait duration from all message delays
-                for (_, delay, _) in &mut sphinx_messages {
-                    *delay = delay.saturating_sub(wait_before_send);
-                }
 
                 // Receive new messages
                 if let Some((node_id, delay, sphinx)) = receiver.recv().await {
                     sphinx_messages.push((node_id, delay.to_duration(), sphinx));
                 }
 
-                log::trace!("length of queue {}", sphinx_messages.len());
-
+                log::trace!("{}: length of queue {}", our_id, sphinx_messages.len());
                 // Sort messages by remaining delay
                 sphinx_messages.sort_by_key(|&(_, delay, _)| delay); // TODO technically this is not the protocol
 
+                log::trace!("{}: first message in queue: {:?}", our_id, sphinx_messages.first());
                 // Emit messages with 0 or less delay
                 if let Some((node_id, delay, sphinx_packet)) = sphinx_messages.first() {
                     if *delay <= Duration::ZERO {
                         if let Err(e) = broker.emit_msg(
                             LoopixOut::SphinxToNetwork(*node_id, sphinx_packet.clone()).into(),
                         ) {
-                            log::error!("Error emitting networkmessage: {e:?}");
+                            log::error!("Error emitting network message: {e:?}");
                         } else {
+                            log::trace!("{} emitted a payload message to node {}", our_id, node_id);
                             sphinx_messages.remove(0);
                         }
                     } else {
@@ -241,7 +250,17 @@ impl LoopixBroker {
                         {
                             log::error!("Error emitting drop message: {e:?}");
                         }
+                        log::trace!("{} emitted a drop message to node {}", our_id, node_id);
                     }
+                }
+
+                // Wait for send delay
+                tokio::time::sleep(wait_before_send).await;
+
+
+                // Subtract the wait duration from all message delays
+                for (_, delay, _) in &mut sphinx_messages {
+                    *delay = delay.saturating_sub(wait_before_send);
                 }
             }
         });
@@ -438,7 +457,7 @@ mod tests {
         let (loopix_broker, storage, network) = setup_network().await?;
 
         let client_to_provider_map = storage.get_client_to_provider_map().await;
-        println!("Client to provider map: {:?}", client_to_provider_map);
+        log::debug!("Client to provider map: {:?}", client_to_provider_map);
         // Simulate sending an overlay request to the LoopixBroker
         let test_node_id = NodeID::from(1);
         let network_wrapper = NetworkWrapper {
