@@ -21,7 +21,8 @@
     "wasm-pack": "latest",
     "nodejs":    "18",
     "procps":    "latest",
-    "vscode":    "latest"
+    "vscode":    "latest",
+    "moreutils": "latest"
   },
   "shell": {
     "init_hook": [
