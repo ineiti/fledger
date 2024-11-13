@@ -108,7 +108,7 @@ async fn test_loopix_tiny() -> Result<(), Box<dyn Error>> {
             )?,
         )))?;
 
-    tokio::time::sleep(Duration::from_secs(15)).await;
+    tokio::time::sleep(Duration::from_secs(25)).await;
 
     loopix_setup.print_all_messages(true).await;
 

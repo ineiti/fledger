@@ -262,6 +262,7 @@ impl Provider {
         // get max send amount and messages
         log::trace!("Creating pull reply for client: {}", client_id);
         let max_retrieve = self.get_config().max_retrieve();
+        let index = self.get_storage().get_client_message_index(client_id).await;
         let messages = self.get_client_messages(client_id).await;
 
         log::debug!(
@@ -269,17 +270,22 @@ impl Provider {
             messages.len(),
             max_retrieve
         );
+
         // add messages to send
         let mut messages_to_send = Vec::new();
-        for message in messages.iter().take(max_retrieve) {
+        for message in messages.iter().skip(index).take(max_retrieve) {
             messages_to_send.push(message.clone());
         }
 
+        self.get_storage()
+            .update_client_message_index(client_id, index + messages_to_send.len())
+            .await;
+
         // pad vec if not enough messages
-        // for _ in messages_to_send.len()..max_retrieve {
-        //     let (delay, sphinx) = self.create_dummy_message(client_id).await;
-        //     messages_to_send.push((delay, sphinx));
-        // } // TODO uncomment
+        for _ in messages_to_send.len()..max_retrieve {
+            let (delay, sphinx) = self.create_dummy_message(client_id).await;
+            messages_to_send.push((delay, sphinx));
+        }
 
         messages_to_send
     }

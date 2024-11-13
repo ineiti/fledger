@@ -124,7 +124,7 @@ impl LoopixBroker {
                 Self::client_subscribe_loop(loopix_messages.clone(), network.clone());
 
                 // client pull loop
-                // Self::client_pull_loop(loopix_messages.clone(), network.clone()); // TODO uncomment
+                Self::client_pull_loop(loopix_messages.clone(), network.clone());
             }
             _ => {}
         }
@@ -247,7 +247,7 @@ impl LoopixBroker {
                 );
 
                 // Receive new messages
-                if let Ok((node_id, delay, sphinx)) = receiver.try_recv() {
+                while let Ok((node_id, delay, sphinx)) = receiver.try_recv() {
                     log::trace!("{}: Received message for node {}", our_id, node_id);
                     sphinx_messages.push((node_id, delay.to_duration(), sphinx));
                 }
@@ -303,7 +303,6 @@ impl LoopixBroker {
 
                 log::trace!("{}: new delays: {:?}", our_id, sphinx_messages);
             }
-            log::info!("{}: Network send thread finished", loopix_messages.role.get_our_id().await);
         });
     }
 

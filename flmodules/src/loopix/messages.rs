@@ -249,7 +249,6 @@ impl LoopixMessages {
                     );
                     log::debug!("Sending {} messages back to {}", messages.len(), source);
                     for (delay, sphinx) in messages {
-                        log::debug!("Sending message with delay {:?} to {}", delay, source);
                         self.network_sender
                             .send((source, delay, sphinx))
                             .await

@@ -122,16 +122,18 @@ pub struct ProviderStorage {
         deserialize_with = "deserialize_client_messages"
     )]
     client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>,
+    client_message_index: HashMap<NodeID, usize>,
 }
 
 impl ProviderStorage {
     pub fn new(
         subscribed_clients: HashSet<NodeID>,
-        client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>,
+        client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>
     ) -> Self {
         ProviderStorage {
             subscribed_clients,
             client_messages,
+            client_message_index: HashMap::new(),
         }
     }
 
@@ -139,6 +141,7 @@ impl ProviderStorage {
         ProviderStorage {
             subscribed_clients: HashSet::new(),
             client_messages: HashMap::new(),
+            client_message_index: HashMap::new(),
         }
     }
 
@@ -147,6 +150,7 @@ impl ProviderStorage {
         ProviderStorage {
             subscribed_clients: clients,
             client_messages: HashMap::new(),
+            client_message_index: HashMap::new(),
         }
     }
 }
@@ -225,6 +229,22 @@ impl LoopixStorage {
 
     pub async fn get_forwarded_messages(&self) -> Vec<(NodeID, NodeID)> {
         self.network_storage.read().await.forwarded_messages.clone()
+    }
+
+    pub async fn get_client_message_index(&self, client_id: NodeID) -> usize {
+        if let Some(storage) = self.provider_storage.read().await.as_ref() {
+            storage.client_message_index.get(&client_id).cloned().unwrap_or(0)
+        } else {
+            panic!("Provider storage not found");
+        }
+    }
+
+    pub async fn update_client_message_index(&self, client_id: NodeID, new_index: usize) {
+        if let Some(storage) = &mut *self.provider_storage.write().await {
+            storage.client_message_index.insert(client_id, new_index);
+        } else {
+            panic!("Provider storage not found");
+        }
     }
 
     pub async fn add_forwarded_messages(&self, new_messages: Vec<(NodeID, NodeID)>) {
