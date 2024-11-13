@@ -245,7 +245,7 @@ impl SignalServer {
     }
 
     fn ws_list_ids(&mut self, id: usize) -> Vec<SignalMessage> {
-        log::info!("Current list is: {:?}", self.info.values());
+        log::debug!("Current list is: {:?}", self.info.values());
         self.send_msg_node(
             id,
             WSSignalMessageToNode::ListIDsReply(self.info.values().cloned().collect()),

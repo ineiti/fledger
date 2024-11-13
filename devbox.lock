@@ -189,6 +189,54 @@
         }
       }
     },
+    "moreutils@latest": {
+      "last_modified": "2024-11-03T14:18:04Z",
+      "resolved": "github:NixOS/nixpkgs/4ae2e647537bcdbb82265469442713d066675275#moreutils",
+      "source": "devbox-search",
+      "version": "0.69",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/0lkxr0l5k82llf0q72qbbdls4zs4gh6x-moreutils-0.69",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/0lkxr0l5k82llf0q72qbbdls4zs4gh6x-moreutils-0.69"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/l2ymq6clrn6206hy44b7i2wwpd68zk91-moreutils-0.69",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/l2ymq6clrn6206hy44b7i2wwpd68zk91-moreutils-0.69"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/892vhm4lx3cg75s95i9w5h7nyzgfw5x3-moreutils-0.69",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/892vhm4lx3cg75s95i9w5h7nyzgfw5x3-moreutils-0.69"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/rldyh6dlvnzn76xc2hrb93pq27fjpian-moreutils-0.69",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/rldyh6dlvnzn76xc2hrb93pq27fjpian-moreutils-0.69"
+        }
+      }
+    },
     "nodejs@18": {
       "last_modified": "2024-08-14T11:41:26Z",
       "plugin_version": "0.0.2",
