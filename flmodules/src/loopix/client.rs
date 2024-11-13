@@ -14,7 +14,6 @@ use sphinx_packet::header::delays::Delay;
 use sphinx_packet::payload::Payload;
 use sphinx_packet::SphinxPacket;
 
-
 #[derive(Debug, PartialEq)]
 pub struct Client {
     storage: Arc<LoopixStorage>,
@@ -23,7 +22,7 @@ pub struct Client {
 
 impl Client {
     pub fn new(storage: Arc<LoopixStorage>, config: CoreConfig) -> Self {
-        Client {storage, config }
+        Client { storage, config }
     }
 }
 
@@ -57,7 +56,7 @@ impl LoopixCore for Client {
             .await;
 
         // create the networkmessage
-        
+
         let loop_msg = serde_yaml::to_string(&MessageType::Loop).unwrap();
         let msg = NetworkWrapper {
             module: MODULE_NAME.into(),
@@ -67,7 +66,9 @@ impl LoopixCore for Client {
         // create sphinx packet
         let our_provider = self.get_our_provider().await.unwrap();
         let (_, sphinx) = self.create_sphinx_packet(our_provider, msg, &route);
-        self.storage.add_sent_message(route, MessageType::Loop).await;
+        self.storage
+            .add_sent_message(route, MessageType::Loop)
+            .await;
         (our_provider, sphinx)
     }
 
@@ -98,7 +99,9 @@ impl LoopixCore for Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
-        self.storage.add_sent_message(route, MessageType::Drop).await;
+        self.storage
+            .add_sent_message(route, MessageType::Drop)
+            .await;
         (random_provider, sphinx)
     }
 
@@ -107,8 +110,12 @@ impl LoopixCore for Client {
         destination: NodeID,
         _surb_id: [u8; 16],
         payload: Payload,
-    ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>, Option<MessageType>) {
-
+    ) -> (
+        NodeID,
+        Option<NetworkWrapper>,
+        Option<Vec<(Delay, Sphinx)>>,
+        Option<MessageType>,
+    ) {
         if destination != self.get_our_id().await {
             log::info!("Final hop received, but we're not the destination");
             return (destination, None, None, None);
@@ -124,18 +131,36 @@ impl LoopixCore for Client {
                         MessageType::Payload(source, msg) => {
                             (source, Some(msg), None, Some(message))
                         }
-                        MessageType::PullRequest(_) => { log::error!("Client shouldn't receive pull requests!"); (destination, None, None, Some(message)) },
-                        MessageType::SubscriptionRequest(_) => { log::error!("Client shouldn't receive subscription requests!"); (destination, None, None, Some(message)) },
-                        MessageType::Drop => { log::info!("Client received drop"); (destination, None, None, Some(message)) },
-                        MessageType::Loop => { log::info!("Client received loop"); (destination, None, None, Some(message)) },
-                        MessageType::Dummy => { log::info!("Client received dummy"); (destination, None, None, Some(message)) },
+                        MessageType::PullRequest(client_id) => {
+                            log::error!("Client shouldn't receive pull requests!");
+                            (client_id, None, None, Some(message))
+                        }
+                        MessageType::SubscriptionRequest(client_id) => {
+                            log::error!("Client shouldn't receive subscription requests!");
+                            (client_id, None, None, Some(message))
+                        }
+                        MessageType::Drop => {
+                            log::info!("Client received drop");
+                            (destination, None, None, Some(message))
+                        }
+                        MessageType::Loop => {
+                            log::info!("Client received loop");
+                            (destination, None, None, Some(message))
+                        }
+                        MessageType::Dummy => {
+                            log::info!("Client received dummy");
+                            (destination, None, None, Some(message))
+                        }
                     }
                 } else {
                     log::error!("Received message in wrong format");
                     (destination, None, None, None)
                 }
             } else {
-                log::error!("Received message from module that is not Loopix: {:?}", module_message.module);
+                log::error!(
+                    "Received message from module that is not Loopix: {:?}",
+                    module_message.module
+                );
                 (destination, None, None, None)
             }
         } else {
@@ -187,15 +212,16 @@ impl Client {
         self.storage.get_our_provider().await
     }
 
-    pub async fn create_pull_message(&self) -> (NodeID, Option<Sphinx>) {
+    pub async fn create_pull_message(self) -> (NodeID, Option<Sphinx>) {
         let our_id = self.get_our_id().await;
 
-        let provider = match self.get_our_provider().await {
-            Some(provider) => provider,
-            None => {
-                self.get_storage().get_random_provider().await
-            }
-        };
+        let our_provider = self.get_our_provider().await;
+
+        if our_provider.is_none() {
+            panic!("Client has no provider");
+        }
+
+        let provider = our_provider.unwrap();
 
         //create route (path length is 0 because we directly send to the provider)
         let route = self.create_route(0, None, None, Some(provider)).await;
@@ -209,18 +235,22 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(provider, msg, &route);
-        self.storage.add_sent_message(route, MessageType::PullRequest(our_id)).await;
+        self.storage
+            .add_sent_message(route, MessageType::PullRequest(our_id))
+            .await;
         (provider, Some(sphinx))
     }
 
-    pub async fn create_subscribe_message(&self) -> (NodeID, Sphinx) {
+    pub async fn create_subscribe_message(&mut self) -> (NodeID, Sphinx) {
         let our_id = self.get_our_id().await;
 
         // get provider or choose one randomly
         let provider = match self.get_our_provider().await {
             Some(provider) => provider,
             None => {
-                self.get_storage().get_random_provider().await
+                let provider = self.get_storage().get_random_provider().await;
+                self.register_provider(provider).await;
+                provider
             }
         };
 
@@ -237,7 +267,9 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(provider, msg, &route);
-        self.storage.add_sent_message(route, MessageType::SubscriptionRequest(our_id)).await;
+        self.storage
+            .add_sent_message(route, MessageType::SubscriptionRequest(our_id))
+            .await;
         (provider, sphinx)
     }
 
@@ -274,7 +306,8 @@ impl Client {
             .await;
 
         // create payload message
-        let payload_msg = serde_yaml::to_string(&MessageType::Payload(our_id, msg.clone())).unwrap();
+        let payload_msg =
+            serde_yaml::to_string(&MessageType::Payload(our_id, msg.clone())).unwrap();
         let network_msg = NetworkWrapper {
             module: MODULE_NAME.into(),
             msg: payload_msg,
@@ -282,10 +315,11 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(destination, network_msg, &route);
-        self.storage.add_sent_message(route, MessageType::Payload(our_id, msg)).await;
+        self.storage
+            .add_sent_message(route, MessageType::Payload(our_id, msg))
+            .await;
         (our_provider.unwrap(), sphinx)
     }
-
 }
 
 #[cfg(test)]
@@ -307,9 +341,16 @@ mod tests {
 
     use super::*;
 
-    async fn setup() -> (Client, Vec<NodeInfo>, usize, HashMap<NodeID, (PublicKey, StaticSecret)>, Vec<NodeInfo>) {
+    async fn setup() -> (
+        Client,
+        Vec<NodeInfo>,
+        usize,
+        HashMap<NodeID, (PublicKey, StaticSecret)>,
+        Vec<NodeInfo>,
+    ) {
         let path_length = 2;
-        let (all_nodes, node_public_keys, loopix_key_pairs, _) = LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, node_public_keys, loopix_key_pairs, _) =
+            LoopixSetup::create_nodes_and_keys(path_length);
 
         // get our node info
         let node_id = all_nodes.iter().next().unwrap().get_id();
@@ -343,7 +384,10 @@ mod tests {
     async fn get_provider() {
         let (client, nodes, path_length, _, _) = setup().await;
         let node_id = client.get_our_id().await;
-        let our_id_index = nodes.iter().position(|node| node.get_id() == node_id).unwrap();
+        let our_id_index = nodes
+            .iter()
+            .position(|node| node.get_id() == node_id)
+            .unwrap();
         assert_eq!(
             client.get_our_provider().await,
             Some(NodeID::from(nodes[our_id_index + path_length].get_id()))
@@ -356,16 +400,13 @@ mod tests {
         let new_provider = nodes[path_length].get_id();
         // println!("New provider ID: {}", new_provider);
         client.register_provider(new_provider).await;
-        assert_eq!(
-            client.get_our_provider().await,
-            Some(new_provider)
-        );
+        assert_eq!(client.get_our_provider().await, Some(new_provider));
     }
 
     #[tokio::test]
     async fn test_deep_clone_storage() {
         let (client1, _, _, _, _) = setup().await;
-    
+
         let client2: Client = client1.async_clone().await;
 
         let keypair = KeyPair::from_seed(Seed::default());
@@ -373,10 +414,10 @@ mod tests {
             .get_storage()
             .add_client_in_network(NodeInfo::new(keypair.pk))
             .await;
-    
+
         let ptr1 = Arc::as_ptr(&client1.get_storage());
         let ptr2 = Arc::as_ptr(&client2.get_storage());
-    
+
         assert_ne!(
             ptr1, ptr2,
             "The cloned client's storage should not point to the same memory address as the original"
@@ -387,17 +428,19 @@ mod tests {
     async fn test_create_payload_message() {
         let (client, _nodes, _path_length, key_pairs, _all_nodes) = setup().await;
 
-
         let dst_client = client.get_storage().get_clients_in_network().await;
 
         println!("Dst client: {:?}", dst_client);
 
-        let (_next_node, sphinx) = 
-            client.create_payload_message(dst_client[0].get_id(),
-            NetworkWrapper {
-                module: MODULE_NAME.into(),
-                msg: serde_yaml::to_string(&MessageType::Dummy).unwrap(),
-            }).await;
+        let (_next_node, sphinx) = client
+            .create_payload_message(
+                dst_client[0].get_id(),
+                NetworkWrapper {
+                    module: MODULE_NAME.into(),
+                    msg: serde_yaml::to_string(&MessageType::Dummy).unwrap(),
+                },
+            )
+            .await;
 
         let sent_msg = client.get_storage().get_sent_messages().await;
         println!("Sent messages: {:?}", sent_msg);
@@ -417,8 +460,10 @@ mod tests {
             let processed = sphinx_packet.clone().inner.process(&static_secret).unwrap();
 
             match processed {
-                ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
-                    sphinx_packet = Sphinx{ inner: *next_packet };
+                ProcessedPacket::ForwardHop(next_packet, next_address, _delay) => {
+                    sphinx_packet = Sphinx {
+                        inner: *next_packet,
+                    };
                     next_node = node_id_from_node_address(next_address);
                 }
                 ProcessedPacket::FinalHop(destination, _, payload) => {
@@ -431,13 +476,13 @@ mod tests {
                         ) {
                             // check module name
                             assert_eq!(module_message.module, MODULE_NAME);
-    
-                            let msg = serde_yaml::from_str::<MessageType>(&module_message.msg).unwrap();
+
+                            let msg =
+                                serde_yaml::from_str::<MessageType>(&module_message.msg).unwrap();
                             match msg {
                                 MessageType::Payload(_, _) => assert!(true),
                                 _ => assert!(false),
                             }
-
                         } else {
                             assert!(false);
                         }
@@ -446,10 +491,6 @@ mod tests {
                     }
                 }
             }
-
         }
-    }   
-    
-    
-    
+    }
 }

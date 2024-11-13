@@ -1,7 +1,10 @@
 use std::{error::Error, time::Duration};
 
 use flarch::start_logging_filter_level;
-use flmodules::{loopix::sphinx::Sphinx, network::messages::{NetworkIn, NetworkMessage}};
+use flmodules::{
+    loopix::sphinx::Sphinx,
+    network::messages::{NetworkIn, NetworkMessage},
+};
 #[cfg(test)]
 use flmodules::{
     loopix::testing::{LoopixSetup, NetworkSimul, ProxyBroker},
@@ -47,7 +50,6 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
 
         proxy_src.proxy.get("https://fledg.re").await?;
         println!("Ids for proxies: ${} / ${}", proxy_src.id, proxy_dst.id);
-
     }
 
     if true {
@@ -68,10 +70,11 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
         tokio::time::sleep(Duration::from_secs(15)).await;
 
         let (mut tap, _) = loopix_setup.clients[1].net.get_tap().await?;
-        if let NetworkMessage::Input(NetworkIn::MessageToNode(_node_id, msg)) = tap.recv().await.ok_or("Error receiving message")? {
+        if let NetworkMessage::Input(NetworkIn::MessageToNode(_node_id, msg)) =
+            tap.recv().await.ok_or("Error receiving message")?
+        {
             let _ = serde_yaml::from_str::<Sphinx>(&msg).unwrap();
         }
-
     }
 
     // Quit the tokio-thread
@@ -105,12 +108,12 @@ async fn test_loopix_tiny() -> Result<(), Box<dyn Error>> {
             )?,
         )))?;
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_secs(15)).await;
+
+    loopix_setup.print_all_messages(true).await;
 
     // Quit the tokio-thread
     stop.send(true).ok();
-
-    loopix_setup.print_all_messages(true).await;
 
     Ok(())
 }

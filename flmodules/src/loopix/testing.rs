@@ -254,6 +254,18 @@ impl LoopixSetup {
                 .collect::<Vec<String>>();
             println!("{:<60} {:<20}", format!("[{}]", short_route.join(", ")), format!("{:?}", message_type));
         }
+
+        if role == "Provider" {
+            let client_messages = node.storage.get_all_client_messages().await;
+            println!("\nClient Messages:");
+            println!("{:<60} {:<20}", "Client ID", "Message Type");
+            println!("{:-<80}", "");
+            for (client_id, messages) in client_messages {
+                for (_delay, sphinx) in messages {
+                    println!("{:<60} {:<20}", format!("{:x}", client_id), format!("{:?}", sphinx));
+                }
+            }
+        }
     }
     
 }
@@ -296,7 +308,7 @@ impl NetworkSimul {
         for (id_tx, id_rx, msg) in msgs.iter() {
             if let Some((broker, _)) = self.nodes.get_mut(&id_rx) {
                 // This is for debugging and can be removed
-                // println!("{id_tx}->{id_rx}: {msg}");
+                println!("NetworkOut: {id_tx}->{id_rx}: {msg}");
                 broker.emit_msg(NetworkMessage::Output(NetworkOut::MessageFromNode(
                     id_tx.clone(),
                     msg.clone(),

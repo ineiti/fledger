@@ -152,7 +152,7 @@ impl CoreConfig {
             mean_delay: 1,
             lambda_loop_mix: 60.0,
             time_pull: 0.0,
-            max_retrieve: 0,
+            max_retrieve: 10,
             pad_length: 150,
         }
     }

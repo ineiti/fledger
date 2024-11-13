@@ -1,6 +1,6 @@
+use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
-use std::fmt;
 
 use async_trait::async_trait;
 use sphinx_packet::header::delays::generate_from_average_duration;
@@ -13,13 +13,7 @@ use sphinx_packet::{header::delays::Delay, packet::*, payload::*};
 
 use super::config::CoreConfig;
 use super::storage::LoopixStorage;
-use super::{
-    client::Client,
-    core::*,
-    mixnode::Mixnode,
-    provider::Provider,
-    sphinx::*,
-};
+use super::{client::Client, core::*, mixnode::Mixnode, provider::Provider, sphinx::*};
 use crate::nodeconfig::NodeInfo;
 use crate::overlay::messages::NetworkWrapper;
 
@@ -50,12 +44,16 @@ pub enum MessageType {
 impl fmt::Display for MessageType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MessageType::Payload(node_id, payload) => write!(f, "Payload({}, {:?})", node_id, payload),
+            MessageType::Payload(node_id, payload) => {
+                write!(f, "Payload({}, {:?})", node_id, payload)
+            }
             MessageType::Drop => write!(f, "Drop"),
             MessageType::Loop => write!(f, "Loop"),
             MessageType::Dummy => write!(f, "Dummy"),
             MessageType::PullRequest(node_id) => write!(f, "PullRequest({})", node_id),
-            MessageType::SubscriptionRequest(node_id) => write!(f, "SubscriptionRequest({})", node_id),
+            MessageType::SubscriptionRequest(node_id) => {
+                write!(f, "SubscriptionRequest({})", node_id)
+            }
         }
     }
 }
@@ -94,8 +92,8 @@ impl Clone for LoopixMessages {
 impl LoopixMessages {
     pub fn new(
         node_type: NodeType,
-        network_sender: Sender<(NodeID, Delay, Sphinx)>,    
-        overlay_sender: Sender<(NodeID, NetworkWrapper) >, 
+        network_sender: Sender<(NodeID, Delay, Sphinx)>,
+        overlay_sender: Sender<(NodeID, NetworkWrapper)>,
     ) -> Self {
         Self {
             role: node_type,
@@ -113,10 +111,23 @@ impl LoopixMessages {
     async fn process_message(&self, msg: LoopixIn) {
         match msg {
             LoopixIn::OverlayRequest(node_id, message) => {
-                log::trace!("OverlayRequest with node_id {} and message {:?}", node_id, message);
+                log::trace!(
+                    "{}: OverlayRequest with node_id {} and message {:?}",
+                    self.role.get_our_id().await,
+                    node_id,
+                    message
+                );
                 self.process_overlay_message(node_id, message).await
             }
-            LoopixIn::SphinxFromNetwork(node_id, sphinx) => self.process_sphinx_packet(node_id, sphinx).await,
+            LoopixIn::SphinxFromNetwork(node_id, sphinx) => {
+                log::trace!(
+                    "{}: SphinxFromNetwork from node_id {} and sphinx {:?}",
+                    self.role.get_our_id().await,
+                    node_id,
+                    sphinx.clone()
+                );
+                self.process_sphinx_packet(node_id, sphinx).await
+            }
         }
     }
 
@@ -148,15 +159,22 @@ impl LoopixMessages {
         self.role.create_subscribe_message().await
     }
 
-    pub async fn create_pull_message(&self) -> (NodeID, Option<Sphinx>) {
+    pub async fn create_pull_message(self) -> (NodeID, Option<Sphinx>) {
         self.role.create_pull_message().await
     }
 
     async fn process_overlay_message(&self, node_id: NodeID, message: NetworkWrapper) {
         let (next_node, sphinx) = self.role.process_overlay_message(node_id, message).await;
         let mean_delay = Duration::from_millis(self.role.get_config().mean_delay());
+
         let delay = generate_from_average_duration(1, mean_delay);
-        log::trace!("Overlay message to {:?}, with delay {:?}", next_node, delay[0]);
+
+        log::trace!(
+            "{}: Overlay message to {:?}, with delay {:?}",
+            self.role.get_our_id().await,
+            next_node,
+            delay[0]
+        );
         self.network_sender
             .send((next_node, delay[0], sphinx))
             .await
@@ -164,42 +182,75 @@ impl LoopixMessages {
     }
 
     async fn process_sphinx_packet(&self, node_id: NodeID, sphinx_packet: Sphinx) {
-        let processed = self.role.process_sphinx_packet(sphinx_packet).await;
+        let processed = self.role.process_sphinx_packet(sphinx_packet.clone()).await;
         match processed {
             ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
+                log::trace!(
+                    "{}: ForwardHop from node_id {} and sphinx {:?}",
+                    self.role.get_our_id().await,
+                    node_id,
+                    sphinx_packet.clone()
+                );
                 let next_node_id = node_id_from_node_address(next_address);
                 let (next_node_id, next_delay, sphinx) = self
                     .role
                     .process_forward_hop(next_packet, next_node_id, delay)
                     .await;
-                self.role.get_storage().add_forwarded_messages(vec![(node_id, next_node_id)]).await; // from node_id to next_node_id
 
                 if let Some(sphinx) = sphinx {
+                    self.role
+                        .get_storage()
+                    .add_forwarded_messages(vec![(node_id, next_node_id)])
+                    .await; // from node_id to next_node_id
+
                     self.network_sender
                         .send((next_node_id, next_delay, sphinx))
                         .await
                         .expect("while sending message");
+                } else {
+                    log::debug!("No message to forward to {}", next_node_id);
                 }
             }
             ProcessedPacket::FinalHop(destination, surb_id, payload) => {
-                // Check if the final destination matches our ID
+                log::trace!(
+                    "FinalHop from node_id {} and sphinx {:?}",
+                    node_id,
+                    sphinx_packet
+                );
                 let dest = node_id_from_destination_address(destination);
 
-                let (source, msg, messages, message_type) = self.role.process_final_hop(dest, surb_id, payload).await;
+                let (source, msg, messages, message_type) =
+                    self.role.process_final_hop(dest, surb_id, payload).await;
 
                 if let Some(message_type) = message_type {
-                    self.role.get_storage().add_received_messages(vec![(source, dest, message_type)]).await;
+                    self.role
+                        .get_storage()
+                        .add_received_messages(vec![(source, dest, message_type)])
+                        .await;
                 }
 
                 if let Some(msg) = msg {
+                    log::debug!(
+                        "Final hop was a payload message: {} -> {}: {:?}",
+                        source,
+                        dest,
+                        msg
+                    );
                     self.overlay_sender
                         .send((source, msg))
                         .await
                         .expect("while sending message");
                 }
                 if let Some(messages) = messages {
+                    log::debug!(
+                        "Final hop was a pull request: {} -> {}",
+                        source,
+                        dest
+                    );
+                    log::debug!("Sending {} messages back to {}", messages.len(), source);
                     for (delay, sphinx) in messages {
-                            self.network_sender
+                        log::debug!("Sending message with delay {:?} to {}", delay, source);
+                        self.network_sender
                             .send((source, delay, sphinx))
                             .await
                             .expect("while sending message");
@@ -259,11 +310,33 @@ impl LoopixCore for NodeType {
         }
     }
 
-    async fn process_final_hop(&self, destination: NodeID, surb_id: [u8; 16], payload: Payload) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>, Option<MessageType>) {
+    async fn process_final_hop(
+        &self,
+        destination: NodeID,
+        surb_id: [u8; 16],
+        payload: Payload,
+    ) -> (
+        NodeID,
+        Option<NetworkWrapper>,
+        Option<Vec<(Delay, Sphinx)>>,
+        Option<MessageType>,
+    ) {
         match self {
-            NodeType::Client(client) => client.process_final_hop(destination, surb_id, payload).await,
-            NodeType::Mixnode(mixnode) =>  mixnode.process_final_hop(destination, surb_id, payload).await,
-            NodeType::Provider(provider) =>  provider.process_final_hop(destination, surb_id, payload).await,
+            NodeType::Client(client) => {
+                client
+                    .process_final_hop(destination, surb_id, payload)
+                    .await
+            }
+            NodeType::Mixnode(mixnode) => {
+                mixnode
+                    .process_final_hop(destination, surb_id, payload)
+                    .await
+            }
+            NodeType::Provider(provider) => {
+                provider
+                    .process_final_hop(destination, surb_id, payload)
+                    .await
+            }
         }
     }
 
@@ -274,16 +347,23 @@ impl LoopixCore for NodeType {
         delay: Delay,
     ) -> (NodeID, Delay, Option<Sphinx>) {
         match self {
-            NodeType::Client(client) => client.process_forward_hop(next_packet, next_node, delay).await,
+            NodeType::Client(client) => {
+                client
+                    .process_forward_hop(next_packet, next_node, delay)
+                    .await
+            }
             NodeType::Mixnode(mixnode) => {
-                mixnode.process_forward_hop(next_packet, next_node, delay).await
+                mixnode
+                    .process_forward_hop(next_packet, next_node, delay)
+                    .await
             }
             NodeType::Provider(provider) => {
-                provider.process_forward_hop(next_packet, next_node, delay).await
+                provider
+                    .process_forward_hop(next_packet, next_node, delay)
+                    .await
             }
         }
     }
-
 }
 
 impl NodeType {
@@ -307,7 +387,7 @@ impl NodeType {
         }
     }
 
-    async fn create_subscribe_message(&self) -> (NodeID, Sphinx) {
+    async fn create_subscribe_message(&mut self) -> (NodeID, Sphinx) {
         match self {
             NodeType::Client(client) => client.create_subscribe_message().await,
             NodeType::Mixnode(_) => panic!("Mixnode does not implement create_subscribe_message"),
@@ -315,7 +395,7 @@ impl NodeType {
         }
     }
 
-    async fn create_pull_message(&self) -> (NodeID, Option<Sphinx>) {
+    async fn create_pull_message(self) -> (NodeID, Option<Sphinx>) {
         match self {
             NodeType::Client(client) => client.create_pull_message().await,
             NodeType::Mixnode(_) => panic!("Mixnode does not implement create_pull_message"),

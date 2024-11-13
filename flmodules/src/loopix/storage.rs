@@ -1,13 +1,13 @@
-use std::collections::HashMap;
-use rand::seq::IteratorRandom;
-use sphinx_packet::{header::delays::Delay, route::Node};
-use x25519_dalek::{PublicKey, StaticSecret};
-use tokio::sync::RwLock;
-use std::sync::Arc;
-use std::collections::HashSet;
 use crate::{loopix::sphinx::Sphinx, nodeconfig::NodeInfo};
 use flarch::nodeids::NodeID;
+use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
+use sphinx_packet::{header::delays::Delay, route::Node};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use x25519_dalek::{PublicKey, StaticSecret};
 
 use super::{messages::MessageType, sphinx::node_id_from_node_address};
 
@@ -84,7 +84,11 @@ impl ClientStorage {
     }
 
     /// Client IDs are chosen randomly
-    pub fn default_with_path_length(our_node_id: NodeID, all_nodes: Vec<NodeInfo>, path_length: usize) -> Self {
+    pub fn default_with_path_length(
+        our_node_id: NodeID,
+        all_nodes: Vec<NodeInfo>,
+        path_length: usize,
+    ) -> Self {
         let mut our_provider: Option<NodeID> = None;
 
         let mut client_to_provider_map: HashMap<NodeID, NodeID> = HashMap::new();
@@ -113,12 +117,18 @@ impl ClientStorage {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ProviderStorage {
     subscribed_clients: HashSet<NodeID>,
-    #[serde(serialize_with = "serialize_client_messages", deserialize_with = "deserialize_client_messages")]
+    #[serde(
+        serialize_with = "serialize_client_messages",
+        deserialize_with = "deserialize_client_messages"
+    )]
     client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>,
 }
 
 impl ProviderStorage {
-    pub fn new(subscribed_clients: HashSet<NodeID>, client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>) -> Self {
+    pub fn new(
+        subscribed_clients: HashSet<NodeID>,
+        client_messages: HashMap<NodeID, Vec<(Delay, Sphinx)>>,
+    ) -> Self {
         ProviderStorage {
             subscribed_clients,
             client_messages,
@@ -134,7 +144,6 @@ impl ProviderStorage {
 
     /// given path_length 3: our node either 3, 4, or 5
     pub fn default_with_path_length(clients: HashSet<NodeID>) -> Self {
-
         ProviderStorage {
             subscribed_clients: clients,
             client_messages: HashMap::new(),
@@ -170,7 +179,12 @@ impl LoopixStorage {
         if storage.providers.is_empty() {
             panic!("No providers available");
         }
-        storage.providers.iter().choose(&mut rand::thread_rng()).unwrap().clone()
+        storage
+            .providers
+            .iter()
+            .choose(&mut rand::thread_rng())
+            .unwrap()
+            .clone()
     }
 
     pub async fn get_our_id(&self) -> NodeID {
@@ -214,7 +228,11 @@ impl LoopixStorage {
     }
 
     pub async fn add_forwarded_messages(&self, new_messages: Vec<(NodeID, NodeID)>) {
-        self.network_storage.write().await.forwarded_messages.extend(new_messages);
+        self.network_storage
+            .write()
+            .await
+            .forwarded_messages
+            .extend(new_messages);
     }
 
     pub async fn get_received_messages(&self) -> Vec<(NodeID, NodeID, MessageType)> {
@@ -222,7 +240,11 @@ impl LoopixStorage {
     }
 
     pub async fn add_received_messages(&self, new_messages: Vec<(NodeID, NodeID, MessageType)>) {
-        self.network_storage.write().await.received_messages.extend(new_messages);
+        self.network_storage
+            .write()
+            .await
+            .received_messages
+            .extend(new_messages);
     }
 
     pub async fn get_sent_messages(&self) -> Vec<(Vec<NodeID>, MessageType)> {
@@ -234,8 +256,12 @@ impl LoopixStorage {
             .iter()
             .map(|node| node_id_from_node_address(node.address))
             .collect();
-        self.network_storage.write().await.sent_messages.push((route_ids, message_type));
-    }   
+        self.network_storage
+            .write()
+            .await
+            .sent_messages
+            .push((route_ids, message_type));
+    }
 
     pub async fn get_our_provider(&self) -> Option<NodeID> {
         if let Some(storage) = self.client_storage.read().await.as_ref() {
@@ -330,6 +356,14 @@ impl LoopixStorage {
     pub async fn set_subscribed_clients(&self, new_clients: HashSet<NodeID>) {
         if let Some(storage) = &mut *self.provider_storage.write().await {
             storage.subscribed_clients = new_clients;
+        } else {
+            panic!("Provider storage not found");
+        }
+    }
+
+    pub async fn get_all_client_messages(&self) -> HashMap<NodeID, Vec<(Delay, Sphinx)>> {
+        if let Some(storage) = self.provider_storage.read().await.as_ref() {
+            storage.client_messages.clone()
         } else {
             panic!("Provider storage not found");
         }
@@ -495,18 +529,31 @@ impl LoopixStorage {
         all_nodes: Vec<NodeInfo>,
     ) -> Self {
         //provider generation
-        let provider_infos = all_nodes.iter().skip(path_length).take(path_length).collect::<Vec<&NodeInfo>>();
-        
+        let provider_infos = all_nodes
+            .iter()
+            .skip(path_length)
+            .take(path_length)
+            .collect::<Vec<&NodeInfo>>();
+
         let mut providers = HashSet::from_iter(provider_infos.iter().map(|node| node.get_id()));
         if providers.contains(&node_id) {
             providers.remove(&node_id);
         }
-        
+
         // mix generation
         let mix_infos = all_nodes.iter().skip(path_length * 2);
         let mut mixes = Vec::new();
         for i in 0..path_length {
-            mixes.push(mix_infos.clone().skip(i * path_length).take(path_length).collect::<Vec<&NodeInfo>>().iter().map(|node| node.get_id()).collect::<Vec<NodeID>>());
+            mixes.push(
+                mix_infos
+                    .clone()
+                    .skip(i * path_length)
+                    .take(path_length)
+                    .collect::<Vec<&NodeInfo>>()
+                    .iter()
+                    .map(|node| node.get_id())
+                    .collect::<Vec<NodeID>>(),
+            );
         }
 
         for mix_layer in &mut mixes {
@@ -581,9 +628,12 @@ impl std::fmt::Debug for LoopixStorage {
 #[derive(Serialize, Deserialize)]
 struct SerializableMessage {
     delay: [u8; 8],
-    sphinx: Sphinx, 
+    sphinx: Sphinx,
 }
-pub fn serialize_client_messages<S>(messages: &HashMap<NodeID, Vec<(Delay, Sphinx)>>, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize_client_messages<S>(
+    messages: &HashMap<NodeID, Vec<(Delay, Sphinx)>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -604,12 +654,15 @@ where
     serializable_messages.serialize(serializer)
 }
 
-pub fn deserialize_client_messages<'de, D>(deserializer: D) -> Result<HashMap<NodeID, Vec<(Delay, Sphinx)>>, D::Error>
+pub fn deserialize_client_messages<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<NodeID, Vec<(Delay, Sphinx)>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let serializable_messages: HashMap<NodeID, Vec<SerializableMessage>> = HashMap::deserialize(deserializer)?;
-    
+    let serializable_messages: HashMap<NodeID, Vec<SerializableMessage>> =
+        HashMap::deserialize(deserializer)?;
+
     let messages: HashMap<_, Vec<_>> = serializable_messages
         .into_iter()
         .map(|(node_id, messages)| {
@@ -740,7 +793,8 @@ mod tests {
 
         let our_node_id = all_nodes[0].get_id();
 
-        let client_storage = ClientStorage::default_with_path_length(our_node_id, all_nodes, path_length);
+        let client_storage =
+            ClientStorage::default_with_path_length(our_node_id, all_nodes, path_length);
 
         println!("Our Provider: {:?}", client_storage.our_provider);
         println!(
@@ -762,14 +816,16 @@ mod tests {
             .take(path_length)
             .collect::<Vec<NodeInfo>>();
 
-        let provider_storage = ProviderStorage::default_with_path_length(HashSet::from_iter(clients.iter().map(|node| node.get_id())));
+        let provider_storage = ProviderStorage::default_with_path_length(HashSet::from_iter(
+            clients.iter().map(|node| node.get_id()),
+        ));
 
         println!("Clients: {:?}", provider_storage.subscribed_clients);
     }
 
     #[test]
     fn test_loopix_storage_serde() {
-        let path_length = 3;    
+        let path_length = 3;
 
         let (all_nodes, _, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
@@ -816,7 +872,9 @@ mod tests {
             .take(path_length)
             .collect::<Vec<NodeInfo>>();
 
-        let provider_storage = ProviderStorage::default_with_path_length(HashSet::from_iter(clients.iter().map(|node| node.get_id())));
+        let provider_storage = ProviderStorage::default_with_path_length(HashSet::from_iter(
+            clients.iter().map(|node| node.get_id()),
+        ));
 
         let loopix_storage = LoopixStorage::default_with_path_length(
             node_id,
@@ -828,7 +886,9 @@ mod tests {
             all_nodes.clone(),
         );
 
-        loopix_storage.add_client_message(NodeID::from(1), Delay::new_from_nanos(1), Sphinx::default()).await;
+        loopix_storage
+            .add_client_message(NodeID::from(1), Delay::new_from_nanos(1), Sphinx::default())
+            .await;
 
         let provider_storage = loopix_storage.provider_storage.read().await;
 
@@ -836,8 +896,10 @@ mod tests {
 
         println!("Provider Storage: {:?}", updated_provider_storage);
 
-        let serialized = serde_yaml::to_string(&updated_provider_storage).expect("Failed to serialize");
-        let deserialized: ProviderStorage = serde_yaml::from_str(&serialized).expect("Failed to deserialize");
+        let serialized =
+            serde_yaml::to_string(&updated_provider_storage).expect("Failed to serialize");
+        let deserialized: ProviderStorage =
+            serde_yaml::from_str(&serialized).expect("Failed to deserialize");
 
         assert_eq!(updated_provider_storage, deserialized);
     }

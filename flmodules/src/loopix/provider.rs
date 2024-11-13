@@ -37,7 +37,6 @@ impl LoopixCore for Provider {
         self.storage.get_our_id().await
     }
 
-
     // THIS IS COPY PASTED FROM MIXNODE, I JUST DON'T KNOW HOW TO DO TRAITS IN RUST
     async fn create_loop_message(&self) -> (NodeID, Sphinx) {
         let providers = self.get_storage().get_providers().await;
@@ -65,7 +64,9 @@ impl LoopixCore for Provider {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(our_id, msg, &route);
-        self.storage.add_sent_message(route, MessageType::Loop).await;
+        self.storage
+            .add_sent_message(route, MessageType::Loop)
+            .await;
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
@@ -92,7 +93,9 @@ impl LoopixCore for Provider {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
-        self.storage.add_sent_message(route, MessageType::Drop).await;
+        self.storage
+            .add_sent_message(route, MessageType::Drop)
+            .await;
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
@@ -101,41 +104,65 @@ impl LoopixCore for Provider {
         destination: NodeID,
         _surb_id: [u8; 16],
         payload: Payload,
-    ) -> (NodeID, Option<NetworkWrapper>, Option<Vec<(Delay, Sphinx)>>, Option<MessageType>) {
-        
+    ) -> (
+        NodeID,
+        Option<NetworkWrapper>,
+        Option<Vec<(Delay, Sphinx)>>,
+        Option<MessageType>,
+    ) {
         if destination != self.get_our_id().await {
-            log::info!("Final hop received, but we're not the destination");    
+            log::info!("Final hop received, but we're not the destination");
             return (destination, None, None, None);
         }
 
-        let plaintext = payload.recover_plaintext().unwrap();
-        let plaintext_str = std::str::from_utf8(&plaintext).unwrap();
-
-        if let Ok(module_message) = serde_yaml::from_str::<NetworkWrapper>(plaintext_str) {
+        if let Ok(module_message) = serde_yaml::from_str::<NetworkWrapper>(
+            std::str::from_utf8(&payload.recover_plaintext().unwrap()).unwrap(),
+        ) {
             if module_message.module == MODULE_NAME {
                 if let Ok(message) = serde_yaml::from_str::<MessageType>(&module_message.msg) {
                     match message {
-                        MessageType::Payload(_, _) => { log::error!("Provider shouldn't receive payloads!"); (destination, None, None, Some(message)) },
-                        MessageType::PullRequest(client_id) => { 
+                        MessageType::Payload(_, _) => {
+                            log::error!("Provider shouldn't receive payloads!");
+                            (destination, None, None, Some(message))
+                        }
+                        MessageType::PullRequest(client_id) => {
                             let messages = self.create_pull_reply(client_id).await;
-                            log::trace!("Provider received pull request from client: {:?}", client_id);
-                            (destination, None, Some(messages), Some(message))
-                        },
+                            log::trace!(
+                                "Provider received pull request from client: {:?}",
+                                client_id
+                            );
+                            (client_id, None, Some(messages), Some(message))
+                        }
                         MessageType::SubscriptionRequest(client_id) => {
                             self.get_storage().add_subscribed_client(client_id).await;
-                            log::trace!("Provider received subscription request from client: {:?}", client_id);
+                            log::trace!(
+                                "Provider received subscription request from client: {:?}",
+                                client_id
+                            );
+                            (client_id, None, None, Some(message))
+                        }
+                        MessageType::Drop => {
+                            log::trace!("Provider received drop");
                             (destination, None, None, Some(message))
-                        },
-                        MessageType::Drop => { log::trace!("Provider received drop"); (destination, None, None, Some(message)) },
-                        MessageType::Loop => { log::trace!("Provider received loop"); (destination, None, None, Some(message)) },
-                        MessageType::Dummy => { log::error!("Provider shouldn't receive dummy messages!"); (destination, None, None, Some(message)) },
+                        }
+                        MessageType::Loop => {
+                            log::trace!("Provider received loop");
+                            (destination, None, None, Some(message))
+                        }
+                        MessageType::Dummy => {
+                            log::error!("Provider shouldn't receive dummy messages!");
+                            (destination, None, None, Some(message))
+                        }
                     }
                 } else {
                     log::error!("Received message in wrong format");
-                    (destination, None, None, None  )
+                    (destination, None, None, None)
                 }
             } else {
-                log::error!("Received message from module that is not Loopix: {:?}", module_message.module);
+                log::error!(
+                    "Received message from module that is not Loopix: {:?}",
+                    module_message.module
+                );
                 (destination, None, None, None)
             }
         } else {
@@ -150,21 +177,33 @@ impl LoopixCore for Provider {
         next_node: NodeID,
         delay: Delay,
     ) -> (NodeID, Delay, Option<Sphinx>) {
-        if self.get_storage().get_subscribed_clients().await.contains(&next_node) {
+        if self
+            .get_storage()
+            .get_subscribed_clients()
+            .await
+            .contains(&next_node)
+        {
             let sphinx = &Sphinx {
                 inner: *next_packet,
             };
-            self.store_client_message(next_node, delay, sphinx.clone()).await;
+            self.store_client_message(next_node, delay, sphinx.clone())
+                .await;
+
             (next_node, delay, None)
         } else {
             // THIS IS COPY PASTED FROM MIXNODE, I JUST DON'T KNOW HOW TO DO TRAITS IN RUST
             let sphinx = &Sphinx {
                 inner: *next_packet,
             };
+            log::debug!(
+                "{} --> {}: {:?}",
+                self.get_our_id().await,
+                next_node,
+                sphinx
+            );
             (next_node, delay, Some(sphinx.clone()))
         }
     }
-
 }
 
 impl Provider {
@@ -192,7 +231,7 @@ impl Provider {
     pub async fn store_client_message(&self, client_id: NodeID, delay: Delay, message: Sphinx) {
         self.get_storage()
             .add_client_message(client_id, delay, message)
-            .await  
+            .await
     }
 
     pub async fn create_dummy_message(&self, client_id: NodeID) -> (Delay, Sphinx) {
@@ -212,16 +251,24 @@ impl Provider {
         // create delay
         let mean_delay = Duration::from_millis(self.get_config().mean_delay());
         let delay = generate_from_average_duration(1, mean_delay);
-        self.storage.add_sent_message(route, MessageType::Dummy).await;
+        self.storage
+            .add_sent_message(route, MessageType::Dummy)
+            .await;
 
         (delay[0], sphinx)
     }
 
     pub async fn create_pull_reply(&self, client_id: NodeID) -> Vec<(Delay, Sphinx)> {
         // get max send amount and messages
+        log::trace!("Creating pull reply for client: {}", client_id);
         let max_retrieve = self.get_config().max_retrieve();
         let messages = self.get_client_messages(client_id).await;
 
+        log::debug!(
+            "Pull reply has {} real messages and {} messages will be send",
+            messages.len(),
+            max_retrieve
+        );
         // add messages to send
         let mut messages_to_send = Vec::new();
         for message in messages.iter().take(max_retrieve) {
@@ -229,10 +276,10 @@ impl Provider {
         }
 
         // pad vec if not enough messages
-        if messages_to_send.len() < max_retrieve {
-            let (delay, sphinx) = self.create_dummy_message(client_id).await;
-            messages_to_send.push((delay, sphinx));
-        }
+        // for _ in messages_to_send.len()..max_retrieve {
+        //     let (delay, sphinx) = self.create_dummy_message(client_id).await;
+        //     messages_to_send.push((delay, sphinx));
+        // } // TODO uncomment
 
         messages_to_send
     }
