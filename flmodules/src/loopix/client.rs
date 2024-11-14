@@ -463,6 +463,7 @@ mod tests {
                 Err(e) => {
                     log::error!("Failed to process packet: {:?}", e);
                     assert!(false);
+                    return;
                 }
             };
 
@@ -527,6 +528,7 @@ mod tests {
                 Err(e) => {
                     log::error!("Failed to process packet: {:?}", e);
                     assert!(false);
+                    return;
                 }
             };
 
@@ -591,6 +593,7 @@ mod tests {
                 Err(e) => {
                     log::error!("Failed to process packet: {:?}", e);
                     assert!(false);
+                    return;
                 }
             };
 
