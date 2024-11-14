@@ -1,7 +1,13 @@
 use std::error::Error;
 
-use flarch::nodeids::{NodeID, NodeIDs};
+use flarch::{
+    broker::SubsystemHandler,
+    nodeids::{NodeID, NodeIDs, U256},
+    platform_async_trait,
+};
 use serde::{Deserialize, Serialize};
+
+use crate::overlay::messages::NetworkWrapper;
 
 use super::core::*;
 
@@ -9,14 +15,18 @@ use super::core::*;
 /// module.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ModuleMessage {
-    Increase(u32),
-    Counter(u32),
+    Ping,
+    Pong,
+    // Send the NetworkWrapper message to the closest node of U256.
+    // Usually the destination doesn't exist, so whenever there is no
+    // closer node to send the message to, propagation stops.
+    Route(U256, NetworkWrapper),
 }
 
 /// First wrap all messages coming into this module and all messages going out in
 /// a single message time.
 #[derive(Clone, Debug)]
-pub enum DHTRoutingMessage {
+pub enum DHTRoutingMessageIntern {
     Input(DHTRoutingIn),
     Output(DHTRoutingOut),
 }
@@ -26,6 +36,7 @@ pub enum DHTRoutingMessage {
 pub enum DHTRoutingIn {
     FromNetwork(NodeID, ModuleMessage),
     UpdateNodeList(NodeIDs),
+    Tick,
 }
 
 #[derive(Debug, Clone)]
@@ -63,8 +74,11 @@ impl DHTRoutingMessages {
         for msg in msgs {
             log::trace!("Got msg: {msg:?}");
             out.extend(match msg {
-                DHTRoutingIn::FromNetwork(src, node_msg) => self.process_node_message(src, node_msg),
+                DHTRoutingIn::FromNetwork(src, node_msg) => {
+                    self.process_node_message(src, node_msg)
+                }
                 DHTRoutingIn::UpdateNodeList(ids) => self.node_list(ids),
+                DHTRoutingIn::Tick => todo!(),
             });
         }
         out
@@ -74,26 +88,11 @@ impl DHTRoutingMessages {
     /// MessageOut.
     pub fn process_node_message(&mut self, _src: NodeID, msg: ModuleMessage) -> Vec<DHTRoutingOut> {
         match msg {
-            ModuleMessage::Increase(c) => {
-                // When increasing the counter, send 'self' counter to all other nodes.
-                // Also send a StorageUpdate message.
-                self.core.increase(c);
-                return self
-                    .nodes
-                    .0
-                    .iter()
-                    .map(|id| {
-                        DHTRoutingOut::ToNetwork(
-                            id.clone(),
-                            ModuleMessage::Counter(self.core.storage.counter),
-                        )
-                    })
-                    .chain(vec![DHTRoutingOut::UpdateStorage(self.core.storage.clone())])
-                    .collect();
-            }
-            ModuleMessage::Counter(c) => log::info!("Got counter from {}: {}", _src, c),
+            ModuleMessage::Ping => todo!(),
+            ModuleMessage::Pong => todo!(),
+            ModuleMessage::Route(_dst, _network_wrapper) => todo!(),
         }
-        vec![]
+        // vec![]
     }
 
     /// Stores the new node list, excluding the ID of this node.
@@ -103,17 +102,34 @@ impl DHTRoutingMessages {
     }
 }
 
-/// Convenience method to reduce long lines.
-impl From<DHTRoutingIn> for DHTRoutingMessage {
-    fn from(msg: DHTRoutingIn) -> Self {
-        DHTRoutingMessage::Input(msg)
+#[platform_async_trait()]
+impl SubsystemHandler<DHTRoutingMessageIntern> for DHTRoutingMessages {
+    async fn messages(&mut self, msgs: Vec<DHTRoutingMessageIntern>) -> Vec<DHTRoutingMessageIntern> {
+        self.process_messages(
+            msgs.into_iter()
+                .filter_map(|msg: DHTRoutingMessageIntern| match msg {
+                    DHTRoutingMessageIntern::Input(msg_in) => Some(msg_in),
+                    DHTRoutingMessageIntern::Output(_) => None,
+                })
+                .collect(),
+        )
+        .into_iter()
+        .map(|o| o.into())
+        .collect()
     }
 }
 
 /// Convenience method to reduce long lines.
-impl From<DHTRoutingOut> for DHTRoutingMessage {
+impl From<DHTRoutingIn> for DHTRoutingMessageIntern {
+    fn from(msg: DHTRoutingIn) -> Self {
+        DHTRoutingMessageIntern::Input(msg)
+    }
+}
+
+/// Convenience method to reduce long lines.
+impl From<DHTRoutingOut> for DHTRoutingMessageIntern {
     fn from(msg: DHTRoutingOut) -> Self {
-        DHTRoutingMessage::Output(msg)
+        DHTRoutingMessageIntern::Output(msg)
     }
 }
 
@@ -123,23 +139,23 @@ mod tests {
 
     #[test]
     fn test_something() -> Result<(), Box<dyn Error>> {
-        let ids = NodeIDs::new(2);
-        let id0 = *ids.0.get(0).unwrap();
-        let id1 = *ids.0.get(1).unwrap();
-        let storage = DHTRoutingStorage::default();
-        let mut msg = DHTRoutingMessages::new(storage, DHTRoutingConfig::default(), id0)?;
-        msg.process_messages(vec![DHTRoutingIn::UpdateNodeList(ids).into()]);
-        let ret =
-            msg.process_messages(vec![DHTRoutingIn::FromNetwork(id1, ModuleMessage::Increase(2)).into()]);
-        assert_eq!(2, ret.len());
-        assert!(matches!(
-            ret[0],
-            DHTRoutingOut::ToNetwork(_, ModuleMessage::Counter(2))
-        ));
-        assert!(matches!(
-            ret[1],
-            DHTRoutingOut::UpdateStorage(DHTRoutingStorage { counter: 2 })
-        ));
+        // let ids = NodeIDs::new(2);
+        // let id0 = *ids.0.get(0).unwrap();
+        // let id1 = *ids.0.get(1).unwrap();
+        // let storage = DHTRoutingStorage::default();
+        // let mut msg = DHTRoutingMessages::new(storage, DHTRoutingConfig::default(), id0)?;
+        // msg.process_messages(vec![DHTRoutingIn::UpdateNodeList(ids).into()]);
+        // let ret =
+        //     msg.process_messages(vec![DHTRoutingIn::FromNetwork(id1, ModuleMessage::Increase(2)).into()]);
+        // assert_eq!(2, ret.len());
+        // assert!(matches!(
+        //     ret[0],
+        //     DHTRoutingOut::ToNetwork(_, ModuleMessage::Counter(2))
+        // ));
+        // assert!(matches!(
+        //     ret[1],
+        //     DHTRoutingOut::UpdateStorage(DHTRoutingStorage { counter: 2 })
+        // ));
         Ok(())
     }
 }
