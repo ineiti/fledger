@@ -152,6 +152,7 @@ impl LoopixCore for Mixnode {
     }
 
     async fn create_drop_message(&self) -> (NodeID, Sphinx) {
+        // pick random provider
         let random_provider = self.get_storage().get_random_provider().await;
 
         // create route
@@ -159,8 +160,8 @@ impl LoopixCore for Mixnode {
             .create_route(
                 self.get_config().path_length(),
                 None,
-                Some(random_provider),
                 None,
+                Some(random_provider),
             )
             .await;
 

@@ -140,25 +140,25 @@ impl LoopixMessages {
         self.role.create_drop_message().await
     }
 
-    pub async fn send_drop_message(&self) {
-        let (node_id, sphinx) = self.create_drop_message().await;
-        let mean_delay = Duration::from_millis(self.role.get_config().mean_delay());
-        let delay = generate_from_average_duration(1, mean_delay);
-        self.network_sender
-            .send((node_id, delay[0], sphinx))
-            .await
-            .expect("while sending message");
-    }
+    // pub async fn send_drop_message(&self) {
+    //     let (node_id, sphinx) = self.create_drop_message().await;
+    //     let mean_delay = Duration::from_millis(self.role.get_config().mean_delay());
+    //     let delay = generate_from_average_duration(1, mean_delay);
+    //     self.network_sender
+    //         .send((node_id, delay[0], sphinx))
+    //         .await
+    //         .expect("while sending message");
+    // }
 
-    pub async fn send_loop_message(&self) {
-        let (node_id, sphinx) = self.role.create_loop_message().await;
-        let mean_delay = Duration::from_millis(self.role.get_config().mean_delay());
-        let delay = generate_from_average_duration(1, mean_delay);
-        self.network_sender
-            .send((node_id, delay[0], sphinx))
-            .await
-            .expect("while sending message");
-    }
+    // pub async fn send_loop_message(&self) {
+    //     let (node_id, sphinx) = self.role.create_loop_message().await;
+    //     let mean_delay = Duration::from_millis(self.role.get_config().mean_delay());
+    //     let delay = generate_from_average_duration(1, mean_delay);
+    //     self.network_sender
+    //         .send((node_id, delay[0], sphinx))
+    //         .await
+    //         .expect("while sending message");
+    // }
 
     pub async fn create_subscribe_message(&mut self) -> (NodeID, Sphinx) {
         self.role.create_subscribe_message().await
@@ -298,16 +298,16 @@ impl LoopixCore for NodeType {
     async fn create_drop_message(&self) -> (NodeID, Sphinx) {
         match self {
             NodeType::Client(client) => client.create_drop_message().await,
-            NodeType::Mixnode(mixnode) => LoopixCore::create_drop_message(mixnode).await,
-            NodeType::Provider(provider) => LoopixCore::create_drop_message(provider).await,
+            NodeType::Mixnode(mixnode) => mixnode.create_drop_message().await,
+            NodeType::Provider(provider) => provider.create_drop_message().await,
         }
     }
 
     async fn create_loop_message(&self) -> (NodeID, Sphinx) {
         match self {
             NodeType::Client(client) => client.create_loop_message().await,
-            NodeType::Mixnode(mixnode) => LoopixCore::create_loop_message(mixnode).await,
-            NodeType::Provider(provider) => LoopixCore::create_loop_message(provider).await,
+            NodeType::Mixnode(mixnode) => mixnode.create_loop_message().await,
+            NodeType::Provider(provider) => provider.create_loop_message().await,
         }
     }
 

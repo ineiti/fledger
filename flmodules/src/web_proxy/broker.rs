@@ -78,7 +78,7 @@ impl WebProxy {
     /// returned.
     /// TODO: add GET headers and body, move timeout to configuration
     pub async fn get(&mut self, url: &str) -> Result<Response, WebProxyError> {
-        log::debug!("Getting {url}");
+        // log::debug!("Getting {url}");
         let our_rnd = U256::rnd();
         let (tx, rx) = channel(128);
         self.web_proxy
@@ -105,7 +105,7 @@ impl WebProxy {
         url: &str,
         timeout_duration: Duration,
     ) -> Result<Response, WebProxyError> {
-        log::debug!("Getting {url}");
+        // log::debug!("Getting {url}");
         let our_rnd = U256::rnd();
         let (tx, rx) = channel(128);
         self.web_proxy
@@ -156,8 +156,8 @@ impl Translate {
     }
 
     fn link_overlay_proxy(msg: OverlayMessage) -> Option<WebProxyMessage> {
-        log::info!("Received message from overlay: {:?}", msg);
         if let OverlayMessage::Output(msg_out) = msg {
+            log::info!("WebProxy: Received message from overlay: {:?}", msg_out);
             match msg_out {
                 OverlayOut::NodeInfosConnected(list) => {
                     Some(WebProxyIn::NodeInfoConnected(list).into())
@@ -173,7 +173,7 @@ impl Translate {
     }
 
     fn link_proxy_overlay(msg: WebProxyMessage) -> Option<OverlayMessage> {
-        log::info!("Sending message to overlay: {:?}", msg);
+        log::info!("WebProxy: Sending message to overlay: {:?}", msg);
         if let WebProxyMessage::Output(WebProxyOut::ToNetwork(id, msg_node)) = msg {
             Some(
                 OverlayIn::NetworkWrapperToNetwork(
@@ -232,8 +232,6 @@ mod tests {
         let (mut cl_tap, _) = cl_rnd.get_tap().await?;
         let _wp = WebProxy::start(wp_ds, wp_id, wp_rnd.clone(), WebProxyConfig::default()).await?;
 
-        tokio::time::sleep(Duration::from_secs(3)).await;
-        
         let (mut wp_tap, _) = wp_rnd.get_tap().await?;
 
         let list = vec![cl_in, wp_in];

@@ -260,6 +260,7 @@ impl Client {
         // create the networkmessage
         let subscribe_msg =
             serde_yaml::to_string(&MessageType::SubscriptionRequest(our_id)).unwrap();
+
         let msg = NetworkWrapper {
             module: MODULE_NAME.into(),
             msg: subscribe_msg,
@@ -456,8 +457,14 @@ mod tests {
             assert_eq!(next_node, node_id);
             let key_pair = key_pairs.get(&node_id).unwrap();
             let static_secret = &key_pair.1;
-
-            let processed = sphinx_packet.clone().inner.process(&static_secret).unwrap();
+            
+            let processed = match sphinx_packet.clone().inner.process(&static_secret) {
+                Ok(processed) => processed,
+                Err(e) => {
+                    log::error!("Failed to process packet: {:?}", e);
+                    assert!(false);
+                }
+            };
 
             match processed {
                 ProcessedPacket::ForwardHop(next_packet, next_address, _delay) => {
@@ -481,6 +488,132 @@ mod tests {
                                 serde_yaml::from_str::<MessageType>(&module_message.msg).unwrap();
                             match msg {
                                 MessageType::Payload(_, _) => assert!(true),
+                                _ => assert!(false),
+                            }
+                        } else {
+                            assert!(false);
+                        }
+                    } else {
+                        assert!(false);
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_drop_message() {
+        let (client, _nodes, _path_length, key_pairs, _all_nodes) = setup().await;
+
+        let (_next_node, sphinx) = client.create_drop_message().await;
+
+        let sent_msg = client.get_storage().get_sent_messages().await;
+        println!("Sent messages: {:?}", sent_msg);
+
+        let (route, _msg) = sent_msg[0].clone();
+
+        let mut sphinx_packet = sphinx.clone();
+
+        let mut next_node = route[0];
+
+        for node_id in route {
+            println!("Node ID: {}", node_id);
+            assert_eq!(next_node, node_id);
+            let key_pair = key_pairs.get(&node_id).unwrap();
+            let static_secret = &key_pair.1;
+
+            let processed = match sphinx_packet.clone().inner.process(&static_secret) {
+                Ok(processed) => processed,
+                Err(e) => {
+                    log::error!("Failed to process packet: {:?}", e);
+                    assert!(false);
+                }
+            };
+
+            match processed {
+                ProcessedPacket::ForwardHop(next_packet, next_address, _delay) => {
+                    sphinx_packet = Sphinx {
+                        inner: *next_packet,
+                    };
+                    next_node = node_id_from_node_address(next_address);
+                }
+                ProcessedPacket::FinalHop(destination, _, payload) => {
+                    // Check if the final destination matches our ID
+                    let dest = node_id_from_destination_address(destination);
+                    if dest == node_id {
+                        // Recover the network wrapper
+                        if let Ok(module_message) = serde_yaml::from_str::<NetworkWrapper>(
+                            std::str::from_utf8(&payload.recover_plaintext().unwrap()).unwrap(),
+                        ) {
+                            // check module name
+                            assert_eq!(module_message.module, MODULE_NAME);
+
+                            let msg =
+                                serde_yaml::from_str::<MessageType>(&module_message.msg).unwrap();
+                            match msg {
+                                MessageType::Drop => assert!(true),
+                                _ => assert!(false),
+                            }
+                        } else {
+                            assert!(false);
+                        }
+                    } else {
+                        assert!(false);
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_subscribe_message() {
+        let (mut client, _nodes, _path_length, key_pairs, _all_nodes) = setup().await;
+
+        let (_next_node, sphinx) = client.create_subscribe_message().await;
+
+        let sent_msg = client.get_storage().get_sent_messages().await;
+        println!("Sent messages: {:?}", sent_msg);
+
+        let (route, _msg) = sent_msg[0].clone();
+
+        let mut sphinx_packet = sphinx.clone();
+
+        let mut next_node = route[0];
+
+        for node_id in route {
+            println!("Node ID: {}", node_id);
+            assert_eq!(next_node, node_id);
+            let key_pair = key_pairs.get(&node_id).unwrap();
+            let static_secret = &key_pair.1;
+
+            let processed = match sphinx_packet.clone().inner.process(&static_secret) {
+                Ok(processed) => processed,
+                Err(e) => {
+                    log::error!("Failed to process packet: {:?}", e);
+                    assert!(false);
+                }
+            };
+
+            match processed {
+                ProcessedPacket::ForwardHop(next_packet, next_address, _delay) => {
+                    sphinx_packet = Sphinx {
+                        inner: *next_packet,
+                    };
+                    next_node = node_id_from_node_address(next_address);
+                }
+                ProcessedPacket::FinalHop(destination, _, payload) => {
+                    let dest = node_id_from_destination_address(destination);
+                    assert_eq!(dest, client.get_our_provider().await.unwrap());
+                    if dest == node_id {
+                        if let Ok(module_message) = serde_yaml::from_str::<NetworkWrapper>(
+                            std::str::from_utf8(&payload.recover_plaintext().unwrap()).unwrap(),
+                        ) {
+                            assert_eq!(module_message.module, MODULE_NAME);
+
+                            let msg =
+                                serde_yaml::from_str::<MessageType>(&module_message.msg).unwrap();
+                            match msg {
+                                MessageType::SubscriptionRequest(id) => assert_eq!(id, client.get_our_id().await),
                                 _ => assert!(false),
                             }
                         } else {

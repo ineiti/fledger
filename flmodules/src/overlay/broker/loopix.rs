@@ -1,4 +1,4 @@
-use flarch::{broker::{Broker, BrokerError, SubsystemHandler}, platform_async_trait};
+use flarch::broker::{Broker, BrokerError};
 
 use crate::loopix::messages::{LoopixIn, LoopixMessage, LoopixOut};
 
@@ -30,15 +30,14 @@ impl OverlayLoopix {
     }
 
     fn from_loopix(msg: LoopixMessage) -> Option<OverlayMessage> {
-        log::info!("OverlayLoopix: Received message from loopix: {:?}", msg);
         if let LoopixMessage::Output(out) = msg {
             let ret = match out {
                 LoopixOut::NodeIDsConnected(node_ids) => {
-                    log::info!("OverlayLoopix: NodeIDsConnected message received: {:?}", node_ids);
+                    log::trace!("OverlayLoopix: NodeIDsConnected message received: {:?}", node_ids);
                     OverlayOut::NodeIDsConnected(node_ids)
                 },
                 LoopixOut::NodeInfosConnected(infos) => {
-                    log::info!("OverlayLoopix: NodeInfosConnected message received: {:?}", infos);
+                    log::trace!("OverlayLoopix: NodeInfosConnected message received: {:?}", infos);
                     OverlayOut::NodeInfosConnected(infos)
                 },
                 LoopixOut::NodeInfoAvailable(availables) => {
@@ -57,8 +56,8 @@ impl OverlayLoopix {
     }
 
     fn to_loopix(msg: OverlayMessage) -> Option<LoopixMessage> {
-        log::info!("Sending message to loopix: {:?}", msg);
         if let OverlayMessage::Input(input) = msg {
+            log::info!("OverlayLoopix: Sending message to loopix: {:?}", input);
             match input {
                 OverlayIn::NetworkWrapperToNetwork(node_id, wrapper) => {
                     return Some(LoopixIn::OverlayRequest(node_id, wrapper).into());
@@ -270,8 +269,9 @@ mod test {
         let mut cl =
             WebProxy::start(cl_ds, cl_id, overlay_broker.clone(), WebProxyConfig::default()).await.unwrap();
 
+        tokio::time::sleep(Duration::from_secs(3)).await;
 
-        if let Err(e) = cl.get_with_timeout("https://fledg.re", Duration::from_secs(30)).await {
+        if let Err(e) = cl.get_with_timeout("https://fledg.re", Duration::from_secs(10)).await {
             log::error!("Failed to fetch https://fledg.re: {:?}", e);
         } else {
             log::info!("Successfully fetched https://fledg.re");
@@ -328,16 +328,16 @@ mod test {
         println!("{:<60} {:<20}", "Route", "Message Type");
         println!("{:-<80}", "");
 
-        // for (route, message_type) in sent_messages {
-        //     let route_str = format!("{:?}", route);
-        //     let short_route: Vec<String> = route_str
-        //         .trim_matches(|c| c == '[' || c == ']')
-        //         .split(", ")
-        //         .map(|node_id| node_id.split('-').next().unwrap_or(node_id).to_string())
-        //         .collect();
-        //     let formatted_route = format!("[{}]", short_route.join(", "));
-        //     println!("{:<60} {:<20}", formatted_route, format!("{:?}", message_type));
-        // }
+        for (route, message_type) in sent_messages {
+            let route_str = format!("{:?}", route);
+            let short_route: Vec<String> = route_str
+                .trim_matches(|c| c == '[' || c == ']')
+                .split(", ")
+                .map(|node_id| node_id.split('-').next().unwrap_or(node_id).to_string())
+                .collect();
+            let formatted_route = format!("[{}]", short_route.join(", "));
+            println!("{:<60} {:<20}", formatted_route, format!("{:?}", message_type));
+        }
 
         // Ok(())
     }

@@ -4,7 +4,7 @@ use flarch::nodeids::NodeID;
 use sphinx_packet::header::delays::{generate_from_average_duration, Delay};
 use sphinx_packet::payload::Payload;
 use sphinx_packet::route::{Destination, Node, NodeAddressBytes};
-use sphinx_packet::{ProcessedPacket, SphinxPacket};
+use sphinx_packet::{ProcessedPacket, SphinxPacket, SphinxPacketBuilder};
 use std::time::Duration;
 
 use crate::loopix::config::CoreConfig;
@@ -15,6 +15,8 @@ use std::sync::Arc;
 use rand::prelude::SliceRandom;
 
 use super::messages::MessageType;
+
+const MAX_PAYLOAD_SIZE: usize = 10240;
 
 #[async_trait]
 pub trait LoopixCore {
@@ -66,7 +68,8 @@ pub trait LoopixCore {
         // message conversion
         let msg_bytes = serde_yaml::to_vec(&msg).unwrap();
 
-        let sphinx_packet = SphinxPacket::new(msg_bytes, route, &destination, &delays).unwrap();
+        let builder = SphinxPacketBuilder::new().with_payload_size(MAX_PAYLOAD_SIZE);
+        let sphinx_packet = builder.build_packet(msg_bytes, route, &destination, &delays).unwrap();
         (
             route[0].clone(),
             Sphinx {
@@ -274,7 +277,13 @@ mod tests {
 
         let (_, sphinx) = core.create_sphinx_packet(our_id, msg, &route);
 
-        let processed = sphinx.inner.process(&private_key).unwrap();
+        let processed = match sphinx.inner.process(&private_key) {
+            Ok(processed) => processed,
+            Err(e) => {
+                assert!(false, "Failed to process sphinx packet: {:?}", e);
+                return;
+            }
+        };
 
         match processed {
             ProcessedPacket::ForwardHop(_, _, _) => {

@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
  */
 #[tokio::test]
 async fn test_loopix() -> Result<(), Box<dyn Error>> {
-    start_logging_filter_level(vec![], log::LevelFilter::Debug);
+    start_logging_filter_level(vec![], log::LevelFilter::Trace);
 
     let loopix_setup = LoopixSetup::new(2).await?;
     let mut network = NetworkSimul::new();
@@ -43,9 +43,23 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
     let mut proxy_src = ProxyBroker::new(loopix_setup.clients[0].loopix.clone()).await?;
     let proxy_dst = ProxyBroker::new(loopix_setup.clients[1].loopix.clone()).await?;
 
-    if let Err(e) = proxy_src.proxy.get_with_timeout("https://fledg.re", Duration::from_secs(30)).await {
-        eprintln!("Proxy timeout or error: {:?}", e);
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    let resp_result = proxy_src.proxy.get_with_timeout("https://fledg.re/", Duration::from_secs(30)).await;
+
+    match resp_result {
+        Ok(mut resp) => {
+            log::debug!("Got response struct with headers: {resp:?}");
+            let content = resp.text().await.expect("getting text");
+            log::debug!("Got text from content: {content:?}");
+        }
+        Err(e) => {
+            log::error!("Failed to get response: {e}");
+            loopix_setup.print_all_messages(true).await;
+            return Err(e.into());
+        }
     }
+
     println!("Ids for proxies: ${} / ${}", proxy_src.id, proxy_dst.id);
 
     stop.send(true).ok();
