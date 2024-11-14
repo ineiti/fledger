@@ -140,15 +140,15 @@ impl LoopixCore for Client {
                             (client_id, None, None, Some(message))
                         }
                         MessageType::Drop => {
-                            log::info!("Client received drop");
+                            log::debug!("Client received drop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Loop => {
-                            log::info!("Client received loop");
+                            log::debug!("Client received loop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Dummy => {
-                            log::info!("Client received dummy");
+                            log::debug!("Client received dummy");
                             (destination, None, None, Some(message))
                         }
                     }

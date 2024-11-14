@@ -100,6 +100,33 @@ impl WebProxy {
         .map_err(|_| WebProxyError::ResponseTimeout)?
     }
 
+    pub async fn get_with_timeout(
+        &mut self,
+        url: &str,
+        timeout_duration: Duration,
+    ) -> Result<Response, WebProxyError> {
+        log::debug!("Getting {url}");
+        let our_rnd = U256::rnd();
+        let (tx, rx) = channel(128);
+        self.web_proxy
+            .emit_msg(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx).into())?;
+        let (mut tap, id) = self.web_proxy.get_tap().await?;
+        timeout(timeout_duration, async move {
+            while let Some(msg) = tap.recv().await {
+                if let WebProxyMessage::Output(WebProxyOut::ResponseGet(proxy, rnd, header)) = msg {
+                    if rnd == our_rnd {
+                        self.web_proxy.remove_subsystem(id).await?;
+                        return Ok(Response::new(proxy, header, rx));
+                    }
+                }
+            }
+            self.web_proxy.remove_subsystem(id).await?;
+            return Err(WebProxyError::ResponseTimeout);
+        })
+        .await
+        .map_err(|_| WebProxyError::ResponseTimeout)?
+    }
+
     pub fn get_counters(&mut self) -> Counters {
         self.storage.borrow().counters.clone()
     }
@@ -129,6 +156,7 @@ impl Translate {
     }
 
     fn link_overlay_proxy(msg: OverlayMessage) -> Option<WebProxyMessage> {
+        log::info!("Received message from overlay: {:?}", msg);
         if let OverlayMessage::Output(msg_out) = msg {
             match msg_out {
                 OverlayOut::NodeInfosConnected(list) => {
@@ -145,6 +173,7 @@ impl Translate {
     }
 
     fn link_proxy_overlay(msg: WebProxyMessage) -> Option<OverlayMessage> {
+        log::info!("Sending message to overlay: {:?}", msg);
         if let WebProxyMessage::Output(WebProxyOut::ToNetwork(id, msg_node)) = msg {
             Some(
                 OverlayIn::NetworkWrapperToNetwork(
@@ -202,6 +231,9 @@ mod tests {
             WebProxy::start(cl_ds, cl_id, cl_rnd.clone(), WebProxyConfig::default()).await?;
         let (mut cl_tap, _) = cl_rnd.get_tap().await?;
         let _wp = WebProxy::start(wp_ds, wp_id, wp_rnd.clone(), WebProxyConfig::default()).await?;
+
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        
         let (mut wp_tap, _) = wp_rnd.get_tap().await?;
 
         let list = vec![cl_in, wp_in];

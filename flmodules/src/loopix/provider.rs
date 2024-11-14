@@ -126,7 +126,7 @@ impl LoopixCore for Provider {
                         }
                         MessageType::PullRequest(client_id) => {
                             let messages = self.create_pull_reply(client_id).await;
-                            log::trace!(
+                            log::debug!(
                                 "Provider received pull request from client: {:?}",
                                 client_id
                             );
@@ -134,18 +134,18 @@ impl LoopixCore for Provider {
                         }
                         MessageType::SubscriptionRequest(client_id) => {
                             self.get_storage().add_subscribed_client(client_id).await;
-                            log::trace!(
+                            log::debug!(
                                 "Provider received subscription request from client: {:?}",
                                 client_id
                             );
                             (client_id, None, None, Some(message))
                         }
                         MessageType::Drop => {
-                            log::trace!("Provider received drop");
+                            log::debug!("Provider received drop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Loop => {
-                            log::trace!("Provider received loop");
+                            log::debug!("Provider received loop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Dummy => {

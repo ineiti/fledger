@@ -90,11 +90,11 @@ impl LoopixCore for Mixnode {
                             (destination, None, None, Some(message))
                         }
                         MessageType::Drop => {
-                            log::info!("Mixnode received drop");
+                            log::debug!("Mixnode received drop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Loop => {
-                            log::info!("Mixnode received loop");
+                            log::debug!("Mixnode received loop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Dummy => {

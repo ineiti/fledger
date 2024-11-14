@@ -56,6 +56,7 @@ async fn proxy_nodes_n(path_length: usize) -> Result<(), Box<dyn Error>> {
                 .unwrap()
                 .msg,
         )?;
+        
         // This is my configuration-wrapper. Of course the nodes should have a way to get their role.
         // The role choice could be done in step 2 where one node creates the global configuration.
         let config = setup

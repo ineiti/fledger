@@ -368,8 +368,8 @@ impl LoopixSetup {
         let config = self.get_config(node_id, role).await?;
         let loopix_broker = LoopixBroker::start(net, config).await?;
         Ok((
-            loopix_broker.clone(),
-            OverlayLoopix::start(loopix_broker).await?,
+            loopix_broker.broker.clone(),
+            OverlayLoopix::start(loopix_broker.broker).await?,
         ))
     }
 
