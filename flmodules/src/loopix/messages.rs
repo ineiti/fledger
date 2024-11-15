@@ -205,7 +205,7 @@ impl LoopixMessages {
                 if let Some(sphinx) = sphinx {
                     self.role
                         .get_storage()
-                    .add_forwarded_messages(vec![(node_id, next_node_id)])
+                    .add_forwarded_message((node_id, next_node_id))
                     .await; // from node_id to next_node_id
 
                     self.network_sender
@@ -231,7 +231,7 @@ impl LoopixMessages {
                 if let Some(message_type) = message_type {
                     self.role
                         .get_storage()
-                        .add_received_messages(vec![(source, dest, message_type)])
+                        .add_received_message((source, dest, message_type))
                         .await;
                 }
 

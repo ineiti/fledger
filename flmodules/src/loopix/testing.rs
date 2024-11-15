@@ -237,11 +237,11 @@ impl LoopixSetup {
         println!();
 
         println!("\nForwarded Messages:");
-        println!("{:<10} {:<60} {:<20}", "Count", "From -> To", "Message Type");
+        println!("{:<10} {:<20} {:<20}", "Count", "Timestamp", "From -> To");
         println!("{:-<300}", "");
 
         let mut forwarded_count = HashMap::new();
-        for (from, to) in forwarded_messages {
+        for (_timestamp, from, to) in forwarded_messages {
             *forwarded_count.entry((from, to)).or_insert(0) += 1;
         }
         for ((from, to), count) in forwarded_count {
@@ -249,11 +249,11 @@ impl LoopixSetup {
         }
 
         println!("\nReceived Messages:");
-        println!("{:<10} {:<20} {:<20}", "Count", "Origin -> Relayed By", "Message Type");
+        println!("{:<10} {:<20} {:<20} {:<20}", "Count", "Timestamp", "Origin -> Relayed By", "Message Type");
         println!("{:-<300}", "");
 
         let mut received_count = HashMap::new();
-        for (origin, relay, message_type) in received_messages {
+        for (_timestamp, origin, relay, message_type) in received_messages {
             *received_count.entry((origin, relay, message_type)).or_insert(0) += 1;
         }
         for ((origin, relay, message_type), count) in received_count {
@@ -261,11 +261,11 @@ impl LoopixSetup {
         }
 
         println!("\nSent Messages:");
-        println!("{:<10} {:<100} {:<60}", "Count", "Message Type", "Route");
+        println!("{:<10} {:<20} {:<100} {:<60}", "Count", "Timestamp", "Message Type", "Route");
         println!("{:-<300}", "");
 
         let mut sent_count = HashMap::new();
-        for (route, message_type) in sent_messages {
+        for (_timestamp, route, message_type) in sent_messages {
             let short_route: Vec<String> = route
                 .iter()
                 .map(|node_id| format!("{:x}", node_id))

@@ -446,7 +446,7 @@ mod tests {
         let sent_msg = client.get_storage().get_sent_messages().await;
         println!("Sent messages: {:?}", sent_msg);
 
-        let (route, _msg) = sent_msg[0].clone();
+        let (timestamp, route, _msg) = sent_msg[0].clone();
 
         let mut sphinx_packet = sphinx.clone();
 
@@ -511,7 +511,7 @@ mod tests {
         let sent_msg = client.get_storage().get_sent_messages().await;
         println!("Sent messages: {:?}", sent_msg);
 
-        let (route, _msg) = sent_msg[0].clone();
+        let (timestamp, route, _msg) = sent_msg[0].clone();
 
         let mut sphinx_packet = sphinx.clone();
 
@@ -576,7 +576,7 @@ mod tests {
         let sent_msg = client.get_storage().get_sent_messages().await;
         println!("Sent messages: {:?}", sent_msg);
 
-        let (route, _msg) = sent_msg[0].clone();
+        let (timestamp, route, _msg) = sent_msg[0].clone();
 
         let mut sphinx_packet = sphinx.clone();
 

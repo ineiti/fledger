@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use x25519_dalek::{PublicKey, StaticSecret};
 use base64::{engine::general_purpose::STANDARD, Engine};
+use std::time::SystemTime;
 
 use super::{messages::MessageType, sphinx::node_id_from_node_address};
 
@@ -50,9 +51,9 @@ pub struct NetworkStorage {
     )]
     node_public_keys: HashMap<NodeID, PublicKey>,
 
-    forwarded_messages: Vec<(NodeID, NodeID)>, // from, to
-    received_messages: Vec<(NodeID, NodeID, MessageType)>, // origin, relayed by, Message
-    sent_messages: Vec<(Vec<NodeID>, MessageType)>, // route and the message
+    forwarded_messages: Vec<(SystemTime, NodeID, NodeID)>, // timestamp, from, to
+    received_messages: Vec<(SystemTime, NodeID, NodeID, MessageType)>, // timestamp, origin, relayed by, Message
+    sent_messages: Vec<(SystemTime, Vec<NodeID>, MessageType)>, // timestamp, route, message
 }
 
 impl NetworkStorage {
@@ -225,7 +226,7 @@ impl LoopixStorage {
         self.network_storage.write().await.node_public_keys = new_keys;
     }
 
-    pub async fn get_forwarded_messages(&self) -> Vec<(NodeID, NodeID)> {
+    pub async fn get_forwarded_messages(&self) -> Vec<(SystemTime, NodeID, NodeID)> {
         self.network_storage.read().await.forwarded_messages.clone()
     }
 
@@ -245,27 +246,31 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn add_forwarded_messages(&self, new_messages: Vec<(NodeID, NodeID)>) {
+    pub async fn add_forwarded_message(&self, new_message: (NodeID, NodeID)) {
+        let timestamped_message = (SystemTime::now(), new_message.0, new_message.1);
+        
         self.network_storage
             .write()
             .await
             .forwarded_messages
-            .extend(new_messages);
+            .push(timestamped_message);
     }
 
-    pub async fn get_received_messages(&self) -> Vec<(NodeID, NodeID, MessageType)> {
+    pub async fn get_received_messages(&self) -> Vec<(SystemTime, NodeID, NodeID, MessageType)> {
         self.network_storage.read().await.received_messages.clone()
     }
 
-    pub async fn add_received_messages(&self, new_messages: Vec<(NodeID, NodeID, MessageType)>) {
+    pub async fn add_received_message(&self, new_message: (NodeID, NodeID, MessageType)) {
+        let timestamped_message = (SystemTime::now(), new_message.0, new_message.1, new_message.2);
+        
         self.network_storage
             .write()
             .await
             .received_messages
-            .extend(new_messages);
+            .push(timestamped_message);
     }
 
-    pub async fn get_sent_messages(&self) -> Vec<(Vec<NodeID>, MessageType)> {
+    pub async fn get_sent_messages(&self) -> Vec<(SystemTime, Vec<NodeID>, MessageType)> {
         self.network_storage.read().await.sent_messages.clone()
     }
 
@@ -278,7 +283,7 @@ impl LoopixStorage {
             .write()
             .await
             .sent_messages
-            .push((route_ids, message_type));
+            .push((SystemTime::now(), route_ids, message_type));
     }
 
     pub async fn get_our_provider(&self) -> Option<NodeID> {

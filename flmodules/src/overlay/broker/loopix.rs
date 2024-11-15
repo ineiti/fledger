@@ -200,23 +200,25 @@ mod test {
 
         let received_messages = storage.get_received_messages().await;
         log::info!("Received messages: {:?}", received_messages.len());
-        for (source, dest, message_type) in received_messages {
-            log::info!("Received message from {} to {} with type {:?}", source, dest, message_type);
+        for (timestamp, source, dest, message_type) in received_messages {
+            log::info!("Received message at {:?} from {} to {} with type {:?}", 
+                timestamp, source, dest, message_type);
         }
     
         let forwarded_messages = storage.get_forwarded_messages().await;
         log::info!("Forwarded messages: {:?}", forwarded_messages.len());
-        for (source, dest) in forwarded_messages {
-            log::info!("Forwarded message from {} to {}", source, dest);
+        for (timestamp, source, dest) in forwarded_messages {
+            log::info!("Forwarded message at {:?} from {} to {}", 
+                timestamp, source, dest);
         }
 
         let sent_messages = storage.get_sent_messages().await;
         log::info!("Sent messages: {:?}", sent_messages.len());
 
-        println!("{:<60} {:<20}", "Route", "Message Type");
-        println!("{:-<80}", "");
+        println!("{:<30} {:<60} {:<20}", "Timestamp", "Route", "Message Type");
+        println!("{:-<110}", "");
 
-        for (route, message_type) in sent_messages {
+        for (timestamp, route, message_type) in sent_messages {
             let route_str = format!("{:?}", route);
             let short_route: Vec<String> = route_str
                 .trim_matches(|c| c == '[' || c == ']')
@@ -224,7 +226,10 @@ mod test {
                 .map(|node_id| node_id.split('-').next().unwrap_or(node_id).to_string())
                 .collect();
             let formatted_route = format!("[{}]", short_route.join(", "));
-            println!("{:<60} {:<20}", formatted_route, format!("{:?}", message_type));
+            println!("{:<30} {:<60} {:<20}", 
+                format!("{:?}", timestamp), 
+                formatted_route, 
+                format!("{:?}", message_type));
         }
 
         Ok(())
@@ -312,23 +317,25 @@ mod test {
 
         let received_messages = storage.get_received_messages().await;
         log::info!("Received messages: {:?}", received_messages.len());
-        for (source, dest, message_type) in received_messages {
-            log::info!("Received message from {} to {} with type {:?}", source, dest, message_type);
+        for (timestamp, source, dest, message_type) in received_messages {
+            log::info!("Received message at {:?} from {} to {} with type {:?}", 
+                timestamp, source, dest, message_type);
         }
     
         let forwarded_messages = storage.get_forwarded_messages().await;
         log::info!("Forwarded messages: {:?}", forwarded_messages.len());
-        for (source, dest) in forwarded_messages {
-            log::info!("Forwarded message from {} to {}", source, dest);
+        for (timestamp, source, dest) in forwarded_messages {
+            log::info!("Forwarded message at {:?} from {} to {}", 
+                timestamp, source, dest);
         }
 
         let sent_messages = storage.get_sent_messages().await;
         log::info!("Sent messages: {:?}", sent_messages.len());
 
-        println!("{:<60} {:<20}", "Route", "Message Type");
-        println!("{:-<80}", "");
+        println!("{:<30} {:<60} {:<20}", "Timestamp", "Route", "Message Type");
+        println!("{:-<110}", "");
 
-        for (route, message_type) in sent_messages {
+        for (timestamp, route, message_type) in sent_messages {
             let route_str = format!("{:?}", route);
             let short_route: Vec<String> = route_str
                 .trim_matches(|c| c == '[' || c == ']')
@@ -336,7 +343,10 @@ mod test {
                 .map(|node_id| node_id.split('-').next().unwrap_or(node_id).to_string())
                 .collect();
             let formatted_route = format!("[{}]", short_route.join(", "));
-            println!("{:<60} {:<20}", formatted_route, format!("{:?}", message_type));
+            println!("{:<30} {:<60} {:<20}", 
+                format!("{:?}", timestamp), 
+                formatted_route, 
+                format!("{:?}", message_type));
         }
 
         // Ok(())
