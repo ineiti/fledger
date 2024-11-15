@@ -1,4 +1,4 @@
-#!/usr/bin/env bash -e
+#!/bin/bash -e
 
 make kill
 
@@ -11,7 +11,7 @@ fi
 (cd cli/fledger && cargo build -r)
 (cd cli/flsignal && cargo build -r)
 
-NODES=$(( ( $PATH_LEN + 2 ) * $PATH_LEN ))
+NODES=$(( ( $PATH_LEN * 2 ) + $PATH_LEN * $PATH_LEN ))
 SIMUL=simul/
 rm -rf $SIMUL
 mkdir -p $SIMUL

@@ -16,7 +16,7 @@ use flmodules::{
         core::{self, Category, Event},
         messages::{GossipIn, GossipMessage},
     },
-    loopix::messages::LoopixMessage,
+    loopix::broker::LoopixBroker,
     network::messages::{NetworkError, NetworkIn, NetworkMessage},
     nodeconfig::{ConfigError, NodeConfig, NodeInfo},
     overlay::broker::{direct::OverlayDirect, random::OverlayRandom},
@@ -73,7 +73,7 @@ pub struct Node {
     /// Answers GET requests from another node
     pub webproxy: Option<WebProxy>,
     /// Create a mix-network for anonymous communication
-    pub loopix: Option<Broker<LoopixMessage>>,
+    pub loopix: Option<LoopixBroker>,
 }
 
 const STORAGE_GOSSIP_EVENTS: &str = "gossip_events";

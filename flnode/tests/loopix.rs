@@ -1,11 +1,9 @@
-use std::{error::Error, sync::Arc};
+use std::{error::Error, sync::Arc, time::Duration};
 
 use flarch::{start_logging, tasks::now};
 mod helpers;
 use flmodules::{
-    gossip_events::core::{Category, Event},
-    loopix::{broker::LoopixBroker, testing::LoopixSetup},
-    Modules,
+    gossip_events::core::{Category, Event}, loopix::{broker::LoopixBroker, testing::LoopixSetup}, overlay::broker::loopix::OverlayLoopix, web_proxy::{broker::WebProxy, core::WebProxyConfig}, Modules
 };
 use helpers::*;
 
@@ -63,13 +61,31 @@ async fn proxy_nodes_n(path_length: usize) -> Result<(), Box<dyn Error>> {
             .get_config(*id, flmodules::loopix::config::LoopixRole::Client)
             .await?;
         let loopix_broker = LoopixBroker::start(v.node.broker_net.clone(), config).await?;
-        v.node.loopix = Some(loopix_broker.broker);
-        //
-        // v.node.webproxy = Some(WebProxy::start(v.node.storage, *id, OverlayLoopix::start(v.node.loopix.unwrap().clone()), WebProxyConfig::default()).await?);
+        let overlay = OverlayLoopix::start(loopix_broker.broker.clone()).await?;
+        v.node.loopix = Some(loopix_broker);
+        v.node.webproxy = Some(WebProxy::start(v.node.storage.clone(), *id, overlay, WebProxyConfig::default()).await?);
     }
 
-    // Now do some webProxy stuff while the network runs.
-    // net.nodes.clients[1].webproxy.get("google.com");
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    let client1_id = loopix_setup.all_nodes[0].get_id();
+
+    let webproxy = net.nodes[&client1_id].node.webproxy.as_ref().expect("WebProxy is not available");
+    match webproxy.clone().get_with_timeout("https://fleg.re/", Duration::from_secs(60)).await {
+        Ok(mut resp) => {
+            log::debug!("Got response struct with headers: {resp:?}");
+            let content = resp.text().await.expect("getting text");
+            log::debug!("Got text from content: {content:?}");
+            loopix_setup.print_all_messages(true).await;
+        }
+        Err(e) => {
+            log::error!("Failed to get response: {e}");
+            loopix_setup.print_all_messages(true).await;
+            return Err(e.into());
+        }
+    }
+
+    println!("Client ID for proxy: {}", client1_id);
 
     Ok(())
 }
@@ -82,7 +98,7 @@ mod tests {
     async fn connect_nodes() -> Result<(), Box<dyn Error>> {
         start_logging();
 
-        proxy_nodes_n(4).await?;
+        proxy_nodes_n(2).await?;
         Ok(())
     }
 }

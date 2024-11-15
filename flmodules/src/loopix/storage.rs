@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use x25519_dalek::{PublicKey, StaticSecret};
+use base64::{engine::general_purpose::STANDARD, Engine};
 
 use super::{messages::MessageType, sphinx::node_id_from_node_address};
 
@@ -49,11 +50,8 @@ pub struct NetworkStorage {
     )]
     node_public_keys: HashMap<NodeID, PublicKey>,
 
-    #[serde(skip)]
     forwarded_messages: Vec<(NodeID, NodeID)>, // from, to
-    #[serde(skip)]
     received_messages: Vec<(NodeID, NodeID, MessageType)>, // origin, relayed by, Message
-    #[serde(skip)]
     sent_messages: Vec<(Vec<NodeID>, MessageType)>, // route and the message
 }
 
@@ -500,6 +498,20 @@ impl LoopixStorage {
         }
     }
 
+    pub async fn to_yaml_async(&self) -> Result<String, serde_yaml::Error> {
+        let network_storage = self.network_storage.read().await.clone();
+        let client_storage = self.client_storage.read().await.clone();
+        let provider_storage = self.provider_storage.read().await.clone();
+
+        let serializable = SerializableLoopixStorage {
+            network_storage,
+            client_storage,
+            provider_storage,
+        };
+
+        serde_yaml::to_string(&serializable)
+    }
+
     pub fn new_with_key_generation(
         node_id: NodeID,
         mixes: Vec<Vec<NodeID>>,
@@ -704,32 +716,46 @@ pub fn serialize_public_key<S>(key: &PublicKey, serializer: S) -> Result<S::Ok, 
 where
     S: serde::Serializer,
 {
-    let key_bytes: &[u8] = key.as_bytes();
-    serializer.serialize_bytes(key_bytes)
+    let key_bytes = key.as_bytes();
+    let base64_encoded = STANDARD.encode(key_bytes);
+    serializer.serialize_str(&base64_encoded)
 }
 
 pub fn deserialize_public_key<'de, D>(deserializer: D) -> Result<PublicKey, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let key_bytes: [u8; 32] = serde::Deserialize::deserialize(deserializer)?;
-    Ok(PublicKey::from(key_bytes))
+    let base64_encoded = String::deserialize(deserializer)?;
+    let key_bytes = STANDARD
+        .decode(&base64_encoded)
+        .map_err(serde::de::Error::custom)?;
+    let key_array: [u8; 32] = key_bytes
+        .try_into()
+        .map_err(|_| serde::de::Error::custom("Invalid key length"))?;
+    Ok(PublicKey::from(key_array))
 }
 
 pub fn serialize_static_secret<S>(key: &StaticSecret, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    let key_bytes: [u8; 32] = key.to_bytes();
-    serializer.serialize_bytes(&key_bytes)
+    let key_bytes = key.to_bytes();
+    let base64_encoded = STANDARD.encode(&key_bytes);
+    serializer.serialize_str(&base64_encoded)
 }
 
 pub fn deserialize_static_secret<'de, D>(deserializer: D) -> Result<StaticSecret, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let key_bytes: [u8; 32] = serde::Deserialize::deserialize(deserializer)?;
-    Ok(StaticSecret::from(key_bytes))
+    let base64_encoded = String::deserialize(deserializer)?;
+    let key_bytes = STANDARD
+        .decode(&base64_encoded)
+        .map_err(serde::de::Error::custom)?;
+    let key_array: [u8; 32] = key_bytes
+        .try_into()
+        .map_err(|_| serde::de::Error::custom("Invalid key length"))?;
+    Ok(StaticSecret::from(key_array))
 }
 
 pub fn serialize_node_public_keys<S>(
@@ -739,11 +765,11 @@ pub fn serialize_node_public_keys<S>(
 where
     S: serde::Serializer,
 {
-    let keys_bytes: HashMap<_, _> = keys
+    let encoded_keys: HashMap<_, _> = keys
         .iter()
-        .map(|(node_id, key)| (node_id, key.as_bytes()))
+        .map(|(node_id, key)| (node_id, STANDARD.encode(key.as_bytes())))
         .collect();
-    keys_bytes.serialize(serializer)
+    encoded_keys.serialize(serializer)
 }
 
 pub fn deserialize_node_public_keys<'de, D>(
@@ -752,11 +778,19 @@ pub fn deserialize_node_public_keys<'de, D>(
 where
     D: serde::Deserializer<'de>,
 {
-    let keys_bytes: HashMap<NodeID, [u8; 32]> = HashMap::deserialize(deserializer)?;
-    let keys = keys_bytes
+    let encoded_keys: HashMap<NodeID, String> = HashMap::deserialize(deserializer)?;
+    let keys = encoded_keys
         .into_iter()
-        .map(|(node_id, key_bytes)| (node_id, PublicKey::from(key_bytes)))
-        .collect();
+        .map(|(node_id, encoded)| {
+            let key_bytes = STANDARD
+                .decode(&encoded)
+                .map_err(serde::de::Error::custom)?;
+            let key_array: [u8; 32] = key_bytes
+                .try_into()
+                .map_err(|_| serde::de::Error::custom("Invalid key length"))?;
+            Ok((node_id, PublicKey::from(key_array)))
+        })
+        .collect::<Result<HashMap<_, _>, D::Error>>()?;
     Ok(keys)
 }
 
@@ -774,7 +808,9 @@ impl Clone for LoopixStorage {
 
 #[cfg(test)]
 mod tests {
-    use crate::loopix::testing::LoopixSetup;
+    use std::{fs::{self, create_dir_all, File}, io::Write, path::PathBuf};
+
+    use crate::loopix::{config::{LoopixConfig, LoopixRole}, testing::LoopixSetup};
 
     use super::*;
 
@@ -899,7 +935,7 @@ mod tests {
         let loopix_storage = LoopixStorage::default_with_path_length(
             node_id,
             path_length,
-            private_key,
+            private_key, 
             public_key,
             None,
             Some(provider_storage),
@@ -922,5 +958,49 @@ mod tests {
             serde_yaml::from_str(&serialized).expect("Failed to deserialize");
 
         assert_eq!(updated_provider_storage, deserialized);
+    }
+
+    #[tokio::test]
+    async fn test_loopix_storage_to_yaml_async() {
+        let path_length = 2;
+        let (all_nodes, _, loopix_key_pairs, _) =
+            LoopixSetup::create_nodes_and_keys(path_length);
+
+        let node_id = all_nodes.iter().next().unwrap().get_id();
+        let private_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
+        let public_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
+
+        let config = LoopixConfig::default_with_path_length(
+            LoopixRole::Client,
+            node_id,
+            path_length,
+            private_key.clone(),
+            public_key.clone(),
+            all_nodes.clone(),
+        );
+
+        let mut path = PathBuf::from("./test_storage");
+
+        if let Err(e) = create_dir_all(&path) {
+            eprintln!("Failed to create directory: {}", e);
+            return;
+        }
+        path.push("loopix_storage.yaml");
+
+        let storage_bytes = config.storage_config.to_yaml_async().await.unwrap();
+
+        match File::create(&path) {
+            Ok(mut file) => {
+                if let Err(e) = file.write_all(storage_bytes.as_bytes()) {
+                    println!("Failed to write storage file: {}", e);
+                    assert!(false);
+                }
+            }
+            Err(e) => {
+                println!("Failed to create storage file: {}", e);
+                assert!(false);
+            }
+        }
+
     }
 }
