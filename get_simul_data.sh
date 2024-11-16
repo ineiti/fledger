@@ -36,14 +36,10 @@ initial_max_retrieve=$max_retrieve
 initial_pad_length=$pad_length
 
 # Try different lambda values between 1 and 60
-# lambda_loops=(1 5 10 15 20 25 30 35 40 45 50 55 60)
-# lambda_drops=(1 5 10 15 20 25 30 35 40 45 50 55 60)
-# lambda_payloads=(1 5 10 15 20 25 30 35 40 45 50 55 60)
-# lambda_loop_mixes=(1 5 10 15 20 25 30 35 40 45 50 55 60)
-lambda_loops=(10.0)
-lambda_drops=(10.0)
-lambda_payloads=(10.0)
-lambda_loop_mixes=(10.0)
+lambda_loops=(1 5 10 15 20 25 30 35 40 45 50 55 60)
+lambda_drops=(1 5 10 15 20 25 30 35 40 45 50 55 60)
+lambda_payloads=(1 5 10 15 20 25 30 35 40 45 50 55 60)
+lambda_loop_mixes=(1 5 10 15 20 25 30 35 40 45 50 55 60)
 
 for i in "${!lambda_loops[@]}"; do
     lambda_loop=${lambda_loops[$i]}
@@ -183,7 +179,7 @@ time_pull=$initial_time_pull
 max_retrieve=$initial_max_retrieve
 pad_length=$initial_pad_length
 
-path_lengths=(3 4 5 6 7 8)
+path_lengths=(2 3 4 5 6 7 8)
 
 for i in "${!path_lengths[@]}"; do
     path_length=${path_lengths[$i]}
