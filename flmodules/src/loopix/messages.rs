@@ -106,7 +106,9 @@ impl LoopixMessages {
         let mut sphinx_messages: Vec<(NodeID, Sphinx)> = Vec::new();
         for msg in msgs {
             if let Some((node_id, messages)) = self.process_message(msg).await {
-                messages.into_iter().for_each(|s| sphinx_messages.push((node_id, s)));
+                messages
+                    .into_iter()
+                    .for_each(|s| sphinx_messages.push((node_id, s)));
             }
         }
         sphinx_messages
@@ -186,78 +188,99 @@ impl LoopixMessages {
             .expect("while sending overlay message to network");
     }
 
-    async fn process_sphinx_packet(&self, node_id: NodeID, sphinx_packet: Sphinx) -> Option<(NodeID, Vec<Sphinx>)> {
+    async fn process_sphinx_packet(
+        &self,
+        node_id: NodeID,
+        sphinx_packet: Sphinx,
+    ) -> Option<(NodeID, Vec<Sphinx>)> {
         let processed = self.role.process_sphinx_packet(sphinx_packet.clone()).await;
-        match processed {
-            ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
-                log::info!(
-                    "ForwardHop from node_id {} and sphinx {:?}",
-                    node_id,
-                    sphinx_packet.message_id
-                );
-                let next_node_id = node_id_from_node_address(next_address);
-                let (next_node_id, next_delay, sphinx) = self
-                    .role
-                    .process_forward_hop(next_packet, next_node_id, delay, sphinx_packet.message_id)
-                    .await;
-
-                if let Some(sphinx) = sphinx {
-                    self.role
-                        .get_storage()
-                    .add_forwarded_message((node_id, next_node_id, sphinx.message_id.clone()))
-                    .await; // from node_id to next_node_id
-
-                    self.network_sender
-                        .send((next_node_id, next_delay, sphinx))
-                        .await
-                        .expect("while sending message");
-                } else {
-                    log::debug!("No message to forward to {}", next_node_id);
-                }
-                None
-            }
-            ProcessedPacket::FinalHop(destination, surb_id, payload) => {
-
-                let dest = node_id_from_destination_address(destination);
-
-                let (source, msg, messages, message_type) =
-                    self.role.process_final_hop(dest, surb_id, payload).await;
-
-                if let Some(message_type) = message_type {
-                    match message_type {
-                        MessageType::Payload(_, _) => {
-                            self.role
-                                .get_storage()
-                                .add_received_message((source, dest, message_type, sphinx_packet.message_id.clone()))
-                                .await;
-                        }
-                        _ => {}
-                    }
-                }
-
-                if let Some(msg) = msg {
-                    log::debug!(
-                        "Final hop was a payload message with id: {} -> {}: {:?}",
-                        source,
-                        dest,
+        if let Some(processed) = processed {
+            match processed {
+                ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
+                    log::info!(
+                        "ForwardHop from node_id {} and sphinx {:?}",
+                        node_id,
                         sphinx_packet.message_id
                     );
-                    self.overlay_sender
-                        .send((source, msg))
-                        .await
-                        .expect("while sending message");
-                }
-                if let Some((node_id, messages)) = messages {
-                    log::trace!(
-                        "Final hop was a pull request: {} -> {}",
-                        node_id,
-                        messages.len()
-                    );
-                    Some((node_id, messages))
-                } else {
+                    let next_node_id = node_id_from_node_address(next_address);
+                    let (next_node_id, next_delay, sphinx) = self
+                        .role
+                        .process_forward_hop(
+                            next_packet,
+                            next_node_id,
+                            delay,
+                            sphinx_packet.message_id,
+                        )
+                        .await;
+
+                    if let Some(sphinx) = sphinx {
+                        self.role
+                            .get_storage()
+                            .add_forwarded_message((
+                                node_id,
+                                next_node_id,
+                                sphinx.message_id.clone(),
+                            ))
+                            .await; // from node_id to next_node_id
+
+                        self.network_sender
+                            .send((next_node_id, next_delay, sphinx))
+                            .await
+                            .expect("while sending message");
+                    } else {
+                        log::debug!("No message to forward to {}", next_node_id);
+                    }
                     None
                 }
+                ProcessedPacket::FinalHop(destination, surb_id, payload) => {
+                    let dest = node_id_from_destination_address(destination);
+
+                    let (source, msg, messages, message_type) =
+                        self.role.process_final_hop(dest, surb_id, payload).await;
+
+                    if let Some(message_type) = message_type {
+                        match message_type {
+                            MessageType::Payload(_, _) => {
+                                self.role
+                                    .get_storage()
+                                    .add_received_message((
+                                        source,
+                                        dest,
+                                        message_type,
+                                        sphinx_packet.message_id.clone(),
+                                    ))
+                                    .await;
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    if let Some(msg) = msg {
+                        log::debug!(
+                            "Final hop was a payload message with id: {} -> {}: {:?}",
+                            source,
+                            dest,
+                            sphinx_packet.message_id
+                        );
+                        self.overlay_sender
+                            .send((source, msg))
+                            .await
+                            .expect("while sending message");
+                    }
+                    if let Some((node_id, messages)) = messages {
+                        log::trace!(
+                            "Final hop was a pull request: {} -> {}",
+                            node_id,
+                            messages.len()
+                        );
+                        Some((node_id, messages))
+                    } else {
+                        None
+                    }
+                }
             }
+        } else {
+            None
         }
     }
 }

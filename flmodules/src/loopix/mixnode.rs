@@ -162,8 +162,8 @@ impl LoopixCore for Mixnode {
             .create_route(
                 self.get_config().path_length(),
                 None,
-                None,
                 Some(random_provider),
+                None,
             )
             .await;
 
@@ -179,6 +179,7 @@ impl LoopixCore for Mixnode {
         // self.storage
         //     .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
         //     .await; // TODO uncomment
+
         (node_id_from_node_address(next_node.address), sphinx)
     }
 }

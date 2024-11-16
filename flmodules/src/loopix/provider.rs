@@ -183,6 +183,11 @@ impl LoopixCore for Provider {
             .await
             .contains(&next_node)
         {
+            log::debug!(
+                "Provider received message for subscribed client: {:?} {:?}",
+                next_node,
+                message_id
+            );
             let sphinx = &Sphinx {
                 message_id,
                 inner: *next_packet,
@@ -200,7 +205,7 @@ impl LoopixCore for Provider {
                 "{} --> {}: {:?}",
                 self.get_our_id().await,
                 next_node,
-                sphinx
+                sphinx.message_id
             );
             (next_node, delay, Some(sphinx.clone()))
         }

@@ -393,6 +393,7 @@ impl LoopixStorage {
 
     pub async fn add_subscribed_client(&self, client_id: NodeID) {
         if let Some(storage) = &mut *self.provider_storage.write().await {
+            log::debug!("Adding subscribed client: {:?}", client_id);
             storage.subscribed_clients.insert(client_id);
         } else {
             panic!("Provider storage not found");

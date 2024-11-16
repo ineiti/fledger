@@ -75,7 +75,7 @@ async fn save_loopix_storage_periodically(
     storage_path.push("loopix_storage.yaml");
 
     loop {
-        std::thread::sleep(Duration::from_secs(5));
+        std::thread::sleep(Duration::from_secs(1));
 
         let storage_bytes = storage.to_yaml_async().await.unwrap();
 
@@ -286,7 +286,7 @@ impl LSRoot {
                 }
             }
             LSRoot::SendProxyRequest(start) => {
-                if true {
+                if false {
                     if (i - *start) % 10 == 0 {
                         log::info!("Sending request through WebProxy");
                         let start = now();
@@ -314,17 +314,17 @@ impl LSRoot {
                         .webproxy
                         .as_mut()
                         .unwrap()
-                        .get_with_timeout("https://ipinfo.io", Duration::from_secs(30))
+                        .get_with_timeout("https://ipinfo.io", Duration::from_secs(10))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
                             Ok(body) => {
-                                log::info!("Total time for request: {}ms", now() - start);
-                                log::info!("Got reply from webproxy: {}", body);
+                                log::info!("----------------------------------------------------------------------- Total time for request: {}ms", now() - start);
+                                log::info!("----------------------------------------------------------------------- Got reply from webproxy: {}", body);
                             }
-                            Err(e) => log::info!("Couldn't get body: {e:?}"),
+                            Err(e) => log::info!(" ----------------------------------------------------------------------- Couldn't get body: {e:?}"),
                         },
-                        Err(e) => log::info!("Webproxy returned error: {e:?}"),
+                        Err(e) => log::info!("----------------------------------------------------------------------- Webproxy returned error: {e:?}"),
                     }
                     return Ok(LSRoot::Done.into());
                 }

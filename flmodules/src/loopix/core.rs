@@ -24,9 +24,19 @@ pub trait LoopixCore {
     fn get_storage(&self) -> &Arc<LoopixStorage>;
     async fn get_our_id(&self) -> NodeID;
 
-    async fn process_sphinx_packet(&self, sphinx_packet: Sphinx) -> ProcessedPacket {
+    async fn process_sphinx_packet(&self, sphinx_packet: Sphinx) -> Option<ProcessedPacket> {
         let secret_key = self.get_storage().get_private_key().await;
-        sphinx_packet.inner.process(&secret_key).unwrap()
+        match sphinx_packet.inner.process(&secret_key) {
+            Ok(processed_packet) => Some(processed_packet),
+            Err(e) => {
+                log::error!(
+                    "Failed to process sphinx packet {}: {:?}",
+                    sphinx_packet.message_id,
+                    e
+                );
+                None
+            }
+        }
     }
 
     async fn create_loop_message(&self) -> (NodeID, Sphinx);

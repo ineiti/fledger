@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Range, sync::Arc};
+use std::{collections::HashMap, fs::File, io::Write, ops::Range, path::PathBuf, sync::Arc};
 
 use crate::{
     loopix::{
@@ -137,6 +137,34 @@ impl LoopixSetup {
         (node_infos, node_public_keys, loopix_key_pairs, node_configs)
     }
 
+    pub async fn save_storages(&self, path: PathBuf) {
+        if let Err(e) = std::fs::create_dir_all(&path) {
+            println!("Failed to create directory: {}", e);
+        }
+
+        for (node_type, nodes) in [("client", &self.clients), ("mixer", &self.mixers), ("provider", &self.providers)].iter() {
+            for (index, node) in nodes.iter().enumerate() {
+                let mut storage_path = path.clone();
+                storage_path.push(format!("{}_{}.yaml", node_type, index));
+
+                let storage_bytes = node.storage.to_yaml_async().await.unwrap();
+
+                match File::create(&storage_path) {
+                Ok(mut file) => {
+                    if let Err(e) = file.write_all(storage_bytes.as_bytes()) {
+                        println!("Failed to write storage file: {}", e);
+                    } else {
+                        println!("Saved storage file to: {:?}", storage_path);
+                    }
+                }
+                Err(e) => {
+                    println!("Failed to create storage file: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
     pub async fn get_nodes(
         &self,
         range: Range<usize>,
@@ -245,7 +273,7 @@ impl LoopixSetup {
             *forwarded_count.entry((from, to, message_id)).or_insert(0) += 1;
         }
         for ((from, to, message_id), count) in forwarded_count {
-            println!("{:<10} {:<60} {:<20} {:<20} {:<20}", count, format!("{:x} -> {:x}", from, to), "N/A", format!("{:?}", message_id), format!("{:?}", message_id));
+            println!("{:<10} {:<60} {:<20} {:<20}", count, format!("{:x} -> {:x}", from, to), "N/A", format!("{:?}", message_id));
         }
 
         println!("\nReceived Messages:");
@@ -349,7 +377,7 @@ impl NetworkSimul {
                     Ok(msgs) => {
                         if msgs == 0 {
                             // Wait for 100 ms if no messages got passed.
-                            wait_ms(20).await;
+                            wait_ms(100).await;
                         }
                     }
                     Err(e) => println!("Error while processing network: {e:?}"),

@@ -198,7 +198,7 @@ impl CoreConfig {
             lambda_payload: 0.0, // payload rate (0 times per minute)
             path_length,
             mean_delay: 1, // mean delay (1ms)
-            lambda_loop_mix: 60.0, // loop mix rate (10 times per minute)
+            lambda_loop_mix: 120.0, // loop mix rate (10 times per minute)
             time_pull: 0.0, // time pull (3 second)
             max_retrieve: 0, // messages sent to client per pull request
             pad_length: 150, // dummy, drop, loop messages are padded
@@ -214,7 +214,7 @@ impl CoreConfig {
             lambda_payload: 0.0,
             path_length,
             mean_delay: 1,
-            lambda_loop_mix: 60.0,
+            lambda_loop_mix: 120.0,
             time_pull: 0.0,
             max_retrieve: 5,
             pad_length: 150,
@@ -227,11 +227,11 @@ impl CoreConfig {
             lambda_drop: 6.0,
             // lambda_loop: 0.0,
             // lambda_drop: 0.0,
-            lambda_payload: 60.0,
+            lambda_payload: 120.0,
             path_length,
             mean_delay: 1,
             lambda_loop_mix: 0.0,
-            time_pull: 1.0,
+            time_pull: 0.05,
             max_retrieve: 0,
             pad_length: 150,
         }

@@ -78,15 +78,21 @@ impl LoopixCore for Client {
         let random_provider = self.get_storage().get_random_provider().await;
 
         // get our provider
-        let our_provider = self.get_our_provider().await;
-
+        let our_provider = match self.get_our_provider().await {
+            Some(provider) => provider,
+            None => {
+                log::error!("Our provider is None");
+                NodeID::from(1)
+            }
+        };
+        
         // create route
         let route = self
             .create_route(
                 self.get_config().path_length(),
-                our_provider,
-                None,
+                Some(our_provider),
                 Some(random_provider),
+                None,
             )
             .await;
 
@@ -102,7 +108,8 @@ impl LoopixCore for Client {
         // self.storage
         //     .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
         //     .await; // TODO uncomment
-        (random_provider, sphinx)
+
+        (our_provider, sphinx)
     }
 
     async fn process_final_hop(

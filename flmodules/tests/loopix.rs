@@ -1,4 +1,4 @@
-use std::{error::Error, time::Duration};
+use std::{error::Error, path::PathBuf, time::Duration};
 
 use flarch::start_logging_filter_level;
 
@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
  */
 #[tokio::test]
 async fn test_loopix() -> Result<(), Box<dyn Error>> {
-    start_logging_filter_level(vec![], log::LevelFilter::Trace);
+    start_logging_filter_level(vec![], log::LevelFilter::Debug);
 
     let loopix_setup = LoopixSetup::new(2).await?;
     let mut network = NetworkSimul::new();
@@ -56,6 +56,8 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
         Err(e) => {
             log::error!("Failed to get response: {e}");
             loopix_setup.print_all_messages(true).await;
+            loopix_setup.save_storages(PathBuf::from("./trials/1")).await;
+
             return Err(e.into());
         }
     }
@@ -66,12 +68,14 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
 
     loopix_setup.print_all_messages(true).await;
 
+    loopix_setup.save_storages(PathBuf::from("./trials/1")).await;
+
     Ok(())
 }
 
 #[tokio::test]
 async fn test_tiny_loopix() -> Result<(), Box<dyn Error>> {
-    start_logging_filter_level(vec![], log::LevelFilter::Trace);
+    start_logging_filter_level(vec![], log::LevelFilter::Debug);
 
     let mut loopix_setup = LoopixSetup::new(2).await?;
     let mut network = NetworkSimul::new();

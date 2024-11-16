@@ -218,6 +218,11 @@ impl LoopixBroker {
 
                 // create loop message
                 let (node_id, sphinx) = loopix_messages.role.create_loop_message().await;
+                log::debug!(
+                    "Sending loop message with id {} to {}",
+                    sphinx.message_id,
+                    node_id
+                );
 
                 // emit loop message
                 if let Err(e) = broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx).into()) {
@@ -249,6 +254,11 @@ impl LoopixBroker {
 
                 // create drop message
                 let (node_id, sphinx) = loopix_messages.role.create_drop_message().await;
+                log::debug!(
+                    "Sending drop message with id {} to {}",
+                    sphinx.message_id,
+                    node_id
+                );
 
                 // emit drop message
                 if let Err(e) = broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx).into()) {
@@ -264,15 +274,21 @@ impl LoopixBroker {
         mut loopix_messages: LoopixMessages,
         mut broker: Broker<LoopixMessage>,
     ) {
-        let pull_request_rate =
+        let subscribe_request_rate =
             Duration::from_secs_f64(loopix_messages.role.get_config().time_pull());
+        // let subscribe_request_rate = Duration::from_secs_f64(1.0);
 
-        log::debug!("Subscribe request rate: {:?}", pull_request_rate);
+        log::debug!("Subscribe request rate: {:?}", subscribe_request_rate);
 
         tokio::spawn(async move {
             loop {
                 // subscribe message
                 let (node_id, sphinx) = loopix_messages.create_subscribe_message().await;
+                log::debug!(
+                    "Sending subscribe message with id {} to {}",
+                    sphinx.message_id,
+                    node_id
+                );
 
                 // serialize and send
                 // let msg = serde_yaml::to_string(&sphinx).unwrap();
@@ -283,7 +299,7 @@ impl LoopixBroker {
                 }
 
                 // wait
-                tokio::time::sleep(pull_request_rate).await;
+                tokio::time::sleep(subscribe_request_rate).await;
             }
         });
     }
@@ -298,6 +314,13 @@ impl LoopixBroker {
             loop {
                 // pull message
                 let (node_id, sphinx) = loopix_messages.clone().create_pull_message().await;
+                if let Some(sphinx) = sphinx.clone() {
+                    log::debug!(
+                        "Sending pull message with id {} to {}",
+                        sphinx.message_id,
+                        node_id
+                    );
+                }
 
                 if let Some(sphinx) = sphinx {
                     if let Err(e) = broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx).into())
@@ -376,6 +399,11 @@ impl LoopixBroker {
                         }
                     } else {
                         let (node_id, sphinx) = loopix_messages.create_drop_message().await;
+                        log::debug!(
+                            "Sending drop message with id {} to {}",
+                            sphinx.message_id,
+                            node_id
+                        );
                         if let Err(e) = broker
                             .emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx.clone()).into())
                         {
