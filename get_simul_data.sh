@@ -51,7 +51,7 @@ for i in "${!lambda_loops[@]}"; do
     lambda_payload=${lambda_payloads[$i]}
     lambda_loop_mix=${lambda_loop_mixes[$i]}
 
-    cat <<EOL > loopix_core_config_$i.yaml
+    cat <<EOL > loopix_core_config.yaml
 ---
 lambda_loop: $lambda_loop
 lambda_drop: $lambda_drop
@@ -85,7 +85,7 @@ max_retrieves=(1 3 5 7 9)
 for i in "${!max_retrieves[@]}"; do
     max_retrieve=${max_retrieves[$i]}
 
-    cat <<EOL > loopix_core_config_$i.yaml
+    cat <<EOL > loopix_core_config.yaml
 ---
 lambda_loop: $lambda_loop
 lambda_drop: $lambda_drop
@@ -119,7 +119,7 @@ mean_delays=(0.02 0.2 1 2 5 10 20 200)
 for i in "${!mean_delays[@]}"; do
     mean_delay=${mean_delays[$i]}
 
-    cat <<EOL > loopix_core_config_$i.yaml
+    cat <<EOL > loopix_core_config.yaml
 ---
 lambda_loop: $lambda_loop
 lambda_drop: $lambda_drop
@@ -153,7 +153,7 @@ time_pulls=(0.1 0.5 1 2 5 10)
 for i in "${!time_pulls[@]}"; do
     time_pull=${time_pulls[$i]}
 
-    cat <<EOL > loopix_core_config_$i.yaml
+    cat <<EOL > loopix_core_config.yaml
 ---
 lambda_loop: $lambda_loop
 lambda_drop: $lambda_drop
@@ -188,7 +188,7 @@ path_lengths=(3 4 5 6 7 8)
 for i in "${!path_lengths[@]}"; do
     path_length=${path_lengths[$i]}
 
-    cat <<EOL > loopix_core_config_$i.yaml
+    cat <<EOL > loopix_core_config.yaml
 ---
 lambda_loop: $lambda_loop
 lambda_drop: $lambda_drop
