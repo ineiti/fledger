@@ -66,9 +66,9 @@ impl LoopixCore for Client {
         // create sphinx packet
         let our_provider = self.get_our_provider().await.unwrap();
         let (_, sphinx) = self.create_sphinx_packet(our_provider, msg, &route);
-        // self.storage
-        //     .add_sent_message(route, MessageType::Loop, sphinx.message_id.clone())
-        //     .await; // TODO uncomment
+        self.storage
+            .add_sent_message(route, MessageType::Loop, sphinx.message_id.clone())
+            .await; // TODO uncomment
         (our_provider, sphinx)
     }
 
@@ -85,7 +85,7 @@ impl LoopixCore for Client {
                 NodeID::from(1)
             }
         };
-        
+
         // create route
         let route = self
             .create_route(
@@ -105,9 +105,9 @@ impl LoopixCore for Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
-        // self.storage
-        //     .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
-        //     .await; // TODO uncomment
+        self.storage
+            .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
+            .await; // TODO uncomment
 
         (our_provider, sphinx)
     }
@@ -246,9 +246,9 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(provider, msg, &route);
-        // self.storage
-        //     .add_sent_message(route, MessageType::PullRequest(our_id), sphinx.message_id.clone())
-        //     .await; // TODO uncomment
+        self.storage
+            .add_sent_message(route, MessageType::PullRequest(our_id), sphinx.message_id.clone())
+            .await; // TODO uncomment
         (provider, Some(sphinx))
     }
 
@@ -279,9 +279,9 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(provider, msg, &route);
-        // self.storage
-        //     .add_sent_message(route, MessageType::SubscriptionRequest(our_id), sphinx.message_id.clone())
-        //     .await; // TODO uncomment
+        self.storage
+            .add_sent_message(route, MessageType::SubscriptionRequest(our_id), sphinx.message_id.clone())
+            .await; // TODO uncomment
         (provider, sphinx)
     }
 
