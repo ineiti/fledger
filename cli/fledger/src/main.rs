@@ -1,3 +1,4 @@
+use flmodules::loopix::config::CoreConfig;
 use std::fs::File;
 use std::io::Write;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
@@ -26,6 +27,7 @@ use flmodules::{
 };
 use flnode::{node::Node, version::VERSION_STRING};
 use serde::{Deserialize, Serialize};
+use serde_yaml;
 use x25519_dalek::{PublicKey, StaticSecret};
 
 /// Fledger node CLI binary
@@ -95,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let mut logger = env_logger::Builder::new();
-    logger.filter_module("fl", args.verbosity.log_level_filter());
+    logger.filter_module("fl", log::LevelFilter::Debug);
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
 
@@ -471,6 +473,7 @@ impl LoopixSetup {
         let config = self.get_config(node_id, role).await?;
         let loopix_broker = LoopixBroker::start(net, config).await?;
         let overlay = OverlayLoopix::start(loopix_broker.broker.clone()).await?;
+        wait_ms(3000).await;
         Ok((loopix_broker, overlay))
     }
 
@@ -482,13 +485,20 @@ impl LoopixSetup {
         let private_key = &self.loopix_key_pairs.get(&node_id).unwrap().1;
         let public_key = &self.loopix_key_pairs.get(&node_id).unwrap().0;
 
-        let config = LoopixConfig::default_with_path_length(
+        let config_path = PathBuf::from("./loopix_core_config.yaml");
+
+        let config_str = std::fs::read_to_string(config_path.clone()).unwrap();
+
+        let core_config: CoreConfig = serde_yaml::from_str(&config_str).unwrap();
+
+        let config = LoopixConfig::default_with_core_config_and_path_length(
             role,
             node_id,
             self.path_length as usize,
             private_key.clone(),
             public_key.clone(),
             self.all_nodes.clone(),
+            core_config,
         );
 
         config

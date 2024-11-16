@@ -12,6 +12,7 @@ use x25519_dalek::PublicKey;
 
 #[derive(Serialize, Deserialize)]
 pub struct Sphinx {
+    pub message_id: String,
     #[serde(
         serialize_with = "serialize_sphinx_packet",
         deserialize_with = "deserialize_sphinx_packet"
@@ -33,6 +34,7 @@ impl Default for Sphinx {
         }];
         let delays = vec![Delay::new_from_nanos(1)];
         Sphinx {
+            message_id: uuid::Uuid::new_v4().to_string(),
             inner: SphinxPacket::new(message, &route, &destination, &delays).unwrap(),
         }
     }
@@ -87,6 +89,7 @@ impl Clone for Sphinx {
         let cloned_packet =
             deserialize_sphinx_packet(&mut serde_json::Deserializer::from_slice(&buffer)).unwrap();
         Sphinx {
+            message_id: self.message_id.clone(),
             inner: cloned_packet,
         }
     }
@@ -135,7 +138,10 @@ mod tests {
     #[test]
     fn test_sphinx_serialization() {
         let packet = create_dummy_sphinx_packet();
-        let sphinx = Sphinx { inner: packet };
+        let sphinx = Sphinx {
+            message_id: uuid::Uuid::new_v4().to_string(),
+            inner: packet,
+        };
 
         let mut serialized = Vec::new();
         bincode::serialize_into(&mut serialized, &sphinx).unwrap();
@@ -148,7 +154,10 @@ mod tests {
     #[test]
     fn test_sphinx_clone() {
         let packet = create_dummy_sphinx_packet();
-        let sphinx = Sphinx { inner: packet };
+        let sphinx = Sphinx {
+            message_id: uuid::Uuid::new_v4().to_string(),
+            inner: packet,
+        };
         let cloned_sphinx = sphinx.clone();
         assert_eq!(sphinx, cloned_sphinx);
     }
@@ -156,7 +165,10 @@ mod tests {
     #[test]
     fn test_sphinx_equality() {
         let packet1 = create_dummy_sphinx_packet();
-        let sphinx1 = Sphinx { inner: packet1 };
+        let sphinx1 = Sphinx {
+            message_id: uuid::Uuid::new_v4().to_string(),
+            inner: packet1,
+        };
         let sphinx2 = sphinx1.clone();
         assert_eq!(sphinx1, sphinx2);
     }

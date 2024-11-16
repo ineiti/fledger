@@ -115,7 +115,7 @@ impl LoopixMessages {
     async fn process_message(&self, msg: LoopixIn) -> Option<(NodeID, Vec<Sphinx>)> {
         match msg {
             LoopixIn::OverlayRequest(node_id, message) => {
-                log::trace!(
+                log::info!(
                     "{}: OverlayRequest with node_id {} and message {:?}",
                     self.role.get_our_id().await,
                     node_id,
@@ -125,11 +125,11 @@ impl LoopixMessages {
                 None
             }
             LoopixIn::SphinxFromNetwork(node_id, sphinx) => {
-                log::trace!(
+                log::info!(
                     "{}: SphinxFromNetwork from node_id {} and sphinx {:?}",
                     self.role.get_our_id().await,
                     node_id,
-                    sphinx.clone()
+                    sphinx.message_id
                 );
                 self.process_sphinx_packet(node_id, sphinx).await
             }
@@ -190,22 +190,21 @@ impl LoopixMessages {
         let processed = self.role.process_sphinx_packet(sphinx_packet.clone()).await;
         match processed {
             ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
-                log::trace!(
-                    "{}: ForwardHop from node_id {} and sphinx {:?}",
-                    self.role.get_our_id().await,
+                log::info!(
+                    "ForwardHop from node_id {} and sphinx {:?}",
                     node_id,
-                    sphinx_packet.clone()
+                    sphinx_packet.message_id
                 );
                 let next_node_id = node_id_from_node_address(next_address);
                 let (next_node_id, next_delay, sphinx) = self
                     .role
-                    .process_forward_hop(next_packet, next_node_id, delay)
+                    .process_forward_hop(next_packet, next_node_id, delay, sphinx_packet.message_id)
                     .await;
 
                 if let Some(sphinx) = sphinx {
                     self.role
                         .get_storage()
-                    .add_forwarded_message((node_id, next_node_id))
+                    .add_forwarded_message((node_id, next_node_id, sphinx.message_id.clone()))
                     .await; // from node_id to next_node_id
 
                     self.network_sender
@@ -218,29 +217,30 @@ impl LoopixMessages {
                 None
             }
             ProcessedPacket::FinalHop(destination, surb_id, payload) => {
-                log::trace!(
-                    "FinalHop from node_id {} and sphinx {:?}",
-                    node_id,
-                    sphinx_packet
-                );
+
                 let dest = node_id_from_destination_address(destination);
 
                 let (source, msg, messages, message_type) =
                     self.role.process_final_hop(dest, surb_id, payload).await;
 
                 if let Some(message_type) = message_type {
-                    self.role
-                        .get_storage()
-                        .add_received_message((source, dest, message_type))
-                        .await;
+                    match message_type {
+                        MessageType::Payload(_, _) => {
+                            self.role
+                                .get_storage()
+                                .add_received_message((source, dest, message_type, sphinx_packet.message_id.clone()))
+                                .await;
+                        }
+                        _ => {}
+                    }
                 }
 
                 if let Some(msg) = msg {
                     log::debug!(
-                        "Final hop was a payload message: {} -> {}: {:?}",
+                        "Final hop was a payload message with id: {} -> {}: {:?}",
                         source,
                         dest,
-                        msg
+                        sphinx_packet.message_id
                     );
                     self.overlay_sender
                         .send((source, msg))
@@ -248,7 +248,7 @@ impl LoopixMessages {
                         .expect("while sending message");
                 }
                 if let Some((node_id, messages)) = messages {
-                    log::debug!(
+                    log::trace!(
                         "Final hop was a pull request: {} -> {}",
                         node_id,
                         messages.len()
@@ -346,21 +346,22 @@ impl LoopixCore for NodeType {
         next_packet: Box<SphinxPacket>,
         next_node: NodeID,
         delay: Delay,
+        message_id: String,
     ) -> (NodeID, Delay, Option<Sphinx>) {
         match self {
             NodeType::Client(client) => {
                 client
-                    .process_forward_hop(next_packet, next_node, delay)
+                    .process_forward_hop(next_packet, next_node, delay, message_id)
                     .await
             }
             NodeType::Mixnode(mixnode) => {
                 mixnode
-                    .process_forward_hop(next_packet, next_node, delay)
+                    .process_forward_hop(next_packet, next_node, delay, message_id)
                     .await
             }
             NodeType::Provider(provider) => {
                 provider
-                    .process_forward_hop(next_packet, next_node, delay)
+                    .process_forward_hop(next_packet, next_node, delay, message_id)
                     .await
             }
         }

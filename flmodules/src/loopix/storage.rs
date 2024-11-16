@@ -1,4 +1,5 @@
 use crate::{loopix::sphinx::Sphinx, nodeconfig::NodeInfo};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use flarch::nodeids::NodeID;
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
@@ -6,10 +7,9 @@ use sphinx_packet::{header::delays::Delay, route::Node};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::SystemTime;
 use tokio::sync::RwLock;
 use x25519_dalek::{PublicKey, StaticSecret};
-use base64::{engine::general_purpose::STANDARD, Engine};
-use std::time::SystemTime;
 
 use super::{messages::MessageType, sphinx::node_id_from_node_address};
 
@@ -51,9 +51,9 @@ pub struct NetworkStorage {
     )]
     node_public_keys: HashMap<NodeID, PublicKey>,
 
-    forwarded_messages: Vec<(SystemTime, NodeID, NodeID)>, // timestamp, from, to
-    received_messages: Vec<(SystemTime, NodeID, NodeID, MessageType)>, // timestamp, origin, relayed by, Message
-    sent_messages: Vec<(SystemTime, Vec<NodeID>, MessageType)>, // timestamp, route, message
+    forwarded_messages: Vec<(SystemTime, NodeID, NodeID, String)>, // timestamp, from, to, message_id
+    received_messages: Vec<(SystemTime, NodeID, NodeID, MessageType, String)>, // timestamp, origin, relayed by, Message, message_id
+    sent_messages: Vec<(SystemTime, Vec<NodeID>, MessageType, String)>, // timestamp, route, message, message_id
 }
 
 impl NetworkStorage {
@@ -226,13 +226,17 @@ impl LoopixStorage {
         self.network_storage.write().await.node_public_keys = new_keys;
     }
 
-    pub async fn get_forwarded_messages(&self) -> Vec<(SystemTime, NodeID, NodeID)> {
+    pub async fn get_forwarded_messages(&self) -> Vec<(SystemTime, NodeID, NodeID, String)> {
         self.network_storage.read().await.forwarded_messages.clone()
     }
 
     pub async fn get_client_message_index(&self, client_id: NodeID) -> usize {
         if let Some(storage) = self.provider_storage.read().await.as_ref() {
-            storage.client_message_index.get(&client_id).cloned().unwrap_or(0)
+            storage
+                .client_message_index
+                .get(&client_id)
+                .cloned()
+                .unwrap_or(0)
         } else {
             panic!("Provider storage not found");
         }
@@ -246,9 +250,14 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn add_forwarded_message(&self, new_message: (NodeID, NodeID)) {
-        let timestamped_message = (SystemTime::now(), new_message.0, new_message.1);
-        
+    pub async fn add_forwarded_message(&self, new_message: (NodeID, NodeID, String)) {
+        let timestamped_message = (
+            SystemTime::now(),
+            new_message.0,
+            new_message.1,
+            new_message.2,
+        );
+
         self.network_storage
             .write()
             .await
@@ -256,13 +265,21 @@ impl LoopixStorage {
             .push(timestamped_message);
     }
 
-    pub async fn get_received_messages(&self) -> Vec<(SystemTime, NodeID, NodeID, MessageType)> {
+    pub async fn get_received_messages(
+        &self,
+    ) -> Vec<(SystemTime, NodeID, NodeID, MessageType, String)> {
         self.network_storage.read().await.received_messages.clone()
     }
 
-    pub async fn add_received_message(&self, new_message: (NodeID, NodeID, MessageType)) {
-        let timestamped_message = (SystemTime::now(), new_message.0, new_message.1, new_message.2);
-        
+    pub async fn add_received_message(&self, new_message: (NodeID, NodeID, MessageType, String)) {
+        let timestamped_message = (
+            SystemTime::now(),
+            new_message.0,
+            new_message.1,
+            new_message.2,
+            new_message.3,
+        );
+
         self.network_storage
             .write()
             .await
@@ -270,20 +287,26 @@ impl LoopixStorage {
             .push(timestamped_message);
     }
 
-    pub async fn get_sent_messages(&self) -> Vec<(SystemTime, Vec<NodeID>, MessageType)> {
+    pub async fn get_sent_messages(&self) -> Vec<(SystemTime, Vec<NodeID>, MessageType, String)> {
         self.network_storage.read().await.sent_messages.clone()
     }
 
-    pub async fn add_sent_message(&self, route: Vec<Node>, message_type: MessageType) {
+    pub async fn add_sent_message(
+        &self,
+        route: Vec<Node>,
+        message_type: MessageType,
+        message_id: String,
+    ) {
         let route_ids: Vec<NodeID> = route
             .iter()
             .map(|node| node_id_from_node_address(node.address))
             .collect();
-        self.network_storage
-            .write()
-            .await
-            .sent_messages
-            .push((SystemTime::now(), route_ids, message_type));
+        self.network_storage.write().await.sent_messages.push((
+            SystemTime::now(),
+            route_ids,
+            message_type,
+            message_id,
+        ));
     }
 
     pub async fn get_our_provider(&self) -> Option<NodeID> {
@@ -813,9 +836,16 @@ impl Clone for LoopixStorage {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::{self, create_dir_all, File}, io::Write, path::PathBuf};
+    use std::{
+        fs::{create_dir_all, remove_file, File},
+        io::Write,
+        path::PathBuf,
+    };
 
-    use crate::loopix::{config::{LoopixConfig, LoopixRole}, testing::LoopixSetup};
+    use crate::loopix::{
+        config::{LoopixConfig, LoopixRole},
+        testing::LoopixSetup,
+    };
 
     use super::*;
 
@@ -940,7 +970,7 @@ mod tests {
         let loopix_storage = LoopixStorage::default_with_path_length(
             node_id,
             path_length,
-            private_key, 
+            private_key,
             public_key,
             None,
             Some(provider_storage),
@@ -968,8 +998,7 @@ mod tests {
     #[tokio::test]
     async fn test_loopix_storage_to_yaml_async() {
         let path_length = 2;
-        let (all_nodes, _, loopix_key_pairs, _) =
-            LoopixSetup::create_nodes_and_keys(path_length);
+        let (all_nodes, _, loopix_key_pairs, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
         let node_id = all_nodes.iter().next().unwrap().get_id();
         let private_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
@@ -1007,5 +1036,6 @@ mod tests {
             }
         }
 
+        remove_file(path).unwrap();
     }
 }

@@ -14,7 +14,7 @@ pub enum LoopixRole {
 }
 
 //////////////////////////////////////// Loopix Config ////////////////////////////////////////
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LoopixConfig {
     pub role: LoopixRole,
     pub core_config: CoreConfig,
@@ -106,6 +106,71 @@ impl LoopixConfig {
         );
 
         LoopixConfig::new_default(role, path_length, storage)
+    }
+
+    pub fn default_with_core_config_and_path_length(
+        role: LoopixRole,
+        our_node_id: NodeID,
+        path_length: usize,
+        private_key: StaticSecret,
+        public_key: PublicKey,
+        all_nodes: Vec<NodeInfo>,
+        core_config: CoreConfig,
+    ) -> Self {
+        let client_storage = match role {
+            LoopixRole::Client => {
+                Some(ClientStorage::default_with_path_length(
+                    our_node_id,
+                    all_nodes.clone(),
+                    path_length,
+                ))
+            }
+            _ => None,
+        };
+
+        let provider_storage = match role {
+            LoopixRole::Provider => {
+                let all_clients = all_nodes
+                    .clone()
+                    .into_iter()
+                    .take(path_length)
+                    .collect::<Vec<NodeInfo>>();
+
+                Some(ProviderStorage::default_with_path_length(
+                    HashSet::from_iter(all_clients.iter().map(|node| node.get_id())),
+                ))
+            }
+            _ => None,
+        };
+
+        if (client_storage.is_none() 
+            && provider_storage.is_none() 
+            && !all_nodes
+                .clone()
+                .into_iter()
+                .skip(path_length * 2)
+                .any(|node| node.get_id() == our_node_id))
+            && (role == LoopixRole::Mixnode)
+        {
+            log::error!("Node ID {} not found in {:?}", our_node_id, all_nodes);
+            panic!("Our node id must be between the path length and 2 times the path length");
+        }
+        
+        let storage = LoopixStorage::default_with_path_length(
+            our_node_id,
+            path_length,
+            private_key,
+            public_key,
+            client_storage,
+            provider_storage,
+            all_nodes,
+        );
+
+        LoopixConfig {
+            role,
+            core_config,
+            storage_config: storage,
+        }
     }
 }
 
@@ -226,3 +291,29 @@ impl CoreConfig {
         self.pad_length
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_write_core_config_to_file() {
+        let config = CoreConfig::default();
+        let json = serde_yaml::to_string(&config).unwrap();
+        
+        let mut path = PathBuf::from(".");
+        path.push("test_core_config.yaml");
+        
+        fs::write(&path, json).unwrap();
+        
+        let read_json = fs::read_to_string(&path).unwrap();
+        let read_config: CoreConfig = serde_yaml::from_str(&read_json).unwrap();
+        
+        assert_eq!(config, read_config);
+        
+        fs::remove_file(path).unwrap();
+    }
+}
+

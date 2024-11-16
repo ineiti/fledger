@@ -41,15 +41,17 @@ impl LoopixCore for Mixnode {
         next_packet: Box<SphinxPacket>,
         next_node: NodeID,
         delay: Delay,
+        message_id: String
     ) -> (NodeID, Delay, Option<Sphinx>) {
         let sphinx = &Sphinx {
+            message_id: message_id.clone(),
             inner: *next_packet,
         };
         log::debug!(
             "{} --> {}: {:?}",
             self.get_our_id().await,
             next_node,
-            sphinx
+            message_id.clone()
         );
         (next_node, delay, Some(sphinx.clone()))
     }
@@ -145,9 +147,9 @@ impl LoopixCore for Mixnode {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(our_id, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Loop)
-            .await;
+        // self.storage
+        //     .add_sent_message(route, MessageType::Loop, sphinx.message_id.clone())
+        //     .await; // TODO uncomment
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
@@ -174,9 +176,9 @@ impl LoopixCore for Mixnode {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Drop)
-            .await;
+        // self.storage
+        //     .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
+        //     .await; // TODO uncomment
         (node_id_from_node_address(next_node.address), sphinx)
     }
 }

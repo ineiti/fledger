@@ -63,9 +63,9 @@ impl LoopixCore for Provider {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(our_id, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Loop)
-            .await;
+        // self.storage
+        //     .add_sent_message(route, MessageType::Loop, sphinx.message_id.clone())
+        //     .await; // TODO uncomment
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
@@ -92,9 +92,9 @@ impl LoopixCore for Provider {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Drop)
-            .await;
+        // self.storage
+        //     .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
+        //     .await; // TODO uncomment
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
@@ -126,7 +126,7 @@ impl LoopixCore for Provider {
                         }
                         MessageType::PullRequest(client_id) => {
                             let messages = self.create_pull_reply(client_id).await;
-                            log::debug!(
+                            log::trace!(
                                 "Provider received pull request from client: {:?}",
                                 client_id
                             );
@@ -134,22 +134,22 @@ impl LoopixCore for Provider {
                         }
                         MessageType::SubscriptionRequest(client_id) => {
                             self.get_storage().add_subscribed_client(client_id).await;
-                            log::debug!(
+                            log::trace!(
                                 "Provider received subscription request from client: {:?}",
                                 client_id
                             );
                             (client_id, None, None, Some(message))
                         }
                         MessageType::Drop => {
-                            log::debug!("Provider received drop");
+                            log::trace!("Provider received drop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Loop => {
-                            log::debug!("Provider received loop");
+                            log::trace!("Provider received loop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Dummy => {
-                            log::error!("Provider shouldn't receive dummy messages!");
+                            log::warn!("Provider received dummy");
                             (destination, None, None, Some(message))
                         }
                     }
@@ -175,6 +175,7 @@ impl LoopixCore for Provider {
         next_packet: Box<SphinxPacket>,
         next_node: NodeID,
         delay: Delay,
+        message_id: String,
     ) -> (NodeID, Delay, Option<Sphinx>) {
         if self
             .get_storage()
@@ -183,6 +184,7 @@ impl LoopixCore for Provider {
             .contains(&next_node)
         {
             let sphinx = &Sphinx {
+                message_id,
                 inner: *next_packet,
             };
             self.store_client_message(next_node, sphinx.clone()).await;
@@ -191,6 +193,7 @@ impl LoopixCore for Provider {
         } else {
             // THIS IS COPY PASTED FROM MIXNODE, I JUST DON'T KNOW HOW TO DO TRAITS IN RUST
             let sphinx = &Sphinx {
+                message_id,
                 inner: *next_packet,
             };
             log::debug!(
@@ -245,9 +248,9 @@ impl Provider {
         let (_, sphinx) = self.create_sphinx_packet(client_id, msg, &route);
 
         // create delay
-        self.storage
-            .add_sent_message(route, MessageType::Dummy)
-            .await;
+        // self.storage
+        //     .add_sent_message(route, MessageType::Dummy, sphinx.message_id.clone()  )
+        //     .await;
 
         sphinx
     }
@@ -259,8 +262,8 @@ impl Provider {
         let index = self.get_storage().get_client_message_index(client_id).await;
         let messages = self.get_client_messages(client_id).await;
 
-        log::debug!(
-            "Pull reply has {} real messages and {} messages will be send",
+        log::trace!(
+            "Pull reply has {} real messages and {} messages will be sent",
             messages.len(),
             max_retrieve
         );
@@ -279,7 +282,7 @@ impl Provider {
         for _ in messages_to_send.len()..max_retrieve {
             let sphinx = self.create_dummy_message(client_id).await;
             messages_to_send.push(sphinx);
-        }
+        } // TODO uncomment
 
         (client_id, messages_to_send)
     }

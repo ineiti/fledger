@@ -48,6 +48,7 @@ pub trait LoopixCore {
         next_packet: Box<SphinxPacket>,
         next_address: NodeID,
         delay: Delay,
+        message_id: String,
     ) -> (NodeID, Delay, Option<Sphinx>);
 
     fn create_sphinx_packet(
@@ -73,6 +74,7 @@ pub trait LoopixCore {
         (
             route[0].clone(),
             Sphinx {
+                message_id: uuid::Uuid::new_v4().to_string(),
                 inner: sphinx_packet,
             },
         )
@@ -195,6 +197,7 @@ mod tests {
             _next_packet: Box<SphinxPacket>,
             _next_address: NodeID,
             _delay: Delay,
+            _message_id: String,
         ) -> (NodeID, Delay, Option<Sphinx>) {
             todo!()
         }

@@ -66,9 +66,9 @@ impl LoopixCore for Client {
         // create sphinx packet
         let our_provider = self.get_our_provider().await.unwrap();
         let (_, sphinx) = self.create_sphinx_packet(our_provider, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Loop)
-            .await;
+        // self.storage
+        //     .add_sent_message(route, MessageType::Loop, sphinx.message_id.clone())
+        //     .await; // TODO uncomment
         (our_provider, sphinx)
     }
 
@@ -99,9 +99,9 @@ impl LoopixCore for Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Drop)
-            .await;
+        // self.storage
+        //     .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
+        //     .await; // TODO uncomment
         (random_provider, sphinx)
     }
 
@@ -174,8 +174,12 @@ impl LoopixCore for Client {
         _next_packet: Box<SphinxPacket>,
         _next_address: NodeID,
         delay: Delay,
+        message_id: String,
     ) -> (NodeID, Delay, Option<Sphinx>) {
-        log::error!("Client shouldn't receive forward hops");
+        log::error!(
+            "Client shouldn't receive forward hops, message id: {}",
+            message_id
+        );
         let our_id = self.get_our_id().await;
         (our_id, delay, None)
     }
@@ -235,9 +239,9 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(provider, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::PullRequest(our_id))
-            .await;
+        // self.storage
+        //     .add_sent_message(route, MessageType::PullRequest(our_id), sphinx.message_id.clone())
+        //     .await; // TODO uncomment
         (provider, Some(sphinx))
     }
 
@@ -268,9 +272,9 @@ impl Client {
 
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(provider, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::SubscriptionRequest(our_id))
-            .await;
+        // self.storage
+        //     .add_sent_message(route, MessageType::SubscriptionRequest(our_id), sphinx.message_id.clone())
+        //     .await; // TODO uncomment
         (provider, sphinx)
     }
 
@@ -317,8 +321,9 @@ impl Client {
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(destination, network_msg, &route);
         self.storage
-            .add_sent_message(route, MessageType::Payload(our_id, msg))
+            .add_sent_message(route, MessageType::Payload(our_id, msg), sphinx.message_id.clone())
             .await;
+        log::info!("Sent message {} to {}", sphinx.message_id, destination);
         (our_provider.unwrap(), sphinx)
     }
 }
@@ -446,7 +451,7 @@ mod tests {
         let sent_msg = client.get_storage().get_sent_messages().await;
         println!("Sent messages: {:?}", sent_msg);
 
-        let (timestamp, route, _msg) = sent_msg[0].clone();
+        let (_timestamp, route, _msg, _msg_id) = sent_msg[0].clone();
 
         let mut sphinx_packet = sphinx.clone();
 
@@ -470,6 +475,7 @@ mod tests {
             match processed {
                 ProcessedPacket::ForwardHop(next_packet, next_address, _delay) => {
                     sphinx_packet = Sphinx {
+                        message_id: sphinx_packet.message_id.clone(),
                         inner: *next_packet,
                     };
                     next_node = node_id_from_node_address(next_address);
@@ -511,7 +517,7 @@ mod tests {
         let sent_msg = client.get_storage().get_sent_messages().await;
         println!("Sent messages: {:?}", sent_msg);
 
-        let (timestamp, route, _msg) = sent_msg[0].clone();
+        let (_timestamp, route, _msg, _msg_id) = sent_msg[0].clone();
 
         let mut sphinx_packet = sphinx.clone();
 
@@ -535,6 +541,7 @@ mod tests {
             match processed {
                 ProcessedPacket::ForwardHop(next_packet, next_address, _delay) => {
                     sphinx_packet = Sphinx {
+                        message_id: sphinx_packet.message_id.clone(),
                         inner: *next_packet,
                     };
                     next_node = node_id_from_node_address(next_address);
@@ -576,7 +583,7 @@ mod tests {
         let sent_msg = client.get_storage().get_sent_messages().await;
         println!("Sent messages: {:?}", sent_msg);
 
-        let (timestamp, route, _msg) = sent_msg[0].clone();
+        let (_timestamp, route, _msg, _msg_id) = sent_msg[0].clone();
 
         let mut sphinx_packet = sphinx.clone();
 
@@ -600,6 +607,7 @@ mod tests {
             match processed {
                 ProcessedPacket::ForwardHop(next_packet, next_address, _delay) => {
                     sphinx_packet = Sphinx {
+                        message_id: sphinx_packet.message_id.clone(),
                         inner: *next_packet,
                     };
                     next_node = node_id_from_node_address(next_address);

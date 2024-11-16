@@ -87,9 +87,9 @@ impl LoopixBroker {
 
         Self::start_overlay_send_thread(broker.clone(), overlay_receiver);
 
-        // Self::start_loop_message_thread(loopix_messages.clone(), broker.clone());
+        Self::start_loop_message_thread(loopix_messages.clone(), broker.clone());
 
-        // Self::start_drop_message_thread(loopix_messages.clone(), broker.clone());
+        Self::start_drop_message_thread(loopix_messages.clone(), broker.clone());
 
         // Client has two extra threads
         match node_type {
@@ -168,9 +168,9 @@ impl LoopixBroker {
                 if let Err(e) = broker.emit_msg(LoopixOut::NodeInfosConnected(node_infos).into()) {
                     log::error!("Failed to emit node infos connected message: {:?}", e);
                 } else {
-                    log::info!("Successfully emitted node infos connected message");
+                    // log::info!("Successfully emitted node infos connected message");
                 }
-                tokio::time::sleep(Duration::from_secs(10)).await;
+                tokio::time::sleep(Duration::from_secs(1)).await;
             }
         });
     }
@@ -183,9 +183,15 @@ impl LoopixBroker {
             loop {
                 if let Some((node_id, wrapper)) = receiver.recv().await {
                     if let Err(e) =
-                        broker.emit_msg(LoopixOut::OverlayReply(node_id, wrapper).into())
+                        broker.emit_msg(LoopixOut::OverlayReply(node_id, wrapper.clone()).into())
                     {
                         log::error!("Error emitting overlay message: {e:?}");
+                    } else {
+                        log::info!(
+                            "Loopix to Overlay from {}, wrapper len: {:?}",
+                            node_id,
+                            wrapper
+                        );
                     }
                 }
             }
@@ -298,7 +304,7 @@ impl LoopixBroker {
                     {
                         log::error!("Failed to emit pull message: {:?}", e);
                     } else {
-                        log::info!("Successfully emitted pull message to node {}", node_id);
+                        log::trace!("Successfully emitted pull message to node {}", node_id);
                     }
                 }
 
@@ -342,6 +348,10 @@ impl LoopixBroker {
                 // Sort messages by remaining delay
                 sphinx_messages.sort_by_key(|&(_, delay, _)| delay); // TODO technically this is not the protocol
 
+                if !sphinx_messages.is_empty() {
+                    log::debug!("{}: sphinx_messages: {:?}", our_id, sphinx_messages);
+                }
+                
                 // Emit messages with 0 or less delay
                 if let Some((node_id, delay, sphinx_packet)) = sphinx_messages.first() {
                     log::trace!(
@@ -356,7 +366,12 @@ impl LoopixBroker {
                         ) {
                             log::error!("Error emitting network message: {e:?}");
                         } else {
-                            log::trace!("{} emitted a payload message to node {}", our_id, node_id);
+                            log::info!(
+                                "{} emitted a payload message {:?} to node {}",
+                                our_id,
+                                sphinx_packet.message_id,
+                                node_id
+                            );
                             sphinx_messages.remove(0);
                         }
                     } else {
@@ -373,7 +388,7 @@ impl LoopixBroker {
                 // Wait for send delay
                 tokio::time::sleep(wait_before_send).await;
 
-                log::debug!(
+                log::trace!(
                     "{}: messages in queue before: {:?}",
                     our_id,
                     sphinx_messages
@@ -607,6 +622,7 @@ mod tests {
         let message_vec = serde_yaml::to_string(&msg).unwrap().as_bytes().to_vec();
         let sphinx_packet = SphinxPacket::new(message_vec, &route, &destination, &delays).unwrap();
         let sphinx = Sphinx {
+            message_id: uuid::Uuid::new_v4().to_string(),
             inner: sphinx_packet,
         };
 

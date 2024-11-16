@@ -88,6 +88,7 @@ impl LoopixSetup {
         let (node_infos, node_public_keys, loopix_key_pairs, node_configs) = Self::create_nodes_and_keys(path_length);
 
         log::info!("Node configs: {:?}", node_configs.len());
+        log::info!("Node key pairs: {:?}", loopix_key_pairs.len());
 
         let mut setup = Self {
             node_public_keys,
@@ -235,55 +236,54 @@ impl LoopixSetup {
         println!("Sent messages: {:?}", sent_messages.len());
 
         println!();
-
         println!("\nForwarded Messages:");
-        println!("{:<10} {:<20} {:<20}", "Count", "Timestamp", "From -> To");
+        println!("{:<10} {:<20} {:<20} {:<20} {:<20}", "Count", "Timestamp", "From -> To", "Message ID", "Message ID");
         println!("{:-<300}", "");
 
         let mut forwarded_count = HashMap::new();
-        for (_timestamp, from, to) in forwarded_messages {
-            *forwarded_count.entry((from, to)).or_insert(0) += 1;
+        for (_timestamp, from, to, message_id) in forwarded_messages {
+            *forwarded_count.entry((from, to, message_id)).or_insert(0) += 1;
         }
-        for ((from, to), count) in forwarded_count {
-            println!("{:<10} {:<60} {:<20}", count, format!("{:x} -> {:x}", from, to), "N/A");
+        for ((from, to, message_id), count) in forwarded_count {
+            println!("{:<10} {:<60} {:<20} {:<20} {:<20}", count, format!("{:x} -> {:x}", from, to), "N/A", format!("{:?}", message_id), format!("{:?}", message_id));
         }
 
         println!("\nReceived Messages:");
-        println!("{:<10} {:<20} {:<20} {:<20}", "Count", "Timestamp", "Origin -> Relayed By", "Message Type");
+        println!("{:<10} {:<20} {:<20} {:<20} {:<20} {:<20}", "Count", "Timestamp", "Origin -> Relayed By", "Message Type", "Message ID", "Message ID");
         println!("{:-<300}", "");
 
         let mut received_count = HashMap::new();
-        for (_timestamp, origin, relay, message_type) in received_messages {
-            *received_count.entry((origin, relay, message_type)).or_insert(0) += 1;
+        for (_timestamp, origin, relay, message_type, message_id) in received_messages {
+            *received_count.entry((origin, relay, message_type, message_id)).or_insert(0) += 1;
         }
-        for ((origin, relay, message_type), count) in received_count {
-            println!("{:<10} {:<20} {:<20}", count, format!("{:x} -> {:x}", origin, relay), format!("{:?}", message_type));
+        for ((origin, relay, message_type, message_id), count) in received_count {
+            println!("{:<10} {:<20} {:<40} {:<20} {:<20}", count, "N/A", format!("{:x} -> {:x}", origin, relay), format!("{:?}", message_type), format!("{:?}", message_id));
         }
 
         println!("\nSent Messages:");
-        println!("{:<10} {:<20} {:<100} {:<60}", "Count", "Timestamp", "Message Type", "Route");
+        println!("{:<10} {:<20} {:<100} {:<60} {:<20} {:<20}", "Count", "Timestamp", "Message Type", "Route", "Message ID", "Message ID");
         println!("{:-<300}", "");
 
         let mut sent_count = HashMap::new();
-        for (_timestamp, route, message_type) in sent_messages {
+        for (_timestamp, route, message_type, message_id) in sent_messages {
             let short_route: Vec<String> = route
                 .iter()
                 .map(|node_id| format!("{:x}", node_id))
                 .collect::<Vec<String>>();
-            *sent_count.entry((short_route, message_type)).or_insert(0) += 1;
+            *sent_count.entry((short_route, message_type, message_id)).or_insert(0) += 1;
         }
-        for ((short_route, message_type), count) in sent_count {
-            println!("{:<10} {:<100} {:<60}", count, format!("{:?}", message_type), format!("[{}]", short_route.join(", ")));
+        for ((short_route, message_type, message_id), count) in sent_count {
+            println!("{:<10} {:<20} {:<100} {:<60}", count, format!("{:?}", message_type), format!("[{}]", short_route.join(", ")), format!("{:?}", message_id));
         }
 
         if role == "Provider" {
             let client_messages = node.storage.get_all_client_messages().await;
             println!("\nClient Messages:");
-            println!("{:<60} {:<20}", "Client ID", "Message Type");
+            println!("{:<60} {:<20} {:<20} {:<20}", "Client ID", "Message Type", "Message ID", "Message ID");
             println!("{:-<300}", "");
             for (client_id, messages) in client_messages {
                 for sphinx in messages {
-                    println!("{:<60} {:<20}", format!("{:x}", client_id), format!("{:?}", sphinx));
+                    println!("{:<60} {:<20} {:<20} {:<20}", format!("{:x}", client_id), format!("{:?}", sphinx), format!("{:?}", sphinx.message_id.clone()), format!("{:?}", sphinx.message_id.clone()));
                 }
             }
         }

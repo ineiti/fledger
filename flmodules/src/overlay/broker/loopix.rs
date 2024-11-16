@@ -30,6 +30,8 @@ impl OverlayLoopix {
     }
 
     fn from_loopix(msg: LoopixMessage) -> Option<OverlayMessage> {
+        // log::debug!("OverlayLoopix: Received message: {:?}", msg.clone());
+
         if let LoopixMessage::Output(out) = msg {
             let ret = match out {
                 LoopixOut::NodeIDsConnected(node_ids) => {
@@ -56,6 +58,8 @@ impl OverlayLoopix {
     }
 
     fn to_loopix(msg: OverlayMessage) -> Option<LoopixMessage> {
+        // log::debug!("Overlay Received me {:?}", msg.clone());
+
         if let OverlayMessage::Input(input) = msg {
             log::info!("OverlayLoopix: Sending message to loopix: {:?}", input);
             match input {
@@ -200,25 +204,25 @@ mod test {
 
         let received_messages = storage.get_received_messages().await;
         log::info!("Received messages: {:?}", received_messages.len());
-        for (timestamp, source, dest, message_type) in received_messages {
-            log::info!("Received message at {:?} from {} to {} with type {:?}", 
-                timestamp, source, dest, message_type);
+        for (timestamp, source, dest, message_type, message_id) in received_messages {
+            log::info!("Received message {} at {:?} from {} to {} with type {:?}", 
+                message_id, timestamp, source, dest, message_type);
         }
     
         let forwarded_messages = storage.get_forwarded_messages().await;
         log::info!("Forwarded messages: {:?}", forwarded_messages.len());
-        for (timestamp, source, dest) in forwarded_messages {
-            log::info!("Forwarded message at {:?} from {} to {}", 
-                timestamp, source, dest);
+        for (timestamp, source, dest, message_id) in forwarded_messages {
+            log::info!("Forwarded message {} at {:?} from {} to {}", 
+                message_id, timestamp, source, dest);
         }
 
         let sent_messages = storage.get_sent_messages().await;
         log::info!("Sent messages: {:?}", sent_messages.len());
 
-        println!("{:<30} {:<60} {:<20}", "Timestamp", "Route", "Message Type");
+        println!("{:<30} {:<60} {:<20} {:<20}", "Timestamp", "Route", "Message Type", "Message ID");
         println!("{:-<110}", "");
 
-        for (timestamp, route, message_type) in sent_messages {
+        for (timestamp, route, message_type, message_id) in sent_messages {
             let route_str = format!("{:?}", route);
             let short_route: Vec<String> = route_str
                 .trim_matches(|c| c == '[' || c == ']')
@@ -226,10 +230,11 @@ mod test {
                 .map(|node_id| node_id.split('-').next().unwrap_or(node_id).to_string())
                 .collect();
             let formatted_route = format!("[{}]", short_route.join(", "));
-            println!("{:<30} {:<60} {:<20}", 
+            println!("{:<30} {:<60} {:<20} {:<20}", 
                 format!("{:?}", timestamp), 
                 formatted_route, 
-                format!("{:?}", message_type));
+                format!("{:?}", message_type),
+                format!("{:?}", message_id));
         }
 
         Ok(())
@@ -317,25 +322,25 @@ mod test {
 
         let received_messages = storage.get_received_messages().await;
         log::info!("Received messages: {:?}", received_messages.len());
-        for (timestamp, source, dest, message_type) in received_messages {
-            log::info!("Received message at {:?} from {} to {} with type {:?}", 
-                timestamp, source, dest, message_type);
+        for (timestamp, source, dest, message_type, message_id) in received_messages {
+            log::info!("Received message {} at {:?} from {} to {} with type {:?}", 
+                message_id, timestamp, source, dest, message_type);
         }
     
         let forwarded_messages = storage.get_forwarded_messages().await;
         log::info!("Forwarded messages: {:?}", forwarded_messages.len());
-        for (timestamp, source, dest) in forwarded_messages {
-            log::info!("Forwarded message at {:?} from {} to {}", 
-                timestamp, source, dest);
+        for (timestamp, source, dest, message_id) in forwarded_messages {
+            log::info!("Forwarded message {} at {:?} from {} to {}", 
+                message_id, timestamp, source, dest);
         }
 
         let sent_messages = storage.get_sent_messages().await;
         log::info!("Sent messages: {:?}", sent_messages.len());
 
-        println!("{:<30} {:<60} {:<20}", "Timestamp", "Route", "Message Type");
+        println!("{:<30} {:<60} {:<20} {:<20}", "Timestamp", "Route", "Message Type", "Message ID");
         println!("{:-<110}", "");
 
-        for (timestamp, route, message_type) in sent_messages {
+        for (timestamp, route, message_type, message_id) in sent_messages {
             let route_str = format!("{:?}", route);
             let short_route: Vec<String> = route_str
                 .trim_matches(|c| c == '[' || c == ']')
@@ -343,10 +348,11 @@ mod test {
                 .map(|node_id| node_id.split('-').next().unwrap_or(node_id).to_string())
                 .collect();
             let formatted_route = format!("[{}]", short_route.join(", "));
-            println!("{:<30} {:<60} {:<20}", 
+            println!("{:<30} {:<60} {:<20} {:<20}", 
                 format!("{:?}", timestamp), 
                 formatted_route, 
-                format!("{:?}", message_type));
+                format!("{:?}", message_type),
+                format!("{:?}", message_id));
         }
 
         // Ok(())

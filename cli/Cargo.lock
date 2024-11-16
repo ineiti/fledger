@@ -920,6 +920,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "serde_yaml",
  "thiserror",
  "tokio",
  "webrtc-util",
@@ -959,6 +960,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "toml",
+ "uuid",
  "x25519-dalek",
 ]
 
