@@ -128,8 +128,20 @@ impl LoopixCore for Client {
             return (destination, None, None, None);
         }
 
-        let plaintext = payload.recover_plaintext().unwrap();
-        let plaintext_str = std::str::from_utf8(&plaintext).unwrap();
+        let plaintext = match payload.recover_plaintext() {
+            Ok(plaintext) => plaintext,
+            Err(e) => {
+                log::error!("Failed to recover plaintext: {:?}", e);
+                return (destination, None, None, None);
+            }
+        };
+        let plaintext_str = match std::str::from_utf8(&plaintext) {
+            Ok(plaintext_str) => plaintext_str,
+            Err(e) => {
+                log::error!("Failed to convert plaintext to string: {:?}", e);
+                return (destination, None, None, None);
+            }
+        };
 
         if let Ok(module_message) = serde_yaml::from_str::<NetworkWrapper>(plaintext_str) {
             if module_message.module == MODULE_NAME {
@@ -147,15 +159,15 @@ impl LoopixCore for Client {
                             (client_id, None, None, Some(message))
                         }
                         MessageType::Drop => {
-                            log::debug!("Client received drop");
+                            log::trace!("Client received drop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Loop => {
-                            log::debug!("Client received loop");
+                            log::trace!("Client received loop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Dummy => {
-                            log::debug!("Client received dummy");
+                            log::trace!("Client received dummy");
                             (destination, None, None, Some(message))
                         }
                     }
@@ -229,7 +241,8 @@ impl Client {
         let our_provider = self.get_our_provider().await;
 
         if our_provider.is_none() {
-            panic!("Client has no provider");
+            log::error!("Client has no provider");
+            return (our_id, None);
         }
 
         let provider = our_provider.unwrap();

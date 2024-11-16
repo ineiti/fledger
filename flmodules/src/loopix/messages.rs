@@ -111,6 +111,15 @@ impl LoopixMessages {
                     .for_each(|s| sphinx_messages.push((node_id, s)));
             }
         }
+        
+        if !sphinx_messages.is_empty() {
+            let message_details: Vec<_> = sphinx_messages
+                .iter()
+                .map(|(node_id, sphinx)| (node_id, &sphinx.message_id))
+                .collect();
+            log::trace!("Processed sphinx_message_details: {:?}", message_details);
+        }
+        
         sphinx_messages
     }
 
@@ -239,20 +248,15 @@ impl LoopixMessages {
                         self.role.process_final_hop(dest, surb_id, payload).await;
 
                     if let Some(message_type) = message_type {
-                        match message_type {
-                            MessageType::Payload(_, _) => {
-                                self.role
-                                    .get_storage()
-                                    .add_received_message((
-                                        source,
-                                        dest,
-                                        message_type,
-                                        sphinx_packet.message_id.clone(),
-                                    ))
-                                    .await;
-                            }
-                            _ => {}
-                        }
+                        self.role
+                            .get_storage()
+                            .add_received_message((
+                                source,
+                                dest,
+                                message_type,
+                                sphinx_packet.message_id.clone(),
+                            ))
+                            .await;
                     }
 
                     if let Some(msg) = msg {
@@ -268,10 +272,15 @@ impl LoopixMessages {
                             .expect("while sending message");
                     }
                     if let Some((node_id, messages)) = messages {
+                        let message_details: Vec<_> = messages
+                            .iter()
+                            .map(|sphinx| &sphinx.message_id)
+                            .collect();
                         log::trace!(
-                            "Final hop was a pull request: {} -> {}",
+                            "Final hop was a pull request: {} -> {} with message IDs: {:?}",
                             node_id,
-                            messages.len()
+                            messages.len(),
+                            message_details
                         );
                         Some((node_id, messages))
                     } else {

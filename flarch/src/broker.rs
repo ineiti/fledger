@@ -282,12 +282,12 @@ impl<R: Async + Clone + fmt::Debug, S: 'static + Async + Clone + fmt::Debug> Sub
     async fn translate(&mut self, trail: Vec<BrokerID>, msg: R) -> bool {
         let msg_res = (self.translate)(msg.clone());
         if let Some(msg_tr) = msg_res {
-            log::trace!(
-                "Translated {} -> {}: {msg_tr:?}, sending to {}",
-                std::any::type_name::<R>(),
-                std::any::type_name::<S>(),
-                self.broker.id,
-            );
+            // log::trace!(
+            //     "Translated {} -> {}: {msg_tr:?}, sending to {}",
+            //     std::any::type_name::<R>(),
+            //     std::any::type_name::<S>(),
+            //     self.broker.id,
+            // );
             self.broker
                 .emit_msg_dest(Destination::Forwarded(trail), msg_tr)
                 .err()

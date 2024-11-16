@@ -253,9 +253,9 @@ impl Provider {
         let (_, sphinx) = self.create_sphinx_packet(client_id, msg, &route);
 
         // create delay
-        // self.storage
-        //     .add_sent_message(route, MessageType::Dummy, sphinx.message_id.clone()  )
-        //     .await;
+        self.storage
+            .add_sent_message(route, MessageType::Dummy, sphinx.message_id.clone()  )
+            .await; // TODO uncomment
 
         sphinx
     }
@@ -267,16 +267,18 @@ impl Provider {
         let index = self.get_storage().get_client_message_index(client_id).await;
         let messages = self.get_client_messages(client_id).await;
 
-        log::trace!(
-            "Pull reply has {} real messages and {} messages will be sent",
-            messages.len(),
-            max_retrieve
-        );
-
         // add messages to send
         let mut messages_to_send = Vec::new();
         for message in messages.iter().skip(index).take(max_retrieve) {
             messages_to_send.push(message.clone());
+        }
+
+        if !messages_to_send.is_empty() {
+            let message_details: Vec<_> = messages
+                .iter()
+                .map(|sphinx| &sphinx.message_id)
+                .collect();
+            log::debug!("Pull reply message IDs: {:?}", message_details);
         }
 
         self.get_storage()

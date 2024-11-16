@@ -97,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let mut logger = env_logger::Builder::new();
-    logger.filter_module("fl", log::LevelFilter::Debug);
+    logger.filter_module("fl", log::LevelFilter::Info);
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
 
@@ -286,7 +286,7 @@ impl LSRoot {
                 }
             }
             LSRoot::SendProxyRequest(start) => {
-                if false {
+                if true {
                     if (i - *start) % 10 == 0 {
                         log::info!("Sending request through WebProxy");
                         let start = now();
@@ -294,17 +294,25 @@ impl LSRoot {
                             .webproxy
                             .as_mut()
                             .unwrap()
-                            .get_with_timeout("https://ipinfo.io", Duration::from_secs(30))
+                            .get_with_timeout("https://ipinfo.io", Duration::from_secs(60))
                             .await
                         {
                             Ok(mut res) => match res.text().await {
                                 Ok(body) => {
-                                    log::info!("Total time for request: {}ms", now() - start);
-                                    log::info!("Got reply from webproxy: {}", body);
+                                    let total_time = now() - start;
+                                    log::info!(
+                                        "----------------------------------------------------------------------- Total time for request: {}ms",
+                                        total_time
+                                    );
+                                    log::info!("----------------------------------------------------------------------- Got reply from webproxy: {}", body);
                                 }
-                                Err(e) => log::info!("Couldn't get body: {e:?}"),
+                                Err(e) => {
+                                    log::info!(" ----------------------------------------------------------------------- Couldn't get body: {e:?}");
+                                }
                             },
-                            Err(e) => log::info!("Webproxy returned error: {e:?}"),
+                            Err(e) => {
+                                log::info!("----------------------------------------------------------------------- Webproxy returned error: {e:?}");
+                            }
                         }
                     }
                 } else {
@@ -424,6 +432,17 @@ impl LoopixSetup {
 
     pub fn new(path_length: usize, all_nodes: Vec<NodeInfo>) -> Self {
         let (node_public_keys, loopix_key_pairs) = Self::create_nodes_and_keys(all_nodes.clone());
+
+        let clients: Vec<_> = all_nodes.iter().take(path_length).collect();
+        let providers: Vec<_> = all_nodes.iter().skip(path_length).take(path_length).collect();
+        let mixnodes: Vec<_> = all_nodes.iter().skip(path_length * 2).collect();
+
+        log::info!(
+            "\n--------------------------------------------------------\nClients: {:?}\nProviders: {:?}\nMixnodes: {:?}\n--------------------------------------------------------\n",
+            clients,
+            providers,
+            mixnodes
+        );
 
         Self {
             node_public_keys,

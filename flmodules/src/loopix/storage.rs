@@ -145,9 +145,9 @@ impl ProviderStorage {
     }
 
     /// given path_length 3: our node either 3, 4, or 5
-    pub fn default_with_path_length(clients: HashSet<NodeID>) -> Self {
+    pub fn default_with_path_length() -> Self {
         ProviderStorage {
-            subscribed_clients: clients,
+            subscribed_clients: HashSet::new(),
             client_messages: HashMap::new(),
             client_message_index: HashMap::new(),
         }
@@ -393,7 +393,6 @@ impl LoopixStorage {
 
     pub async fn add_subscribed_client(&self, client_id: NodeID) {
         if let Some(storage) = &mut *self.provider_storage.write().await {
-            log::debug!("Adding subscribed client: {:?}", client_id);
             storage.subscribed_clients.insert(client_id);
         } else {
             panic!("Provider storage not found");
@@ -895,25 +894,25 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_provider_storage_default_with_path_length() {
-        let path_length = 3;
+    // #[test]
+    // fn test_provider_storage_default_with_path_length() {
+    //     let path_length = 3;
 
-        let (all_nodes, _, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
+    //     let (all_nodes, _, _, _) = LoopixSetup::create_nodes_and_keys(path_length);
 
-        let clients = all_nodes
-            .clone()
-            .into_iter()
-            .skip(path_length)
-            .take(path_length)
-            .collect::<Vec<NodeInfo>>();
+    //     let clients = all_nodes
+    //         .clone()
+    //         .into_iter()
+    //         .skip(path_length)
+    //         .take(path_length)
+    //         .collect::<Vec<NodeInfo>>();
 
-        let provider_storage = ProviderStorage::default_with_path_length(HashSet::from_iter(
-            clients.iter().map(|node| node.get_id()),
-        ));
+    //     let provider_storage = ProviderStorage::default_with_path_length(HashSet::from_iter(
+    //         clients.iter().map(|node| node.get_id()),
+    //     ));
 
-        println!("Clients: {:?}", provider_storage.subscribed_clients);
-    }
+    //     println!("Clients: {:?}", provider_storage.subscribed_clients);
+    // }
 
     #[test]
     fn test_loopix_storage_serde() {
@@ -957,16 +956,7 @@ mod tests {
         let node_id = all_nodes.clone().into_iter().next().unwrap().get_id();
         let (public_key, private_key) = LoopixStorage::generate_key_pair();
 
-        let clients = all_nodes
-            .clone()
-            .into_iter()
-            .skip(path_length)
-            .take(path_length)
-            .collect::<Vec<NodeInfo>>();
-
-        let provider_storage = ProviderStorage::default_with_path_length(HashSet::from_iter(
-            clients.iter().map(|node| node.get_id()),
-        ));
+        let provider_storage = ProviderStorage::default_with_path_length();
 
         let loopix_storage = LoopixStorage::default_with_path_length(
             node_id,

@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{loopix::storage::{ClientStorage, LoopixStorage, ProviderStorage}, nodeconfig::NodeInfo};
 use flarch::nodeids::NodeID;
 use serde::{Deserialize, Serialize};
@@ -69,15 +67,7 @@ impl LoopixConfig {
 
         let provider_storage = match role {
             LoopixRole::Provider => {
-                let all_clients = all_nodes
-                    .clone()
-                    .into_iter()
-                    .take(path_length)
-                    .collect::<Vec<NodeInfo>>();
-
-                Some(ProviderStorage::default_with_path_length(
-                    HashSet::from_iter(all_clients.iter().map(|node| node.get_id())),
-                ))
+                Some(ProviderStorage::default_with_path_length())
             }
             _ => None,
         };
@@ -130,15 +120,7 @@ impl LoopixConfig {
 
         let provider_storage = match role {
             LoopixRole::Provider => {
-                let all_clients = all_nodes
-                    .clone()
-                    .into_iter()
-                    .take(path_length)
-                    .collect::<Vec<NodeInfo>>();
-
-                Some(ProviderStorage::default_with_path_length(
-                    HashSet::from_iter(all_clients.iter().map(|node| node.get_id())),
-                ))
+                Some(ProviderStorage::default_with_path_length())
             }
             _ => None,
         };

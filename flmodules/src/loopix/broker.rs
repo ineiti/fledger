@@ -103,7 +103,7 @@ impl LoopixBroker {
                     .is_none()
                 {
                     let our_provider = loopix_messages.role.get_storage().get_our_provider().await;
-                    
+
                     let provider = if our_provider.is_none() {
                         loopix_messages
                             .role
@@ -172,10 +172,10 @@ impl LoopixBroker {
             loop {
                 // emit node infos connected
                 let node_infos = loopix_messages.role.get_connected_nodes().await;
-                if let Err(e) = broker.emit_msg(LoopixOut::NodeInfosConnected(node_infos).into()) {
+                if let Err(e) = broker.emit_msg(LoopixOut::NodeInfosConnected(node_infos.clone()).into()) {
                     log::error!("Failed to emit node infos connected message: {:?}", e);
                 } else {
-                    // log::info!("Successfully emitted node infos connected message");
+                    log::info!("Nodeinfos connected message emitted: {:?}", node_infos);
                 }
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
@@ -293,7 +293,7 @@ impl LoopixBroker {
             loop {
                 // subscribe message
                 let (node_id, sphinx) = loopix_messages.create_subscribe_message().await;
-                log::debug!(
+                log::trace!(
                     "Sending subscribe message with id {} to {}",
                     sphinx.message_id,
                     node_id
@@ -325,11 +325,13 @@ impl LoopixBroker {
                 // pull message
                 let (node_id, sphinx) = loopix_messages.clone().create_pull_message().await;
                 if let Some(sphinx) = sphinx.clone() {
-                    log::debug!(
+                    log::trace!(
                         "Sending pull message with id {} to {}",
                         sphinx.message_id,
                         node_id
                     );
+                } else {
+                    log::debug!("Why don't we send a pull message?");
                 }
 
                 if let Some(sphinx) = sphinx {
@@ -384,6 +386,20 @@ impl LoopixBroker {
                 // Sort messages by delay, then by insertion order (FIFO for same delay)
                 sphinx_messages.sort_by_key(|&(_, delay, _, order)| (delay, order));
 
+                if !sphinx_messages.is_empty() {
+                    let formatted_queue: Vec<String> = sphinx_messages
+                        .iter()
+                        .map(|(node_id, delay, sphinx, order)| {
+                            format!(
+                                "Order: {}, Node ID: {}, Delay: {:?}, Message ID: {}",
+                                order, node_id, delay, sphinx.message_id
+                            )
+                        })
+                        .collect();
+
+                    log::debug!("Sphinx message queue:\n{}", formatted_queue.join("\n"));
+                }
+
                 // Emit messages with 0 or less delay
                 while let Some((node_id, delay, sphinx_packet, _)) = sphinx_messages.first() {
                     log::trace!(
@@ -399,7 +415,7 @@ impl LoopixBroker {
                             log::error!("Error emitting network message: {e:?}");
                         } else {
                             log::info!(
-                                "{} emitted a payload message {:?} to node {}",
+                                "{} emitted a message network{:?} to node {}",
                                 our_id,
                                 sphinx_packet.message_id,
                                 node_id
@@ -415,7 +431,7 @@ impl LoopixBroker {
                 if sphinx_messages.is_empty() || sphinx_messages.first().unwrap().1 > Duration::ZERO
                 {
                     let (node_id, sphinx) = loopix_messages.create_drop_message().await;
-                    log::debug!(
+                    log::trace!(
                         "Sending drop message with id {} to {}",
                         sphinx.message_id,
                         node_id
