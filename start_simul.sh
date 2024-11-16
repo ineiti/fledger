@@ -28,3 +28,7 @@ for NODE in $( seq $NODES ); do
   fi
   ./target-common/release/fledger --config $CONFIG --name $NAME -vv -s ws://localhost:8765 $PATH_LEN_ARG |& ts "$NAME" &
 done
+
+sleep 300
+
+make kill

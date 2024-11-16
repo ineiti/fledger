@@ -282,7 +282,7 @@ impl LSRoot {
                         ));
                     }
                     log::info!("Root is starting to send requests");
-                    return Ok(LSRoot::SendProxyRequest(i).into());
+                    return Ok(LSRoot::SendProxyRequest(i + 8).into());
                 }
             }
             LSRoot::SendProxyRequest(start) => {
@@ -294,7 +294,7 @@ impl LSRoot {
                             .webproxy
                             .as_mut()
                             .unwrap()
-                            .get_with_timeout("https://ipinfo.io", Duration::from_secs(60))
+                            .get_with_timeout("https://ipinfo.io", Duration::from_secs(300))
                             .await
                         {
                             Ok(mut res) => match res.text().await {

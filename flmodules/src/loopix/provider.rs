@@ -10,7 +10,6 @@ use crate::loopix::sphinx::Sphinx;
 use crate::loopix::storage::LoopixStorage;
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
-use sphinx_packet::header::delays::Delay;
 use sphinx_packet::payload::Payload;
 use sphinx_packet::SphinxPacket;
 

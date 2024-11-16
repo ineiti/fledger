@@ -1,9 +1,8 @@
 use std::fmt;
 use std::sync::Arc;
-use std::time::Duration;
 
 use async_trait::async_trait;
-use sphinx_packet::header::delays::{generate_from_average_duration, Delay};
+use sphinx_packet::header::delays::Delay;
 
 use tokio::sync::mpsc::Sender;
 
