@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ $# -ne 2 ]; then
+if [ $# -ne 3 ]; then
     echo "Usage: $0 <path_length> <dir_name> <number>"
     exit 1
 fi

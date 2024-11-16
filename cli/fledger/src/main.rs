@@ -438,7 +438,7 @@ impl LoopixSetup {
         let mixnodes: Vec<_> = all_nodes.iter().skip(path_length * 2).collect();
 
         log::info!(
-            "\n--------------------------------------------------------\nClients: {:?}\nProviders: {:?}\nMixnodes: {:?}\n--------------------------------------------------------\n",
+            "\n--------------------------------------------------------\nClients: {:#?}\nProviders: {:#?}\nMixnodes: {:#?}\n--------------------------------------------------------\n",
             clients,
             providers,
             mixnodes
