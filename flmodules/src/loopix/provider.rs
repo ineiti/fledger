@@ -69,35 +69,6 @@ impl LoopixCore for Provider {
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
-    // THIS IS COPY PASTED FROM MIXNODE, I JUST DON'T KNOW HOW TO DO TRAITS IN RUST
-    async fn create_drop_message(&self) -> (NodeID, Sphinx) {
-        let random_provider = self.get_storage().get_random_provider().await;
-
-        // create route
-        let route = self
-            .create_route(
-                self.get_config().path_length(),
-                None,
-                Some(random_provider),
-                None,
-            )
-            .await;
-
-        // create the networkmessage
-        let drop_msg = serde_json::to_string(&MessageType::Drop).unwrap();
-        let msg = NetworkWrapper {
-            module: MODULE_NAME.into(),
-            msg: drop_msg,
-        };
-
-        // create sphinx packet
-        let (next_node, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
-            .await; // TODO uncomment
-        (node_id_from_node_address(next_node.address), sphinx)
-    }
-
     async fn process_final_hop(
         &self,
         destination: NodeID,
@@ -174,9 +145,8 @@ impl LoopixCore for Provider {
         &self,
         next_packet: Box<SphinxPacket>,
         next_node: NodeID,
-        delay: Delay,
         message_id: String,
-    ) -> (NodeID, Delay, Option<Sphinx>) {
+    ) -> (NodeID, Option<Sphinx>) {
         if self
             .get_storage()
             .get_subscribed_clients()
@@ -194,7 +164,7 @@ impl LoopixCore for Provider {
             };
             self.store_client_message(next_node, sphinx.clone()).await;
 
-            (next_node, delay, None)
+            (next_node, None)
         } else {
             // THIS IS COPY PASTED FROM MIXNODE, I JUST DON'T KNOW HOW TO DO TRAITS IN RUST
             let sphinx = &Sphinx {
@@ -207,7 +177,7 @@ impl LoopixCore for Provider {
                 next_node,
                 sphinx.message_id
             );
-            (next_node, delay, Some(sphinx.clone()))
+            (next_node, Some(sphinx.clone()))
         }
     }
 }

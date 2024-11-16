@@ -1,5 +1,4 @@
 use flarch::nodeids::NodeID;
-use sphinx_packet::header::delays::Delay;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
@@ -61,8 +60,8 @@ impl LoopixBroker {
         };
 
         let (network_sender, network_receiver): (
-            Sender<(NodeID, Delay, Sphinx)>,
-            Receiver<(NodeID, Delay, Sphinx)>,
+            Sender<(NodeID, Sphinx)>,
+            Receiver<(NodeID, Sphinx)>,
         ) = channel(200);
 
         let (overlay_sender, overlay_receiver): (
@@ -83,60 +82,39 @@ impl LoopixBroker {
             .await?;
 
         // Threads for all nodes
-        Self::start_network_send_thread(loopix_messages.clone(), broker.clone(), network_receiver);
-
-        Self::start_overlay_send_thread(broker.clone(), overlay_receiver);
-
-        Self::start_loop_message_thread(loopix_messages.clone(), broker.clone());
-
-        Self::start_drop_message_thread(loopix_messages.clone(), broker.clone());
-
-        // Client has two extra threads
         match node_type {
+            // Client has a queue to send messages to the network
+            // Lambda_payload per minute, it sends either a message from the queue or a drop message
+            // It sends loop traffic and drop traffic as configured
+            // it also sends subscribe and pull messages continually
             NodeType::Client(_) => {
-                // Subscribe to a provider if we don't have one
-                if loopix_messages
-                    .role
-                    .get_storage()
-                    .get_our_provider()
-                    .await
-                    .is_none()
-                {
-                    let our_provider = loopix_messages.role.get_storage().get_our_provider().await;
+                // network send thread
+                Self::client_payload_thread(
+                    loopix_messages.clone(),
+                    broker.clone(),
+                    network_receiver,
+                );
 
-                    let provider = if our_provider.is_none() {
-                        loopix_messages
-                            .role
-                            .get_storage()
-                            .get_random_provider()
-                            .await
-                    } else {
-                        our_provider.unwrap()
-                    };
+                // drop message thread
+                Self::start_drop_message_thread(loopix_messages.clone(), broker.clone());
 
-                    loopix_messages
-                        .role
-                        .get_storage()
-                        .set_our_provider(Some(provider))
-                        .await;
-
-                    let (provider, sphinx) =
-                        loopix_messages.clone().create_subscribe_message().await;
-
-                    if let Err(e) =
-                        broker.emit_msg(LoopixOut::SphinxToNetwork(provider, sphinx).into())
-                    {
-                        log::error!("Failed to emit initial subscribe message: {:?}", e);
-                    }
-                }
                 // // client subscribe loop
                 Self::client_subscribe_loop(loopix_messages.clone(), broker.clone());
 
                 // client pull loop
                 Self::client_pull_loop(loopix_messages.clone(), broker.clone());
+
+                // messages that get sent back to this node are distributed from the overlay
+                Self::start_overlay_send_thread(broker.clone(), overlay_receiver);
             }
-            _ => {}
+            NodeType::Provider(_) | NodeType::Mixnode(_) => {
+                Self::mixnode_forward_thread(broker.clone(), network_receiver);
+            }
         }
+
+        // All nodes send loop messages
+        // All nodes need to notify other brokers about which nodes are connected
+        Self::start_loop_message_thread(loopix_messages.clone(), broker.clone());
 
         Self::start_infos_connected_thread(broker.clone(), loopix_messages.clone());
 
@@ -172,7 +150,9 @@ impl LoopixBroker {
             loop {
                 // emit node infos connected
                 let node_infos = loopix_messages.role.get_connected_nodes().await;
-                if let Err(e) = broker.emit_msg(LoopixOut::NodeInfosConnected(node_infos.clone()).into()) {
+                if let Err(e) =
+                    broker.emit_msg(LoopixOut::NodeInfosConnected(node_infos.clone()).into())
+                {
                     log::error!("Failed to emit node infos connected message: {:?}", e);
                 } else {
                     log::info!("Nodeinfos connected message emitted: {:?}", node_infos);
@@ -209,13 +189,14 @@ impl LoopixBroker {
         loopix_messages: LoopixMessages,
         mut broker: Broker<LoopixMessage>,
     ) {
-        if loopix_messages.role.get_config().lambda_loop() == 0.0 {
-            log::trace!("Loop message rate: 0.0, skipping thread");
-            return;
-        }
+        let lambda_loop = match loopix_messages.role {
+            NodeType::Client(_) => loopix_messages.role.get_config().lambda_loop(),
+            NodeType::Mixnode(_) => loopix_messages.role.get_config().lambda_loop_mix(),
+            NodeType::Provider(_) => loopix_messages.role.get_config().lambda_loop_mix(),
+        };
 
         let wait_before_send =
-            Duration::from_secs_f64(60.0 / loopix_messages.role.get_config().lambda_loop());
+            Duration::from_secs_f64(60.0 / lambda_loop);
 
         log::debug!("Loop message rate: {:?}", wait_before_send);
 
@@ -261,7 +242,7 @@ impl LoopixBroker {
                 tokio::time::sleep(wait_before_send).await;
 
                 // create drop message
-                let (node_id, sphinx) = loopix_messages.role.create_drop_message().await;
+                let (node_id, sphinx) = loopix_messages.create_drop_message().await;
                 log::debug!(
                     "Sending drop message with id {} to {}",
                     sphinx.message_id,
@@ -350,86 +331,85 @@ impl LoopixBroker {
         });
     }
 
-    pub fn start_network_send_thread(
-        loopix_messages: LoopixMessages,
+    pub fn mixnode_forward_thread(
         mut broker: Broker<LoopixMessage>,
-        mut receiver: Receiver<(NodeID, Delay, Sphinx)>,
+        mut receiver: Receiver<(NodeID, Sphinx)>,
     ) {
         tokio::spawn(async move {
-            let mut sphinx_messages: Vec<(NodeID, Duration, Sphinx, u128)> = Vec::new();
-            let mut message_counter = 0u128;
-            let wait_before_send = match loopix_messages.role {
-                NodeType::Client(_) => Duration::from_secs_f64(
-                    60.0 / loopix_messages.role.get_config().lambda_payload(),
-                ),
-                NodeType::Provider(_) | NodeType::Mixnode(_) => Duration::from_secs_f64(
-                    60.0 / loopix_messages.role.get_config().lambda_loop_mix(),
-                ),
-            };
+            loop {
+                if let Some((node_id, sphinx)) = receiver.recv().await {
+                    if let Err(e) = broker
+                        .emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx.clone()).into())
+                    {
+                        log::error!("Error emitting forward message: {e:?}");
+                    } else {
+                        log::info!(
+                            "Loopix to Network from {}, message id: {:?}",
+                            node_id,
+                            sphinx.message_id
+                        );
+                    }
+                }
+            }
+        });
+    }
+
+    pub fn client_payload_thread(
+        loopix_messages: LoopixMessages,
+        mut broker: Broker<LoopixMessage>,
+        mut receiver: Receiver<(NodeID, Sphinx)>,
+    ) {
+        tokio::spawn(async move {
+            let mut sphinx_messages: Vec<(NodeID, Sphinx)> = Vec::new();
+            let lambda_payload = loopix_messages.role.get_config().lambda_payload();
+            let wait_before_send = Duration::from_secs_f64(60.0 / lambda_payload);
+
             let our_id = loopix_messages.role.get_our_id().await;
 
             log::info!(
-                "{}: Started network send thread with {:?} wait time! The mean delay is {:?}.",
+                "{}: Real message rate is {:?} per minute",
                 our_id,
-                wait_before_send,
-                Duration::from_millis(loopix_messages.role.get_config().mean_delay()),
+                lambda_payload
             );
 
             loop {
                 // Receive new messages
-                while let Ok((node_id, delay, sphinx)) = receiver.try_recv() {
+                while let Ok((node_id, sphinx)) = receiver.try_recv() {
                     log::trace!("{}: Received message for node {}", our_id, node_id);
-                    sphinx_messages.push((node_id, delay.to_duration(), sphinx, message_counter));
-                    message_counter += 1;
+                    sphinx_messages.push((node_id, sphinx));
                 }
-
-                // Sort messages by delay, then by insertion order (FIFO for same delay)
-                sphinx_messages.sort_by_key(|&(_, delay, _, order)| (delay, order));
 
                 if !sphinx_messages.is_empty() {
                     let formatted_queue: Vec<String> = sphinx_messages
                         .iter()
-                        .map(|(node_id, delay, sphinx, order)| {
-                            format!(
-                                "Order: {}, Node ID: {}, Delay: {:?}, Message ID: {}",
-                                order, node_id, delay, sphinx.message_id
-                            )
+                        .map(|(node_id, sphinx)| {
+                            format!("Node ID: {}, Message ID: {}", node_id, sphinx.message_id)
                         })
                         .collect();
 
                     log::debug!("Sphinx message queue:\n{}", formatted_queue.join("\n"));
                 }
 
-                // Emit messages with 0 or less delay
-                while let Some((node_id, delay, sphinx_packet, _)) = sphinx_messages.first() {
+                if let Some((node_id, sphinx)) = sphinx_messages.first() {
                     log::trace!(
-                        "{}: first message in queue: {:?}, with delay {:?}",
+                        "{}: first message in queue: {:?}",
                         our_id,
-                        sphinx_messages.first(),
-                        delay
+                        sphinx.message_id
                     );
-                    if *delay <= Duration::ZERO {
-                        if let Err(e) = broker.emit_msg(
-                            LoopixOut::SphinxToNetwork(*node_id, sphinx_packet.clone()).into(),
-                        ) {
-                            log::error!("Error emitting network message: {e:?}");
-                        } else {
-                            log::info!(
-                                "{} emitted a message network{:?} to node {}",
-                                our_id,
-                                sphinx_packet.message_id,
-                                node_id
-                            );
-                            sphinx_messages.remove(0); // Remove the first message after sending
-                        }
+                    if let Err(e) =
+                        broker.emit_msg(LoopixOut::SphinxToNetwork(*node_id, sphinx.clone()).into())
+                    {
+                        log::error!("Error emitting network message: {e:?}");
                     } else {
-                        break; // Stop emitting when the first message delay is greater than 0
+                        log::info!(
+                            "{} emitted a message network {:?} to node {}",
+                            our_id,
+                            sphinx.message_id,
+                            node_id
+                        );
+                        sphinx_messages.remove(0);
                     }
-                }
-
-                // Send a drop message if no valid messages are ready
-                if sphinx_messages.is_empty() || sphinx_messages.first().unwrap().1 > Duration::ZERO
-                {
+                } else {
                     let (node_id, sphinx) = loopix_messages.create_drop_message().await;
                     log::trace!(
                         "Sending drop message with id {} to {}",
@@ -446,11 +426,6 @@ impl LoopixBroker {
 
                 // Wait for send delay
                 tokio::time::sleep(wait_before_send).await;
-
-                // Subtract the wait duration from all message delays
-                for (_, delay, _, _) in &mut sphinx_messages {
-                    *delay = delay.saturating_sub(wait_before_send);
-                }
             }
         });
     }
@@ -490,6 +465,7 @@ mod tests {
     use crate::network::messages::NetworkMessage;
     use flarch::broker::Broker;
     use flarch::start_logging_filter_level;
+    use sphinx_packet::header::delays::Delay;
     use sphinx_packet::route::{Destination, Node};
     use sphinx_packet::SphinxPacket;
     use tokio::time::{timeout, Duration};

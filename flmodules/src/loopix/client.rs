@@ -10,7 +10,6 @@ use crate::loopix::sphinx::Sphinx;
 use crate::overlay::messages::NetworkWrapper;
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
-use sphinx_packet::header::delays::Delay;
 use sphinx_packet::payload::Payload;
 use sphinx_packet::SphinxPacket;
 
@@ -69,46 +68,6 @@ impl LoopixCore for Client {
         self.storage
             .add_sent_message(route, MessageType::Loop, sphinx.message_id.clone())
             .await; // TODO uncomment
-        (our_provider, sphinx)
-    }
-
-    /// Packet with a random provider as destination (drop)
-    async fn create_drop_message(&self) -> (NodeID, Sphinx) {
-        // pick random provider
-        let random_provider = self.get_storage().get_random_provider().await;
-
-        // get our provider
-        let our_provider = match self.get_our_provider().await {
-            Some(provider) => provider,
-            None => {
-                log::error!("Our provider is None");
-                NodeID::from(1)
-            }
-        };
-
-        // create route
-        let route = self
-            .create_route(
-                self.get_config().path_length(),
-                Some(our_provider),
-                Some(random_provider),
-                None,
-            )
-            .await;
-
-        // create the networkmessage
-        let drop_msg = serde_yaml::to_string(&MessageType::Drop).unwrap();
-        let msg = NetworkWrapper {
-            module: MODULE_NAME.into(),
-            msg: drop_msg,
-        };
-
-        // create sphinx packet
-        let (_, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
-            .await; // TODO uncomment
-
         (our_provider, sphinx)
     }
 
@@ -192,15 +151,14 @@ impl LoopixCore for Client {
         &self,
         _next_packet: Box<SphinxPacket>,
         _next_address: NodeID,
-        delay: Delay,
         message_id: String,
-    ) -> (NodeID, Delay, Option<Sphinx>) {
+    ) -> (NodeID, Option<Sphinx>) {
         log::error!(
             "Client shouldn't receive forward hops, message id: {}",
             message_id
         );
         let our_id = self.get_our_id().await;
-        (our_id, delay, None)
+        (our_id, None)
     }
 }
 
@@ -233,6 +191,46 @@ impl Client {
 
     pub async fn get_our_provider(&self) -> Option<NodeID> {
         self.storage.get_our_provider().await
+    }
+
+    /// Packet with a random provider as destination (drop)
+    pub async fn create_drop_message(&self) -> (NodeID, Sphinx) {
+        // pick random provider
+        let random_provider = self.get_storage().get_random_provider().await;
+
+        // get our provider
+        let our_provider = match self.get_our_provider().await {
+            Some(provider) => provider,
+            None => {
+                log::error!("Our provider is None");
+                NodeID::from(1)
+            }
+        };
+
+        // create route
+        let route = self
+            .create_route(
+                self.get_config().path_length(),
+                Some(our_provider),
+                Some(random_provider),
+                None,
+            )
+            .await;
+
+        // create the networkmessage
+        let drop_msg = serde_yaml::to_string(&MessageType::Drop).unwrap();
+        let msg = NetworkWrapper {
+            module: MODULE_NAME.into(),
+            msg: drop_msg,
+        };
+
+        // create sphinx packet
+        let (_, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
+        self.storage
+            .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
+            .await; // TODO uncomment
+
+        (our_provider, sphinx)
     }
 
     pub async fn create_pull_message(self) -> (NodeID, Option<Sphinx>) {

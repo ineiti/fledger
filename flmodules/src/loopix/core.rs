@@ -1,7 +1,7 @@
 use crate::overlay::messages::NetworkWrapper;
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
-use sphinx_packet::header::delays::{generate_from_average_duration, Delay};
+use sphinx_packet::header::delays::generate_from_average_duration;
 use sphinx_packet::payload::Payload;
 use sphinx_packet::route::{Destination, Node, NodeAddressBytes};
 use sphinx_packet::{ProcessedPacket, SphinxPacket, SphinxPacketBuilder};
@@ -40,7 +40,6 @@ pub trait LoopixCore {
     }
 
     async fn create_loop_message(&self) -> (NodeID, Sphinx);
-    async fn create_drop_message(&self) -> (NodeID, Sphinx);
 
     async fn process_final_hop(
         &self,
@@ -57,9 +56,8 @@ pub trait LoopixCore {
         &self,
         next_packet: Box<SphinxPacket>,
         next_address: NodeID,
-        delay: Delay,
         message_id: String,
-    ) -> (NodeID, Delay, Option<Sphinx>);
+    ) -> (NodeID, Option<Sphinx>);
 
     fn create_sphinx_packet(
         &self,
@@ -184,10 +182,6 @@ mod tests {
             todo!()
         }
 
-        async fn create_drop_message(&self) -> (NodeID, Sphinx) {
-            todo!()
-        }
-
         async fn process_final_hop(
             &self,
             _destination: NodeID,
@@ -206,9 +200,8 @@ mod tests {
             &self,
             _next_packet: Box<SphinxPacket>,
             _next_address: NodeID,
-            _delay: Delay,
             _message_id: String,
-        ) -> (NodeID, Delay, Option<Sphinx>) {
+        ) -> (NodeID, Option<Sphinx>) {
             todo!()
         }
     }

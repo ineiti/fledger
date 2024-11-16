@@ -12,7 +12,7 @@ use crate::loopix::{
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
 use sphinx_packet::payload::Payload;
-use sphinx_packet::{header::delays::Delay, packet::*};
+use sphinx_packet::packet::*;
 
 use crate::overlay::messages::NetworkWrapper;
 
@@ -40,9 +40,8 @@ impl LoopixCore for Mixnode {
         &self,
         next_packet: Box<SphinxPacket>,
         next_node: NodeID,
-        delay: Delay,
-        message_id: String
-    ) -> (NodeID, Delay, Option<Sphinx>) {
+        message_id: String,
+    ) -> (NodeID, Option<Sphinx>) {
         let sphinx = &Sphinx {
             message_id: message_id.clone(),
             inner: *next_packet,
@@ -53,7 +52,7 @@ impl LoopixCore for Mixnode {
             next_node,
             message_id.clone()
         );
-        (next_node, delay, Some(sphinx.clone()))
+        (next_node, Some(sphinx.clone()))
     }
 
     async fn process_final_hop(
@@ -153,35 +152,6 @@ impl LoopixCore for Mixnode {
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
-    async fn create_drop_message(&self) -> (NodeID, Sphinx) {
-        // pick random provider
-        let random_provider = self.get_storage().get_random_provider().await;
-
-        // create route
-        let route = self
-            .create_route(
-                self.get_config().path_length(),
-                None,
-                Some(random_provider),
-                None,
-            )
-            .await;
-
-        // create the networkmessage
-        let drop_msg = serde_json::to_string(&MessageType::Drop).unwrap();
-        let msg = NetworkWrapper {
-            module: MODULE_NAME.into(),
-            msg: drop_msg,
-        };
-
-        // create sphinx packet
-        let (next_node, sphinx) = self.create_sphinx_packet(random_provider, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Drop, sphinx.message_id.clone())
-            .await; // TODO uncomment
-
-        (node_id_from_node_address(next_node.address), sphinx)
-    }
 }
 
 impl Mixnode {
