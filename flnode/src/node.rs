@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use flarch::{
-    broker::{Broker, BrokerError},
-    nodeids::NodeID,
+    broker::{Broker, BrokerError}, broker_io::BrokerIO, nodeids::NodeID
 };
 use flarch::{
     data_storage::{DataStorage, StorageError},
@@ -15,7 +14,7 @@ use flmodules::{
         broker::GossipBroker,
         core::{self, Category, Event},
         messages::{GossipIn, GossipMessage},
-    }, network::messages::{NetworkError, NetworkIn, NetworkMessage}, nodeconfig::{ConfigError, NodeConfig, NodeInfo}, overlay::broker::OverlayRandom, ping::{broker::PingBroker, messages::PingConfig}, random_connections::broker::RandomBroker, timer::{TimerBroker, TimerMessage}, web_proxy::{
+    }, network::messages::{NetworkError, NetworkIn, NetworkMessage, NetworkOut}, nodeconfig::{ConfigError, NodeConfig, NodeInfo}, overlay::broker::OverlayRandom, ping::{broker::PingBroker, messages::PingConfig}, random_connections::broker::RandomBroker, timer::{TimerBroker, TimerMessage}, web_proxy::{
         broker::{WebProxy, WebProxyError},
         core::WebProxyConfig,
     }, Modules
@@ -84,6 +83,9 @@ impl Node {
             node_config.info.get_id()
         );
 
+        let mut brokerio_net = BrokerIO::<NetworkIn, NetworkOut>::new();
+        brokerio_net.link_broker(broker_net.clone()).await?;
+        
         let modules = node_config.info.modules;
         let id = node_config.info.get_id();
         let mut random = None;

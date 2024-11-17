@@ -493,6 +493,18 @@ impl fmt::Display for NetworkOut {
     }
 }
 
+impl TryFrom<NetworkMessage> for NetworkOut {
+    type Error = BrokerError;
+
+    fn try_from(value: NetworkMessage) -> Result<Self, Self::Error> {
+        if let NetworkMessage::Output(out) = value {
+            Ok(out)
+        } else {
+            Err(BrokerError::Translation)
+        }
+    }
+}
+
 impl From<NetworkOut> for NetworkMessage {
     fn from(msg: NetworkOut) -> Self {
         Self::Output(msg)

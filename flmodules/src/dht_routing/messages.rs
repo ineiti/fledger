@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use flarch::{
-    broker::SubsystemHandler,
+    broker_io::SubsystemHandler,
     nodeids::{NodeID, NodeIDs, U256},
     platform_async_trait,
 };
@@ -21,14 +21,6 @@ pub enum ModuleMessage {
     // Usually the destination doesn't exist, so whenever there is no
     // closer node to send the message to, propagation stops.
     Route(U256, NetworkWrapper),
-}
-
-/// First wrap all messages coming into this module and all messages going out in
-/// a single message time.
-#[derive(Clone, Debug)]
-pub enum DHTRoutingMessageIntern {
-    Input(DHTRoutingIn),
-    Output(DHTRoutingOut),
 }
 
 /// The messages here represent all possible interactions with this module.
@@ -67,23 +59,6 @@ impl DHTRoutingMessages {
         })
     }
 
-    /// Processes one generic message and returns either an error
-    /// or a Vec<MessageOut>.
-    pub fn process_messages(&mut self, msgs: Vec<DHTRoutingIn>) -> Vec<DHTRoutingOut> {
-        let mut out = vec![];
-        for msg in msgs {
-            log::trace!("Got msg: {msg:?}");
-            out.extend(match msg {
-                DHTRoutingIn::FromNetwork(src, node_msg) => {
-                    self.process_node_message(src, node_msg)
-                }
-                DHTRoutingIn::UpdateNodeList(ids) => self.node_list(ids),
-                DHTRoutingIn::Tick => todo!(),
-            });
-        }
-        out
-    }
-
     /// Processes a node to node message and returns zero or more
     /// MessageOut.
     pub fn process_node_message(&mut self, _src: NodeID, msg: ModuleMessage) -> Vec<DHTRoutingOut> {
@@ -103,33 +78,22 @@ impl DHTRoutingMessages {
 }
 
 #[platform_async_trait()]
-impl SubsystemHandler<DHTRoutingMessageIntern> for DHTRoutingMessages {
-    async fn messages(&mut self, msgs: Vec<DHTRoutingMessageIntern>) -> Vec<DHTRoutingMessageIntern> {
-        self.process_messages(
-            msgs.into_iter()
-                .filter_map(|msg: DHTRoutingMessageIntern| match msg {
-                    DHTRoutingMessageIntern::Input(msg_in) => Some(msg_in),
-                    DHTRoutingMessageIntern::Output(_) => None,
-                })
-                .collect(),
-        )
-        .into_iter()
-        .map(|o| o.into())
-        .collect()
-    }
-}
-
-/// Convenience method to reduce long lines.
-impl From<DHTRoutingIn> for DHTRoutingMessageIntern {
-    fn from(msg: DHTRoutingIn) -> Self {
-        DHTRoutingMessageIntern::Input(msg)
-    }
-}
-
-/// Convenience method to reduce long lines.
-impl From<DHTRoutingOut> for DHTRoutingMessageIntern {
-    fn from(msg: DHTRoutingOut) -> Self {
-        DHTRoutingMessageIntern::Output(msg)
+impl SubsystemHandler<DHTRoutingIn, DHTRoutingOut> for DHTRoutingMessages {
+    /// Processes one generic message and returns either an error
+    /// or a Vec<MessageOut>.
+    async fn messages(&mut self, msgs: Vec<DHTRoutingIn>) -> Vec<DHTRoutingOut> {
+        let mut out = vec![];
+        for msg in msgs {
+            log::trace!("Got msg: {msg:?}");
+            out.extend(match msg {
+                DHTRoutingIn::FromNetwork(src, node_msg) => {
+                    self.process_node_message(src, node_msg)
+                }
+                DHTRoutingIn::UpdateNodeList(ids) => self.node_list(ids),
+                DHTRoutingIn::Tick => todo!(),
+            });
+        }
+        out
     }
 }
 

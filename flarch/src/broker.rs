@@ -55,6 +55,8 @@ pub enum BrokerError {
     #[error("While sending to {0}")]
     /// Couldn't send to this queue.
     SendQueue(String),
+    #[error("Translation error")]
+    Translation,
 }
 
 /// Identifies a broker for loop detection.
@@ -94,7 +96,7 @@ mod asy {
     impl<T> Async for T {}
 }
 #[cfg(target_family = "unix")]
-mod asy {
+pub mod asy {
     pub trait Async: Sync + Send {}
     impl<T: Sync + Send> Async for T {}
 }
@@ -261,7 +263,7 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
     /// It also calls all brokers that are signed up as forwarding targets.
     /// The caller argument is to be used when recursively settling, to avoid
     /// endless loops.
-    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
+    pub async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
         let (tx, mut rx) = unbounded_channel();
         self.intern_tx
             .send(InternMessage::Settle(callers.clone(), tx))
