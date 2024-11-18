@@ -27,6 +27,7 @@ pub enum ModuleMessage {
 #[derive(Debug, Clone)]
 pub enum DHTRoutingIn {
     FromNetwork(NodeID, ModuleMessage),
+    ToDHTNetwork(NodeID, NetworkWrapper),
     UpdateNodeList(NodeIDs),
     Tick,
 }
@@ -34,6 +35,8 @@ pub enum DHTRoutingIn {
 #[derive(Debug, Clone)]
 pub enum DHTRoutingOut {
     ToNetwork(NodeID, ModuleMessage),
+    FromDHTNetwork(NodeID, NetworkWrapper),
+    UpdateDHTNodeList(NodeIDs),
     UpdateStorage(DHTRoutingStorage),
 }
 
@@ -75,6 +78,28 @@ impl DHTRoutingMessages {
         self.nodes = ids.remove_missing(&vec![self.our_id].into());
         vec![]
     }
+
+    /// One second passes - and return messages for nodes to ping.
+    fn tick(&mut self) -> Vec<DHTRoutingOut> {
+        let mut out = vec![];
+        self.core.tick();
+        for id in self.core.nodes_ping() {
+            out.push(DHTRoutingOut::ToNetwork(id, ModuleMessage::Ping));
+        }
+        if self.core.nodes_timeout().len() > 0 {
+            out.push(DHTRoutingOut::UpdateDHTNodeList(
+                self.core.node_ids().into(),
+            ));
+        }
+        out
+    }
+
+    fn route_msg(&mut self, dst: U256, msg: NetworkWrapper) -> Vec<DHTRoutingOut> {
+        if let Some(id) = self.core.next_hop(dst) {
+            return vec![DHTRoutingOut::ToNetwork(id, ModuleMessage::Route(dst, msg))];
+        }
+        vec![]
+    }
 }
 
 #[platform_async_trait()]
@@ -87,10 +112,13 @@ impl SubsystemHandler<DHTRoutingIn, DHTRoutingOut> for DHTRoutingMessages {
             log::trace!("Got msg: {msg:?}");
             out.extend(match msg {
                 DHTRoutingIn::FromNetwork(src, node_msg) => {
-                    self.process_node_message(src, node_msg)
+                    __self.process_node_message(src, node_msg)
                 }
-                DHTRoutingIn::UpdateNodeList(ids) => self.node_list(ids),
-                DHTRoutingIn::Tick => todo!(),
+                DHTRoutingIn::UpdateNodeList(ids) => __self.node_list(ids),
+                DHTRoutingIn::Tick => self.tick(),
+                DHTRoutingIn::ToDHTNetwork(u256, network_wrapper) => {
+                    self.route_msg(u256, network_wrapper)
+                }
             });
         }
         out

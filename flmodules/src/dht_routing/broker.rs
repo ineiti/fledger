@@ -54,14 +54,28 @@ impl DHTRouting {
         let overlay = BrokerIO::<OverlayIn, OverlayOut>::new();
 
         dht_routing.add_handler(Box::new(messages)).await?;
-        dht_routing.link_bi(net.clone()).await?;
-        dht_routing.link_direct(overlay.clone()).await?;
+        dht_routing
+            .add_translator_link(
+                net.clone(),
+                Box::new(Self::bi_dht_out),
+                Box::new(Self::bi_overlay_out),
+            )
+            .await?;
+        dht_routing
+            .add_translator_direct(
+                overlay.clone(),
+                Box::new(Self::direct_dht_in),
+                Box::new(Self::direct_dht_out),
+            )
+            .await?;
         let output = Broker::new();
-        dht_routing.add_translator(Box::new(DHTForwarder {
-            output: output.clone(),
-            tx,
-            ds,
-        })).await?;
+        dht_routing
+            .add_translator(Box::new(DHTForwarder {
+                output: output.clone(),
+                tx,
+                ds,
+            }))
+            .await?;
 
         Ok(DHTRouting {
             overlay,
@@ -69,85 +83,48 @@ impl DHTRouting {
             _storage: storage,
         })
     }
-}
 
-impl TryFrom<OverlayOut> for DHTRoutingIn {
-    type Error = BrokerError;
-
-    fn try_from(msg_out: OverlayOut) -> Result<Self, Self::Error> {
-        match msg_out {
+    fn bi_overlay_out(msg: OverlayOut) -> Option<DHTRoutingIn> {
+        match msg {
             OverlayOut::NodeIDsConnected(list) => Some(DHTRoutingIn::UpdateNodeList(list.into())),
             OverlayOut::NetworkWrapperFromNetwork(id, msg) => msg
                 .unwrap_yaml(MODULE_NAME)
                 .map(|msg| DHTRoutingIn::FromNetwork(id, msg)),
             _ => None,
         }
-        .ok_or(BrokerError::Translation)
     }
-}
 
-impl TryInto<OverlayIn> for DHTRoutingOut {
-    type Error = BrokerError;
-
-    fn try_into(self) -> Result<OverlayIn, Self::Error> {
-        if let DHTRoutingOut::ToNetwork(id, msg_node) = self {
-            Ok(OverlayIn::NetworkWrapperToNetwork(
+    fn bi_dht_out(msg: DHTRoutingOut) -> Option<OverlayIn> {
+        match msg {
+            DHTRoutingOut::ToNetwork(id, msg_node) => Some(OverlayIn::NetworkWrapperToNetwork(
                 id,
                 NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
-            ))
-        } else {
-            Err(BrokerError::Translation)
+            )),
+            _ => None,
         }
     }
-}
 
-impl TryInto<OverlayOut> for DHTRoutingOut {
-    type Error = BrokerError;
-
-    fn try_into(self) -> Result<OverlayOut, Self::Error> {
-        Err(BrokerError::Translation)
-    }
-}
-
-impl TryInto<OverlayIn> for DHTRoutingIn {
-    type Error = BrokerError;
-
-    fn try_into(self) -> Result<OverlayIn, Self::Error> {
-        Err(BrokerError::Translation)
-    }
-}
-/*
-    fn link_overlay_dhtrouting(msg: OverlayMessage) -> Option<DHTRoutingMessageIntern> {
-        if let OverlayMessage::Output(msg_out) = msg {
-            match msg_out {
-                OverlayOut::NodeIDsConnected(list) => {
-                    Some(DHTRoutingIn::UpdateNodeList(list.into()).into())
-                }
-                OverlayOut::NetworkWrapperFromNetwork(id, msg) => msg
-                    .unwrap_yaml(MODULE_NAME)
-                    .map(|msg| DHTRoutingIn::FromNetwork(id, msg).into()),
-                _ => None,
+    fn direct_dht_out(msg: DHTRoutingOut) -> Option<OverlayOut> {
+        match msg {
+            DHTRoutingOut::FromDHTNetwork(u256, network_wrapper) => {
+                Some(OverlayOut::NetworkWrapperFromNetwork(u256, network_wrapper))
             }
-        } else {
-            None
+            DHTRoutingOut::UpdateDHTNodeList(node_ids) => {
+                Some(OverlayOut::NodeIDsConnected(node_ids))
+            }
+            _ => None,
         }
     }
 
-    fn link_dhtrouting_overlay(msg: DHTRoutingMessageIntern) -> Option<OverlayMessage> {
-        if let DHTRoutingMessageIntern::Output(DHTRoutingOut::ToNetwork(id, msg_node)) = msg {
-            Some(
-                OverlayIn::NetworkWrapperToNetwork(
-                    id,
-                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
-                )
-                .into(),
-            )
-        } else {
-            None
+    fn direct_dht_in(msg: DHTRoutingIn) -> Option<OverlayIn> {
+        match msg {
+            DHTRoutingIn::ToDHTNetwork(u256, network_wrapper) => {
+                Some(OverlayIn::NetworkWrapperToNetwork(u256, network_wrapper))
+            }
+            _ => None,
         }
     }
-
-*/
+}
 
 struct DHTForwarder {
     output: Broker<DHTRoutingMessage>,
@@ -155,11 +132,6 @@ struct DHTForwarder {
     ds: Box<dyn DataStorage + Send>,
 }
 
-// pub trait SubsystemTranslator<I: Async, O: Async> {
-//     async fn translate_input(&mut self, trail: Vec<BrokerID>, from_broker: I);
-//     async fn translate_output(&mut self, trail: Vec<BrokerID>, from_broker: O);
-//     async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError>;
-// }
 #[platform_async_trait()]
 impl SubsystemTranslator<DHTRoutingIn, DHTRoutingOut> for DHTForwarder {
     async fn translate_input(&mut self, trail: Vec<BrokerID>, input: DHTRoutingIn) {

@@ -1,15 +1,24 @@
+use std::collections::HashMap;
+
+use flarch::nodeids::{NodeID, U256};
 use serde::{Deserialize, Serialize};
 
 /// Whatever hardcoded config you want to pass to your module.
 /// It must have a default option.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DHTRoutingConfig {
-    multiplier: u32,
+    pub multiplier: u32,
+    pub ping_period: u32,
+    pub ping_timeout: u32,
 }
 
 impl Default for DHTRoutingConfig {
     fn default() -> Self {
-        Self { multiplier: 1 }
+        Self {
+            multiplier: 1,
+            ping_period: 60,
+            ping_timeout: 90,
+        }
     }
 }
 
@@ -19,18 +28,69 @@ impl Default for DHTRoutingConfig {
 pub struct DHTRoutingCore {
     pub storage: DHTRoutingStorage,
     pub config: DHTRoutingConfig,
+    pub nodes: HashMap<NodeID, NodeStats>,
+    nodes_timeout: Vec<NodeID>,
+    nodes_ping: Vec<NodeID>,
 }
 
 impl DHTRoutingCore {
     /// Initializes a new DHTRoutingCore.
     pub fn new(storage: DHTRoutingStorage, config: DHTRoutingConfig) -> Self {
-        Self { storage, config }
+        Self {
+            storage,
+            config,
+            nodes: HashMap::new(),
+            nodes_timeout: vec![],
+            nodes_ping: vec![],
+        }
     }
 
     // Here are the different methods to interact with this module.
     pub fn increase(&mut self, i: u32) {
         self.storage.counter += i * self.config.multiplier;
     }
+
+    pub fn ping(&mut self, id: U256) {
+        self.nodes
+            .entry(id)
+            .and_modify(|ns| ns.last_ping = 0)
+            .or_insert(NodeStats { last_ping: 0 });
+    }
+
+    pub fn tick(&mut self) {
+        for (id, node) in self.nodes.iter_mut() {
+            node.last_ping += 1;
+            if node.last_ping == self.config.ping_period {
+                self.nodes_ping.push(*id);
+            } else if node.last_ping == self.config.ping_timeout {
+                self.nodes_timeout.push(*id);
+            }
+        }
+        self.nodes.retain(|id, _| self.nodes_timeout.contains(id));
+    }
+
+    pub fn nodes_timeout(&mut self) -> Vec<NodeID> {
+        self.nodes_timeout.drain(..).collect()
+    }
+
+    pub fn nodes_ping(&mut self) -> Vec<NodeID> {
+        self.nodes_ping.drain(..).collect()
+    }
+
+    pub fn node_ids(&self) -> Vec<NodeID>{
+        self.nodes.keys().cloned().collect()
+    }
+
+    /// If the core knows of a closer node, returns the ID of the closer node.
+    /// Else it returns None.
+    pub fn next_hop(&self, id: NodeID) -> Option<NodeID>{
+        None
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct NodeStats {
+    pub last_ping: u32,
 }
 
 /// The storage will probably evolve over time, so it's a good idea to store the different
@@ -99,7 +159,7 @@ mod tests {
         tc.config.multiplier = 2;
         tc.increase(1);
         assert_eq!(5, tc.storage.counter);
-        
+
         Ok(())
     }
 }

@@ -327,37 +327,51 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
     }
 
     /// Connects to another brokerio.
-    /// TI and TO need to implement TryFrom<O> and TryInto<I>.
-    /// This is to avoid having to define "I: TryFrom<TO>", which
-    /// would mean that each broker could only forward messages to exactly
-    /// one other broker.
-    ///
-    /// Any error in the TryInto and TryFrom are interpreted as a message
-    /// that cannot be translated and that is ignored.
+    /// The translations are defined using TranslateFrom and TranslateInto.
+    /// If you don't own the types I and O, then you can call link_bi on
+    /// the 'other' brokerio.
     pub async fn link_bi<TI: 'static + Message, TO: 'static + Message>(
         &mut self,
         other: BrokerIO<TI, TO>,
-    ) -> Result<(), BrokerError> 
-    where I: TryFrom<TO>, O: TryInto<TI>{
-        self.add_translator_link(other, Box::new(tr_into_a_b), Box::new(tr_into_a_b))
+    ) -> Result<(), BrokerError>
+    where
+        I: TranslateFrom<TO>,
+        O: TranslateInto<TI>,
+    {
+        self.add_translator_link(other, Box::new(O::translate), Box::new(I::translate))
             .await?;
         Ok(())
     }
 
+    // /// Connects to another brokerio.
+    // /// The translations are defined using TranslateFrom and TranslateInto.
+    // /// If you don't own the types I and O, then you can call link_bi on
+    // /// the 'other' brokerio.
+    // pub async fn link_bi_dyn<TI: 'static + Message, TO: 'static + Message>(
+    //     &mut self,
+    //     other: BrokerIO<TI, TO>,
+    //     translate: Box<dyn TranslateLink<I, O, TI, TO>>,
+    // ) -> Result<(), BrokerError> {
+    //     self.add_translator_link(
+    //         other,
+    //         Box::new(|msg| translate.clone().translate_o_ti(msg)),
+    //         Box::new(|msg| translate.translate_to_i(msg)),
+    //     )
+    //     .await?;
+    //     Ok(())
+    // }
+
     /// Connects to another brokerio, but in a direct way:
     /// I forwards to TI, O forwards to TO.
-    ///
-    /// Any error in the TryInto and TryFrom are interpreted as a message
-    /// that cannot be translated and that is ignored.
-    pub async fn link_direct<
-        TI: 'static + Message,
-        TO: 'static + Message,
-    >(
+    pub async fn link_direct<TI: 'static + Message, TO: 'static + Message>(
         &mut self,
         other: BrokerIO<TI, TO>,
-    ) -> Result<(), BrokerError> 
-    where I: TryInto<TI>, O: TryInto<TO>{
-        self.add_translator_direct(other, Box::new(tr_into_a_b), Box::new(tr_into_a_b))
+    ) -> Result<(), BrokerError>
+    where
+        I: TranslateInto<TI>,
+        O: TranslateInto<TO>,
+    {
+        self.add_translator_direct(other, Box::new(I::translate), Box::new(O::translate))
             .await?;
         Ok(())
     }
@@ -365,7 +379,7 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
     // Links with a "Broker": any message received by self::Input will be forwarded to the
     // Broker, and any Broker::Output message will be forwarded to self::Output.
     pub async fn link_broker<
-        IO: broker::asy::Async + Clone + fmt::Debug + TryFrom<I> + TryInto<O> + 'static,
+        IO: broker::asy::Async + Clone + fmt::Debug + TranslateFrom<I> + TranslateInto<O> + 'static,
     >(
         &mut self,
         mut broker: broker::Broker<IO>,
@@ -890,7 +904,8 @@ impl<I: Message, O: Message, TI: Message + 'static, TO: Message + 'static> Subsy
                 .as_ref()
                 .and_then(|tr| tr(msg.clone())),
             self.translate_fn_i_to.as_ref().and_then(|tr| tr(msg)),
-        ).await;
+        )
+        .await;
     }
 
     async fn translate_output(&mut self, trail: Vec<BrokerID>, msg: O) {
@@ -900,7 +915,8 @@ impl<I: Message, O: Message, TI: Message + 'static, TO: Message + 'static> Subsy
                 .as_ref()
                 .and_then(|tr| tr(msg.clone())),
             self.translate_fn_o_to.as_ref().and_then(|tr| tr(msg)),
-        ).await;
+        )
+        .await;
     }
 
     async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
@@ -911,12 +927,26 @@ impl<I: Message, O: Message, TI: Message + 'static, TO: Message + 'static> Subsy
     }
 }
 
-fn _tr_from_a_b<A: Message, B: Message + TryFrom<A>>(a: A) -> Option<B> {
-    B::try_from(a).ok()
+#[platform_async_trait()]
+pub trait TranslateFrom<T: Message>: Sized {
+    fn translate(msg: T) -> Option<Self>;
 }
 
-fn tr_into_a_b<A: Message + TryInto<B>, B: Message>(a: A) -> Option<B> {
-    a.try_into().ok()
+#[platform_async_trait()]
+pub trait TranslateInto<T: Message> {
+    fn translate(self) -> Option<T>;
+}
+
+#[platform_async_trait()]
+pub trait TranslateLink<I: Message + 'static, O: Message + 'static, TI: Message, TO: Message>: Async + Clone {
+    fn translate_o_ti(&self, msg: O) -> Option<TI>;
+    fn translate_to_i(&self, msg: TO) -> Option<I>;
+}
+
+#[platform_async_trait()]
+pub trait TranslateDirect<I: Message, O: Message, TI: Message, TO: Message> {
+    fn translate_o_ti(msg: O) -> Option<TO>;
+    fn translate_to_i(msg: I) -> Option<TI>;
 }
 
 #[derive(Clone)]
@@ -929,12 +959,12 @@ struct BrokerLink<I: Message, O: Message, IO: broker::asy::Async + Clone + fmt::
 impl<
         I: Message,
         O: Message,
-        IO: broker::asy::Async + Clone + fmt::Debug + TryFrom<I> + 'static,
+        IO: broker::asy::Async + Clone + fmt::Debug + TranslateFrom<I> + 'static,
     > SubsystemHandler<I, O> for BrokerLink<I, O, IO>
 {
     async fn messages(&mut self, from_broker: Vec<I>) -> Vec<O> {
         for msg in from_broker {
-            if let Ok(msg_in) = msg.try_into() {
+            if let Some(msg_in) = IO::translate(msg) {
                 if let Err(e) = self.broker.emit_msg(msg_in) {
                     log::warn!("Couldn't convert message: {e:?}");
                 }
@@ -948,12 +978,12 @@ impl<
 impl<
         I: Message + 'static,
         O: Message + 'static,
-        IO: broker::asy::Async + Clone + fmt::Debug + TryInto<O>,
+        IO: broker::asy::Async + Clone + fmt::Debug + TranslateInto<O>,
     > broker::SubsystemHandler<IO> for BrokerLink<I, O, IO>
 {
     async fn messages(&mut self, from_broker: Vec<IO>) -> Vec<IO> {
         for msg in from_broker {
-            if let Ok(msg_out) = msg.try_into() {
+            if let Some(msg_out) = msg.translate() {
                 if let Err(e) = self.brokerio.emit_msg_out(msg_out) {
                     log::warn!("Couldn't convert message: {e:?}");
                 }
@@ -1158,22 +1188,18 @@ mod tests {
         Output(MessageAO),
     }
 
-    impl TryFrom<MessageAI> for MessageAIO {
-        type Error = BrokerError;
-
-        fn try_from(value: MessageAI) -> Result<Self, Self::Error> {
-            Ok(MessageAIO::Input(value))
+    impl TranslateFrom<MessageAI> for MessageAIO {
+        fn translate(value: MessageAI) -> Option<Self> {
+            Some(MessageAIO::Input(value))
         }
     }
 
-    impl TryInto<MessageAO> for MessageAIO {
-        type Error = BrokerError;
-
-        fn try_into(self) -> Result<MessageAO, Self::Error> {
+    impl TranslateInto<MessageAO> for MessageAIO {
+        fn translate(self) -> Option<MessageAO> {
             if let MessageAIO::Output(out) = self {
-                Ok(out)
+                Some(out)
             } else {
-                Err(BrokerError::Translation)
+                None
             }
         }
     }
