@@ -6,84 +6,15 @@
 
 ## Current concrete goal
 
-- Data Storage (DS)
-  - Has
-    - 0..n Blobs
+### DHT_routing
 
-- Blob
-  - Has
-    - Data
-    - Parents
-
-- Node
-  - Has
-    - 1..n root-Domains: can be modified by the user
-    - Configuration:
-      - Mana-Condition
-
-- Ledger
-  - Has
-    - List of nodes who participate
-  - Creates
-    - Proofs for pointing to data
-    - Global State
-  - Uses DHT to store Mana for nodes
-  - Uses DHT to store global state of Ledger
-
-- Ledger - Proof
-  - Has
-    - Flo
-    - Signature of nodes
-
-- Ledger - Global State
-  
-- Mana
-  - Has
-    - Type
-
-- DHT
-  - Uses Mana and Domains to prioritize storage
-  - Will only accept a restricted list of Flo-IDs as root parents and refuse
-    to store Flos with other or missing root parents.
-
-- Domain
-  - Has
-    - Ledger?
-    - DHT?
-    - 0..n sub-Domains
-
-- Fledger Object (Flo)
-  - Has
-    - ID = H(Type | ACE_0 | Updates_0)
-    - Type: (Domain, DHT, Ledger, Mana, Blob)
-    - ACE
-    - 1..n Updates
-
-- Flo - Updates
-  - Has
-    - Time
-    - Data | ACE: replaces previous Data or ACE
-    - Proof of condition: will probably need to include all the parents
-      ACEs, or at least a proof from the Ledger that all is OK
-
-- Flo - Access Control Element (ACE)
-  - Actions: modify, owner.
-  - Has
-    - 1..n Rules:
-      - Action
-        - Flo_type:action - will be imposed on all children
-        - action - only for the Flo-ID
-      - Condition
-        - Signature (given one or more public keys, and/or)
-        - Ledger States (time, other Flos)
-        - Mana (type of Mana, owner of Mana)
-        - Delegation (its own Flo type)
-
-### User-facing
-
-1. Store configuration of node
-  1. Rename node
-  2. Show last updated nodes
+1. Finish implementation of Kademlia structure
+  - find out how the Kademlia.add_node, RootBucket, and Kademlia.buckets go
+  together. Is the RootBucket the newest element, and Kademlia.buckets should
+  be removed? Or is Kademlia.buckets the new thing and RootBucket should be removed?
+  - add more tests to make sure it's more or less stable
+2. Create simplest DHT_routing which implements the messages::ModuleMessage
+3. Add tests to make sure it works
 
 ### DHT_storage
 
@@ -95,6 +26,12 @@
 1. Create simple DAG storage
 2. Store global state in DHT
 3. Store mana of node in DHT
+
+### User-facing
+
+1. Store configuration of node
+  1. Rename node
+  2. Show last updated nodes
 
 # TODO
 

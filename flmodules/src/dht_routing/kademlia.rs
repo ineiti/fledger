@@ -1,47 +1,47 @@
 use std::fmt::Debug;
 
-use crate::nodeids::NodeID;
+use flarch::nodeids::NodeID;
 
 pub struct Kademlia {
-    // All buckets starting with 0..depth-1 0s
+    // All buckets starting with a distance of 0..depth-1 0s followed by at least
+    // one 1.
     buckets: Vec<KBucket>,
     // The home of the root bucket, including the optimization if the root
     // bucket is isolated
     root_bucket: RootBucket,
     // The root node of this Kademlia instance
-    root: Box<dyn ID>,
-    root_bytes: Vec<u8>,
+    root: NodeID,
     // Maximum number of nodes per bucket
     k: usize,
 }
 
 impl Kademlia {
-    pub fn new(k: usize, root: Box<dyn ID>) -> Self {
+    pub fn new(k: usize, root: NodeID) -> Self {
         Self {
             buckets: vec![],
             root_bucket: RootBucket::new(k, 0),
-            root_bytes: root.get_bytes(),
             root,
             k,
         }
     }
 
-    pub fn add_node(&mut self, id: Box<dyn ID>) {
-        let node = KNode::new(&self.root_bytes, id);
-        let state = if node.depth < self.buckets.len() {
-            self.buckets.get_mut(node.depth).unwrap().add_node(node)
+    pub fn add_node(&mut self, id: NodeID) {
+        let node = KNode::new(&self.root, id);
+        let bucket = if node.depth < self.buckets.len() {
+            self.buckets.get_mut(node.depth).unwrap()
         } else {
-            self.root_bucket.add_node(node)
+            &mut self.root_bucket.root
         };
-        match state {
-            BucketStatus::Stable => todo!(),
-            BucketStatus::Empty => todo!(),
-            BucketStatus::Overflowing => todo!(),
+        match bucket.add_node(node) {
+            BucketStatus::Stable => {},
+            BucketStatus::Empty => panic!("Shouldn't get empty bucket when adding a node"),
+            BucketStatus::Overflowing => {
+            },
         }
     }
 
-    pub fn remove_node(&mut self, id: Box<dyn ID>) {
-        let node = KNode::new(&self.root_bytes, id);
+    pub fn remove_node(&mut self, id: NodeID) {
+        let node = KNode::new(&self.root, id);
         let state = if node.depth < self.buckets.len() {
             self.buckets.get_mut(node.depth).unwrap().remove_node(node)
         } else {
@@ -54,13 +54,13 @@ impl Kademlia {
         }
     }
 
-    pub fn nearest_nodes(&mut self, _node: Box<dyn ID>) -> Vec<Box<dyn ID>> {
+    pub fn nearest_nodes(&mut self, _node: NodeID) -> Vec<NodeID> {
         vec![]
     }
 
-    pub fn ping_answer(&mut self, _node: Box<dyn ID>) {}
+    pub fn ping_answer(&mut self, _node: NodeID) {}
 
-    pub fn tick(&mut self) -> Vec<Box<dyn ID>> {
+    pub fn tick(&mut self) -> Vec<NodeID> {
         vec![]
     }
 }
@@ -83,10 +83,11 @@ impl KBucket {
     fn add_node(&mut self, node: KNode) -> BucketStatus {
         if self.active.len() < self.k {
             self.active.push(node);
+            BucketStatus::Stable
         } else {
             self.cache.push(node);
+            BucketStatus::Overflowing
         }
-        BucketStatus::Stable
     }
 
     fn remove_node(&mut self, node: KNode) -> BucketStatus {
@@ -99,7 +100,9 @@ impl KBucket {
             self.cache.remove(pos);
         }
 
-        if self.active.len() + self.cache.len() > 0 {
+        if self.active.len() + self.cache.len() > self.k {
+            BucketStatus::Overflowing
+        } else if self.active.len() > 0 {
             BucketStatus::Stable
         } else {
             BucketStatus::Empty
@@ -167,7 +170,7 @@ impl KTree {
                     *p = KTreeNode::split_bucket(l.drain(..).collect(), d);
                 }
                 KTreeNode::Node(one, zero) => {
-                    p = match node.distance.get(d).unwrap(){
+                    p = match node.distance.get(d).unwrap() {
                         Bit::Zero => zero,
                         Bit::One => one,
                     };
@@ -212,45 +215,48 @@ enum BucketStatus {
 
 #[derive(Debug)]
 struct KNode {
-    node: Box<dyn ID>,
+    node: NodeID,
     depth: usize,
     distance: Vec<Bit>,
     state: NodeState,
 }
 
 impl KNode {
-    pub fn new(root: &Vec<u8>, node: Box<dyn ID>) -> Self {
-        let distance = Self::distance(root, node.get_bytes());
-        let mut depth = 0;
-        while let Some(bit) = distance.get(depth) {
-            if bit == &Bit::Zero {
-                depth += 1;
-            } else {
-                break;
-            }
-        }
+    pub fn new(root: &NodeID, node: NodeID) -> Self {
+        let distance = Self::distance(root, node);
         Self {
             node,
             state: NodeState::Active,
-            depth,
+            depth: Self::get_depth(&distance),
             distance,
         }
     }
 
-    fn distance(root: &Vec<u8>, mut node: Vec<u8>) -> Vec<Bit> {
-        root.iter()
-            .map(|c| (c ^ node.remove(0)).count_ones())
+    fn distance(root: &NodeID, node: NodeID) -> Vec<Bit> {
+        let mut node_bytes = node.to_bytes().to_vec();
+        root.to_bytes()
+            .iter()
+            .map(|c| (c ^ node_bytes.remove(0)) as u32)
             .flat_map(|mut x| {
-                (0..7).map(move |_| {
+                (0..=7).map(move |_| {
                     x *= 2;
                     if x & 0x100 > 0 {
-                        Bit::Zero
-                    } else {
                         Bit::One
+                    } else {
+                        Bit::Zero
                     }
                 })
             })
             .collect()
+    }
+
+    fn get_depth(distance: &[Bit]) -> usize {
+        for depth in 0..distance.len() {
+            if distance.get(depth) == Some(&Bit::One) {
+                return depth;
+            }
+        }
+        return distance.len();
     }
 
     fn set_state(&mut self, state: NodeState) {
@@ -260,7 +266,7 @@ impl KNode {
 
 impl PartialEq for KNode {
     fn eq(&self, other: &Self) -> bool {
-        self.node.equals(&*other.node)
+        self.node == other.node
     }
 }
 
@@ -278,19 +284,55 @@ enum NodeState {
     Ping(usize),
 }
 
-pub trait ID: Debug {
-    fn get_bytes(&self) -> Vec<u8>;
-    fn equals(&self, other: &dyn ID) -> bool {
-        let mut other_bytes = other.get_bytes().to_vec();
-        self.get_bytes()
-            .to_vec()
-            .iter()
-            .all(|b| b == &other_bytes.remove(0))
-    }
-}
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
 
-impl ID for NodeID {
-    fn get_bytes(&self) -> Vec<u8> {
-        self.to_bytes().to_vec()
+    use flarch::{nodeids::U256, start_logging_filter_level};
+
+    use super::*;
+
+    fn rnd_node_depth(root: &NodeID, depth: usize) -> NodeID {
+        loop {
+            let node = NodeID::rnd();
+            let dist = KNode::distance(root, node);
+            let nd = KNode::get_depth(&dist);
+            if nd == depth {
+                //log::info!("{}-{}: {:?}", depth, node, dist);
+                return node;
+            }
+        }
+    }
+
+    fn distance_str(root: &NodeID, node_str: &str) -> usize {
+        let node = U256::from_str(node_str).expect("NodeID init");
+        KNode::get_depth(&KNode::distance(root, node))
+    }
+
+    #[test]
+    fn test_distance() {
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+
+        let root = U256::from_str("00").expect("NodeID init");
+        assert_eq!(0, distance_str(&root, "80"));
+        assert_eq!(1, distance_str(&root, "40"));
+        assert_eq!(2, distance_str(&root, "20"));
+        assert_eq!(3, distance_str(&root, "10"));
+        assert_eq!(4, distance_str(&root, "08"));
+        assert_eq!(5, distance_str(&root, "04"));
+        assert_eq!(6, distance_str(&root, "02"));
+        assert_eq!(7, distance_str(&root, "01"));
+        assert_eq!(8, distance_str(&root, "0080"));
+    }
+
+    #[test]
+    fn test_rnd_node_depth() {
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+
+        let node = U256::from_str("00").expect("NodeID init");
+        log::info!("{}", node);
+        for i in 0..16 {
+            log::info!("{} - {}", i, rnd_node_depth(&node, i));
+        }
     }
 }
