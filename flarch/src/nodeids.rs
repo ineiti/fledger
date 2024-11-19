@@ -211,6 +211,20 @@ impl From<&Vec<U256>> for NodeIDs {
     }
 }
 
+impl fmt::Display for NodeIDs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "[{}]",
+            &self
+                .0
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::start_logging;
