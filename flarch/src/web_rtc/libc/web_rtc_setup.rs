@@ -9,10 +9,9 @@ use futures::lock::Mutex;
 use webrtc::{
     api::{
         interceptor_registry::register_default_interceptors, media_engine::MediaEngine, setting_engine::SettingEngine, APIBuilder
-    }, data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel}, ice::mdns::MulticastDnsMode, ice_transport::{
+    }, data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel}, ice_transport::{
         ice_candidate::{RTCIceCandidate, RTCIceCandidateInit},
         ice_connection_state::RTCIceConnectionState,
-        ice_credential_type::RTCIceCredentialType,
         ice_server::RTCIceServer,
     }, interceptor::registry::Registry, peer_connection::{
         configuration::RTCConfiguration,
@@ -39,7 +38,6 @@ fn get_ice_server(host: HostLogin) -> RTCIceServer {
     if let Some(login) = host.login {
         server.username = login.user;
         server.credential = login.pass;
-        server.credential_type = RTCIceCredentialType::Password;
     }
 
     server
@@ -98,8 +96,8 @@ impl WebRTCConnectionSetupLibc {
 
         // There seems to be some trouble with mdns where it can flood the local network
         // with requests - so turn it off.
-        let mut setting_engine = SettingEngine::default();
-        setting_engine.set_ice_multicast_dns_mode(MulticastDnsMode::Disabled);
+        let setting_engine = SettingEngine::default();
+        // setting_engine.set_ice_multicast_dns_mode(MulticastDnsMode::Disabled);
 
         // Create the API object with the MediaEngine
         let api = APIBuilder::new()
