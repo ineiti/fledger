@@ -1,6 +1,6 @@
 use flarch::nodeids::NodeID;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::{mpsc::{channel, Receiver, Sender}, Semaphore};
 
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
@@ -75,9 +75,12 @@ impl LoopixBroker {
             overlay_sender.clone(),
         );
 
+        let max_workers = Arc::new(Semaphore::new(20));
+
         broker
             .add_subsystem(Subsystem::Handler(Box::new(LoopixTranslate {
                 loopix_messages: loopix_messages.clone(),
+                max_workers: Arc::clone(&max_workers),
             })))
             .await?;
 
@@ -433,6 +436,7 @@ impl LoopixBroker {
 
 struct LoopixTranslate {
     loopix_messages: LoopixMessages,
+    max_workers: Arc<Semaphore>
 }
 
 #[platform_async_trait()]
@@ -440,14 +444,12 @@ impl SubsystemHandler<LoopixMessage> for LoopixTranslate {
     async fn messages(&mut self, msgs: Vec<LoopixMessage>) -> Vec<LoopixMessage> {
         for msg in msgs {
             if let LoopixMessage::Input(input) = msg {
-                let sphinx_messages = self.loopix_messages.process_messages(vec![input]).await;
-                let mut messages = Vec::new();
-                for (node_id, sphinx) in sphinx_messages {
-                    messages.push(LoopixMessage::Output(LoopixOut::SphinxToNetwork(
-                        node_id, sphinx,
-                    )));
-                }
-                return messages;
+                let permit = self.max_workers.clone().acquire_owned().await.unwrap();
+                let mut loopix_messages = self.loopix_messages.clone();
+                tokio::spawn(async move {
+                    loopix_messages.process_messages(vec![input]).await;
+                    drop(permit);
+                }).await.map_err(|e| log::error!("Error processing messages: {:?}", e)).ok();
             }
         }
         vec![]
