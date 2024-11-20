@@ -163,7 +163,7 @@ pub struct CoreConfig {
     lambda_drop: f64, // Drop cover traffic rate (user) (per minute)
     lambda_payload: f64, // Payload traffic rate (user) (per minute)
     path_length: usize, // Path length (user)
-    mean_delay: u64, // The mean delay at mix Mi (ms)
+    mean_delay: u64, // The mean delay at mix Mi (microseconds)
     lambda_loop_mix: f64, // Loop traffic rate (mix) (per minute)
     time_pull: f64, // Time pull (user) (seconds)
     max_retrieve: usize, // Max retrieve (provider)
@@ -177,7 +177,7 @@ impl CoreConfig {
             lambda_drop: 10.0, // drop rate (10 times per minute)
             lambda_payload: 0.0, // payload rate (0 times per minute)
             path_length,
-            mean_delay: 2, // mean delay (ms)
+            mean_delay: 500, // mean delay (ms)
             lambda_loop_mix: 10.0, // loop mix rate (10 times per minute)
             time_pull: 0.0, // time pull (3 second)
             max_retrieve: 0, // messages sent to client per pull request
@@ -191,7 +191,7 @@ impl CoreConfig {
             lambda_drop: 10.0,
             lambda_payload: 0.0,
             path_length,
-            mean_delay: 2,
+            mean_delay: 2000,
             lambda_loop_mix: 10.0,
             time_pull: 0.0,
             max_retrieve: 5,
@@ -205,7 +205,7 @@ impl CoreConfig {
             lambda_drop: 10.0,
             lambda_payload: 120.0,
             path_length,
-            mean_delay: 1,
+            mean_delay: 2000,
             lambda_loop_mix: 0.0,
             time_pull: 3.0,
             max_retrieve: 0,
@@ -221,7 +221,7 @@ impl Default for CoreConfig {
             lambda_drop: 10.0,
             lambda_payload: 120.0,
             path_length: 3,
-            mean_delay: 2,
+            mean_delay: 2000,
             lambda_loop_mix: 10.0,
             time_pull: 3.0,
             max_retrieve: 10,
