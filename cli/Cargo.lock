@@ -522,15 +522,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
 
 [[package]]
-name = "concurrent-queue"
-version = "2.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
-dependencies = [
- "crossbeam-utils",
-]
-
-[[package]]
 name = "console_error_panic_hook"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -585,12 +576,6 @@ name = "crc-catalog"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19d374276b40fb8bbdee95aef7c7fa6b5316ec764510eb64b8dd0e2ed0d7e7f5"
-
-[[package]]
-name = "crossbeam-utils"
-version = "0.8.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22ec99545bb0ed0ea7bb9b8e1e9122ea386ff8a48c0922e43f36d45ab09e0e80"
 
 [[package]]
 name = "crypto-bigint"
@@ -651,6 +636,7 @@ dependencies = [
  "curve25519-dalek-derive",
  "fiat-crypto",
  "rustc_version",
+ "serde",
  "subtle 2.6.1",
  "zeroize",
 ]
@@ -932,9 +918,13 @@ dependencies = [
  "flmodules",
  "flnode",
  "log",
+ "serde",
+ "serde_json",
+ "serde_yaml",
  "thiserror",
  "tokio",
  "webrtc-util",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -943,11 +933,11 @@ version = "0.8.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "base64 0.22.1",
  "bimap",
  "bincode",
  "bitflags 2.6.0",
  "bytes",
- "concurrent-queue",
  "ed25519-compact",
  "flarch",
  "futures",
@@ -970,6 +960,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "toml",
+ "uuid",
  "x25519-dalek",
 ]
 

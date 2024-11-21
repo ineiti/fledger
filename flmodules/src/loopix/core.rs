@@ -2,29 +2,62 @@ use crate::overlay::messages::NetworkWrapper;
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
 use sphinx_packet::header::delays::generate_from_average_duration;
+use sphinx_packet::payload::Payload;
 use sphinx_packet::route::{Destination, Node, NodeAddressBytes};
-use sphinx_packet::{ProcessedPacket, SphinxPacket};
+use sphinx_packet::{ProcessedPacket, SphinxPacket, SphinxPacketBuilder};
 use std::time::Duration;
 
 use crate::loopix::config::CoreConfig;
 use crate::loopix::sphinx::{destination_address_from_node_id, Sphinx};
 use crate::loopix::storage::LoopixStorage;
+use std::sync::Arc;
 
 use rand::prelude::SliceRandom;
+
+use super::messages::MessageType;
+
+const MAX_PAYLOAD_SIZE: usize = 10240;
 
 #[async_trait]
 pub trait LoopixCore {
     fn get_config(&self) -> &CoreConfig;
-    fn get_storage(&self) -> &LoopixStorage;
+    fn get_storage(&self) -> &Arc<LoopixStorage>;
     async fn get_our_id(&self) -> NodeID;
 
-    async fn process_sphinx_packet(&self, sphinx_packet: Sphinx) -> ProcessedPacket {
+    async fn process_sphinx_packet(&self, sphinx_packet: Sphinx) -> Option<ProcessedPacket> {
         let secret_key = self.get_storage().get_private_key().await;
-        sphinx_packet.inner.process(&secret_key).unwrap()
+        match sphinx_packet.inner.process(&secret_key) {
+            Ok(processed_packet) => Some(processed_packet),
+            Err(e) => {
+                log::error!(
+                    "Failed to process sphinx packet {}: {:?}",
+                    sphinx_packet.message_id,
+                    e
+                );
+                None
+            }
+        }
     }
 
     async fn create_loop_message(&self) -> (NodeID, Sphinx);
-    async fn create_drop_message(&self) -> (NodeID, Sphinx);
+
+    async fn process_final_hop(
+        &self,
+        destination: NodeID,
+        surb_id: [u8; 16],
+        payload: Payload,
+    ) -> (
+        NodeID,
+        Option<NetworkWrapper>,
+        Option<(NodeID, Vec<Sphinx>)>,
+        Option<MessageType>,
+    );
+    async fn process_forward_hop(
+        &self,
+        next_packet: Box<SphinxPacket>,
+        next_address: NodeID,
+        message_id: String,
+    ) -> (NodeID, Option<Sphinx>);
 
     fn create_sphinx_packet(
         &self,
@@ -33,7 +66,7 @@ pub trait LoopixCore {
         route: &[Node],
     ) -> (Node, Sphinx) {
         // delays
-        let mean_delay = Duration::from_secs_f64(self.get_config().mean_delay());
+        let mean_delay = Duration::from_micros(self.get_config().mean_delay());
         let delays = generate_from_average_duration(route.len(), mean_delay);
 
         // destination
@@ -44,10 +77,12 @@ pub trait LoopixCore {
         // message conversion
         let msg_bytes = serde_yaml::to_vec(&msg).unwrap();
 
-        let sphinx_packet = SphinxPacket::new(msg_bytes, route, &destination, &delays).unwrap();
+        let builder = SphinxPacketBuilder::new().with_payload_size(MAX_PAYLOAD_SIZE);
+        let sphinx_packet = builder.build_packet(msg_bytes, route, &destination, &delays).unwrap();
         (
             route[0].clone(),
             Sphinx {
+                message_id: uuid::Uuid::new_v4().to_string(),
                 inner: sphinx_packet,
             },
         )
@@ -116,6 +151,8 @@ mod tests {
     use crate::loopix::messages::MessageType;
     use crate::loopix::sphinx::node_id_from_destination_address;
     use crate::loopix::sphinx::node_id_from_node_address;
+    use crate::loopix::testing::LoopixSetup;
+    use sphinx_packet::payload::Payload;
     use sphinx_packet::{packet::*, route::*};
     use std::collections::HashMap;
     use x25519_dalek::{PublicKey, StaticSecret};
@@ -124,7 +161,7 @@ mod tests {
 
     struct MockLoopixCore {
         config: CoreConfig,
-        storage: LoopixStorage,
+        storage: Arc<LoopixStorage>,
     }
 
     #[async_trait]
@@ -133,7 +170,7 @@ mod tests {
             &self.config
         }
 
-        fn get_storage(&self) -> &LoopixStorage {
+        fn get_storage(&self) -> &Arc<LoopixStorage> {
             &self.storage
         }
 
@@ -145,7 +182,26 @@ mod tests {
             todo!()
         }
 
-        async fn create_drop_message(&self) -> (NodeID, Sphinx) {
+        async fn process_final_hop(
+            &self,
+            _destination: NodeID,
+            _surb_id: [u8; 16],
+            _payload: Payload,
+        ) -> (
+            NodeID,
+            Option<NetworkWrapper>,
+            Option<(NodeID, Vec<Sphinx>)>,
+            Option<MessageType>,
+        ) {
+            todo!()
+        }
+
+        async fn process_forward_hop(
+            &self,
+            _next_packet: Box<SphinxPacket>,
+            _next_address: NodeID,
+            _message_id: String,
+        ) -> (NodeID, Option<Sphinx>) {
             todo!()
         }
     }
@@ -156,43 +212,38 @@ mod tests {
         usize,
     ) {
         let path_length = 2;
-        let mut node_public_keys = HashMap::new();
-        let mut node_key_pairs = HashMap::new();
+        let (all_nodes, node_public_keys, loopix_key_pairs, _) =
+            LoopixSetup::create_nodes_and_keys(path_length);
 
-        for mix in 0..path_length * path_length + path_length + path_length {
-            let node_id = NodeID::from(mix as u32);
-            let (public_key, private_key) = LoopixStorage::generate_key_pair();
-            node_public_keys.insert(node_id, public_key);
-            node_key_pairs.insert(node_id, (public_key, private_key));
-        }
-
-        let node_id = 5;
-        let private_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
-        let public_key = &node_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
+        // get our node info
+        let node_id = all_nodes.iter().next().unwrap().get_id();
+        let private_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().1;
+        let public_key = &loopix_key_pairs.get(&NodeID::from(node_id)).unwrap().0;
 
         let config = LoopixConfig::default_with_path_length(
-            LoopixRole::Mixnode,
+            LoopixRole::Client,
             node_id,
             path_length,
             private_key.clone(),
             public_key.clone(),
+            all_nodes,
         );
 
         let core = MockLoopixCore {
             config: config.core_config,
-            storage: config.storage_config,
+            storage: Arc::new(config.storage_config),
         };
 
         core.get_storage()
             .set_node_public_keys(node_public_keys)
             .await;
 
-        (core, node_key_pairs, path_length)
+        (core, loopix_key_pairs, path_length)
     }
 
     #[tokio::test]
     async fn test_create_route() {
-        let (core, node_key_pairs, _path_length) = setup().await;
+        let (core, loopix_key_pairs, _path_length) = setup().await;
 
         let our_id = core.get_our_id().await;
 
@@ -205,13 +256,13 @@ mod tests {
             NodeAddressBytes::from_bytes(our_id.to_bytes())
         );
 
-        let public_key = node_key_pairs.get(&our_id).unwrap().0;
+        let public_key = loopix_key_pairs.get(&our_id).unwrap().0;
         assert_eq!(public_key, route[0].pub_key);
     }
 
     #[tokio::test]
     async fn test_sphinx_packet_simple() {
-        let (core, node_key_pairs, _) = setup().await;
+        let (core, loopix_key_pairs, _) = setup().await;
 
         let our_id = core.get_our_id().await;
         let storage = core.get_storage();
@@ -219,7 +270,7 @@ mod tests {
 
         assert_eq!(
             private_key.as_bytes(),
-            node_key_pairs.get(&our_id).unwrap().1.as_bytes()
+            loopix_key_pairs.get(&our_id).unwrap().1.as_bytes()
         );
 
         // just create a packet with one layer of encryption
@@ -232,7 +283,13 @@ mod tests {
 
         let (_, sphinx) = core.create_sphinx_packet(our_id, msg, &route);
 
-        let processed = sphinx.inner.process(&private_key).unwrap();
+        let processed = match sphinx.inner.process(&private_key) {
+            Ok(processed) => processed,
+            Err(e) => {
+                assert!(false, "Failed to process sphinx packet: {:?}", e);
+                return;
+            }
+        };
 
         match processed {
             ProcessedPacket::ForwardHop(_, _, _) => {
@@ -266,7 +323,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sphinx_packet_3_layers() {
-        let (core, node_key_pairs, _) = setup().await;
+        let (core, loopix_key_pairs, _) = setup().await;
 
         let our_id = core.get_our_id().await;
         let storage = core.get_storage();
@@ -274,7 +331,7 @@ mod tests {
 
         assert_eq!(
             private_key.as_bytes(),
-            node_key_pairs.get(&our_id).unwrap().1.as_bytes()
+            loopix_key_pairs.get(&our_id).unwrap().1.as_bytes()
         );
 
         // just create a packet with one layer of encryption
@@ -292,7 +349,7 @@ mod tests {
         let mut packet_bytes = sphinx.inner.to_bytes();
         for (index, node) in route.iter().enumerate() {
             let node_id = node_id_from_node_address(node.address);
-            let node_secret_key = &node_key_pairs.get(&node_id).unwrap().1;
+            let node_secret_key = &loopix_key_pairs.get(&node_id).unwrap().1;
             let packet = SphinxPacket::from_bytes(&packet_bytes).unwrap();
             let processed = packet.process(node_secret_key).unwrap();
 

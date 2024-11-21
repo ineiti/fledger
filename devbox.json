@@ -21,7 +21,8 @@
     "wasm-pack": "latest",
     "nodejs":    "18",
     "procps":    "latest",
-    "vscode":    "latest"
+    "vscode":    "latest",
+    "moreutils": "latest"
   },
   "shell": {
     "init_hook": [
@@ -32,6 +33,9 @@
     "scripts": {
       "test": [
         "make cargo_test"
+      ],
+      "code": [
+        "code --user-data-dir .vscode --profile fledger ."
       ],
       "fledger": [
         "cd cli && cargo run -p fledger"

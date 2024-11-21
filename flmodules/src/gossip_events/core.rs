@@ -37,6 +37,26 @@ impl EventsStorage {
                 events: HashMap::new(),
             },
         );
+        storage.insert(
+            Category::LoopixSetup,
+            Events {
+                config: CategoryConfig {
+                    unique: true,
+                    max_events: 1,
+                },
+                events: HashMap::new(),
+            },
+        );
+        storage.insert(
+            Category::LoopixConfig,
+            Events {
+                config: CategoryConfig {
+                    unique: true,
+                    max_events: 1000,
+                },
+                events: HashMap::new(),
+            },
+        );
         Self { storage }
     }
 
@@ -209,6 +229,8 @@ impl Events {
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Category {
+    LoopixSetup,
+    LoopixConfig,
     TextMessage,
     NodeInfo,
 }

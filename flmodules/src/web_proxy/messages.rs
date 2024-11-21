@@ -106,6 +106,7 @@ impl WebProxyMessages {
                 .collect::<Vec<NodeID>>()
                 .into(),
         );
+        log::trace!("WebProxy: Node list updated: {:?}", nodes);
         vec![]
     }
 
