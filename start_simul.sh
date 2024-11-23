@@ -3,8 +3,11 @@
 make kill
 
 PATH_LEN=$1
-if [ -z "$PATH_LEN" ]; then
-  echo "Usage: $0 path_len"
+RETRY=$2
+
+if ! [[ "$RETRY" =~ ^[0-9]+$ ]]; then
+  echo "Usage: $0 path_len retry"
+  echo "retry must be an integer"
   exit 1
 fi
 
@@ -23,12 +26,16 @@ for NODE in $( seq $NODES ); do
   echo "Starting node $NAME"
   CONFIG="$SIMUL$NAME/"
   PATH_LEN_ARG=""
+  RETRY_ARG=""
   if [ $NODE = "1" ]; then
     PATH_LEN_ARG="--path-len $PATH_LEN"
   fi
-  ./target-common/release/fledger --config $CONFIG --name $NAME -vv -s ws://localhost:8765 $PATH_LEN_ARG |& ts "$NAME" &
+  if [ "$RETRY" -gt 0 ]; then
+    RETRY_ARG="--retry $RETRY"
+  fi
+  ./target-common/release/fledger --config $CONFIG --name $NAME -vv -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG |& ts "$NAME" &
 done
 
-sleep 300
+sleep 60
 
 make kill

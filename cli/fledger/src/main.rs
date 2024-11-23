@@ -57,6 +57,10 @@ struct Args {
     /// Uptime interval - to stress test disconnections
     #[clap(short, long)]
     path_len: Option<usize>,
+
+    /// Reliability config
+    #[clap(long, default_value_t = 0)]
+    retry: u8,
 }
 
 async fn save_loopix_storage_periodically(
@@ -97,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let mut logger = env_logger::Builder::new();
-    logger.filter_module("fl", log::LevelFilter::Info);
+    logger.filter_module("fl", log::LevelFilter::Debug);
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
 
@@ -157,7 +161,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .err()
             .map(|e| log::warn!("Couldn't process node: {e:?}"));
 
-        state = state.process(&mut node, i, config_path.clone()).await?;
+        state = state.process(&mut node, i, config_path.clone(), args.retry).await?;
 
         if i % 3 == 2 && false {
             log::info!("Nodes are: {:?}", node.nodes_online()?);
@@ -187,10 +191,11 @@ impl LoopixSimul {
         node: &mut Node,
         i: u32,
         dir_path: PathBuf,
+        retry: u8
     ) -> Result<Self, BrokerError> {
         let new_state = match &self {
-            LoopixSimul::Root(lsroot) => lsroot.process(node, i, dir_path).await?,
-            LoopixSimul::Child(lschild) => lschild.process(node, dir_path).await?,
+            LoopixSimul::Root(lsroot) => lsroot.process(node, i, dir_path, retry).await?,
+            LoopixSimul::Child(lschild) => lschild.process(node, dir_path, retry).await?,
         };
         if *self != new_state {
             log::info!(
@@ -234,6 +239,7 @@ impl LSRoot {
         node: &mut Node,
         i: u32,
         dir_path: PathBuf,
+        retry: u8
     ) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSRoot::WaitNodes(n) => {
@@ -294,7 +300,7 @@ impl LSRoot {
                             .webproxy
                             .as_mut()
                             .unwrap()
-                            .get_with_timeout("https://ipinfo.io", Duration::from_secs(300))
+                            .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(4))
                             .await
                         {
                             Ok(mut res) => match res.text().await {
@@ -322,7 +328,7 @@ impl LSRoot {
                         .webproxy
                         .as_mut()
                         .unwrap()
-                        .get_with_timeout("https://ipinfo.io", Duration::from_secs(10))
+                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(4))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
@@ -357,6 +363,7 @@ impl LSChild {
         &self,
         node: &mut Node,
         dir_path: PathBuf,
+        _retry: u8
     ) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSChild::WaitConfig => {

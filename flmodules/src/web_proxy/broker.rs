@@ -100,6 +100,71 @@ impl WebProxy {
         .map_err(|_| WebProxyError::ResponseTimeout)?
     }
 
+    pub async fn get_with_id(&mut self, url: &str, our_rnd: NodeID) -> Result<Response, WebProxyError> {
+        let (tx, rx) = channel(128);
+        self.web_proxy
+            .emit_msg(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx).into())?;
+        let (mut tap, id) = self.web_proxy.get_tap().await?;
+        timeout(Duration::from_secs(5), async move {
+            while let Some(msg) = tap.recv().await {
+                if let WebProxyMessage::Output(WebProxyOut::ResponseGet(proxy, rnd, header)) = msg {
+                    if rnd == our_rnd {
+                        self.web_proxy.remove_subsystem(id).await?;
+                        return Ok(Response::new(proxy, header, rx));
+                    }
+                }
+            }
+            self.web_proxy.remove_subsystem(id).await?;
+            return Err(WebProxyError::ResponseTimeout);
+        })
+        .await
+        .map_err(|_| WebProxyError::ResponseTimeout)?
+    }
+
+    pub async fn get_with_retry(&mut self, url: &str, retry: u8) -> Result<Response, WebProxyError> {
+        log::info!("Getting {url} with retry: {}", retry);
+        for _ in 0..retry + 1 { // try at leasy once
+            let our_rnd = U256::rnd();
+            match self.get_with_id(url, our_rnd).await {
+                Ok(resp) => {
+                    log::info!("Successfully received response: {:?}", resp);
+                    return Ok(resp);
+                }
+                Err(WebProxyError::ResponseTimeout) => {
+                    log::warn!("Response timed out for URL: {}", url);
+                    continue;
+                }
+                Err(e) => {
+                    log::error!("Error occurred: {:?}", e);
+                    return Err(e);
+                }
+            }
+        }
+        Err(WebProxyError::ResponseTimeout)
+    }
+
+    pub async fn get_with_retry_and_timeout(&mut self, url: &str, retry: u8, timeout_duration: Duration) -> Result<Response, WebProxyError> {
+        log::info!("Getting {url} with retry: {}", retry);
+        for i in 0..retry + 1 { // try at leasy once
+            match self.get_with_timeout(url, timeout_duration).await {
+                Ok(resp) => {
+                    log::info!("Successfully received response: {:?}", resp);
+                    return Ok(resp);
+                }
+                Err(WebProxyError::ResponseTimeout) => {
+                    log::warn!("Response timed out for URL: {}", url);
+                    log::debug!("Response timed out for try {}.", i);
+                    continue;
+                }
+                Err(e) => {
+                    log::error!("Error occurred: {:?}", e);
+                    return Err(e);
+                }
+            }
+        }
+        Err(WebProxyError::ResponseTimeout)
+    }
+
     pub async fn get_with_timeout(
         &mut self,
         url: &str,
