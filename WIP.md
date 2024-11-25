@@ -9,10 +9,7 @@
 ### DHT_routing
 
 1. Finish implementation of Kademlia structure
-  - find out how the Kademlia.add_node, RootBucket, and Kademlia.buckets go
-  together. Is the RootBucket the newest element, and Kademlia.buckets should
-  be removed? Or is Kademlia.buckets the new thing and RootBucket should be removed?
-  - add more tests to make sure it's more or less stable
+  - add pings to kademlia
 2. Create simplest DHT_routing which implements the messages::ModuleMessage
 3. Add tests to make sure it works
 
