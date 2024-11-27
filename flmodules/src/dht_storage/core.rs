@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_increase() -> Result<(), Box<dyn Error>> {
-        let mut tc = DHTStorageCore::new(DHTStorageBucket::default(), DHTStorageConfig::default());
+        let _tc = DHTStorageCore::new(DHTStorageBucket::default(), DHTStorageConfig::default());
         Ok(())
     }
 }

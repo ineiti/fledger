@@ -3,7 +3,9 @@ use std::fmt::Debug;
 
 use flarch::nodeids::{NodeID, NodeIDs};
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Kademlia {
     // All buckets starting with a distance of 0..depth-1 0s followed by at least
     // one 1.
@@ -11,16 +13,16 @@ pub struct Kademlia {
     // The home of the root bucket.
     root_bucket: KBucket,
     // The root node of this Kademlia instance
-    root: NodeID,
+    pub root: NodeID,
     // Configuration for the buckets
     config: Config,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
 pub struct Config {
-    k: usize,
-    ping_interval: u32,
-    ping_timeout: u32,
+    pub k: usize,
+    pub ping_interval: u32,
+    pub ping_timeout: u32,
 }
 
 impl Default for Config {
@@ -44,6 +46,9 @@ impl Kademlia {
     }
 
     pub fn add_node(&mut self, id: NodeID) {
+        if self.has_node_id(&id) {
+            return;
+        }
         let node = KNode::new(&self.root, id);
         if let Some(bucket) = self.buckets.get_mut(node.depth) {
             bucket.add_node(node);
@@ -53,6 +58,12 @@ impl Kademlia {
                 self.rebalance_overflow();
             }
         };
+    }
+
+    pub fn add_nodes(&mut self, ids: Vec<NodeID>) {
+        for id in ids {
+            self.add_node(id);
+        }
     }
 
     pub fn remove_node(&mut self, id: &NodeID) {
@@ -67,7 +78,7 @@ impl Kademlia {
         };
     }
 
-    pub fn nearest_nodes(&mut self, id: &NodeID) -> Vec<NodeID> {
+    pub fn nearest_nodes(&self, id: &NodeID) -> Vec<NodeID> {
         let kn = KNode::new(&self.root, *id);
 
         // Start with potential nodes from the root-bucket.
@@ -94,6 +105,16 @@ impl Kademlia {
 
         // OK, nothing found
         vec![]
+    }
+
+    /// Returns all the active nodes of the kademlia system.
+    pub fn active_nodes(&self) -> Vec<NodeID> {
+        self.buckets
+            .iter()
+            .flat_map(|b| &b.active)
+            .chain(&self.root_bucket.active)
+            .map(|kn| kn.id)
+            .collect()
     }
 
     /// The system received a message from this node, so its considered
@@ -161,6 +182,14 @@ impl Kademlia {
         }
         None
     }
+
+    fn has_node_id(&self, id: &NodeID) -> bool {
+        self.buckets
+            .iter()
+            .chain(std::iter::once(&self.root_bucket))
+            .flat_map(|b| b.active.iter().chain(b.cache.iter()))
+            .any(|kn| &kn.id == id)
+    }
 }
 
 impl fmt::Display for Kademlia {
@@ -174,6 +203,7 @@ impl fmt::Display for Kademlia {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 struct KBucket {
     active: Vec<KNode>,
     cache: Vec<KNode>,
@@ -241,7 +271,7 @@ impl KBucket {
         nodes
     }
 
-    fn get_active_ids(&mut self, depth: usize) -> Vec<NodeID> {
+    fn get_active_ids(&self, depth: usize) -> Vec<NodeID> {
         self.active
             .iter()
             .filter_map(|kn| (kn.depth == depth).then(|| kn.id))
@@ -317,14 +347,14 @@ impl KBucket {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 pub struct TickIDs {
     pub deleted: Vec<NodeID>,
     pub ping: Vec<NodeID>,
 }
 
 impl TickIDs {
-    fn extend(&mut self, other: TickIDs) {
+    pub fn extend(&mut self, other: TickIDs) {
         self.deleted.extend_from_slice(&other.deleted);
         self.ping.extend_from_slice(&other.ping);
     }
@@ -351,7 +381,7 @@ enum BucketStatus {
     Wanting,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct KNode {
     id: NodeID,
     depth: usize,
@@ -425,7 +455,7 @@ enum Bit {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
+    use std::{iter::once, str::FromStr};
 
     use flarch::{nodeids::U256, start_logging_filter_level};
 
@@ -653,5 +683,26 @@ mod test {
         assert_eq!([0, 0], [ticks.deleted.len(), ticks.ping.len()]);
         let ticks = kademlia.tick();
         assert_eq!([1, 3], [ticks.deleted.len(), ticks.ping.len()]);
+    }
+
+    #[test]
+    fn test_distribution() {
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+
+        let root = NodeID::rnd();
+        let mut kademlia = Kademlia::new(root, Config{ k: 2, ping_interval: 10, ping_timeout: 20 });
+
+        for node in (0..256).map(|_| NodeID::rnd()) {
+            kademlia.add_node(node);
+        }
+
+        for (index, bucket) in kademlia
+            .buckets
+            .iter()
+            .chain(once(&kademlia.root_bucket))
+            .enumerate()
+        {
+            log::info!("{index}: {}+{}", bucket.active.len(), bucket.cache.len())
+        }
     }
 }

@@ -8,15 +8,23 @@
 
 ### DHT_routing
 
+-- seems to be more or less OK, at least if it's usable by DHT_storage --
+
 1. Finish implementation of Kademlia structure
-  - add pings to kademlia
 2. Create simplest DHT_routing which implements the messages::ModuleMessage
 3. Add tests to make sure it works
 
 ### DHT_storage
 
-1. Store up to 1MB of data
-2. Delete oldest/farthest data
+1. Link it correctly to DHT_routing
+  - check if dht_storage works like that by adding the following messages:
+    - Store (): which sends a store-request
+    - Load: which requests data
+    - Value: the requested data
+    - what to do with the `(Local|Request|Update)Flo`'s?
+      - Add `GetClosestNodes` / `ClosestNodes` messages to DHT_routing
+2. Store up to 1MB of data
+3. Delete oldest/farthest data
 
 ### Ledger
 

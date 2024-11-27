@@ -194,13 +194,13 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
 
     pub async fn add_translator_direct<TI: Message + 'static, TO: Message + 'static>(
         &mut self,
-        brokerio: BrokerIO<TI, TO>,
-        tr_i_ti: Translate<I, TI>,
+        mut brokerio: BrokerIO<TI, TO>,
+        tr_ti_i: Translate<TI, I>,
         tr_o_to: Translate<O, TO>,
     ) -> Result<usize, BrokerError> {
-        self.add_translator(Box::new(Translator {
-            brokerio: brokerio.clone(),
-            translate_fn_i_ti: Some(tr_i_ti),
+        brokerio.add_translator(Box::new(Translator {
+            brokerio: self.clone(),
+            translate_fn_i_ti: Some(tr_ti_i),
             translate_fn_i_to: None,
             translate_fn_o_ti: None,
             translate_fn_o_to: None,
@@ -368,7 +368,7 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
         other: BrokerIO<TI, TO>,
     ) -> Result<(), BrokerError>
     where
-        I: TranslateInto<TI>,
+        I: TranslateFrom<TI>,
         O: TranslateInto<TO>,
     {
         self.add_translator_direct(other, Box::new(I::translate), Box::new(O::translate))
