@@ -66,6 +66,21 @@ impl Kademlia {
         }
     }
 
+    #[cfg(feature = "testing")]
+    pub fn add_nodes_active(&mut self, ids: Vec<NodeID>) {
+        for id in ids {
+            let node = KNode::new(&self.root, id);
+            if let Some(bucket) = self.buckets.get_mut(node.depth) {
+                bucket.add_node_active(node);
+            } else {
+                self.root_bucket.add_node_active(node);
+                if self.root_bucket.status() == BucketStatus::Overflowing {
+                    self.rebalance_overflow();
+                }
+            }
+        }
+    }
+
     pub fn remove_node(&mut self, id: &NodeID) {
         let node = KNode::new(&self.root, *id);
         if let Some(bucket) = self.buckets.get_mut(node.depth) {
@@ -124,9 +139,11 @@ impl Kademlia {
     /// The system received a message from this node, so its considered
     /// active.
     pub fn node_active(&mut self, id: &NodeID) {
-        if let Some(kn) = self.get_knode(id) {
-            kn.active();
-        }
+        let depth = KNode::get_depth(&self.root, *id);
+        self.buckets
+            .get_mut(depth)
+            .unwrap_or_else(|| &mut self.root_bucket)
+            .node_active(id);
     }
 
     /// Advances the clock by one tick and returns the nodes which were removed,
@@ -140,27 +157,17 @@ impl Kademlia {
         ping_ids
     }
 
-    fn get_knode(&mut self, id: &NodeID) -> Option<&mut KNode> {
-        let kn = KNode::new(&self.root, *id);
-        if let Some(bucket) = self.buckets.get_mut(kn.depth) {
-            if let Some(kn) = bucket.get_knode(id) {
-                return Some(kn);
-            }
-        }
-        self.root_bucket.get_knode(id)
-    }
-
     // The root bucket overflows - split it until it has between k and 2k
     // nodes.
     fn rebalance_overflow(&mut self) {
         while self.root_bucket.status() == BucketStatus::Overflowing {
             let mut bucket = KBucket::new(self.config);
-            bucket.add_nodes(
-                self.root_bucket
-                    .remove_all_nodes_at_depth(self.buckets.len()),
-            );
+            let (active, cache) = self
+                .root_bucket
+                .remove_all_nodes_at_depth(self.buckets.len());
+            bucket.add_nodes_active(active);
+            bucket.add_nodes(cache);
             self.buckets.push(bucket);
-            self.root_bucket.cache_to_active();
         }
     }
 
@@ -169,9 +176,8 @@ impl Kademlia {
     fn rebalance_wanting(&mut self) {
         while self.root_bucket.status() == BucketStatus::Wanting {
             if let Some(bucket) = self.buckets.pop() {
-                self.root_bucket.add_nodes(bucket.active);
+                self.root_bucket.add_nodes_active(bucket.active);
                 self.root_bucket.add_nodes(bucket.cache);
-                self.root_bucket.cache_to_active();
             } else {
                 return;
             }
@@ -194,11 +200,6 @@ impl Kademlia {
             }
         }
         self.root_bucket.has_node_id(id)
-        // self.buckets
-        //     .iter()
-        //     .chain(std::iter::once(&self.root_bucket))
-        //     .flat_map(|b| b.active.iter().chain(b.cache.iter()))
-        //     .any(|kn| &kn.id == id)
     }
 }
 
@@ -241,11 +242,7 @@ impl KBucket {
     }
 
     fn add_node(&mut self, node: KNode) {
-        if self.is_root {
-            self.active.push(node);
-        } else if self.active.len() < self.config.k {
-            self.active.push(node);
-        } else if self.cache.len() < self.config.k {
+        if self.is_root || self.cache.len() < 2 * self.config.k {
             self.cache.push(node);
         }
     }
@@ -256,42 +253,46 @@ impl KBucket {
         }
     }
 
-    fn remove_node(&mut self, id: &NodeID) {
-        if let Some(pos) = self.active.iter().position(|kn| &kn.id == id) {
-            self.active.remove(pos);
-            self.cache_to_active();
-        } else if let Some(pos) = self.cache.iter().position(|kn| &kn.id == id) {
-            self.cache.remove(pos);
+    fn add_nodes_active(&mut self, nodes: Vec<KNode>) {
+        for node in nodes {
+            self.add_node_active(node);
         }
     }
 
-    fn cache_to_active(&mut self) {
-        while self.active.len() < self.config.k {
-            match self.cache.pop() {
-                Some(mut bucket) => {
-                    bucket.reset();
-                    self.active.push(bucket);
-                }
-                None => break,
+    fn add_node_active(&mut self, node: KNode) {
+        if self.is_root || self.active.len() < self.config.k {
+            self.active.push(node);
+        } else if self.cache.len() < self.config.k {
+            self.cache.push(node);
+        }
+    }
+
+    fn remove_node(&mut self, id: &NodeID) {
+        self.active.retain(|kn| &kn.id != id);
+        self.cache.retain(|kn| &kn.id != id);
+    }
+
+    // Removes the node at depth, but avoids draining the
+    // node lists below config.k nodes.
+    // It may still happen that all active nodes get drained, and only
+    // cached nodes remain.
+    fn remove_all_nodes_at_depth(&mut self, depth: usize) -> (Vec<KNode>, Vec<KNode>) {
+        let max_nodes = (self.cache.len() + self.active.len()).saturating_sub(self.config.k);
+        let mut cache = vec![];
+        for _ in 0..max_nodes {
+            if let Some(pos) = self.cache.iter().position(|kn| kn.depth == depth) {
+                cache.push(self.cache.remove(pos));
             }
         }
-    }
 
-    fn remove_all_nodes_at_depth(&mut self, depth: usize) -> Vec<KNode> {
-        let mut nodes: Vec<KNode> = self
-            .active
-            .iter()
-            .chain(self.cache.iter())
-            .filter(|n| n.depth == depth)
-            .cloned()
-            .collect();
-        let left = self.active.len() + self.cache.len() - nodes.len();
-        if left < self.config.k {
-            nodes.splice(left..self.config.k, vec![]);
+        let mut active = vec![];
+        for _ in 0..max_nodes - cache.len() {
+            if let Some(pos) = self.active.iter().position(|kn| kn.depth == depth) {
+                active.push(self.active.remove(pos));
+            }
         }
-        self.active.retain(|n| !nodes.contains(n));
-        self.cache.retain(|n| !nodes.contains(n));
-        nodes
+
+        (active, cache)
     }
 
     fn get_active_ids(&self, depth: usize) -> Vec<NodeID> {
@@ -337,35 +338,70 @@ impl KBucket {
         false
     }
 
-    fn get_knode(&mut self, id: &NodeID) -> Option<&mut KNode> {
-        if let Some(kn) = self.active.iter_mut().find(|kn| &kn.id == id) {
-            return Some(kn);
-        }
-        if let Some(kn) = self.cache.iter_mut().find(|kn| &kn.id == id) {
-            return Some(kn);
-        }
-        None
+    fn _get_knode(&mut self, id: &NodeID) -> Option<&mut KNode> {
+        self.active
+            .iter_mut()
+            .chain(self.cache.iter_mut())
+            .find(|kn| &kn.id == id)
     }
 
     fn tick(&mut self) -> TickIDs {
-        let mut delete_ids = vec![];
+        let mut ticks = self.tick_active();
+        ticks.extend(self.tick_cache());
+        ticks
+    }
+
+    fn tick_active(&mut self) -> TickIDs {
+        let mut tick_ids = TickIDs::default();
+
+        // Active nodes get only pinged when they were active for ping_interval.
         for node in self.active.iter_mut() {
             node.tick();
+            if node.ticks_last % self.config.ping_interval == 0 {
+                tick_ids.ping.push(node.id);
+            }
             if node.ticks_last >= self.config.ping_timeout {
-                delete_ids.push(node.id);
+                tick_ids.deleted.push(node.id);
             }
         }
-        delete_ids.iter().for_each(|id| self.remove_node(id));
-        TickIDs {
-            deleted: delete_ids,
-            ping: self
-                .active
-                .iter()
-                .filter_map(|kn| {
-                    (kn.ticks_last > 0 && kn.ticks_last % self.config.ping_interval == 0)
-                        .then(|| kn.id)
-                })
-                .collect(),
+
+        tick_ids
+    }
+
+    fn tick_cache(&mut self) -> TickIDs {
+        let mut tick_ids = TickIDs::default();
+
+        // Cached nodes get pinged directly.
+        // Up to twice the missig nodes get pinged to fill up self.active.
+        let fillup_nodes = if self.is_root {
+            self.cache.len()
+        } else {
+            2 * (self.config.k - self.active.len())
+        };
+        for node in self.cache.iter_mut().take(fillup_nodes) {
+            if node.ticks_last % self.config.ping_interval == 0 {
+                tick_ids.ping.push(node.id);
+            }
+            node.tick();
+            if node.ticks_last >= self.config.ping_timeout {
+                tick_ids.deleted.push(node.id);
+            }
+        }
+
+        tick_ids
+    }
+
+    fn node_active(&mut self, id: &NodeID) {
+        if let Some(kn) = self.active.iter_mut().find(|kn| &kn.id == id) {
+            kn.active();
+        } else if let Some(pos) = self.cache.iter().position(|kn| &kn.id == id) {
+            let mut kn = self.cache.remove(pos);
+            kn.active();
+            if self.is_root || self.active.len() < self.config.k {
+                self.active.push(kn);
+            } else {
+                self.cache.push(kn);
+            }
         }
     }
 
@@ -429,7 +465,7 @@ impl KNode {
         }
     }
 
-    fn reset(&mut self) {
+    fn _reset(&mut self) {
         self.ticks_active = 0;
         self.ticks_last = 0;
     }
@@ -447,17 +483,8 @@ impl KNode {
                 }
             }
         }
-        return 255;
+        return id.as_ref().len() * 8 - 1;
     }
-
-    // fn get_depth(distance: &[Bit]) -> usize {
-    //     for depth in 0..distance.len() {
-    //         if distance.get(depth) == Some(&Bit::One) {
-    //             return depth;
-    //         }
-    //     }
-    //     return distance.len();
-    // }
 
     fn tick(&mut self) {
         self.ticks_active += 1;
@@ -529,9 +556,11 @@ mod test {
     }
 
     fn kademlia_add_nodes(kademlia: &mut Kademlia, depth: usize, nbr: usize) {
-        for node in rnd_nodes_depth(&kademlia.root, depth, nbr) {
-            kademlia.add_node(node);
-        }
+        kademlia.add_nodes_active(rnd_nodes_depth(&kademlia.root, depth, nbr));
+    }
+
+    fn kademlia_add_nodes_cache(kademlia: &mut Kademlia, depth: usize, nbr: usize) {
+        kademlia.add_nodes(rnd_nodes_depth(&kademlia.root, depth, nbr));
     }
 
     #[test]
@@ -546,6 +575,14 @@ mod test {
     }
 
     fn kademlia_test(kademlia: &Kademlia, buckets: usize, root_active: usize) {
+        kademlia_test_cache(kademlia, buckets, root_active, 0);
+    }
+    fn kademlia_test_cache(
+        kademlia: &Kademlia,
+        buckets: usize,
+        root_active: usize,
+        root_cache: usize,
+    ) {
         assert_eq!(buckets, kademlia.buckets.len(), "Wrong number of buckets");
         assert_eq!(
             root_active,
@@ -553,7 +590,7 @@ mod test {
             "Active KBucket number mismatch"
         );
         assert_eq!(
-            0,
+            root_cache,
             kademlia.root_bucket.cache.len(),
             "Cache KBucket number mismatch"
         );
@@ -686,6 +723,23 @@ mod test {
         }
     }
 
+    fn tick_len(kademlia: &mut Kademlia, ping: usize, deleted: usize) -> TickIDs {
+        let ticks = kademlia.tick();
+        assert_eq!(
+            ping,
+            ticks.ping.len(),
+            "Got ping for {} instead of {ping} nodes",
+            ticks.ping.len()
+        );
+        assert_eq!(
+            deleted,
+            ticks.deleted.len(),
+            "Got deleted for {} instead of {deleted} nodes",
+            ticks.deleted.len()
+        );
+        ticks
+    }
+
     #[test]
     fn test_tick() {
         start_logging_filter_level(vec![], LOG_LVL);
@@ -696,17 +750,13 @@ mod test {
         kademlia_add_nodes(&mut kademlia, 2, 10);
         kademlia_add_nodes(&mut kademlia, 3, 10);
 
-        let ticks = kademlia.tick();
-        assert_eq!([0, 0], [ticks.deleted.len(), ticks.ping.len()]);
-        let ticks = kademlia.tick();
-        assert_eq!([0, 12], [ticks.deleted.len(), ticks.ping.len()]);
+        tick_len(&mut kademlia, 0, 0);
+        let ticks = tick_len(&mut kademlia, 12, 0);
         for ping in &ticks.ping[0..3] {
             kademlia.node_active(&ping);
         }
-        let ticks = kademlia.tick();
-        assert_eq!([0, 0], [ticks.deleted.len(), ticks.ping.len()]);
-        let ticks = kademlia.tick();
-        assert_eq!([9, 3], [ticks.deleted.len(), ticks.ping.len()]);
+        tick_len(&mut kademlia, 0, 0);
+        tick_len(&mut kademlia, 12, 9);
     }
 
     #[test]
@@ -723,9 +773,7 @@ mod test {
             },
         );
 
-        for node in (0..256).map(|_| NodeID::rnd()) {
-            kademlia.add_node(node);
-        }
+        kademlia.add_nodes_active((0..256).map(|_| NodeID::rnd()).collect());
 
         for (index, bucket) in kademlia
             .buckets
@@ -743,7 +791,7 @@ mod test {
         use rayon::prelude::*;
 
         (0..=5).rev().collect::<Vec<_>>().par_iter().for_each(|&k| {
-            reach_one(100, 10, 2 * k + 1);
+            reach_one(1000, 20, 2 * k + 1);
         });
     }
 
@@ -761,7 +809,9 @@ mod test {
                 let mut kad = Kademlia::new(*root, config);
                 let mut shuffled = nodes.clone();
                 shuffled.shuffle(rng);
-                kad.add_nodes(shuffled);
+                shuffled.retain(|id| id != root);
+                kad.add_nodes_active(shuffled);
+                // kad.add_nodes(shuffled);
                 kad
             })
             .collect();
@@ -796,5 +846,59 @@ mod test {
             config.k,
             hops_stat.iter().counts_by(|u| u).iter().sorted()
         );
+    }
+
+    fn kademlia_bucket(kademlia: &Kademlia, depth: usize, active: usize, cache: usize) {
+        let bucket = kademlia
+            .buckets
+            .get(depth)
+            .expect(&format!("Bucket with depth {depth} doesn't exist"));
+        assert_eq!(
+            active,
+            bucket.active.len(),
+            "{} active instead of {active}",
+            bucket.active.len()
+        );
+        assert_eq!(
+            cache,
+            bucket.cache.len(),
+            "{} cache instead of {cache}",
+            bucket.cache.len()
+        );
+    }
+
+    #[test]
+    fn test_add_node_activate() {
+        start_logging_filter_level(vec![], LOG_LVL);
+
+        let root = NodeID::rnd();
+        let mut kademlia = Kademlia::new(root, CONFIG);
+
+        // Create some nodes
+        kademlia_add_nodes_cache(&mut kademlia, 2, 2 * CONFIG.k);
+        kademlia_add_nodes_cache(&mut kademlia, 3, 2 * CONFIG.k);
+        kademlia_test_cache(&kademlia, 3, 0, 2 * CONFIG.k);
+        let ticks = tick_len(&mut kademlia, 4 * CONFIG.k, 0);
+
+        // Ping some of the nodes
+        for id in &ticks.ping[0..2] {
+            kademlia.node_active(id);
+        }
+        for id in &ticks.ping[6..8] {
+            kademlia.node_active(id);
+        }
+        kademlia_test_cache(&kademlia, 3, CONFIG.k, CONFIG.k);
+        kademlia_bucket(&kademlia, 2, CONFIG.k, CONFIG.k);
+
+        // Ping rest of nodes
+        for id in &ticks.ping[2..6] {
+            kademlia.node_active(id);
+        }
+        kademlia_test_cache(&kademlia, 3, 2 * CONFIG.k, 0);
+        kademlia_bucket(&kademlia, 2, CONFIG.k, CONFIG.k);
+
+        tick_len(&mut kademlia, 0, 0);
+        log::info!("{kademlia}");
+        tick_len(&mut kademlia, 3 * CONFIG.k, 0);
     }
 }

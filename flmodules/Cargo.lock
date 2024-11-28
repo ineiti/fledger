@@ -831,6 +831,7 @@ dependencies = [
  "ed25519-compact",
  "env_logger",
  "flarch",
+ "flmodules",
  "futures",
  "getrandom",
  "itertools",

@@ -10,14 +10,8 @@
 
 -- seems to be more or less OK, at least if it's usable by DHT_storage --
 
-1. The KBucket.active should only be populated once a node has been confirmed:
-  - for testing, the old behaviour is nice
-    - add a `add_nodes_test` which doesn't check if the nodes exist
-      and puts them directly in the `active` / `cache` buckets
-  - adding new nodes puts them in the `cache` bucket
-    - when `tick` gets called, up to 2*k PINGs to the `cache` buckets get sent
-    - when `node_active` is called, add nodes from `cache` to `active`
-      - if `active` is already full, mark the node as having sent one message
+1. The KBucket.active should only be populated once a node has been confirmed.
+  - Needs more testing if nodes fail and how they will be replaced
 
 ### DHT_storage
 
