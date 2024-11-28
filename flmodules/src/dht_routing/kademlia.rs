@@ -39,14 +39,14 @@ impl Kademlia {
     pub fn new(root: NodeID, config: Config) -> Self {
         Self {
             buckets: vec![],
-            root_bucket: KBucket::new(config),
+            root_bucket: KBucket::new_root(config),
             root,
             config,
         }
     }
 
     pub fn add_node(&mut self, id: NodeID) {
-        if self.has_node_id(&id) {
+        if id == self.root || self.has_node_id(&id) {
             return;
         }
         let node = KNode::new(&self.root, id);
@@ -79,6 +79,10 @@ impl Kademlia {
     }
 
     pub fn nearest_nodes(&self, id: &NodeID) -> Vec<NodeID> {
+        if id == &self.root {
+            return vec![];
+        }
+
         let kn = KNode::new(&self.root, *id);
 
         // Start with potential nodes from the root-bucket.
@@ -208,6 +212,7 @@ struct KBucket {
     active: Vec<KNode>,
     cache: Vec<KNode>,
     config: Config,
+    is_root: bool,
 }
 
 impl KBucket {
@@ -216,13 +221,25 @@ impl KBucket {
             active: vec![],
             cache: vec![],
             config,
+            is_root: false,
+        }
+    }
+
+    fn new_root(config: Config) -> Self {
+        Self {
+            active: vec![],
+            cache: vec![],
+            config,
+            is_root: true,
         }
     }
 
     fn add_node(&mut self, node: KNode) {
-        if self.active.len() < self.config.k {
+        if self.is_root {
             self.active.push(node);
-        } else {
+        } else if self.active.len() < self.config.k {
+            self.active.push(node);
+        } else if self.cache.len() < self.config.k {
             self.cache.push(node);
         }
     }
@@ -284,7 +301,7 @@ impl KBucket {
     // 2k+1.. nodes: overflowing
     fn status(&mut self) -> BucketStatus {
         let nodes = self.active.len() + self.cache.len();
-        if nodes > 2 * self.config.k {
+        if nodes >= 2 * self.config.k {
             // Check if we're in the edge-case of having too few different nodes.
             if self.overflow_imbalance() {
                 BucketStatus::Stable
@@ -455,9 +472,10 @@ enum Bit {
 
 #[cfg(test)]
 mod test {
-    use std::{iter::once, str::FromStr};
+    use std::{collections::HashMap, iter::once, str::FromStr};
 
     use flarch::{nodeids::U256, start_logging_filter_level};
+    use rand::seq::SliceRandom;
 
     use super::*;
 
@@ -690,7 +708,14 @@ mod test {
         start_logging_filter_level(vec![], log::LevelFilter::Trace);
 
         let root = NodeID::rnd();
-        let mut kademlia = Kademlia::new(root, Config{ k: 2, ping_interval: 10, ping_timeout: 20 });
+        let mut kademlia = Kademlia::new(
+            root,
+            Config {
+                k: 2,
+                ping_interval: 10,
+                ping_timeout: 20,
+            },
+        );
 
         for node in (0..256).map(|_| NodeID::rnd()) {
             kademlia.add_node(node);
@@ -704,5 +729,64 @@ mod test {
         {
             log::info!("{index}: {}+{}", bucket.active.len(), bucket.cache.len())
         }
+    }
+
+    #[test]
+    fn test_reach() {
+        start_logging_filter_level(vec![], log::LevelFilter::Info);
+        for k in (0..=5).rev() {
+            test_reach_one(10000, 20, 2 * k + 1);
+        }
+    }
+
+    fn test_reach_one(node_nbr: usize, max_hops: usize, k: usize) {
+        let config = Config {
+            k,
+            ping_interval: 10,
+            ping_timeout: 20,
+        };
+        let nodes: Vec<NodeID> = (0..node_nbr).map(|_| NodeID::rnd()).collect();
+        let rng = &mut rand::thread_rng();
+        let kademlias: Vec<Kademlia> = nodes
+            .iter()
+            .map(|root| {
+                let mut kad = Kademlia::new(*root, config);
+                let mut shuffled = nodes.clone();
+                shuffled.shuffle(rng);
+                kad.add_nodes(shuffled);
+                kad
+            })
+            .collect();
+
+            log::info!("{}", &kademlias[0]);
+        let mut hops_stat = vec![];
+        for (run, node) in nodes[1..node_nbr].iter().enumerate() {
+            log::debug!("*** {run} ***: Searching route from {} to {node}", nodes[0]);
+            let mut hop_kademlia = &kademlias[0];
+            for hop in 0..max_hops {
+                log::trace!("{hop_kademlia}");
+                let next_hops = hop_kademlia.nearest_nodes(node);
+                if let Some(next_hop) = next_hops.choose(rng) {
+                    hop_kademlia = kademlias.iter().find(|k| k.root == *next_hop).unwrap();
+                    log::trace!("{hop}: {next_hop}");
+                } else {
+                    assert_eq!(node, &hop_kademlia.root);
+                    log::trace!("{hop}: found");
+                    hops_stat.push(hop);
+                    break;
+                }
+                assert_ne!(
+                    max_hops - 1,
+                    hop,
+                    "Didn't find route between {} and {node}",
+                    nodes[0]
+                );
+            }
+        }
+        log::info!(
+            "Stats for {}: {:?}",
+            config.k,
+            hops_stat.iter().counts_by(|u| u).iter().sorted()
+        );
     }
 }

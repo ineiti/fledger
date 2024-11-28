@@ -1,5 +1,5 @@
 use flarch::{
-    broker_io::SubsystemHandler,
+    broker_io::{SubsystemHandler, TranslateFrom, TranslateInto},
     nodeids::{NodeID, U256},
     platform_async_trait,
 };
@@ -8,10 +8,11 @@ use serde::{Deserialize, Serialize};
 use crate::{
     nodeconfig::NodeInfo,
     overlay::messages::{NetworkWrapper, OverlayIn, OverlayOut},
+    timer::TimerMessage,
 };
 
 use super::{
-    broker::{DHTRoutingIn, DHTRoutingMessage, DHTRoutingOut, MODULE_NAME},
+    broker::{DHTRoutingIn, DHTRoutingOut, MODULE_NAME},
     kademlia::*,
 };
 
@@ -21,7 +22,8 @@ use super::{
 pub enum ModuleMessage {
     Ping,
     Pong,
-    DHT(DHTRoutingMessage),
+    /// Source, Key (or NodeID), msg
+    DHTMessage(NodeID, U256, NetworkWrapper),
 }
 
 /// The messages here represent all possible interactions with this module.
@@ -60,12 +62,7 @@ impl DHTRoutingMessages {
             Some(msg) => match msg {
                 ModuleMessage::Ping => vec![(ModuleMessage::Pong).wrapper_network(from)],
                 ModuleMessage::Pong => vec![],
-                ModuleMessage::DHT(msg) => match msg {
-                    DHTRoutingMessage::Request(orig, key, msg) => {
-                        self.request(from, orig, key, msg)
-                    }
-                    DHTRoutingMessage::Reply(to, key, msg) => self.reply(self.core.root, from, to, key, msg),
-                },
+                ModuleMessage::DHTMessage(orig, key, msg) => self.dht_message(orig, from, key, msg),
             },
             None => vec![],
         }
@@ -88,54 +85,35 @@ impl DHTRoutingMessages {
         out
     }
 
-    fn new_request(&mut self, key: U256, msg: NetworkWrapper) -> Vec<InternOut> {
+    fn new_dht_message(&self, key: U256, msg: NetworkWrapper) -> Vec<InternOut> {
         if let Some(&next_hop) = self.core.nearest_nodes(&key).first() {
-            vec![DHTRoutingMessage::Request(self.core.root, key, msg).wrapper_network(next_hop)]
+            vec![ModuleMessage::DHTMessage(self.core.root, key, msg.clone())
+                .wrapper_network(next_hop)]
         } else {
             log::warn!("Couldn't send new request because no nodes found!");
             vec![]
         }
     }
 
-    fn request(
-        &mut self,
-        last_hop: NodeID,
+    fn dht_message(
+        &self,
         orig: NodeID,
-        key: U256,
-        msg: NetworkWrapper,
-    ) -> Vec<InternOut> {
-        match self.core.nearest_nodes(&key).first() {
-            Some(&next_hop) => vec![
-                DHTRoutingMessage::Request(orig, key, msg.clone()).wrapper_network(next_hop),
-                DHTRoutingOut::RequestRouting(orig, last_hop, next_hop, key, msg).into(),
-            ],
-            None => vec![DHTRoutingOut::RequestClosest(orig, last_hop, key, msg).into()],
-        }
-    }
-
-    fn new_reply(&mut self, key: U256, msg: NetworkWrapper) -> Vec<InternOut> {
-        if let Some(&next_hop) = self.core.nearest_nodes(&key).first() {
-            vec![DHTRoutingMessage::Reply(self.core.root, key, msg).wrapper_network(next_hop)]
-        } else {
-            log::warn!("Couldn't send new reply because no nodes found!");
-            vec![]
-        }
-    }
-
-    fn reply(
-        &mut self,
-        origin: NodeID,
         last_hop: NodeID,
-        to: NodeID,
         key: U256,
         msg: NetworkWrapper,
     ) -> Vec<InternOut> {
         match self.core.nearest_nodes(&key).first() {
             Some(&next_hop) => vec![
-                DHTRoutingMessage::Reply(to, key, msg.clone()).wrapper_network(next_hop),
-                DHTRoutingOut::ReplyRouting(origin, to, last_hop, next_hop, key, msg).into(),
+                ModuleMessage::DHTMessage(orig, key, msg.clone()).wrapper_network(next_hop),
+                DHTRoutingOut::MessageRouting(orig, last_hop, next_hop, key, msg).into(),
             ],
-            None => vec![DHTRoutingOut::Reply(origin, last_hop, key, msg).into()],
+            None => {
+                if key == self.core.root {
+                    vec![DHTRoutingOut::MessageDest(orig, last_hop, msg).into()]
+                } else {
+                    vec![DHTRoutingOut::MessageClosest(orig, last_hop, key, msg).into()]
+                }
+            }
         }
     }
 }
@@ -150,10 +128,9 @@ impl SubsystemHandler<InternIn, InternOut> for DHTRoutingMessages {
             log::trace!("Got msg: {msg:?}");
             out.extend(match msg {
                 InternIn::Tick => self.tick(),
-                InternIn::DHTRouting(DHTRoutingIn::Message(dht_msg)) => match dht_msg {
-                    DHTRoutingMessage::Request(_, key, msg) => self.new_request(key, msg),
-                    DHTRoutingMessage::Reply(_, key, msg) => self.new_reply(key, msg),
-                },
+                InternIn::DHTRouting(DHTRoutingIn::DHTMessage(key, msg)) => {
+                    self.new_dht_message(key, msg)
+                }
                 InternIn::Network(overlay_out) => match overlay_out {
                     OverlayOut::NodeInfoAvailable(node_infos) => self.node_list(node_infos),
                     OverlayOut::NetworkWrapperFromNetwork(from, network_wrapper) => {
@@ -168,14 +145,14 @@ impl SubsystemHandler<InternIn, InternOut> for DHTRoutingMessages {
 }
 
 impl ModuleMessage {
-    pub fn wrapper_network(&self, dst: NodeID) -> InternOut {
+    pub(super) fn wrapper_network(&self, dst: NodeID) -> InternOut {
         InternOut::Network(OverlayIn::NetworkWrapperToNetwork(
             dst,
             NetworkWrapper::wrap_yaml(MODULE_NAME, self).unwrap(),
         ))
     }
 
-    fn from_wrapper(msg: NetworkWrapper) -> Option<ModuleMessage> {
+    fn _from_wrapper(msg: NetworkWrapper) -> Option<ModuleMessage> {
         msg.unwrap_yaml(MODULE_NAME)
     }
 }
@@ -183,6 +160,18 @@ impl ModuleMessage {
 impl From<DHTRoutingOut> for InternOut {
     fn from(value: DHTRoutingOut) -> Self {
         InternOut::DHTRouting(value)
+    }
+}
+
+impl TranslateFrom<TimerMessage> for InternIn {
+    fn translate(msg: TimerMessage) -> Option<Self> {
+        (msg == TimerMessage::Second).then(|| InternIn::Tick)
+    }
+}
+
+impl TranslateInto<TimerMessage> for InternOut {
+    fn translate(self) -> Option<TimerMessage> {
+        None
     }
 }
 

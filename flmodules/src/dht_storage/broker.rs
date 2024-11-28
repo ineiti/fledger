@@ -6,7 +6,7 @@ use std::error::Error;
 use tokio::sync::watch;
 
 use crate::{
-    dht_routing::broker::{DHTRoutingIn, DHTRoutingMessage, DHTRoutingOut},
+    dht_routing::broker::{DHTRoutingIn, DHTRoutingOut},
     flo::dht::DHTStorageConfig,
     overlay::messages::{NetworkWrapper, OverlayIn, OverlayOut},
     random_connections::messages::{RandomIn, RandomMessage, RandomOut},

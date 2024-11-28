@@ -198,14 +198,15 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
         tr_ti_i: Translate<TI, I>,
         tr_o_to: Translate<O, TO>,
     ) -> Result<usize, BrokerError> {
-        brokerio.add_translator(Box::new(Translator {
-            brokerio: self.clone(),
-            translate_fn_i_ti: Some(tr_ti_i),
-            translate_fn_i_to: None,
-            translate_fn_o_ti: None,
-            translate_fn_o_to: None,
-        }))
-        .await?;
+        brokerio
+            .add_translator(Box::new(Translator {
+                brokerio: self.clone(),
+                translate_fn_i_ti: Some(tr_ti_i),
+                translate_fn_i_to: None,
+                translate_fn_o_ti: None,
+                translate_fn_o_to: None,
+            }))
+            .await?;
         self.add_translator(Box::new(Translator {
             brokerio,
             translate_fn_i_ti: None,
@@ -378,18 +379,20 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
 
     // Links with a "Broker": any message received by self::Input will be forwarded to the
     // Broker, and any Broker::Output message will be forwarded to self::Output.
-    pub async fn link_broker<
-        IO: broker::asy::Async + Clone + fmt::Debug + TranslateFrom<I> + TranslateInto<O> + 'static,
-    >(
+    pub async fn link_broker<IO: broker::asy::Async + Clone + fmt::Debug + 'static>(
         &mut self,
         mut broker: broker::Broker<IO>,
-    ) -> Result<(), BrokerError> {
-        let handler = BrokerLink {
+    ) -> Result<(), BrokerError>
+    where
+        I: TranslateFrom<IO>,
+        O: TranslateInto<IO>,
+    {
+        let link = BrokerLink {
             brokerio: self.clone(),
             broker: broker.clone(),
         };
-        broker.add_handler(Box::new(handler.clone())).await?;
-        self.add_handler(Box::new(handler)).await?;
+        broker.add_handler(Box::new(link.clone())).await?;
+        self.add_translator(Box::new(link)).await?; 
         Ok(())
     }
 
@@ -938,7 +941,9 @@ pub trait TranslateInto<T: Message> {
 }
 
 #[platform_async_trait()]
-pub trait TranslateLink<I: Message + 'static, O: Message + 'static, TI: Message, TO: Message>: Async + Clone {
+pub trait TranslateLink<I: Message + 'static, O: Message + 'static, TI: Message, TO: Message>:
+    Async + Clone
+{
     fn translate_o_ti(&self, msg: O) -> Option<TI>;
     fn translate_to_i(&self, msg: TO) -> Option<I>;
 }
@@ -957,15 +962,15 @@ struct BrokerLink<I: Message, O: Message, IO: broker::asy::Async + Clone + fmt::
 
 #[platform_async_trait()]
 impl<
-        I: Message,
-        O: Message,
-        IO: broker::asy::Async + Clone + fmt::Debug + TranslateFrom<I> + 'static,
-    > SubsystemHandler<I, O> for BrokerLink<I, O, IO>
+        I: Message + TranslateFrom<IO> + 'static,
+        O: Message + 'static,
+        IO: broker::asy::Async + Clone + fmt::Debug,
+    > broker::SubsystemHandler<IO> for BrokerLink<I, O, IO>
 {
-    async fn messages(&mut self, from_broker: Vec<I>) -> Vec<O> {
+    async fn messages(&mut self, from_broker: Vec<IO>) -> Vec<IO> {
         for msg in from_broker {
-            if let Some(msg_in) = IO::translate(msg) {
-                if let Err(e) = self.broker.emit_msg(msg_in) {
+            if let Some(msg_in) = TranslateFrom::translate(msg) {
+                if let Err(e) = self.brokerio.emit_msg_in(msg_in) {
                     log::warn!("Couldn't convert message: {e:?}");
                 }
             }
@@ -977,19 +982,24 @@ impl<
 #[platform_async_trait()]
 impl<
         I: Message + 'static,
-        O: Message + 'static,
-        IO: broker::asy::Async + Clone + fmt::Debug + TranslateInto<O>,
-    > broker::SubsystemHandler<IO> for BrokerLink<I, O, IO>
+        O: Message + TranslateInto<IO> + 'static,
+        IO: broker::asy::Async + Clone + fmt::Debug + 'static,
+    > SubsystemTranslator<I, O> for BrokerLink<I, O, IO>
 {
-    async fn messages(&mut self, from_broker: Vec<IO>) -> Vec<IO> {
-        for msg in from_broker {
-            if let Some(msg_out) = msg.translate() {
-                if let Err(e) = self.brokerio.emit_msg_out(msg_out) {
-                    log::warn!("Couldn't convert message: {e:?}");
-                }
-            }
+    async fn translate_input(&mut self, _: Vec<BrokerID>, _: I) {}
+
+    async fn translate_output(&mut self, _: Vec<BrokerID>, msg: O) {
+        if let Some(msg_in) = msg.translate() {
+            self.broker.emit_msg(msg_in).unwrap();
         }
-        vec![]
+    }
+
+    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
+        if !callers.contains(&self.brokerio.id) {
+            self.brokerio.settle(callers.clone()).await?;
+            self.broker.settle(callers).await?;
+        }
+        Ok(())
     }
 }
 
@@ -1188,16 +1198,24 @@ mod tests {
         Output(MessageAO),
     }
 
-    impl TranslateFrom<MessageAI> for MessageAIO {
-        fn translate(value: MessageAI) -> Option<Self> {
-            Some(MessageAIO::Input(value))
+    impl TranslateInto<MessageAIO> for MessageAO {
+        fn translate(self) -> Option<MessageAIO> {
+            Some(match self {
+                MessageAO::Un => MessageAIO::Input(MessageAI::One),
+                MessageAO::Deux => MessageAIO::Input(MessageAI::_Two),
+                MessageAO::Trois => MessageAIO::Input(MessageAI::_Three),
+            })
         }
     }
 
-    impl TranslateInto<MessageAO> for MessageAIO {
-        fn translate(self) -> Option<MessageAO> {
-            if let MessageAIO::Output(out) = self {
-                Some(out)
+    impl TranslateFrom<MessageAIO> for MessageAI {
+        fn translate(value: MessageAIO) -> Option<MessageAI> {
+            if let MessageAIO::Output(out) = value {
+                Some(match out { 
+                    MessageAO::Un => MessageAI::One,
+                    MessageAO::Deux => MessageAI::_Two,
+                    MessageAO::Trois => MessageAI::_Three,
+                })
             } else {
                 None
             }
@@ -1212,17 +1230,17 @@ mod tests {
         let mut b = broker::Broker::<MessageAIO>::new();
         bio.link_broker(b.clone()).await?;
 
-        let (bio_out, _) = bio.get_tap_out_sync().await?;
+        let (bio_in, _) = bio.get_tap_in_sync().await?;
         let (b_tap, _) = b.get_tap_sync().await?;
 
-        bio.settle_msg_in(MessageAI::One).await?;
+        bio.settle_msg_out(MessageAO::Un).await?;
         assert_eq!(
             MessageAIO::Input(MessageAI::One),
             b_tap.recv().expect("receive b_tap")
         );
 
         b.settle_msg(MessageAIO::Output(MessageAO::Deux)).await?;
-        assert_eq!(MessageAO::Deux, bio_out.recv().expect("receive bio_out"));
+        assert_eq!(MessageAI::_Two, bio_in.recv().expect("receive bio_out"));
         Ok(())
     }
 }

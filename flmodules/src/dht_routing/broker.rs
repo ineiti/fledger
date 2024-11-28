@@ -1,42 +1,33 @@
-use flarch::{broker_io::BrokerIO, nodeids::U256};
+use flarch::{broker::Broker, broker_io::BrokerIO, nodeids::U256};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
-use crate::overlay::messages::{NetworkWrapper, OverlayIn, OverlayOut};
+use crate::{
+    overlay::messages::{NetworkWrapper, OverlayIn, OverlayOut},
+    timer::TimerMessage,
+};
 use flarch::nodeids::NodeID;
 
 use super::{
     kademlia::Config,
-    messages::{DHTRoutingMessages, InternIn, InternOut, ModuleMessage},
+    messages::{DHTRoutingMessages, InternIn, InternOut},
 };
 
 pub(super) const MODULE_NAME: &str = "DHTRouting";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum DHTRoutingMessage {
-    // Send the NetworkWrapper message to the closest node of U256.
-    // Usually the destination doesn't exist, so whenever there is no
-    // closer node to send the message to, propagation stops.
-    Request(NodeID, U256, NetworkWrapper),
-    // The destination of the reply
-    Reply(NodeID, U256, NetworkWrapper),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTRoutingIn {
-    Message(DHTRoutingMessage),
+    DHTMessage(U256, NetworkWrapper),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTRoutingOut {
-    // Reply(origin, last_hop, key, msg)
-    Reply(NodeID, NodeID, U256, NetworkWrapper),
-    // ReplyRouting(origin, last_hop, next_hop, destination, key, msg)
-    ReplyRouting(NodeID, NodeID, NodeID, NodeID, U256, NetworkWrapper),
-    // RequestClosest(origin, last_hop, key, msg)
-    RequestClosest(NodeID, NodeID, U256, NetworkWrapper),
-    // RequestRouting(origin, last_hop, next_hop, key, msg)
-    RequestRouting(NodeID, NodeID, NodeID, U256, NetworkWrapper),
+    // MessageRouting(origin, last_hop, next_hop, key, msg)
+    MessageRouting(NodeID, NodeID, NodeID, U256, NetworkWrapper),
+    // MessageClosest(origin, last_hop, key, msg)
+    MessageClosest(NodeID, NodeID, U256, NetworkWrapper),
+    // MessageDest(origin, last_hop, msg)
+    MessageDest(NodeID, NodeID, NetworkWrapper),
     Stats(DHTRoutingStats),
 }
 
@@ -60,6 +51,7 @@ impl DHTRouting {
     pub async fn start(
         our_id: NodeID,
         net: BrokerIO<OverlayIn, OverlayOut>,
+        tick: Broker<TimerMessage>,
         config: Config,
     ) -> Result<Self, Box<dyn Error>> {
         let messages = DHTRoutingMessages::new(our_id, config);
@@ -87,14 +79,9 @@ impl DHTRouting {
                 }),
             )
             .await?;
+        dht_routing.link_broker(tick).await?;
 
         Ok(DHTRouting { routing })
-    }
-}
-
-impl DHTRoutingMessage {
-    pub fn wrapper_network(self, dst: NodeID) -> InternOut {
-        ModuleMessage::DHT(self).wrapper_network(dst)
     }
 }
 
