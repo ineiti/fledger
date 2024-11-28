@@ -188,11 +188,17 @@ impl Kademlia {
     }
 
     fn has_node_id(&self, id: &NodeID) -> bool {
-        self.buckets
-            .iter()
-            .chain(std::iter::once(&self.root_bucket))
-            .flat_map(|b| b.active.iter().chain(b.cache.iter()))
-            .any(|kn| &kn.id == id)
+        for bucket in &self.buckets {
+            if bucket.has_node_id(id) {
+                return true;
+            }
+        }
+        self.root_bucket.has_node_id(id)
+        // self.buckets
+        //     .iter()
+        //     .chain(std::iter::once(&self.root_bucket))
+        //     .flat_map(|b| b.active.iter().chain(b.cache.iter()))
+        //     .any(|kn| &kn.id == id)
     }
 }
 
@@ -362,6 +368,13 @@ impl KBucket {
                 .collect(),
         }
     }
+
+    fn has_node_id(&self, id: &NodeID) -> bool {
+        self.active
+            .iter()
+            .chain(self.cache.iter())
+            .any(|kn| &kn.id == id)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
@@ -410,7 +423,7 @@ impl KNode {
     pub fn new(root: &NodeID, id: NodeID) -> Self {
         Self {
             id,
-            depth: Self::get_depth(&Self::distance(root, id)),
+            depth: Self::get_depth(root, id),
             ticks_active: 0,
             ticks_last: 0,
         }
@@ -421,32 +434,30 @@ impl KNode {
         self.ticks_last = 0;
     }
 
-    fn distance(root: &NodeID, id: NodeID) -> Vec<Bit> {
-        let mut node_bytes = id.to_bytes().to_vec();
-        root.to_bytes()
-            .iter()
-            .map(|c| (c ^ node_bytes.remove(0)) as u32)
-            .flat_map(|mut x| {
-                (0..=7).map(move |_| {
-                    x *= 2;
-                    if x & 0x100 > 0 {
-                        Bit::One
-                    } else {
-                        Bit::Zero
-                    }
-                })
-            })
-            .collect()
-    }
+    fn get_depth(root: &NodeID, id: NodeID) -> usize {
+        for (index, (root_byte, id_byte)) in
+            root.as_ref().iter().zip(id.as_ref().iter()).enumerate()
+        {
+            let xor_result = root_byte ^ id_byte;
 
-    fn get_depth(distance: &[Bit]) -> usize {
-        for depth in 0..distance.len() {
-            if distance.get(depth) == Some(&Bit::One) {
-                return depth;
+            // Instead of checking each bit individually, iterate over the bits.
+            for i in (0..8).rev() {
+                if (xor_result & (1 << i)) != 0 {
+                    return index * 8 + 7 - i;
+                }
             }
         }
-        return distance.len();
+        return 255;
     }
+
+    // fn get_depth(distance: &[Bit]) -> usize {
+    //     for depth in 0..distance.len() {
+    //         if distance.get(depth) == Some(&Bit::One) {
+    //             return depth;
+    //         }
+    //     }
+    //     return distance.len();
+    // }
 
     fn tick(&mut self) {
         self.ticks_active += 1;
@@ -464,20 +475,16 @@ impl PartialEq for KNode {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-enum Bit {
-    Zero,
-    One,
-}
-
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, iter::once, str::FromStr};
+    use std::{iter::once, str::FromStr};
 
     use flarch::{nodeids::U256, start_logging_filter_level};
     use rand::seq::SliceRandom;
 
     use super::*;
+
+    const LOG_LVL: log::LevelFilter = log::LevelFilter::Info;
 
     const CONFIG: Config = Config {
         k: 2,
@@ -488,8 +495,7 @@ mod test {
     fn rnd_node_depth(root: &NodeID, depth: usize) -> NodeID {
         loop {
             let node = NodeID::rnd();
-            let dist = KNode::distance(root, node);
-            let nd = KNode::get_depth(&dist);
+            let nd = KNode::get_depth(root, node);
             if nd == depth {
                 return node;
             }
@@ -502,15 +508,15 @@ mod test {
 
     fn distance_str(root: &NodeID, node_str: &str) -> usize {
         let node = U256::from_str(node_str).expect("NodeID init");
-        KNode::get_depth(&KNode::distance(root, node))
+        KNode::get_depth(root, node)
     }
 
     #[test]
-    fn test_distance() {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+    fn test_get_depth() {
+        start_logging_filter_level(vec![], LOG_LVL);
 
         let root = U256::from_str("00").expect("NodeID init");
-        assert_eq!(256, KNode::get_depth(&KNode::distance(&root, root)));
+        assert_eq!(255, KNode::get_depth(&root, root));
         assert_eq!(0, distance_str(&root, "80"));
         assert_eq!(1, distance_str(&root, "40"));
         assert_eq!(2, distance_str(&root, "20"));
@@ -530,7 +536,7 @@ mod test {
 
     #[test]
     fn test_rnd_node_depth() {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], LOG_LVL);
 
         let node = U256::from_str("00").expect("NodeID init");
         log::debug!("{}", node);
@@ -539,7 +545,7 @@ mod test {
         }
     }
 
-    fn kademlia_test(kademlia: &Kademlia, buckets: usize, root_active: usize, root_cache: usize) {
+    fn kademlia_test(kademlia: &Kademlia, buckets: usize, root_active: usize) {
         assert_eq!(buckets, kademlia.buckets.len(), "Wrong number of buckets");
         assert_eq!(
             root_active,
@@ -547,7 +553,7 @@ mod test {
             "Active KBucket number mismatch"
         );
         assert_eq!(
-            root_cache,
+            0,
             kademlia.root_bucket.cache.len(),
             "Cache KBucket number mismatch"
         );
@@ -578,26 +584,26 @@ mod test {
 
     #[test]
     fn test_adding_nodes() {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], LOG_LVL);
 
         let root = U256::from_str("00").expect("NodeID init");
         let mut kademlia = Kademlia::new(root, CONFIG);
         kademlia_add_nodes(&mut kademlia, 0, CONFIG.k);
-        kademlia_test(&kademlia, 0, CONFIG.k, 0);
+        kademlia_test(&kademlia, 0, CONFIG.k);
 
         kademlia_add_nodes(&mut kademlia, 2, CONFIG.k);
-        kademlia_test(&kademlia, 0, CONFIG.k, CONFIG.k);
+        kademlia_test(&kademlia, 1, CONFIG.k);
 
         kademlia_add_nodes(&mut kademlia, 3, 1);
-        kademlia_test(&kademlia, 1, CONFIG.k, CONFIG.k - 1);
+        kademlia_test(&kademlia, 1, CONFIG.k + 1);
 
         kademlia_add_nodes(&mut kademlia, 4, CONFIG.k);
-        kademlia_test(&kademlia, 3, CONFIG.k, CONFIG.k - 1);
+        kademlia_test(&kademlia, 3, CONFIG.k + 1);
 
         // TODO: make this work correctly - what is the good thing to do here?
         let mut kademlia = Kademlia::new(root, CONFIG);
         kademlia_add_nodes(&mut kademlia, 2, 3 * CONFIG.k);
-        kademlia_test(&kademlia, 0, CONFIG.k, 2 * CONFIG.k);
+        kademlia_test(&kademlia, 0, 3 * CONFIG.k);
     }
 
     #[test]
@@ -609,19 +615,19 @@ mod test {
         kademlia_add_nodes(&mut kademlia, 3, 1);
         kademlia_add_nodes(&mut kademlia, 4, CONFIG.k);
 
-        kademlia_test(&kademlia, 3, CONFIG.k, CONFIG.k - 1);
+        kademlia_test(&kademlia, 3, CONFIG.k + 1);
         let id = kademlia.root_bucket.active.get(0).unwrap().id;
         kademlia.remove_node(&id);
-        kademlia_test(&kademlia, 3, CONFIG.k, 0);
+        kademlia_test(&kademlia, 3, CONFIG.k);
         let id = kademlia.root_bucket.active.get(0).unwrap().id;
         kademlia.remove_node(&id);
-        kademlia_test(&kademlia, 2, CONFIG.k, CONFIG.k - 1);
+        kademlia_test(&kademlia, 2, CONFIG.k + 1);
     }
 
     // Test the standard edge-cases: no nodes, only depth==0 nodes
     #[test]
     fn test_closest_nodes_simple() {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], LOG_LVL);
 
         let root = U256::from_str("00").expect("NodeID init");
         let mut kademlia = Kademlia::new(root, CONFIG);
@@ -639,7 +645,7 @@ mod test {
     // Do some more complicated cases
     #[test]
     fn test_closest_nodes_complicated() {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], LOG_LVL);
 
         let root = U256::from_str("00").expect("NodeID init");
         let mut kademlia = Kademlia::new(root, CONFIG);
@@ -650,15 +656,15 @@ mod test {
         // triggers the overflow, and the second one goes to the cache.
         // So the active KBucket of the root_bucket has a depth 3 and a
         // depth 4 inside.
-        kademlia_add_nodes(&mut kademlia, 4, CONFIG.k);
+        kademlia_add_nodes(&mut kademlia, 4, CONFIG.k + 1);
 
         let tests = vec![
             (0, 2, CONFIG.k),
             (1, 2, CONFIG.k),
             (2, 2, CONFIG.k),
-            (3, 3, 1),
-            (4, 4, 1),
-            (5, 4, 1),
+            (3, 3, CONFIG.k),
+            (4, 4, CONFIG.k + 1),
+            (5, 4, CONFIG.k + 1),
         ];
 
         for (depth, returned, nbr) in tests {
@@ -682,7 +688,7 @@ mod test {
 
     #[test]
     fn test_tick() {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], LOG_LVL);
 
         let root = U256::from_str("00").expect("NodeID init");
         let mut kademlia = Kademlia::new(root, CONFIG);
@@ -693,19 +699,19 @@ mod test {
         let ticks = kademlia.tick();
         assert_eq!([0, 0], [ticks.deleted.len(), ticks.ping.len()]);
         let ticks = kademlia.tick();
-        assert_eq!([0, 4], [ticks.deleted.len(), ticks.ping.len()]);
+        assert_eq!([0, 12], [ticks.deleted.len(), ticks.ping.len()]);
         for ping in &ticks.ping[0..3] {
             kademlia.node_active(&ping);
         }
         let ticks = kademlia.tick();
         assert_eq!([0, 0], [ticks.deleted.len(), ticks.ping.len()]);
         let ticks = kademlia.tick();
-        assert_eq!([1, 3], [ticks.deleted.len(), ticks.ping.len()]);
+        assert_eq!([9, 3], [ticks.deleted.len(), ticks.ping.len()]);
     }
 
     #[test]
     fn test_distribution() {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], LOG_LVL);
 
         let root = NodeID::rnd();
         let mut kademlia = Kademlia::new(
@@ -734,12 +740,14 @@ mod test {
     #[test]
     fn test_reach() {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
-        for k in (0..=5).rev() {
-            test_reach_one(10000, 20, 2 * k + 1);
-        }
+        use rayon::prelude::*;
+
+        (0..=5).rev().collect::<Vec<_>>().par_iter().for_each(|&k| {
+            reach_one(100, 10, 2 * k + 1);
+        });
     }
 
-    fn test_reach_one(node_nbr: usize, max_hops: usize, k: usize) {
+    fn reach_one(node_nbr: usize, max_hops: usize, k: usize) {
         let config = Config {
             k,
             ping_interval: 10,
@@ -758,7 +766,7 @@ mod test {
             })
             .collect();
 
-            log::info!("{}", &kademlias[0]);
+        log::debug!("{}", &kademlias[0]);
         let mut hops_stat = vec![];
         for (run, node) in nodes[1..node_nbr].iter().enumerate() {
             log::debug!("*** {run} ***: Searching route from {} to {node}", nodes[0]);
