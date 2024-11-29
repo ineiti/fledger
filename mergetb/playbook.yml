@@ -1,0 +1,94 @@
+---
+- name: Setup and run signal tasks
+  hosts: SIGNAL
+  become: yes
+  vars:
+    simul_dir: /tmp/simul
+    binaries_dir: ./
+  tasks:
+    - name: Create simul directory on signal nodes
+      file:
+        path: "{{ simul_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy flsignal binary to signal nodes
+      copy:
+        src: "{{ binaries_dir }}/flsignal"
+        dest: /usr/local/bin/flsignal
+        mode: '0755'
+
+    - name: Start flsignal process
+      shell: >
+        flsignal -vv
+      async: 300
+      poll: 0
+
+    - name: Wait for 10 seconds to ensure flsignal is running
+      pause:
+        seconds: 10
+
+
+- name: Setup and run fledger tasks
+  hosts: FLEDGER_NODES
+  become: yes
+  vars:
+    path_len: 3
+    retry: 2
+    simul_dir: /tmp/simul
+    binaries_dir: ./  # Local directory with binaries
+
+  tasks:
+    - name: Create simul directory on fledger nodes
+      file:
+        path: "{{ simul_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy fledger binary to fledger nodes
+      copy:
+        src: "{{ binaries_dir }}/fledger"
+        dest: /usr/local/bin/fledger
+        mode: '0755'
+
+    - name: Start fledger processes on fledger nodes
+      shell: >
+        NAME="NODE_$(printf "%02d" {{ ansible_index }})" &&
+        CONFIG="{{ simul_dir }}/$NAME/" &&
+        mkdir -p $CONFIG &&
+        PATH_LEN_ARG="" &&
+        RETRY_ARG="" &&
+        if [ {{ ansible_index }} == 1 ]; then
+          PATH_LEN_ARG="--path-len {{ path_len }}"
+        fi &&
+        if [ {{ retry }} -gt 0 ]; then
+          RETRY_ARG="--retry {{ retry }}"
+        fi &&
+        fledger --config $CONFIG --name $NAME -vv -s ws://{{ groups['SIGNAL'][0] }}:8765 $PATH_LEN_ARG $RETRY_ARG
+      async: 300
+      poll: 0
+      with_sequence: start=1 end="{{ groups['FLEDGER_NODES']|length }}"
+
+    - name: Wait for 60 seconds
+      pause:
+        seconds: 60
+
+
+- name: Cleanup signal processes
+  hosts: SIGNAL
+  become: yes
+  tasks:
+    - name: Kill flsignal process
+      shell: |
+        ps aux | grep "flsignal" | grep -v grep | awk '{print $2}' | xargs -r kill
+      ignore_errors: true
+
+
+- name: Cleanup fledger processes
+  hosts: FLEDGER_NODES
+  become: yes
+  tasks:
+    - name: Kill fledger process
+      shell: |
+        ps aux | grep "fledger" | grep -v grep | awk '{print $2}' | xargs -r kill
+      ignore_errors: true

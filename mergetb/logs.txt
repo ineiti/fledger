@@ -1,0 +1,404 @@
+mrg xsh fledgerxdc.dcog 
+Welcome to Ubuntu 22.04.4 LTS (GNU/Linux 6.9.9-100.fc39.x86_64 x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+This system has been minimized by removing packages and content that are
+not required on a system that users do not log into.
+
+To restore this content, you can run the 'unminimize' command.
+Last login: Fri Nov 29 14:39:53 2024 from 10.1.7.26
+dcog@fledgerxdc:~$ ansible-playbook -i inventory.ini playbook.yml --extra-vars "path_len=3 retry=2"
+[WARNING]: Found both group and host with same name: SIGNAL
+
+PLAY [Setup and run signal tasks] **********************************************************************
+
+TASK [Gathering Facts] *********************************************************************************
+ok: [SIGNAL]
+
+TASK [Create simul directory on signal nodes] **********************************************************
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [SIGNAL]
+
+TASK [Copy flsignal binary to signal nodes] ************************************************************
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [SIGNAL]
+
+TASK [Start flsignal process] **************************************************************************
+changed: [SIGNAL]
+
+TASK [Wait for 10 seconds to ensure flsignal is running] ***********************************************
+Pausing for 10 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [SIGNAL]
+
+PLAY [Setup and run fledger tasks] *********************************************************************
+
+TASK [Gathering Facts] *********************************************************************************
+ok: [node-10]
+ok: [node-8]
+ok: [node-13]
+ok: [node-12]
+ok: [node-5]
+ok: [node-1]
+ok: [node-14]
+ok: [node-4]
+ok: [node-2]
+ok: [node-3]
+ok: [node-11]
+ok: [node-9]
+ok: [node-0]
+ok: [node-7]
+ok: [node-6]
+
+TASK [Create simul directory on fledger nodes] *********************************************************
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-12]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-10]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-5]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-8]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-13]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-14]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-1]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-4]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-3]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-2]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-11]
+changed: [node-9]
+changed: [node-7]
+changed: [node-0]
+changed: [node-6]
+
+TASK [Copy fledger binary to fledger nodes] ************************************************************
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-10]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-5]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-12]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-8]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-13]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-1]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-2]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-14]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-3]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-4]
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+changed: [node-0]
+changed: [node-11]
+changed: [node-9]
+changed: [node-7]
+changed: [node-6]
+
+TASK [Start fledger processes on fledger nodes] ********************************************************
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-12]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-10]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-5]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-13]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-8]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-1]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-14]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-4]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-3]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-2]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-11]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-9]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+fatal: [node-7]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/core.py) as it seems
+to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+[WARNING]: Skipping plugin (/usr/lib/python3/dist-packages/ansible/plugins/filter/mathstuff.py) as it
+seems to be invalid: cannot import name 'environmentfilter' from 'jinja2.filters'
+(/usr/local/lib/python3.10/dist-packages/jinja2/filters.py)
+fatal: [node-0]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+fatal: [node-6]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'ansible_index' is undefined\n\nThe error appears to be in '/home/dcog/playbook.yml': line 54, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: Start fledger processes on fledger nodes\n      ^ here\n"}
+
+PLAY RECAP *********************************************************************************************
+SIGNAL                     : ok=5    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+node-0                     : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-1                     : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-10                    : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-11                    : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-12                    : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-13                    : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-14                    : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-2                     : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-3                     : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-4                     : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-5                     : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-6                     : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-7                     : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-8                     : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+node-9                     : ok=3    changed=2    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+
