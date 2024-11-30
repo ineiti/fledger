@@ -11,6 +11,7 @@ python3 generate_inventory.py
 mrg xdc scp upload inventory.ini fledgerxdc.dcog:/home/dcog
 mrg xdc scp upload playbook.yml fledgerxdc.dcog:/home/dcog
 mrg xdc scp upload install_docker.yml fledgerxdc.dcog:/home/dcog
+mrg xdc scp upload delete_docker.yml fledgerxdc.dcog:/home/dcog
 
 # # build and upload binaries
 # (cd ../cli/fledger && cargo build -r)

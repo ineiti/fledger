@@ -1,8 +1,8 @@
+---
 - name: Setup and run signal tasks
   hosts: SIGNAL_NODE
   become: yes
   vars:
-    simul_dir: /home/dcog/simul
     docker_image: deryacog/flsignal:latest
     container_name: flsignal
   tasks:
@@ -33,25 +33,25 @@
   become: yes
   vars:
     path_len: 3
-    retry: 2
-    simul_dir: /home/dcog/simul
+    retry: 0
     docker_image: deryacog/fledger:latest
+    signal_node: "{{ hostvars[groups['SIGNAL_NODE'][0]].ansible_host }}"
+    simul_path: /home/dcog/data
   tasks:
     - name: Pull fledger Docker image
       docker_image:
         name: "{{ docker_image }}"
         source: pull
 
-    - name: Create simul directory on fledger nodes
-      file:
-        path: "{{ simul_dir }}"
-        state: directory
-        mode: '0755'
-
     - name: Copy loopix core config file
       copy:
         src: /home/dcog/loopix_core_config.yaml
-        dest: /home/dcog/loopix_core_config.yaml
+        dest: "/home/dcog/loopix_core_config.yaml"
+
+    - name: Ensure /home/dcog/data directory exists
+      file:
+        path: "{{ simul_path }}"
+        state: directory
 
     - name: Run fledger containers
       docker_container:
@@ -60,36 +60,45 @@
         state: started
         detach: true
         volumes:
-          - "{{ simul_dir }}:/config"
-          - "{{ simul_dir }}/loopix_core_config.yaml:/fledger/loopix_core_config.yaml"
+          - "{{ simul_path }}:/fledger/data"
+          - "/home/dcog/loopix_core_config.yaml:/fledger/loopix_core_config.yaml"
         command: >
-          --config /config
+          --config /fledger/data
           --name {{ inventory_hostname }}
           -vv
-          -s ws://{{ groups['SIGNAL_NODE'][0] }}:8765
+          -s ws://{{ signal_node }}:8765
           {% if inventory_hostname == 'node-1' %}--path-len {{ path_len }}{% endif %}
-          {% if retry > 0 %}--retry {{ retry }}{% endif %}
+          --retry {{ retry }}
         log_driver: "json-file"
         log_options:
           max-size: "10m"
           max-file: "4"
+      register: fledger_container
 
     - name: Wait for 60 seconds
       pause:
         seconds: 60
 
-- name: Cleanup signal processes
-  hosts: SIGNAL_NODE
-  become: yes
-  tasks:
-    - name: Stop flsignal container
-      shell: docker stop flsignal || true
-      ignore_errors: true
+    - name: Save container logs to logs.txt
+      shell: "docker logs {{ fledger_container.container.Id }} > /home/dcog/data/logs.txt 2>&1"
 
-- name: Cleanup fledger processes
-  hosts: FLEDGER_NODES
-  become: yes
-  tasks:
-    - name: Stop fledger container
-      shell: docker stop fledger_{{ inventory_hostname }} || true
-      ignore_errors: true
+
+# - name: Cleanup signal processes
+#   hosts: SIGNAL_NODE
+#   become: yes
+#   tasks:
+#     - name: Stop flsignal container
+#       docker_container:
+#         name: flsignal
+#         state: stopped
+#       ignore_errors: true
+
+# - name: Cleanup fledger processes
+#   hosts: FLEDGER_NODES
+#   become: yes
+#   tasks:
+#     - name: Stop fledger container
+#       docker_container:
+#         name: "fledger_{{ inventory_hostname }}"
+#         state: stopped
+#       ignore_errors: true

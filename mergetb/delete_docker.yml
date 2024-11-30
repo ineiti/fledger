@@ -1,0 +1,9 @@
+---
+- name: Stop and delete all Docker containers
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Stop and delete all Docker containers
+      shell: |
+        docker ps -aq | xargs -r docker stop && docker ps -aq | xargs -r docker rm
