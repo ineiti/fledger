@@ -1,0 +1,87 @@
+networks:
+  my_network:
+    driver: bridge
+
+services:
+  flsignal:
+    build:
+      context: .
+      dockerfile: Dockerfile.flsignal
+    container_name: flsignal
+    ports:
+      - "8765:8765"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "4"
+    networks:
+      - my_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  fledger:
+    build:
+      context: .
+      dockerfile: Dockerfile.fledger
+    environment:
+      - PATH_LEN=${PATH_LEN}
+      - RETRY=${RETRY}
+    deploy:
+      mode: replicated
+      # replicas: 1
+      replicas: ${FLEDGER_REPLICAS}
+    volumes:
+      - ./loopix_core_config.yaml:/fledger/loopix_core_config.yaml
+    command:
+      - "--config"
+      - "/fledger"
+      - "-vv"
+      - "-s"
+      - "ws://flsignal:8765"
+      - "--retry"
+      - "${RETRY}"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "4"
+    networks:
+      - my_network
+    depends_on:
+      - flsignal
+
+  fledger_1:
+    build:
+      context: .
+      dockerfile: Dockerfile.fledger
+    environment:
+      - PATH_LEN=${PATH_LEN}
+      - RETRY=${RETRY}
+    deploy:
+      mode: replicated
+      replicas: 1
+    volumes:
+      - ./loopix_core_config.yaml:/fledger/loopix_core_config.yaml
+    command:
+      - "--config"
+      - "/fledger"
+      - "-vv"
+      - "-s"
+      - "ws://flsignal:8765"
+      - "--path-len"
+      - "${PATH_LEN}"
+      - "--retry"
+      - "${RETRY}"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "4"
+    networks:
+      - my_network
+    depends_on:
+      - flsignal

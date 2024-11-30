@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let mut logger = env_logger::Builder::new();
-    logger.filter_module("fl", log::LevelFilter::Debug);
+    logger.filter_module("fl", log::LevelFilter::Info);
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
 
@@ -138,6 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     let mut node = Node::start(Box::new(storage), node_config, network).await?;
     let nc = node.node_config.info.clone();
+    log::info!("GETTING CONFIG");
     let mut state = match args.path_len {
         Some(len) => {
             log::info!("Starting with path length {}", len);
@@ -145,6 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         None => LoopixSimul::Child(LSChild::WaitConfig),
     };
+    log::info!("GOT CONFIG");
     log::info!(
         "Starting node with state {:?} {}: {}",
         state,
@@ -510,7 +512,14 @@ impl LoopixSetup {
     ) -> Result<LoopixConfig, BrokerError> {
         let private_key = &self.loopix_key_pairs.get(&node_id).unwrap().1;
         let public_key = &self.loopix_key_pairs.get(&node_id).unwrap().0;
+        let current_dir = std::env::current_dir().unwrap();
+        log::info!("Current directory: {}", current_dir.display());
 
+        let entries = std::fs::read_dir(&current_dir).unwrap();
+        for entry in entries {
+            let entry = entry.unwrap();
+            log::info!("File: {}", entry.path().display());
+        }
         let config_path = PathBuf::from("./loopix_core_config.yaml");
 
         let config_str = std::fs::read_to_string(config_path.clone()).unwrap();

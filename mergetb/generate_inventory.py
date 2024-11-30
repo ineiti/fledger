@@ -32,7 +32,7 @@ def write_inventory(node_ip_mapping, output_file):
     """
     with open(output_file, "w") as file:
             # Write SIGNAL group
-            file.write("[SIGNAL]\n")
+            file.write("[SIGNAL_NODE]\n")
             for node, ip in node_ip_mapping.items():
                 if node.lower() == "signal":  # Adjust matching logic for SIGNAL node
                     ansible_hostname = f"{node}.infra.tryagain.fledgerfirst.dcog"
@@ -44,6 +44,8 @@ def write_inventory(node_ip_mapping, output_file):
                 if node.lower() != "signal" and not node.startswith('ifr'):  # Exclude SIGNAL node
                     ansible_hostname = f"{node}.infra.tryagain.fledgerfirst.dcog"
                     file.write(f"{node} ansible_host={ansible_hostname} ansible_user=dcog ansible_ssh_private_key_file=~/.ssh/id_mrg-0\n")
+
+            file.write("\n[ALL_NODES:children]\nSIGNAL_NODE\nFLEDGER_NODES")
 
 def main():
     # Parse the materialization file

@@ -1,0 +1,410 @@
+Metal:
+Vm:
+node-0 -> md02
+node-6 -> md02
+node-11 -> md02
+node-2 -> md02
+node-5 -> md02
+node-4 -> md02
+node-1 -> md02
+node-12 -> md02
+node-9 -> md02
+node-10 -> md02
+node-13 -> md03
+node-3 -> md02
+SIGNAL -> md03
+node-8 -> md02
+node-7 -> md02
+node-14 -> md03
+Links:
+  ENDPOINTS:
+    [149] SIGNAL@md03 &{Phy:name:"eth13"  mac:"fa:1e:06:05:b6:62"}
+    [149] node-12@md02 &{Phy:name:"eth4"  mac:"f6:3a:72:09:75:fd"}
+    [149] node-12@md02 &{Vtep:name:"vtep533"  vni:533  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [149] SIGNAL@md03 &{Vtep:name:"vtep533"  vni:533  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [149] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth13"  mac:"fa:1e:06:05:b6:62"}  vni:533}
+    [149] md02: &{Tap:node:"node-12"  frontend:{name:"eth4"  mac:"f6:3a:72:09:75:fd"}  vni:533}
+  ENDPOINTS:
+    [109] node-2@md02 &{Phy:name:"eth3"  mac:"72:25:95:4e:06:7f"}
+    [109] node-5@md02 &{Phy:name:"eth3"  mac:"5a:e0:65:7d:ba:5a"}
+  WAYPOINTS:
+    [109] md02: &{Tap:node:"node-2"  frontend:{name:"eth3"  mac:"72:25:95:4e:06:7f"}  vni:541}
+    [109] md02: &{Tap:node:"node-5"  frontend:{name:"eth3"  mac:"5a:e0:65:7d:ba:5a"}  vni:541}
+  ENDPOINTS:
+    [112] node-3@md02 &{Phy:name:"eth6"  mac:"56:d1:3a:f1:07:a9"}
+    [112] node-8@md02 &{Phy:name:"eth1"  mac:"5a:5d:5d:d0:2b:8d"}
+  WAYPOINTS:
+    [112] md02: &{Tap:node:"node-3"  frontend:{name:"eth6"  mac:"56:d1:3a:f1:07:a9"}  vni:491}
+    [112] md02: &{Tap:node:"node-8"  frontend:{name:"eth1"  mac:"5a:5d:5d:d0:2b:8d"}  vni:491}
+  ENDPOINTS:
+    [130] node-5@md02 &{Phy:name:"eth6"  mac:"aa:ff:ea:b1:cb:a6"}
+    [130] node-8@md02 &{Phy:name:"eth3"  mac:"1e:4d:95:5a:26:9f"}
+  WAYPOINTS:
+    [130] md02: &{Tap:node:"node-5"  frontend:{name:"eth6"  mac:"aa:ff:ea:b1:cb:a6"}  vni:474}
+    [130] md02: &{Tap:node:"node-8"  frontend:{name:"eth3"  mac:"1e:4d:95:5a:26:9f"}  vni:474}
+  ENDPOINTS:
+    [122] node-4@md02 &{Phy:name:"eth7"  mac:"06:b4:f7:85:7a:34"}
+    [122] node-9@md02 &{Phy:name:"eth2"  mac:"2a:5f:e5:14:37:1a"}
+  WAYPOINTS:
+    [122] md02: &{Tap:node:"node-4"  frontend:{name:"eth7"  mac:"06:b4:f7:85:7a:34"}  vni:506}
+    [122] md02: &{Tap:node:"node-9"  frontend:{name:"eth2"  mac:"2a:5f:e5:14:37:1a"}  vni:506}
+  ENDPOINTS:
+    [119] node-4@md02 &{Phy:name:"eth4"  mac:"d2:1d:95:38:3d:ed"}
+    [119] node-6@md02 &{Phy:name:"eth2"  mac:"5a:46:17:60:1f:e6"}
+  WAYPOINTS:
+    [119] md02: &{Tap:node:"node-4"  frontend:{name:"eth4"  mac:"d2:1d:95:38:3d:ed"}  vni:488}
+    [119] md02: &{Tap:node:"node-6"  frontend:{name:"eth2"  mac:"5a:46:17:60:1f:e6"}  vni:488}
+  ENDPOINTS:
+    [128] node-5@md02 &{Phy:name:"eth4"  mac:"4e:bc:16:0c:4c:92"}
+    [128] node-6@md02 &{Phy:name:"eth3"  mac:"6e:ce:29:24:49:58"}
+  WAYPOINTS:
+    [128] md02: &{Tap:node:"node-5"  frontend:{name:"eth4"  mac:"4e:bc:16:0c:4c:92"}  vni:516}
+    [128] md02: &{Tap:node:"node-6"  frontend:{name:"eth3"  mac:"6e:ce:29:24:49:58"}  vni:516}
+  ENDPOINTS:
+    [134] node-5@md02 &{Phy:name:"eth10"  mac:"8a:f6:96:25:1a:df"}
+    [134] node-12@md02 &{Phy:name:"eth3"  mac:"12:e3:af:59:b9:eb"}
+  WAYPOINTS:
+    [134] md02: &{Tap:node:"node-5"  frontend:{name:"eth10"  mac:"8a:f6:96:25:1a:df"}  vni:531}
+    [134] md02: &{Tap:node:"node-12"  frontend:{name:"eth3"  mac:"12:e3:af:59:b9:eb"}  vni:531}
+  ENDPOINTS:
+    [147] SIGNAL@md03 &{Phy:name:"eth11"  mac:"ea:ae:9d:da:c1:5c"}
+    [147] node-10@md02 &{Phy:name:"eth4"  mac:"2a:fe:e1:96:26:d7"}
+    [147] node-10@md02 &{Vtep:name:"vtep523"  vni:523  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [147] SIGNAL@md03 &{Vtep:name:"vtep523"  vni:523  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [147] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth11"  mac:"ea:ae:9d:da:c1:5c"}  vni:523}
+    [147] md02: &{Tap:node:"node-10"  frontend:{name:"eth4"  mac:"2a:fe:e1:96:26:d7"}  vni:523}
+  ENDPOINTS:
+    [103] node-0@md02 &{Phy:name:"eth3"  mac:"12:c7:72:60:1b:05"}
+    [103] node-5@md02 &{Phy:name:"eth1"  mac:"8e:a0:d1:2d:ce:b5"}
+  WAYPOINTS:
+    [103] md02: &{Tap:node:"node-0"  frontend:{name:"eth3"  mac:"12:c7:72:60:1b:05"}  vni:497}
+    [103] md02: &{Tap:node:"node-5"  frontend:{name:"eth1"  mac:"8e:a0:d1:2d:ce:b5"}  vni:497}
+  ENDPOINTS:
+    [100] SIGNAL@md03 &{Phy:name:"eth0"  mac:"9a:56:3f:20:86:31"}
+    [100] node-0@md02 &{Phy:name:"eth0"  mac:"ce:1f:f3:08:2e:06"}
+    [100] node-1@md02 &{Phy:name:"eth0"  mac:"2a:4f:3e:7d:35:40"}
+    [100] node-2@md02 &{Phy:name:"eth0"  mac:"3e:62:11:a8:7a:d3"}
+    [100] node-3@md02 &{Phy:name:"eth0"  mac:"e6:d7:58:8a:06:91"}
+    [100] node-4@md02 &{Phy:name:"eth0"  mac:"1e:cc:57:66:d9:47"}
+    [100] node-5@md02 &{Phy:name:"eth0"  mac:"1e:4f:66:d6:48:1e"}
+    [100] node-6@md02 &{Phy:name:"eth0"  mac:"f6:5c:56:59:df:a7"}
+    [100] node-7@md02 &{Phy:name:"eth0"  mac:"22:1a:6e:a9:2b:4d"}
+    [100] node-8@md02 &{Phy:name:"eth0"  mac:"1a:c4:de:ad:41:90"}
+    [100] node-9@md02 &{Phy:name:"eth0"  mac:"ea:f2:79:27:ce:c1"}
+    [100] node-10@md02 &{Phy:name:"eth0"  mac:"5e:51:56:da:6e:c0"}
+    [100] node-11@md02 &{Phy:name:"eth0"  mac:"12:9b:cf:16:dd:7b"}
+    [100] node-12@md02 &{Phy:name:"eth0"  mac:"5e:6a:a1:ff:6f:25"}
+    [100] node-13@md03 &{Phy:name:"eth0"  mac:"82:3c:91:ae:22:63"}
+    [100] node-14@md03 &{Phy:name:"eth0"  mac:"be:df:dd:68:9d:6c"}
+    [100] ifr1@ifr1 &{Vtep:name:"vtep496"  vni:496  parent:{name:"enp33s0f1np1"  mac:"08:c0:eb:af:42:6b"}  tunnel_ip:"10.99.0.3"}
+    [100] node-0@md02 &{Vlan:name:"vlan1804"  vid:1804  parent:{name:"enp65s0f0np0"  mac:"10:70:fd:51:82:0c"}}
+    [100] SIGNAL@md03 &{Vlan:name:"vlan1804"  vid:1804  parent:{name:"enp65s0f0np0"  mac:"10:70:fd:57:0e:2c"}}
+  WAYPOINTS:
+    [100] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth0"  mac:"9a:56:3f:20:86:31"}  vid:1804}
+    [100] md02: &{Tap:node:"node-0"  frontend:{name:"eth0"  mac:"ce:1f:f3:08:2e:06"}  vid:1804}
+    [100] md02: &{Tap:node:"node-1"  frontend:{name:"eth0"  mac:"2a:4f:3e:7d:35:40"}  vid:1804}
+    [100] md02: &{Tap:node:"node-2"  frontend:{name:"eth0"  mac:"3e:62:11:a8:7a:d3"}  vid:1804}
+    [100] md02: &{Tap:node:"node-3"  frontend:{name:"eth0"  mac:"e6:d7:58:8a:06:91"}  vid:1804}
+    [100] md02: &{Tap:node:"node-4"  frontend:{name:"eth0"  mac:"1e:cc:57:66:d9:47"}  vid:1804}
+    [100] md02: &{Tap:node:"node-5"  frontend:{name:"eth0"  mac:"1e:4f:66:d6:48:1e"}  vid:1804}
+    [100] md02: &{Tap:node:"node-6"  frontend:{name:"eth0"  mac:"f6:5c:56:59:df:a7"}  vid:1804}
+    [100] md02: &{Tap:node:"node-7"  frontend:{name:"eth0"  mac:"22:1a:6e:a9:2b:4d"}  vid:1804}
+    [100] md02: &{Tap:node:"node-8"  frontend:{name:"eth0"  mac:"1a:c4:de:ad:41:90"}  vid:1804}
+    [100] md02: &{Tap:node:"node-9"  frontend:{name:"eth0"  mac:"ea:f2:79:27:ce:c1"}  vid:1804}
+    [100] md02: &{Tap:node:"node-10"  frontend:{name:"eth0"  mac:"5e:51:56:da:6e:c0"}  vid:1804}
+    [100] md02: &{Tap:node:"node-11"  frontend:{name:"eth0"  mac:"12:9b:cf:16:dd:7b"}  vid:1804}
+    [100] md02: &{Tap:node:"node-12"  frontend:{name:"eth0"  mac:"5e:6a:a1:ff:6f:25"}  vid:1804}
+    [100] md03: &{Tap:node:"node-13"  frontend:{name:"eth0"  mac:"82:3c:91:ae:22:63"}  vid:1804}
+    [100] md03: &{Tap:node:"node-14"  frontend:{name:"eth0"  mac:"be:df:dd:68:9d:6c"}  vid:1804}
+    [100] il252r207s10-ileaf: &{Trunk:port:{name:"swp3"}  vids:1804}
+    [100] il252r207s10-ileaf: &{Vtep:name:"vtep496"  vni:496  tunnel_ip:"10.99.0.1"}
+    [100] il252r207s10-ileaf: &{BgpPeer:interface:{name:"swp52"}  local_asn:4200000000  remote_asn:4200000002  network:"10.99.0.1"}
+    [100] ifr1: &{BgpPeer:interface:{name:"enp33s0f1np1"  mac:"08:c0:eb:af:42:6b"}  local_asn:4200000002  remote_asn:4200000000  network:"10.99.0.3"}
+    [100] il252r207s10-ileaf: &{Trunk:port:{name:"swp4"}  vids:1804}
+  ENDPOINTS:
+    [135] node-5@md02 &{Phy:name:"eth11"  mac:"fe:5c:55:c5:fe:d5"}
+    [135] node-13@md03 &{Phy:name:"eth3"  mac:"16:c4:85:c9:23:c7"}
+    [135] node-5@md02 &{Vtep:name:"vtep517"  vni:517  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [135] node-13@md03 &{Vtep:name:"vtep517"  vni:517  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [135] md02: &{Tap:node:"node-5"  frontend:{name:"eth11"  mac:"fe:5c:55:c5:fe:d5"}  vni:517}
+    [135] md03: &{Tap:node:"node-13"  frontend:{name:"eth3"  mac:"16:c4:85:c9:23:c7"}  vni:517}
+  ENDPOINTS:
+    [108] node-2@md02 &{Phy:name:"eth2"  mac:"76:30:ae:58:03:b2"}
+    [108] node-4@md02 &{Phy:name:"eth3"  mac:"aa:82:60:4b:5d:dc"}
+  WAYPOINTS:
+    [108] md02: &{Tap:node:"node-2"  frontend:{name:"eth2"  mac:"76:30:ae:58:03:b2"}  vni:518}
+    [108] md02: &{Tap:node:"node-4"  frontend:{name:"eth3"  mac:"aa:82:60:4b:5d:dc"}  vni:518}
+  ENDPOINTS:
+    [110] node-3@md02 &{Phy:name:"eth4"  mac:"1a:80:ee:2d:e2:4e"}
+    [110] node-6@md02 &{Phy:name:"eth1"  mac:"6e:df:4a:73:35:53"}
+  WAYPOINTS:
+    [110] md02: &{Tap:node:"node-3"  frontend:{name:"eth4"  mac:"1a:80:ee:2d:e2:4e"}  vni:530}
+    [110] md02: &{Tap:node:"node-6"  frontend:{name:"eth1"  mac:"6e:df:4a:73:35:53"}  vni:530}
+  ENDPOINTS:
+    [133] node-5@md02 &{Phy:name:"eth9"  mac:"a2:d1:d9:44:b1:e2"}
+    [133] node-11@md02 &{Phy:name:"eth3"  mac:"b6:6a:e7:ea:f5:36"}
+  WAYPOINTS:
+    [133] md02: &{Tap:node:"node-5"  frontend:{name:"eth9"  mac:"a2:d1:d9:44:b1:e2"}  vni:483}
+    [133] md02: &{Tap:node:"node-11"  frontend:{name:"eth3"  mac:"b6:6a:e7:ea:f5:36"}  vni:483}
+  ENDPOINTS:
+    [125] node-4@md02 &{Phy:name:"eth10"  mac:"6e:64:05:f5:70:3e"}
+    [125] node-12@md02 &{Phy:name:"eth2"  mac:"12:fd:c3:e9:af:36"}
+  WAYPOINTS:
+    [125] md02: &{Tap:node:"node-4"  frontend:{name:"eth10"  mac:"6e:64:05:f5:70:3e"}  vni:542}
+    [125] md02: &{Tap:node:"node-12"  frontend:{name:"eth2"  mac:"12:fd:c3:e9:af:36"}  vni:542}
+  ENDPOINTS:
+    [107] node-2@md02 &{Phy:name:"eth1"  mac:"b6:e4:e3:b9:c1:f7"}
+    [107] node-3@md02 &{Phy:name:"eth3"  mac:"ea:b3:db:68:c9:1d"}
+  WAYPOINTS:
+    [107] md02: &{Tap:node:"node-2"  frontend:{name:"eth1"  mac:"b6:e4:e3:b9:c1:f7"}  vni:480}
+    [107] md02: &{Tap:node:"node-3"  frontend:{name:"eth3"  mac:"ea:b3:db:68:c9:1d"}  vni:480}
+  ENDPOINTS:
+    [132] node-5@md02 &{Phy:name:"eth8"  mac:"8e:b9:18:34:6f:50"}
+    [132] node-10@md02 &{Phy:name:"eth3"  mac:"2a:67:4a:10:87:cd"}
+  WAYPOINTS:
+    [132] md02: &{Tap:node:"node-5"  frontend:{name:"eth8"  mac:"8e:b9:18:34:6f:50"}  vni:482}
+    [132] md02: &{Tap:node:"node-10"  frontend:{name:"eth3"  mac:"2a:67:4a:10:87:cd"}  vni:482}
+  ENDPOINTS:
+    [145] SIGNAL@md03 &{Phy:name:"eth9"  mac:"72:b2:39:69:6d:71"}
+    [145] node-8@md02 &{Phy:name:"eth4"  mac:"16:a9:75:20:b1:f5"}
+    [145] node-8@md02 &{Vtep:name:"vtep540"  vni:540  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [145] SIGNAL@md03 &{Vtep:name:"vtep540"  vni:540  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [145] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth9"  mac:"72:b2:39:69:6d:71"}  vni:540}
+    [145] md02: &{Tap:node:"node-8"  frontend:{name:"eth4"  mac:"16:a9:75:20:b1:f5"}  vni:540}
+  ENDPOINTS:
+    [138] SIGNAL@md03 &{Phy:name:"eth2"  mac:"36:1b:7c:33:f6:ad"}
+    [138] node-1@md02 &{Phy:name:"eth4"  mac:"1a:6b:dc:22:7f:b0"}
+    [138] node-1@md02 &{Vtep:name:"vtep479"  vni:479  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [138] SIGNAL@md03 &{Vtep:name:"vtep479"  vni:479  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [138] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth2"  mac:"36:1b:7c:33:f6:ad"}  vni:479}
+    [138] md02: &{Tap:node:"node-1"  frontend:{name:"eth4"  mac:"1a:6b:dc:22:7f:b0"}  vni:479}
+  ENDPOINTS:
+    [113] node-3@md02 &{Phy:name:"eth7"  mac:"ca:97:b7:d4:38:38"}
+    [113] node-9@md02 &{Phy:name:"eth1"  mac:"36:db:98:35:2c:46"}
+  WAYPOINTS:
+    [113] md02: &{Tap:node:"node-3"  frontend:{name:"eth7"  mac:"ca:97:b7:d4:38:38"}  vni:501}
+    [113] md02: &{Tap:node:"node-9"  frontend:{name:"eth1"  mac:"36:db:98:35:2c:46"}  vni:501}
+  ENDPOINTS:
+    [115] node-3@md02 &{Phy:name:"eth9"  mac:"d2:ba:40:4c:04:c1"}
+    [115] node-11@md02 &{Phy:name:"eth1"  mac:"86:69:37:b4:b8:3f"}
+  WAYPOINTS:
+    [115] md02: &{Tap:node:"node-3"  frontend:{name:"eth9"  mac:"d2:ba:40:4c:04:c1"}  vni:511}
+    [115] md02: &{Tap:node:"node-11"  frontend:{name:"eth1"  mac:"86:69:37:b4:b8:3f"}  vni:511}
+  ENDPOINTS:
+    [121] node-4@md02 &{Phy:name:"eth6"  mac:"86:ed:f6:2d:3a:3d"}
+    [121] node-8@md02 &{Phy:name:"eth2"  mac:"0e:8d:56:eb:5e:a0"}
+  WAYPOINTS:
+    [121] md02: &{Tap:node:"node-4"  frontend:{name:"eth6"  mac:"86:ed:f6:2d:3a:3d"}  vni:535}
+    [121] md02: &{Tap:node:"node-8"  frontend:{name:"eth2"  mac:"0e:8d:56:eb:5e:a0"}  vni:535}
+  ENDPOINTS:
+    [136] node-5@md02 &{Phy:name:"eth12"  mac:"8a:46:81:d1:24:ca"}
+    [136] node-14@md03 &{Phy:name:"eth3"  mac:"a6:9c:d7:e9:5e:68"}
+    [136] node-5@md02 &{Vtep:name:"vtep503"  vni:503  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [136] node-14@md03 &{Vtep:name:"vtep503"  vni:503  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [136] md02: &{Tap:node:"node-5"  frontend:{name:"eth12"  mac:"8a:46:81:d1:24:ca"}  vni:503}
+    [136] md03: &{Tap:node:"node-14"  frontend:{name:"eth3"  mac:"a6:9c:d7:e9:5e:68"}  vni:503}
+  ENDPOINTS:
+    [150] SIGNAL@md03 &{Phy:name:"eth14"  mac:"12:12:06:78:53:3f"}
+    [150] node-13@md03 &{Phy:name:"eth4"  mac:"72:56:33:ae:18:aa"}
+  WAYPOINTS:
+    [150] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth14"  mac:"12:12:06:78:53:3f"}  vni:521}
+    [150] md03: &{Tap:node:"node-13"  frontend:{name:"eth4"  mac:"72:56:33:ae:18:aa"}  vni:521}
+  ENDPOINTS:
+    [124] node-4@md02 &{Phy:name:"eth9"  mac:"8e:af:29:9a:51:ab"}
+    [124] node-11@md02 &{Phy:name:"eth2"  mac:"82:38:71:82:4f:52"}
+  WAYPOINTS:
+    [124] md02: &{Tap:node:"node-4"  frontend:{name:"eth9"  mac:"8e:af:29:9a:51:ab"}  vni:507}
+    [124] md02: &{Tap:node:"node-11"  frontend:{name:"eth2"  mac:"82:38:71:82:4f:52"}  vni:507}
+  ENDPOINTS:
+    [151] SIGNAL@md03 &{Phy:name:"eth15"  mac:"72:cb:ec:c5:4e:98"}
+    [151] node-14@md03 &{Phy:name:"eth4"  mac:"7a:c8:6e:ea:de:63"}
+  WAYPOINTS:
+    [151] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth15"  mac:"72:cb:ec:c5:4e:98"}  vni:524}
+    [151] md03: &{Tap:node:"node-14"  frontend:{name:"eth4"  mac:"7a:c8:6e:ea:de:63"}  vni:524}
+  ENDPOINTS:
+    [104] node-1@md02 &{Phy:name:"eth1"  mac:"86:ea:b9:10:83:8a"}
+    [104] node-3@md02 &{Phy:name:"eth2"  mac:"9e:5d:a3:bc:d6:60"}
+  WAYPOINTS:
+    [104] md02: &{Tap:node:"node-1"  frontend:{name:"eth1"  mac:"86:ea:b9:10:83:8a"}  vni:486}
+    [104] md02: &{Tap:node:"node-3"  frontend:{name:"eth2"  mac:"9e:5d:a3:bc:d6:60"}  vni:486}
+  ENDPOINTS:
+    [102] node-0@md02 &{Phy:name:"eth2"  mac:"6a:3a:61:da:24:11"}
+    [102] node-4@md02 &{Phy:name:"eth1"  mac:"ae:37:2c:d7:37:8c"}
+  WAYPOINTS:
+    [102] md02: &{Tap:node:"node-0"  frontend:{name:"eth2"  mac:"6a:3a:61:da:24:11"}  vni:477}
+    [102] md02: &{Tap:node:"node-4"  frontend:{name:"eth1"  mac:"ae:37:2c:d7:37:8c"}  vni:477}
+  ENDPOINTS:
+    [114] node-3@md02 &{Phy:name:"eth8"  mac:"e6:d7:fa:fb:3c:eb"}
+    [114] node-10@md02 &{Phy:name:"eth1"  mac:"fa:68:44:6f:f1:7f"}
+  WAYPOINTS:
+    [114] md02: &{Tap:node:"node-3"  frontend:{name:"eth8"  mac:"e6:d7:fa:fb:3c:eb"}  vni:485}
+    [114] md02: &{Tap:node:"node-10"  frontend:{name:"eth1"  mac:"fa:68:44:6f:f1:7f"}  vni:485}
+  ENDPOINTS:
+    [126] node-4@md02 &{Phy:name:"eth11"  mac:"b2:11:8c:cc:81:fb"}
+    [126] node-13@md03 &{Phy:name:"eth2"  mac:"3a:8d:39:89:c7:00"}
+    [126] node-4@md02 &{Vtep:name:"vtep514"  vni:514  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [126] node-13@md03 &{Vtep:name:"vtep514"  vni:514  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [126] md02: &{Tap:node:"node-4"  frontend:{name:"eth11"  mac:"b2:11:8c:cc:81:fb"}  vni:514}
+    [126] md03: &{Tap:node:"node-13"  frontend:{name:"eth2"  mac:"3a:8d:39:89:c7:00"}  vni:514}
+  ENDPOINTS:
+    [101] node-0@md02 &{Phy:name:"eth1"  mac:"52:0d:98:f0:f4:f2"}
+    [101] node-3@md02 &{Phy:name:"eth1"  mac:"62:e9:8f:a4:eb:0c"}
+  WAYPOINTS:
+    [101] md02: &{Tap:node:"node-0"  frontend:{name:"eth1"  mac:"52:0d:98:f0:f4:f2"}  vni:528}
+    [101] md02: &{Tap:node:"node-3"  frontend:{name:"eth1"  mac:"62:e9:8f:a4:eb:0c"}  vni:528}
+  ENDPOINTS:
+    [127] node-4@md02 &{Phy:name:"eth12"  mac:"f2:7a:6f:1a:67:03"}
+    [127] node-14@md03 &{Phy:name:"eth2"  mac:"5a:cc:72:45:b7:16"}
+    [127] node-4@md02 &{Vtep:name:"vtep515"  vni:515  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [127] node-14@md03 &{Vtep:name:"vtep515"  vni:515  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [127] md02: &{Tap:node:"node-4"  frontend:{name:"eth12"  mac:"f2:7a:6f:1a:67:03"}  vni:515}
+    [127] md03: &{Tap:node:"node-14"  frontend:{name:"eth2"  mac:"5a:cc:72:45:b7:16"}  vni:515}
+  ENDPOINTS:
+    [117] node-3@md02 &{Phy:name:"eth11"  mac:"a2:c2:6c:61:6b:fb"}
+    [117] node-13@md03 &{Phy:name:"eth1"  mac:"2e:6c:ff:f6:7d:a8"}
+    [117] node-3@md02 &{Vtep:name:"vtep512"  vni:512  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [117] node-13@md03 &{Vtep:name:"vtep512"  vni:512  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [117] md02: &{Tap:node:"node-3"  frontend:{name:"eth11"  mac:"a2:c2:6c:61:6b:fb"}  vni:512}
+    [117] md03: &{Tap:node:"node-13"  frontend:{name:"eth1"  mac:"2e:6c:ff:f6:7d:a8"}  vni:512}
+  ENDPOINTS:
+    [140] SIGNAL@md03 &{Phy:name:"eth4"  mac:"d6:e7:ea:94:e6:30"}
+    [140] node-3@md02 &{Phy:name:"eth13"  mac:"ca:ae:d8:be:51:eb"}
+    [140] node-3@md02 &{Vtep:name:"vtep509"  vni:509  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [140] SIGNAL@md03 &{Vtep:name:"vtep509"  vni:509  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [140] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth4"  mac:"d6:e7:ea:94:e6:30"}  vni:509}
+    [140] md02: &{Tap:node:"node-3"  frontend:{name:"eth13"  mac:"ca:ae:d8:be:51:eb"}  vni:509}
+  ENDPOINTS:
+    [141] SIGNAL@md03 &{Phy:name:"eth5"  mac:"b2:7f:55:49:58:1d"}
+    [141] node-4@md02 &{Phy:name:"eth13"  mac:"8e:b4:cb:0f:c6:7f"}
+    [141] node-4@md02 &{Vtep:name:"vtep484"  vni:484  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [141] SIGNAL@md03 &{Vtep:name:"vtep484"  vni:484  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [141] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth5"  mac:"b2:7f:55:49:58:1d"}  vni:484}
+    [141] md02: &{Tap:node:"node-4"  frontend:{name:"eth13"  mac:"8e:b4:cb:0f:c6:7f"}  vni:484}
+  ENDPOINTS:
+    [139] SIGNAL@md03 &{Phy:name:"eth3"  mac:"06:b3:d9:70:13:04"}
+    [139] node-2@md02 &{Phy:name:"eth4"  mac:"1e:47:87:c6:47:e1"}
+    [139] node-2@md02 &{Vtep:name:"vtep490"  vni:490  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [139] SIGNAL@md03 &{Vtep:name:"vtep490"  vni:490  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [139] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth3"  mac:"06:b3:d9:70:13:04"}  vni:490}
+    [139] md02: &{Tap:node:"node-2"  frontend:{name:"eth4"  mac:"1e:47:87:c6:47:e1"}  vni:490}
+  ENDPOINTS:
+    [106] node-1@md02 &{Phy:name:"eth3"  mac:"6e:65:2d:c9:bc:49"}
+    [106] node-5@md02 &{Phy:name:"eth2"  mac:"e2:c7:d5:ec:ef:d1"}
+  WAYPOINTS:
+    [106] md02: &{Tap:node:"node-1"  frontend:{name:"eth3"  mac:"6e:65:2d:c9:bc:49"}  vni:520}
+    [106] md02: &{Tap:node:"node-5"  frontend:{name:"eth2"  mac:"e2:c7:d5:ec:ef:d1"}  vni:520}
+  ENDPOINTS:
+    [123] node-4@md02 &{Phy:name:"eth8"  mac:"0a:ed:64:96:0e:b2"}
+    [123] node-10@md02 &{Phy:name:"eth2"  mac:"02:93:c5:d2:6b:25"}
+  WAYPOINTS:
+    [123] md02: &{Tap:node:"node-4"  frontend:{name:"eth8"  mac:"0a:ed:64:96:0e:b2"}  vni:492}
+    [123] md02: &{Tap:node:"node-10"  frontend:{name:"eth2"  mac:"02:93:c5:d2:6b:25"}  vni:492}
+  ENDPOINTS:
+    [120] node-4@md02 &{Phy:name:"eth5"  mac:"ba:04:ea:04:9e:1d"}
+    [120] node-7@md02 &{Phy:name:"eth2"  mac:"a6:4b:93:e2:78:b3"}
+  WAYPOINTS:
+    [120] md02: &{Tap:node:"node-4"  frontend:{name:"eth5"  mac:"ba:04:ea:04:9e:1d"}  vni:498}
+    [120] md02: &{Tap:node:"node-7"  frontend:{name:"eth2"  mac:"a6:4b:93:e2:78:b3"}  vni:498}
+  ENDPOINTS:
+    [131] node-5@md02 &{Phy:name:"eth7"  mac:"16:aa:a1:e3:ec:06"}
+    [131] node-9@md02 &{Phy:name:"eth3"  mac:"36:91:0b:5c:9c:0a"}
+  WAYPOINTS:
+    [131] md02: &{Tap:node:"node-5"  frontend:{name:"eth7"  mac:"16:aa:a1:e3:ec:06"}  vni:508}
+    [131] md02: &{Tap:node:"node-9"  frontend:{name:"eth3"  mac:"36:91:0b:5c:9c:0a"}  vni:508}
+  ENDPOINTS:
+    [105] node-1@md02 &{Phy:name:"eth2"  mac:"aa:13:46:5b:47:a8"}
+    [105] node-4@md02 &{Phy:name:"eth2"  mac:"02:a9:dc:a5:78:43"}
+  WAYPOINTS:
+    [105] md02: &{Tap:node:"node-1"  frontend:{name:"eth2"  mac:"aa:13:46:5b:47:a8"}  vni:500}
+    [105] md02: &{Tap:node:"node-4"  frontend:{name:"eth2"  mac:"02:a9:dc:a5:78:43"}  vni:500}
+  ENDPOINTS:
+    [129] node-5@md02 &{Phy:name:"eth5"  mac:"6a:1e:63:75:9b:9d"}
+    [129] node-7@md02 &{Phy:name:"eth3"  mac:"22:0b:c8:f8:bf:e0"}
+  WAYPOINTS:
+    [129] md02: &{Tap:node:"node-5"  frontend:{name:"eth5"  mac:"6a:1e:63:75:9b:9d"}  vni:539}
+    [129] md02: &{Tap:node:"node-7"  frontend:{name:"eth3"  mac:"22:0b:c8:f8:bf:e0"}  vni:539}
+  ENDPOINTS:
+    [116] node-3@md02 &{Phy:name:"eth10"  mac:"42:42:04:d8:47:ea"}
+    [116] node-12@md02 &{Phy:name:"eth1"  mac:"da:c9:d3:8f:45:8f"}
+  WAYPOINTS:
+    [116] md02: &{Tap:node:"node-3"  frontend:{name:"eth10"  mac:"42:42:04:d8:47:ea"}  vni:502}
+    [116] md02: &{Tap:node:"node-12"  frontend:{name:"eth1"  mac:"da:c9:d3:8f:45:8f"}  vni:502}
+  ENDPOINTS:
+    [148] SIGNAL@md03 &{Phy:name:"eth12"  mac:"16:f8:37:b6:cf:44"}
+    [148] node-11@md02 &{Phy:name:"eth4"  mac:"0a:a9:8c:f1:23:71"}
+    [148] node-11@md02 &{Vtep:name:"vtep504"  vni:504  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [148] SIGNAL@md03 &{Vtep:name:"vtep504"  vni:504  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [148] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth12"  mac:"16:f8:37:b6:cf:44"}  vni:504}
+    [148] md02: &{Tap:node:"node-11"  frontend:{name:"eth4"  mac:"0a:a9:8c:f1:23:71"}  vni:504}
+    [148] md02: &{BgpPeer:interface:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  local_asn:4210000003  remote_asn:4210000000  network:"10.99.1.4"}
+    [148] xl252r207s8-xleaf: &{BgpPeer:interface:{name:"swp3"}  local_asn:4210000000  remote_asn:4210000003  network:"10.99.1.1"}
+    [148] xl252r207s8-xleaf: &{BgpPeer:interface:{name:"swp4"}  local_asn:4210000000  remote_asn:4210000004  network:"10.99.1.1"}
+    [148] md03: &{BgpPeer:interface:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  local_asn:4210000004  remote_asn:4210000000  network:"10.99.1.5"}
+  ENDPOINTS:
+    [111] node-3@md02 &{Phy:name:"eth5"  mac:"2a:8b:c6:41:a2:37"}
+    [111] node-7@md02 &{Phy:name:"eth1"  mac:"22:30:9d:f4:08:9e"}
+  WAYPOINTS:
+    [111] md02: &{Tap:node:"node-3"  frontend:{name:"eth5"  mac:"2a:8b:c6:41:a2:37"}  vni:478}
+    [111] md02: &{Tap:node:"node-7"  frontend:{name:"eth1"  mac:"22:30:9d:f4:08:9e"}  vni:478}
+  ENDPOINTS:
+    [142] SIGNAL@md03 &{Phy:name:"eth6"  mac:"36:61:4c:a1:dd:0b"}
+    [142] node-5@md02 &{Phy:name:"eth13"  mac:"16:e3:4b:0b:38:b6"}
+    [142] node-5@md02 &{Vtep:name:"vtep532"  vni:532  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [142] SIGNAL@md03 &{Vtep:name:"vtep532"  vni:532  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [142] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth6"  mac:"36:61:4c:a1:dd:0b"}  vni:532}
+    [142] md02: &{Tap:node:"node-5"  frontend:{name:"eth13"  mac:"16:e3:4b:0b:38:b6"}  vni:532}
+  ENDPOINTS:
+    [146] SIGNAL@md03 &{Phy:name:"eth10"  mac:"82:9e:b5:9f:f2:65"}
+    [146] node-9@md02 &{Phy:name:"eth4"  mac:"c2:2a:b8:ce:07:78"}
+    [146] node-9@md02 &{Vtep:name:"vtep495"  vni:495  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [146] SIGNAL@md03 &{Vtep:name:"vtep495"  vni:495  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [146] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth10"  mac:"82:9e:b5:9f:f2:65"}  vni:495}
+    [146] md02: &{Tap:node:"node-9"  frontend:{name:"eth4"  mac:"c2:2a:b8:ce:07:78"}  vni:495}
+  ENDPOINTS:
+    [144] SIGNAL@md03 &{Phy:name:"eth8"  mac:"66:de:8d:a3:89:06"}
+    [144] node-7@md02 &{Phy:name:"eth4"  mac:"2a:7e:26:e3:b1:d2"}
+    [144] node-7@md02 &{Vtep:name:"vtep522"  vni:522  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [144] SIGNAL@md03 &{Vtep:name:"vtep522"  vni:522  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [144] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth8"  mac:"66:de:8d:a3:89:06"}  vni:522}
+    [144] md02: &{Tap:node:"node-7"  frontend:{name:"eth4"  mac:"2a:7e:26:e3:b1:d2"}  vni:522}
+  ENDPOINTS:
+    [137] SIGNAL@md03 &{Phy:name:"eth1"  mac:"fe:3f:b3:27:2b:da"}
+    [137] node-0@md02 &{Phy:name:"eth4"  mac:"ba:e1:2c:a0:7d:48"}
+    [137] node-0@md02 &{Vtep:name:"vtep499"  vni:499  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [137] SIGNAL@md03 &{Vtep:name:"vtep499"  vni:499  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [137] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth1"  mac:"fe:3f:b3:27:2b:da"}  vni:499}
+    [137] md02: &{Tap:node:"node-0"  frontend:{name:"eth4"  mac:"ba:e1:2c:a0:7d:48"}  vni:499}
+  ENDPOINTS:
+    [143] SIGNAL@md03 &{Phy:name:"eth7"  mac:"ae:5e:06:7f:8d:0a"}
+    [143] node-6@md02 &{Phy:name:"eth4"  mac:"22:18:08:a9:73:c8"}
+    [143] node-6@md02 &{Vtep:name:"vtep510"  vni:510  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [143] SIGNAL@md03 &{Vtep:name:"vtep510"  vni:510  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [143] md03: &{Tap:node:"SIGNAL"  frontend:{name:"eth7"  mac:"ae:5e:06:7f:8d:0a"}  vni:510}
+    [143] md02: &{Tap:node:"node-6"  frontend:{name:"eth4"  mac:"22:18:08:a9:73:c8"}  vni:510}
+  ENDPOINTS:
+    [118] node-3@md02 &{Phy:name:"eth12"  mac:"82:60:97:97:49:05"}
+    [118] node-14@md03 &{Phy:name:"eth1"  mac:"ce:ab:6e:c1:0a:3c"}
+    [118] node-3@md02 &{Vtep:name:"vtep487"  vni:487  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+    [118] node-14@md03 &{Vtep:name:"vtep487"  vni:487  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:66:a6"}  tunnel_ip:"10.99.1.5"}
+  WAYPOINTS:
+    [118] md02: &{Tap:node:"node-3"  frontend:{name:"eth12"  mac:"82:60:97:97:49:05"}  vni:487}
+    [118] md03: &{Tap:node:"node-14"  frontend:{name:"eth1"  mac:"ce:ab:6e:c1:0a:3c"}  vni:487}
+Infraserver: ifr1
