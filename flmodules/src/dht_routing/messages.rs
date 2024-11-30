@@ -77,16 +77,16 @@ impl DHTRoutingMessages {
 
     // One second passes - and return messages for nodes to ping.
     fn tick(&mut self) -> Vec<InternOut> {
-        let mut out = vec![];
-        let nodes = self.core.tick();
-        for id in nodes.ping {
-            out.push(ModuleMessage::Ping.wrapper_network(id));
-        }
-        out
+        self.core
+            .tick()
+            .ping
+            .iter()
+            .map(|&id| ModuleMessage::Ping.wrapper_network(id))
+            .collect()
     }
 
     fn new_dht_message(&self, key: U256, msg: NetworkWrapper) -> Vec<InternOut> {
-        if let Some(&next_hop) = self.core.nearest_nodes(&key).first() {
+        if let Some(&next_hop) = self.core.route_nodes(&key, None).first() {
             vec![ModuleMessage::DHTMessage(self.core.root, key, msg.clone())
                 .wrapper_network(next_hop)]
         } else {
@@ -102,7 +102,7 @@ impl DHTRoutingMessages {
         key: U256,
         msg: NetworkWrapper,
     ) -> Vec<InternOut> {
-        match self.core.nearest_nodes(&key).first() {
+        match self.core.route_nodes(&key, Some(&last_hop)).first() {
             Some(&next_hop) => vec![
                 ModuleMessage::DHTMessage(orig, key, msg.clone()).wrapper_network(next_hop),
                 DHTRoutingOut::MessageRouting(orig, last_hop, next_hop, key, msg).into(),
@@ -125,7 +125,6 @@ impl SubsystemHandler<InternIn, InternOut> for DHTRoutingMessages {
     async fn messages(&mut self, msgs: Vec<InternIn>) -> Vec<InternOut> {
         let mut out = vec![];
         for msg in msgs {
-            log::trace!("Got msg: {msg:?}");
             out.extend(match msg {
                 InternIn::Tick => self.tick(),
                 InternIn::DHTRouting(DHTRoutingIn::DHTMessage(key, msg)) => {
@@ -140,6 +139,7 @@ impl SubsystemHandler<InternIn, InternOut> for DHTRoutingMessages {
                 },
             });
         }
+        log::info!("{out:?}");
         out
     }
 }
@@ -177,29 +177,46 @@ impl TranslateInto<TimerMessage> for InternOut {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
+    use std::{error::Error, str::FromStr};
 
-    // use super::*;
+    use flarch::{nodeids::U256, start_logging_filter_level};
 
-    #[test]
-    fn test_something() -> Result<(), Box<dyn Error>> {
-        // let ids = NodeIDs::new(2);
-        // let id0 = *ids.0.get(0).unwrap();
-        // let id1 = *ids.0.get(1).unwrap();
-        // let storage = DHTRoutingStorage::default();
-        // let mut msg = DHTRoutingMessages::new(storage, DHTRoutingConfig::default(), id0)?;
-        // msg.process_messages(vec![DHTRoutingIn::UpdateNodeList(ids).into()]);
-        // let ret =
-        //     msg.process_messages(vec![DHTRoutingIn::FromNetwork(id1, ModuleMessage::Increase(2)).into()]);
-        // assert_eq!(2, ret.len());
-        // assert!(matches!(
-        //     ret[0],
-        //     DHTRoutingOut::ToNetwork(_, ModuleMessage::Counter(2))
-        // ));
-        // assert!(matches!(
-        //     ret[1],
-        //     DHTRoutingOut::UpdateStorage(DHTRoutingStorage { counter: 2 })
-        // ));
+    use super::*;
+
+    const LOG_LVL: log::LevelFilter = log::LevelFilter::Info;
+
+    #[tokio::test]
+    async fn test_something() -> Result<(), Box<dyn Error>> {
+        start_logging_filter_level(vec![], LOG_LVL);
+
+        let root = U256::from_str("00").unwrap();
+        let node1 = U256::from_str("80").unwrap();
+        let node2 = U256::from_str("81").unwrap();
+        let node3 = U256::from_str("40").unwrap();
+        let node4 = U256::from_str("41").unwrap();
+
+        let infos: Vec<NodeInfo> = [node1, node2, node3, node4]
+            .iter()
+            .map(|&id| NodeInfo::new_from_id(id))
+            .collect();
+
+        let mut msg = DHTRoutingMessages::new(
+            root,
+            Config {
+                k: 1,
+                ping_interval: 2,
+                ping_timeout: 4,
+            },
+        );
+
+        let out = msg
+            .messages(vec![
+                InternIn::Network(OverlayOut::NodeInfoAvailable(infos)),
+                InternIn::Tick,
+            ])
+            .await;
+        assert_eq!(4, out.len());
+
         Ok(())
     }
 }

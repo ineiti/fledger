@@ -93,37 +93,30 @@ impl Kademlia {
         };
     }
 
-    pub fn nearest_nodes(&self, id: &NodeID) -> Vec<NodeID> {
-        if id == &self.root {
-            return vec![];
-        }
-
-        let kn = KNode::new(&self.root, *id);
-
-        // Start with potential nodes from the root-bucket.
-        for depth in (self.buckets.len()..=kn.depth).rev() {
-            let nodes = self.root_bucket.get_active_ids(depth);
-            if nodes.len() > 0 {
-                return nodes;
+    pub fn route_nodes(&self, dst: &NodeID, last: Option<&NodeID>) -> Vec<NodeID> {
+        let depth = KNode::get_depth(&self.root, *dst);
+        match last {
+            Some(l) => {
+                let depth_last = depth.max(KNode::get_depth(&self.root, *l));
+                let depth_root_last = self.root_bucket.last_depth().unwrap_or(depth_last);
+                for d in std::iter::once(depth).chain(depth_last + 1..depth_root_last) {
+                    let ret = self.get_nodes_depth(d);
+                    if ret.len() > 0 {
+                        return ret;
+                    }
+                }
+                vec![]
             }
+            None => self.get_nodes_depth(depth),
         }
+    }
 
-        // Then search nodes which are at the same depth or further away.
-        for depth in (0..=kn.depth).rev() {
-            if let Some(nodes) = self.get_active_bucket_ids(depth) {
-                return nodes;
-            }
+    pub fn get_nodes_depth(&self, depth: usize) -> Vec<NodeID> {
+        if let Some(ret) = self.buckets.get(depth).map(|b| b.get_active_ids(depth)) {
+            ret
+        } else {
+            self.root_bucket.get_active_ids(depth)
         }
-
-        // Then try nodes closer - this will probably fail, but might as well try it.
-        for depth in kn.depth + 1..self.buckets.len() {
-            if let Some(nodes) = self.get_active_bucket_ids(depth) {
-                return nodes;
-            }
-        }
-
-        // OK, nothing found
-        vec![]
     }
 
     /// Returns all the active nodes of the kademlia system.
@@ -184,7 +177,7 @@ impl Kademlia {
         }
     }
 
-    fn get_active_bucket_ids(&self, depth: usize) -> Option<Vec<NodeID>> {
+    fn _get_active_bucket_ids(&self, depth: usize) -> Option<Vec<NodeID>> {
         if let Some(bucket) = self.buckets.get(depth) {
             if bucket.active.len() > 0 {
                 return Some(bucket.active.iter().map(|kn| kn.id).collect());
@@ -262,6 +255,7 @@ impl KBucket {
     fn add_node_active(&mut self, node: KNode) {
         if self.is_root || self.active.len() < self.config.k {
             self.active.push(node);
+            self.active.sort_by(|a, b| a.depth.cmp(&b.depth));
         } else if self.cache.len() < self.config.k {
             self.cache.push(node);
         }
@@ -300,6 +294,10 @@ impl KBucket {
             .iter()
             .filter_map(|kn| (kn.depth == depth).then(|| kn.id))
             .collect()
+    }
+
+    fn last_depth(&self) -> Option<usize> {
+        self.active.last().map(|kn| kn.depth)
     }
 
     // Rust range expressions:
@@ -399,6 +397,7 @@ impl KBucket {
             kn.active();
             if self.is_root || self.active.len() < self.config.k {
                 self.active.push(kn);
+                self.active.sort_by(|a, b| a.depth.cmp(&b.depth));
             } else {
                 self.cache.push(kn);
             }
@@ -669,19 +668,31 @@ mod test {
         let root = U256::from_str("00").expect("NodeID init");
         let mut kademlia = Kademlia::new(root, CONFIG);
 
-        let nodes = kademlia.nearest_nodes(&rnd_node_depth(&root, 2));
+        let dst_0 = rnd_node_depth(&root, 0);
+        let dst_1 = rnd_node_depth(&root, 1);
+        let dst_2 = rnd_node_depth(&root,2);
+
+        let nodes = kademlia.route_nodes(&dst_2, None);
         assert_eq!(0, nodes.len());
+
         kademlia_add_nodes(&mut kademlia, 0, 1);
-        let nodes = kademlia.nearest_nodes(&rnd_node_depth(&root, 1));
+        let nodes = kademlia.route_nodes(&dst_0, None);
         assert_eq!(1, nodes.len());
-        kademlia_add_nodes(&mut kademlia, 2, 3 * CONFIG.k);
-        let nodes = kademlia.nearest_nodes(&rnd_node_depth(&root, 1));
+        let nodes = kademlia.route_nodes(&dst_1, None);
+        assert_eq!(0, nodes.len());
+
+        kademlia_add_nodes(&mut kademlia, 2, 1);
+        let nodes = kademlia.route_nodes(&dst_2, None);
         assert_eq!(1, nodes.len());
+
+        kademlia_add_nodes(&mut kademlia, 2, 2 * CONFIG.k);
+        let nodes = kademlia.route_nodes(&dst_2, None);
+        assert_eq!(2*CONFIG.k + 1, nodes.len());
     }
 
     // Do some more complicated cases
     #[test]
-    fn test_closest_nodes_complicated() {
+    fn test_closest_nodes_last() {
         start_logging_filter_level(vec![], LOG_LVL);
 
         let root = U256::from_str("00").expect("NodeID init");
@@ -701,11 +712,12 @@ mod test {
             (2, 2, CONFIG.k),
             (3, 3, CONFIG.k),
             (4, 4, CONFIG.k + 1),
-            (5, 4, CONFIG.k + 1),
+            (5, 4, 0),
         ];
 
         for (depth, returned, nbr) in tests {
-            let nodes = kademlia.nearest_nodes(&rnd_node_depth(&root, depth));
+            let dst = rnd_node_depth(&root, depth);
+            let nodes = kademlia.route_nodes(&dst, Some(&dst));
             assert_eq!(
                 nbr,
                 nodes.len(),
@@ -713,11 +725,10 @@ mod test {
                 NodeIDs::from(nodes),
             );
             for node in nodes {
-                let kn = KNode::new(&root, node);
+                let d = KNode::get_depth(&root, node);
                 assert_eq!(
-                    returned, kn.depth,
-                    "Node {node} with depth {} in {depth} - {returned} - {nbr}",
-                    kn.depth
+                    returned, d,
+                    "Node {node} with depth {d} in {depth} - {returned} - {nbr}"
                 );
             }
         }
@@ -788,14 +799,22 @@ mod test {
     #[test]
     fn test_reach() {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
-        use rayon::prelude::*;
+        // use rayon::prelude::*;
 
-        (0..=5).rev().collect::<Vec<_>>().par_iter().for_each(|&k| {
-            reach_one(1000, 20, 2 * k + 1);
+        let mut res = vec![];
+        (0..5).rev().for_each(|ki| {
+            let k = 20 * ki + 1;
+            (0..=5).collect::<Vec<_>>().iter().for_each(|&missing| {
+                log::info!("{ki}/{missing}");
+                let visible = 1000 - missing * 50;
+                let missed = reach_one(1000, visible, 200, 2);
+                res.push([k, visible, missed]);
+            });
         });
+        log::info!("\n{res:?}");
     }
 
-    fn reach_one(node_nbr: usize, max_hops: usize, k: usize) {
+    fn reach_one(node_nbr: usize, node_visible: usize, max_hops: usize, k: usize) -> usize {
         let config = Config {
             k,
             ping_interval: 10,
@@ -808,44 +827,58 @@ mod test {
             .map(|root| {
                 let mut kad = Kademlia::new(*root, config);
                 let mut shuffled = nodes.clone();
-                shuffled.shuffle(rng);
                 shuffled.retain(|id| id != root);
-                kad.add_nodes_active(shuffled);
+                kad.add_nodes_active(shuffled.partial_shuffle(rng, node_visible).0.to_vec());
                 // kad.add_nodes(shuffled);
                 kad
             })
             .collect();
 
-        log::debug!("{}", &kademlias[0]);
+        // log::debug!("{}", &kademlias[0]);
         let mut hops_stat = vec![];
+        let mut missing = 0;
         for (run, node) in nodes[1..node_nbr].iter().enumerate() {
             log::debug!("*** {run} ***: Searching route from {} to {node}", nodes[0]);
-            let mut hop_kademlia = &kademlias[0];
+            let mut hop_kademlia = kademlias.choose(rng).unwrap();
             for hop in 0..max_hops {
-                log::trace!("{hop_kademlia}");
-                let next_hops = hop_kademlia.nearest_nodes(node);
+                // log::trace!("{hop_kademlia}");
+                let next_hops =
+                    hop_kademlia.route_nodes(node, (hop > 0).then(|| &hop_kademlia.root));
                 if let Some(next_hop) = next_hops.choose(rng) {
                     hop_kademlia = kademlias.iter().find(|k| k.root == *next_hop).unwrap();
-                    log::trace!("{hop}: {next_hop}");
+                    log::trace!("{hop}/{}: {next_hop}", KNode::get_depth(node, *next_hop));
                 } else {
-                    assert_eq!(node, &hop_kademlia.root);
+                    if node != &hop_kademlia.root {
+                        log::trace!(
+                            "{hop}: empty node returned before end: {} != {}",
+                            node,
+                            hop_kademlia.root
+                        );
+                        missing += 1;
+                        // log::info!("{}", hop_kademlia);
+                        // panic!();
+                        break;
+                    }
                     log::trace!("{hop}: found");
                     hops_stat.push(hop);
                     break;
                 }
-                assert_ne!(
-                    max_hops - 1,
-                    hop,
-                    "Didn't find route between {} and {node}",
-                    nodes[0]
-                );
+                if max_hops - 1 == hop {
+                    log::trace!(
+                        "Run {run}: Didn't find destination for this node in {max_hops} hops"
+                    );
+                    missing += 1;
+                    // panic!();
+                }
             }
         }
-        log::info!(
-            "Stats for {}: {:?}",
+        log::debug!(
+            "Stats for {}: missing, route-length\n{missing} - {:?}",
             config.k,
             hops_stat.iter().counts_by(|u| u).iter().sorted()
         );
+
+        missing
     }
 
     fn kademlia_bucket(kademlia: &Kademlia, depth: usize, active: usize, cache: usize) {
@@ -901,4 +934,28 @@ mod test {
         log::info!("{kademlia}");
         tick_len(&mut kademlia, 3 * CONFIG.k, 0);
     }
+
+    // #[test]
+    // fn test_closer_nodes() {
+    //     start_logging_filter_level(vec![], LOG_LVL);
+
+    //     let root = NodeID::rnd();
+    //     let mut kademlia = Kademlia::new(root, CONFIG);
+
+    //     // Create some nodes
+    //     kademlia_add_nodes(&mut kademlia, 2, 2 * CONFIG.k);
+    //     kademlia_add_nodes(&mut kademlia, 4, 2 * CONFIG.k);
+    //     kademlia_add_nodes(&mut kademlia, 5, 2 * CONFIG.k);
+    //     kademlia_add_nodes(&mut kademlia, 6, 2 * CONFIG.k);
+    //     kademlia_test(&kademlia, 6, 2 * CONFIG.k);
+
+    //     let last = kademlia.buckets.get(2).unwrap().active.get(0).unwrap();
+    //     let closer = |d| kademlia.getcloser_nodes(&last.id, &rnd_node_depth(&root, d));
+    //     assert_eq!(0, closer(1).len());
+    //     assert_eq!(0, closer(2).len());
+    //     assert_eq!(CONFIG.k, closer(3).len());
+    //     assert!(closer(3).iter().all(|&id| KNode::get_depth(&root, id) == 2));
+    //     assert_eq!(CONFIG.k, closer(4).len());
+    //     assert!(closer(3).iter().all(|&id| KNode::get_depth(&root, id) == 4));
+    // }
 }

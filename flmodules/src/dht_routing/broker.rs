@@ -87,32 +87,78 @@ impl DHTRouting {
 
 #[cfg(test)]
 mod tests {
-    use flarch::start_logging_filter_level;
+    use std::str::FromStr;
+
+    use flarch::{start_logging_filter_level, tasks::wait_ms};
 
     use super::*;
+    use crate::{nodeconfig::NodeInfo, overlay::testing::NetworkBrokerSimul};
+
+    const LOG_LVL: log::LevelFilter = log::LevelFilter::Debug;
 
     #[tokio::test]
-    async fn test_increase() -> Result<(), Box<dyn Error>> {
-        start_logging_filter_level(vec![], log::LevelFilter::Info);
+    async fn test_routing() -> Result<(), Box<dyn Error>> {
+        start_logging_filter_level(vec![], LOG_LVL);
 
-        // let ds = Box::new(DataStorageTemp::new());
-        // let id0 = NodeID::rnd();
-        // let id1 = NodeID::rnd();
-        // let mut rnd = Broker::new();
-        // let mut tr = DHTRouting::start(ds, id0, rnd.clone(), DHTRoutingConfig::default()).await?;
-        // let mut tap = rnd.get_tap().await?;
-        // assert_eq!(0, tr.get_counter());
+        let mut tick = Broker::new();
+        let config = Config {
+            k: 1,
+            ping_interval: 2,
+            ping_timeout: 4,
+        };
 
-        // rnd.settle_msg(RandomMessage::Output(RandomOut::NodeIDsConnected(
-        //     vec![id1].into(),
-        // )))
-        // .await?;
-        // tr.increase_self(1)?;
-        // assert!(matches!(
-        //     tap.0.recv().await.unwrap(),
-        //     RandomMessage::Input(_)
-        // ));
-        // assert_eq!(1, tr.get_counter());
+        let mut simul = NetworkBrokerSimul::new().await?;
+        let (nroot, mut root) = simul.new_node_id(Some(U256::from_str("00")?)).await?;
+        let (n1, mut o1) = simul.new_node_id(Some(U256::from_str("80")?)).await?;
+        let (n2, mut o2) = simul.new_node_id(Some(U256::from_str("81")?)).await?;
+        let (n3, mut o3) = simul.new_node_id(Some(U256::from_str("40")?)).await?;
+        let (n4, mut o4) = simul.new_node_id(Some(U256::from_str("41")?)).await?;
+        let list: Vec<NodeInfo> = vec![&nroot, &n1, &n2, &n3, &n4]
+            .iter()
+            .map(|nc| nc.info.clone())
+            .collect();
+
+        let mut dhtr = DHTRouting::start(
+            nroot.info.get_id(),
+            root.clone(),
+            tick.clone(),
+            config.clone(),
+        )
+        .await?;
+        let _dht1 =
+            DHTRouting::start(n1.info.get_id(), o1.clone(), tick.clone(), config.clone()).await?;
+        let _dht2 =
+            DHTRouting::start(n2.info.get_id(), o2.clone(), tick.clone(), config.clone()).await?;
+        let _dht3 =
+            DHTRouting::start(n3.info.get_id(), o3.clone(), tick.clone(), config.clone()).await?;
+        let _dht4 =
+            DHTRouting::start(n4.info.get_id(), o4.clone(), tick.clone(), config.clone()).await?;
+        root.emit_msg_out(OverlayOut::NodeInfoAvailable(list.clone()))?;
+        o1.emit_msg_out(OverlayOut::NodeInfoAvailable(list.clone()))?;
+        o2.emit_msg_out(OverlayOut::NodeInfoAvailable(list.clone()))?;
+        o3.emit_msg_out(OverlayOut::NodeInfoAvailable(list.clone()))?;
+        o4.emit_msg_out(OverlayOut::NodeInfoAvailable(list.clone()))?;
+
+        wait_ms(1000).await;
+        tick.emit_msg(TimerMessage::Second)?;
+        wait_ms(1000).await;
+        dhtr.routing.emit_msg_in(DHTRoutingIn::DHTMessage(
+            list[4].get_id(),
+            NetworkWrapper {
+                module: "Test1".into(),
+                msg: "Brume".into(),
+            },
+        ))?;
+        wait_ms(1000).await;
+        dhtr.routing.emit_msg_in(DHTRoutingIn::DHTMessage(
+            U256::from_str("42")?,
+            NetworkWrapper {
+                module: "Test2".into(),
+                msg: "Brume".into(),
+            },
+        ))?;
+        wait_ms(1000).await;
+
         Ok(())
     }
 }

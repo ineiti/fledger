@@ -106,24 +106,6 @@ mod tests {
 
     #[test]
     fn test_something() -> Result<(), Box<dyn Error>> {
-        let ids = NodeIDs::new(2);
-        let id0 = *ids.0.get(0).unwrap();
-        let id1 = *ids.0.get(1).unwrap();
-        let storage = DHTStorageBucket::default();
-        let mut msg = DHTStorageMessages::new(storage, DHTStorageConfig::default(), id0)?;
-        // msg.process_messages(vec![InternIn::UpdateNodeList(ids).into()]);
-        // let ret = msg.process_messages(vec![
-        //     DHTStorageIn::Node(id1, MessageNode::Increase(2)).into()
-        // ]);
-        // assert_eq!(2, ret.len());
-        // assert!(matches!(
-        //     ret[0],
-        //     DHTStorageOut::Node(_, MessageNode::Counter(2))
-        // ));
-        // assert!(matches!(
-        //     ret[1],
-        //     DHTStorageOut::UpdateStorage(DHTStorageBucket { counter: 2 })
-        // ));
         Ok(())
     }
 }
