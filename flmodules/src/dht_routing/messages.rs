@@ -139,7 +139,7 @@ impl SubsystemHandler<InternIn, InternOut> for DHTRoutingMessages {
                 },
             });
         }
-        log::info!("{out:?}");
+
         out
     }
 }

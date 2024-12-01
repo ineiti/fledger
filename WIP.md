@@ -12,7 +12,6 @@
 
 1. The KBucket.active should only be populated once a node has been confirmed.
   - Needs more testing if nodes fail and how they will be replaced
-2. Do better routing test in dht_routing/broker.rs
 
 ### DHT_storage
 

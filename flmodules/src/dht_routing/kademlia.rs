@@ -934,28 +934,4 @@ mod test {
         log::info!("{kademlia}");
         tick_len(&mut kademlia, 3 * CONFIG.k, 0);
     }
-
-    // #[test]
-    // fn test_closer_nodes() {
-    //     start_logging_filter_level(vec![], LOG_LVL);
-
-    //     let root = NodeID::rnd();
-    //     let mut kademlia = Kademlia::new(root, CONFIG);
-
-    //     // Create some nodes
-    //     kademlia_add_nodes(&mut kademlia, 2, 2 * CONFIG.k);
-    //     kademlia_add_nodes(&mut kademlia, 4, 2 * CONFIG.k);
-    //     kademlia_add_nodes(&mut kademlia, 5, 2 * CONFIG.k);
-    //     kademlia_add_nodes(&mut kademlia, 6, 2 * CONFIG.k);
-    //     kademlia_test(&kademlia, 6, 2 * CONFIG.k);
-
-    //     let last = kademlia.buckets.get(2).unwrap().active.get(0).unwrap();
-    //     let closer = |d| kademlia.getcloser_nodes(&last.id, &rnd_node_depth(&root, d));
-    //     assert_eq!(0, closer(1).len());
-    //     assert_eq!(0, closer(2).len());
-    //     assert_eq!(CONFIG.k, closer(3).len());
-    //     assert!(closer(3).iter().all(|&id| KNode::get_depth(&root, id) == 2));
-    //     assert_eq!(CONFIG.k, closer(4).len());
-    //     assert!(closer(3).iter().all(|&id| KNode::get_depth(&root, id) == 4));
-    // }
 }
