@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::loopix::config::CoreConfig;
 use crate::loopix::core::LoopixCore;
@@ -12,6 +13,8 @@ use async_trait::async_trait;
 use flarch::nodeids::NodeID;
 use sphinx_packet::payload::Payload;
 use sphinx_packet::SphinxPacket;
+
+use super::ENCRYPTION_LATENCY;
 
 #[derive(Debug, PartialEq)]
 pub struct Client {
@@ -301,7 +304,10 @@ impl Client {
         node_id: NodeID,
         message: NetworkWrapper,
     ) -> (NodeID, Sphinx) {
+        let start_time = Instant::now();
         let (next_node, sphinx) = self.create_payload_message(node_id, message).await;
+        let end_time = start_time.elapsed().as_millis() as f64;
+        ENCRYPTION_LATENCY.observe(end_time);
         (next_node, sphinx)
     }
 

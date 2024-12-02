@@ -51,6 +51,8 @@ sphinx-packet = { version = "0.2" }
 rand_distr = "0.4.3"
 base64 = "0.22.1"
 uuid = "1.1"
+prometheus = "0.13.4"
+lazy_static = "1.5"
 
 [dev-dependencies]
 env_logger = "0.11"

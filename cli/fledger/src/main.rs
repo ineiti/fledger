@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::Write;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tokio::time::Duration;
+use prometheus::{gather, TextEncoder, Encoder};
 
 use clap::Parser;
 
@@ -63,36 +64,52 @@ struct Args {
     retry: u8,
 }
 
-async fn save_loopix_storage_periodically(
+async fn save_metrics_loop(
     storage: Arc<LoopixStorage>,
     path: PathBuf,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::info!("Saving loopix storage to {}", path.display());
 
     let mut storage_path = PathBuf::from(".");
-    storage_path.push(path);
-
+    storage_path.push(path.clone());
     if let Err(e) = std::fs::create_dir_all(&storage_path) {
-        eprintln!("Failed to create directory: {}", e);
+        log::error!("Failed to create directory: {}", e);
     }
-
     storage_path.push("loopix_storage.yaml");
 
-    loop {
-        std::thread::sleep(Duration::from_secs(1));
+    let mut metrics_path = PathBuf::from(".");
+    metrics_path.push(path);
+    if let Err(e) = std::fs::create_dir_all(&metrics_path) {
+        log::error!("Failed to create directory: {}", e);
+    }
+    metrics_path.push("metrics.txt");
 
+    loop {
+        std::thread::sleep(Duration::from_secs(5));
+
+        // Save the loopix storage to a file
         let storage_bytes = storage.to_yaml_async().await.unwrap();
 
         match File::create(&storage_path) {
             Ok(mut file) => {
                 if let Err(e) = file.write_all(storage_bytes.as_bytes()) {
-                    println!("Failed to write storage file: {}", e);
+                    log::error!("Failed to write storage file: {}", e);
                 }
             }
             Err(e) => {
-                println!("Failed to create storage file: {}", e);
+                log::error!("Failed to create storage file: {}", e);
             }
         }
+
+        // Gather the current metrics
+        let metric_families = gather();
+        let mut buffer = Vec::new();
+        let encoder = TextEncoder::new();
+        encoder.encode(&metric_families, &mut buffer).unwrap();
+
+        // Write metrics to a file
+        let mut file = File::create(&metrics_path).expect("Unable to create file");
+        file.write_all(&buffer).expect("Unable to write data");
     }
 }
 
@@ -284,7 +301,7 @@ impl LSRoot {
                     LoopixSetup::node_config(node).await?;
                     let loopix = node.loopix.as_ref().map(|l| l.storage.clone());
                     if let Some(loopix) = loopix {
-                        tokio::spawn(save_loopix_storage_periodically(
+                        tokio::spawn(save_metrics_loop(
                             Arc::clone(&loopix),
                             dir_path,
                         ));
@@ -383,7 +400,7 @@ impl LSChild {
                         .await?;
                     let loopix = node.loopix.as_ref().map(|l| l.storage.clone());
                     if let Some(loopix) = loopix {
-                        tokio::spawn(save_loopix_storage_periodically(
+                        tokio::spawn(save_metrics_loop(
                             Arc::clone(&loopix),
                             dir_path,
                         ));

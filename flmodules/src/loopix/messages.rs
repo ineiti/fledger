@@ -1,5 +1,6 @@
 use std::fmt;
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use sphinx_packet::header::delays::Delay;
@@ -12,6 +13,7 @@ use sphinx_packet::{packet::*, payload::*};
 
 use super::config::CoreConfig;
 use super::storage::LoopixStorage;
+use super::{DECRYPTION_LATENCY, MIXNODE_DELAY};
 use super::{client::Client, core::*, mixnode::Mixnode, provider::Provider, sphinx::*};
 use crate::nodeconfig::NodeInfo;
 use crate::overlay::messages::NetworkWrapper;
@@ -162,7 +164,10 @@ impl LoopixMessages {
         node_id: NodeID,
         sphinx_packet: Sphinx,
     ) {
+        let start_time = Instant::now();
         let processed = self.role.process_sphinx_packet(sphinx_packet.clone()).await;
+        let end_time = start_time.elapsed().as_millis() as f64;
+        DECRYPTION_LATENCY.observe(end_time);
         if let Some(processed) = processed {
             match processed {
                 ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
@@ -378,7 +383,10 @@ impl NodeType {
         match self {
             NodeType::Mixnode(_) | NodeType::Provider(_) => {
                 tokio::spawn(async move {
+                    let start_time = Instant::now();
                     tokio::time::sleep(delay.to_duration()).await;
+                    let end_time = start_time.elapsed().as_millis() as f64;
+                    MIXNODE_DELAY.observe(end_time);
                     network_sender
                         .send((node_id, sphinx))
                         .await

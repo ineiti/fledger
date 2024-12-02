@@ -8,8 +8,7 @@ use flarch::{
 };
 
 use crate::{
-    network::messages::{NetworkIn, NetworkMessage, NetworkOut},
-    overlay::messages::NetworkWrapper,
+    loopix::BANDWIDTH, network::messages::{NetworkIn, NetworkMessage, NetworkOut}, overlay::messages::NetworkWrapper
 };
 
 use super::{
@@ -216,11 +215,12 @@ impl LoopixBroker {
                 );
 
                 // emit loop message
-                if let Err(e) = broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx).into())
+                if let Err(e) = broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx.clone()).into())
                 {
                     log::error!("Failed to emit loop message: {:?}", e);
                 } else {
                     log::trace!("Successfully emitted loop message to node {}", node_id);
+                    BANDWIDTH.inc_by(sphinx.inner.to_bytes().len() as f64);
                 }
             }
         });
@@ -253,11 +253,12 @@ impl LoopixBroker {
                 );
 
                 // emit drop message
-                if let Err(e) = broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx).into())
+                if let Err(e) = broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx.clone()).into())
                 {
                     log::error!("Failed to emit drop message: {:?}", e);
                 } else {
                     log::trace!("Successfully emitted drop message to node {}", node_id);
+                    BANDWIDTH.inc_by(sphinx.inner.to_bytes().len() as f64);
                 }
             }
         });
@@ -285,11 +286,12 @@ impl LoopixBroker {
 
                 // serialize and send
                 // let msg = serde_yaml::to_string(&sphinx).unwrap();
-                if let Err(e) = broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx).into())
+                if let Err(e) = broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx.clone()).into())
                 {
                     log::error!("Failed to emit subscribe message: {:?}", e);
                 } else {
                     log::trace!("Successfully emitted subscribe message to node {}", node_id);
+                    BANDWIDTH.inc_by(sphinx.inner.to_bytes().len() as f64);
                 }
 
                 // wait
@@ -320,11 +322,12 @@ impl LoopixBroker {
 
                 if let Some(sphinx) = sphinx {
                     if let Err(e) =
-                        broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx).into())
+                        broker.emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx.clone()).into())
                     {
                         log::error!("Failed to emit pull message: {:?}", e);
                     } else {
                         log::trace!("Successfully emitted pull message to node {}", node_id);
+                        BANDWIDTH.inc_by(sphinx.inner.to_bytes().len() as f64);
                     }
                 }
 
@@ -351,6 +354,7 @@ impl LoopixBroker {
                             node_id,
                             sphinx.message_id
                         );
+                        BANDWIDTH.inc_by(sphinx.inner.to_bytes().len() as f64);
                     }
                 }
             }
@@ -410,6 +414,7 @@ impl LoopixBroker {
                             sphinx.message_id,
                             node_id
                         );
+                        BANDWIDTH.inc_by(sphinx.inner.to_bytes().len() as f64);
                         sphinx_messages.remove(0);
                     }
                 } else {
@@ -425,6 +430,7 @@ impl LoopixBroker {
                         log::error!("Error emitting drop message: {e:?}");
                     }
                     log::trace!("{} emitted a drop message to node {}", our_id, node_id);
+                    BANDWIDTH.inc_by(sphinx.inner.to_bytes().len() as f64);
                 }
 
                 // Wait for send delay
