@@ -20,6 +20,8 @@ pub enum FloError {
     UpdateNoData,
     #[error("This update has no ACE")]
     UpdateNoACE,
+    #[error("No Updates")]
+    UpdatesMissing,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
@@ -82,7 +84,11 @@ impl Flo {
             .unwrap()
     }
 
-    fn is_valid(&self) -> Result<(), FloError> {
+    pub fn is_valid(&self) -> Result<(), FloError> {
+        if self.updates.len() < 2 {
+            return Err(FloError::UpdatesMissing);
+        }
+
         if self
             .updates
             .iter()
@@ -95,6 +101,7 @@ impl Flo {
                 "Missing ACE".into(),
             ));
         }
+
         if self
             .updates
             .iter()
@@ -108,6 +115,10 @@ impl Flo {
             ));
         }
         Ok(())
+    }
+
+    pub fn version(&self) -> usize {
+        self.updates.len()
     }
 }
 

@@ -1,26 +1,35 @@
-use flarch::{broker_io::BrokerIO, data_storage::DataStorage};
+use flarch::{broker_io::BrokerIO, data_storage::DataStorage, nodeids::U256};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use tokio::sync::watch;
 
 use crate::{
     dht_routing::broker::{DHTRoutingIn, DHTRoutingOut},
-    flo::dht::DHTStorageConfig,
+    flo::dht::{DHTFlo, DHTStorageConfig},
     overlay::messages::{OverlayIn, OverlayOut},
 };
 use flarch::nodeids::NodeID;
 
 use super::{
     core::{DHTStorageBucket, DHTStorageStorageSave},
-    messages::{DHTStorageMessages, InternIn, InternOut},
+    messages::{DHTStorageMessages, DHTStorageStats, InternIn, InternOut},
 };
 
 pub(super) const MODULE_NAME: &str = "DHTStorage";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum DHTStorageIn {}
+pub enum DHTStorageIn {
+    StoreValue(DHTFlo),
+    ReadValue(U256),
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum DHTStorageOut {}
+pub enum DHTStorageOut {
+    Value(DHTFlo),
+    ValueMissing(U256),
+    UpdateStorage(DHTStorageBucket),
+    UpdateStats(DHTStorageStats),
+}
 
 /// This links the DHTStorage module with other modules, so that
 /// all messages are correctly translated from one to the other.
@@ -46,7 +55,7 @@ impl DHTStorage {
     ) -> Result<Self, Box<dyn Error>> {
         let str = ds.get(MODULE_NAME).unwrap_or("".into());
         let storage = DHTStorageStorageSave::from_str(&str).unwrap_or_default();
-        let messages = DHTStorageMessages::new(storage.clone(), config, our_id)?;
+        let messages = DHTStorageMessages::new(storage.clone(), config)?;
         let (tx, storage) = watch::channel(storage);
 
         let mut dht_storage = BrokerIO::<InternIn, InternOut>::new();
@@ -99,6 +108,10 @@ impl DHTStorage {
             storage,
         })
     }
+
+    pub fn store_kv() {}
+
+    pub fn read_key() {}
 
     // fn link_net_dhtstorage(msg: OverlayOut) -> Option<DHTStorageMessage> {
     //     if let RandomMessage::Output(msg_out) = msg {

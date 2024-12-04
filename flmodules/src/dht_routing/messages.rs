@@ -3,6 +3,7 @@ use flarch::{
     nodeids::{NodeID, U256},
     platform_async_trait,
 };
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -22,8 +23,12 @@ use super::{
 pub enum ModuleMessage {
     Ping,
     Pong,
-    /// Source, Key (or NodeID), msg
-    DHTMessage(NodeID, U256, NetworkWrapper),
+    /// Sends the message to the closest node and emits messages
+    /// on the path.
+    Closest(NodeID, U256, NetworkWrapper),
+    /// Sends the message to a specific node, using Kademlia routing.
+    /// No messages are emitted during routing.
+    Direct(NodeID, NodeID, NetworkWrapper),
 }
 
 /// The messages here represent all possible interactions with this module.
@@ -62,7 +67,10 @@ impl DHTRoutingMessages {
             Some(msg) => match msg {
                 ModuleMessage::Ping => vec![(ModuleMessage::Pong).wrapper_network(from)],
                 ModuleMessage::Pong => vec![],
-                ModuleMessage::DHTMessage(orig, key, msg) => self.dht_message(orig, from, key, msg),
+                ModuleMessage::Closest(orig, key, msg) => {
+                    self.message_closest(orig, from, key, msg)
+                }
+                ModuleMessage::Direct(orig, dst, msg) => self.message_direct(orig, from, dst, msg),
             },
             None => vec![],
         }
@@ -85,26 +93,34 @@ impl DHTRoutingMessages {
             .collect()
     }
 
-    fn new_dht_message(&self, key: U256, msg: NetworkWrapper) -> Vec<InternOut> {
-        if let Some(&next_hop) = self.core.route_nodes(&key, None).first() {
-            vec![ModuleMessage::DHTMessage(self.core.root, key, msg.clone())
-                .wrapper_network(next_hop)]
+    fn new_closest(&self, key: U256, msg: NetworkWrapper) -> Vec<InternOut> {
+        if let Some(&next_hop) = self.core.route_closest(&key, None).first() {
+            vec![ModuleMessage::Closest(self.core.root, key, msg.clone()).wrapper_network(next_hop)]
         } else {
             log::warn!("Couldn't send new request because no nodes found!");
             vec![]
         }
     }
 
-    fn dht_message(
+    fn new_direct(&self, dst: NodeID, msg: NetworkWrapper) -> Vec<InternOut> {
+        if let Some(&next_hop) = self.core.route_closest(&dst, None).first() {
+            vec![ModuleMessage::Direct(self.core.root, dst, msg.clone()).wrapper_network(next_hop)]
+        } else {
+            log::warn!("Couldn't send new request because no nodes found!");
+            vec![]
+        }
+    }
+
+    fn message_closest(
         &self,
         orig: NodeID,
         last_hop: NodeID,
         key: U256,
         msg: NetworkWrapper,
     ) -> Vec<InternOut> {
-        match self.core.route_nodes(&key, Some(&last_hop)).first() {
+        match self.core.route_closest(&key, Some(&last_hop)).first() {
             Some(&next_hop) => vec![
-                ModuleMessage::DHTMessage(orig, key, msg.clone()).wrapper_network(next_hop),
+                ModuleMessage::Closest(orig, key, msg.clone()).wrapper_network(next_hop),
                 DHTRoutingOut::MessageRouting(orig, last_hop, next_hop, key, msg).into(),
             ],
             None => {
@@ -115,6 +131,23 @@ impl DHTRoutingMessages {
                 }
             }
         }
+    }
+
+    fn message_direct(
+        &self,
+        orig: NodeID,
+        last: NodeID,
+        dst: NodeID,
+        msg: NetworkWrapper,
+    ) -> Vec<InternOut> {
+        if dst == self.core.root {
+            return vec![DHTRoutingOut::MessageDest(orig, last, msg).into()];
+        }
+        let next_hops = self.core.route_direct(&dst);
+        next_hops
+            .choose(&mut rand::thread_rng())
+            .map(|next_hop| vec![ModuleMessage::Direct(orig, dst, msg).wrapper_network(*next_hop)])
+            .unwrap_or(vec![])
     }
 }
 
@@ -127,8 +160,11 @@ impl SubsystemHandler<InternIn, InternOut> for DHTRoutingMessages {
         for msg in msgs {
             out.extend(match msg {
                 InternIn::Tick => self.tick(),
-                InternIn::DHTRouting(DHTRoutingIn::DHTMessage(key, msg)) => {
-                    self.new_dht_message(key, msg)
+                InternIn::DHTRouting(DHTRoutingIn::MessageClosest(key, msg)) => {
+                    self.new_closest(key, msg)
+                }
+                InternIn::DHTRouting(DHTRoutingIn::MessageDirect(key, msg)) => {
+                    self.new_direct(key, msg)
                 }
                 InternIn::Network(overlay_out) => match overlay_out {
                     OverlayOut::NodeInfoAvailable(node_infos) => self.node_list(node_infos),

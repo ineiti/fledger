@@ -17,7 +17,8 @@ pub(super) const MODULE_NAME: &str = "DHTRouting";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTRoutingIn {
-    DHTMessage(U256, NetworkWrapper),
+    MessageClosest(U256, NetworkWrapper),
+    MessageDirect(NodeID, NetworkWrapper),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -133,7 +134,7 @@ mod tests {
         tick.settle_msg(TimerMessage::Second).await?;
 
         let dhtm = |id: NodeID, module: &str, msg: &str| {
-            DHTRoutingIn::DHTMessage(
+            DHTRoutingIn::MessageClosest(
                 id,
                 NetworkWrapper {
                     module: module.into(),

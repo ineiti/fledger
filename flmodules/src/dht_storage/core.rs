@@ -8,7 +8,7 @@ use crate::flo::dht::{DHTFlo, DHTStorageConfig};
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct FloMeta {
     pub id: U256,
-    pub size: u64,
+    pub version: usize,
 }
 
 impl Default for DHTStorageConfig {
@@ -33,6 +33,28 @@ impl DHTStorageCore {
     pub fn new(storage: DHTStorageBucket, config: DHTStorageConfig) -> Self {
         Self { storage, config }
     }
+
+    /// TODO: decide which IDs need to be stored.
+    pub fn update_available(&self, available: Vec<FloMeta>) -> Vec<U256> {
+        available.iter().map(|fm| fm.id).collect()
+    }
+
+    pub fn update_request(&self, keys: Vec<U256>) -> Vec<DHTFlo> {
+        keys.iter()
+            .filter_map(|k| self.storage.flos.get(k))
+            .cloned()
+            .collect()
+    }
+
+    pub fn update_flos(&mut self, flos: Vec<DHTFlo>) {
+        for flo in flos {
+            if let Some(old) = self.storage.flos.get(&flo.id()) {
+                if old.flo.version() < flo.flo.version() {
+                    self.storage.flos.insert(old.flo.id, flo);
+                }
+            }
+        }
+    }
 }
 
 /// The storage will probably evolve over time, so it's a good idea to store the different
@@ -56,14 +78,6 @@ impl DHTStorageStorageSave {
     }
 }
 
-/// If you want to add a new version and the current version is `x`, do the
-/// following:
-/// - copy `DHTStorageStorage` to a struct called `DHTStorageStorageVx`
-/// - change the `DHTStorageStorage` to include your new fields
-/// - change the `DHTStorageStorageSave` to include the new version:
-///   - add a `Vx` to the name of the structure of the `Vx` enum
-///   - add a `V(x+1)` enum pointing to `DHTStorageStorage`
-/// - adapt `DHTStorageStorageSave::to_latest` to go from `Vx` to `V(x+1)`
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 pub struct DHTStorageBucket {
     pub flos: HashMap<U256, DHTFlo>,
@@ -72,6 +86,21 @@ pub struct DHTStorageBucket {
 impl DHTStorageBucket {
     pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
         serde_yaml::to_string::<DHTStorageStorageSave>(&DHTStorageStorageSave::V1(self.clone()))
+    }
+
+    pub fn store_kv(&mut self, flo: DHTFlo) {
+        self.flos.insert(flo.id(), flo);
+        // TODO: evict values which are furthest from us
+    }
+
+    pub fn flo_meta(&self) -> Vec<FloMeta> {
+        self.flos
+            .values()
+            .map(|df| FloMeta {
+                id: df.id(),
+                version: df.flo.version(),
+            })
+            .collect()
     }
 }
 

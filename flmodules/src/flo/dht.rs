@@ -61,6 +61,7 @@ impl TryFrom<Flo> for DHTConfig {
 pub struct DHTFlo {
     pub flo: Flo,
     pub spread: u32,
+    // TODO: Add the domain of this flo here.
 }
 
 impl DHTFlo {
@@ -89,7 +90,10 @@ impl TryFrom<&String> for DHTFlo {
 
     fn try_from(str: &String) -> Result<Self, Self::Error> {
         match serde_json::from_str::<DHTFlo>(str) {
-            Ok(dht_flo) => Ok(dht_flo),
+            Ok(dht_flo) => {
+                dht_flo.flo.is_valid()?;
+                Ok(dht_flo)
+            }
             Err(e) => Err(FloError::Deserialization("DHTFlo".into(), e.to_string())),
         }
     }

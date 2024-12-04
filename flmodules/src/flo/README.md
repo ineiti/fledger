@@ -8,9 +8,9 @@ It looks something like this:
 
 ```
 - Fledger Object (Flo)
-  - ID = Hash(Type | Updates_0 | Updates_1)
+  - ID = Hash(Type | Updates_0 | Updates_1 )
   - Type: (Domain, DHT, Ledger, Mana, Blob)
-  - 1..n Updates
+  - 2..n Updates: [0] is the Data, [1] is the ACE
 ```
 
 The first two updates define the data and the ACE and are included in
@@ -21,11 +21,10 @@ The first two updates have an empty `Proof`.
 
 ```
 - Flo - Updates
-  - Has
-    - Time
-    - Data | ACE: replaces previous Data or ACE
-    - Proof of condition: will probably need to include all the parents
-      ACEs, or at least a proof from the Ledger that all is OK
+  - Time
+  - Data | ACE: replaces previous Data or ACE
+  - Proof of condition: will probably need to include all the parents
+    ACEs, or at least a proof from the Ledger that all is OK
 ```
 
 ## Access Control Element (ACE)

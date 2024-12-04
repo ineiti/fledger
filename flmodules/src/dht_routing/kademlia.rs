@@ -93,7 +93,9 @@ impl Kademlia {
         };
     }
 
-    pub fn route_nodes(&self, dst: &NodeID, last: Option<&NodeID>) -> Vec<NodeID> {
+    /// Returns the next hop to get the message as close to the destination as possible.
+    /// If a needed bucket is empty, the closest nodes on the 'wrong' branch will be returned.
+    pub fn route_closest(&self, dst: &NodeID, last: Option<&NodeID>) -> Vec<NodeID> {
         let depth = KNode::get_depth(&self.root, *dst);
         match last {
             Some(l) => {
@@ -111,6 +113,14 @@ impl Kademlia {
         }
     }
 
+    /// Returns the next hop to get the message to the exact destination as possible.
+    /// If a needed bucket is empty, an empty vector is returned, and the routing will fail.
+    pub fn route_direct(&self, dst: &NodeID) -> Vec<NodeID> {
+        let depth = KNode::get_depth(&self.root, *dst);
+        self.get_nodes_depth(depth)
+    }
+
+    /// Returns all nodes at a given depth.
     pub fn get_nodes_depth(&self, depth: usize) -> Vec<NodeID> {
         if let Some(ret) = self.buckets.get(depth).map(|b| b.get_active_ids(depth)) {
             ret
@@ -670,24 +680,24 @@ mod test {
 
         let dst_0 = rnd_node_depth(&root, 0);
         let dst_1 = rnd_node_depth(&root, 1);
-        let dst_2 = rnd_node_depth(&root,2);
+        let dst_2 = rnd_node_depth(&root, 2);
 
-        let nodes = kademlia.route_nodes(&dst_2, None);
+        let nodes = kademlia.route_closest(&dst_2, None);
         assert_eq!(0, nodes.len());
 
         kademlia_add_nodes(&mut kademlia, 0, 1);
-        let nodes = kademlia.route_nodes(&dst_0, None);
+        let nodes = kademlia.route_closest(&dst_0, None);
         assert_eq!(1, nodes.len());
-        let nodes = kademlia.route_nodes(&dst_1, None);
+        let nodes = kademlia.route_closest(&dst_1, None);
         assert_eq!(0, nodes.len());
 
         kademlia_add_nodes(&mut kademlia, 2, 1);
-        let nodes = kademlia.route_nodes(&dst_2, None);
+        let nodes = kademlia.route_closest(&dst_2, None);
         assert_eq!(1, nodes.len());
 
         kademlia_add_nodes(&mut kademlia, 2, 2 * CONFIG.k);
-        let nodes = kademlia.route_nodes(&dst_2, None);
-        assert_eq!(2*CONFIG.k + 1, nodes.len());
+        let nodes = kademlia.route_closest(&dst_2, None);
+        assert_eq!(2 * CONFIG.k + 1, nodes.len());
     }
 
     // Do some more complicated cases
@@ -717,7 +727,7 @@ mod test {
 
         for (depth, returned, nbr) in tests {
             let dst = rnd_node_depth(&root, depth);
-            let nodes = kademlia.route_nodes(&dst, Some(&dst));
+            let nodes = kademlia.route_closest(&dst, Some(&dst));
             assert_eq!(
                 nbr,
                 nodes.len(),
@@ -843,7 +853,7 @@ mod test {
             for hop in 0..max_hops {
                 // log::trace!("{hop_kademlia}");
                 let next_hops =
-                    hop_kademlia.route_nodes(node, (hop > 0).then(|| &hop_kademlia.root));
+                    hop_kademlia.route_closest(node, (hop > 0).then(|| &hop_kademlia.root));
                 if let Some(next_hop) = next_hops.choose(rng) {
                     hop_kademlia = kademlias.iter().find(|k| k.root == *next_hop).unwrap();
                     log::trace!("{hop}/{}: {next_hop}", KNode::get_depth(node, *next_hop));
