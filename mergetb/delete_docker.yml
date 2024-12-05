@@ -1,9 +1,18 @@
 ---
-- name: Stop and delete all Docker containers
+- name: Cleanup Docker environment and data
   hosts: all
   become: true
 
   tasks:
-    - name: Stop and delete all Docker containers
+    - name: Stop and remove all Docker containers
       shell: |
         docker ps -aq | xargs -r docker stop && docker ps -aq | xargs -r docker rm
+
+    - name: Remove all Docker images
+      shell: |
+        docker images -q | xargs -r docker rmi
+
+    - name: Remove local data directory
+      file:
+        path: /home/dcog/data
+        state: absent

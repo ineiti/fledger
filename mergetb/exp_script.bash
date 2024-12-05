@@ -10,6 +10,7 @@ mrg show materialization tryagain.fledgerfirst.dcog > materialization.txt
 python3 generate_inventory.py
 mrg xdc scp upload inventory.ini fledgerxdc.dcog:/home/dcog
 mrg xdc scp upload playbook.yml fledgerxdc.dcog:/home/dcog
+mrg xdc scp upload playbook_copy.yml fledgerxdc.dcog:/home/dcog
 mrg xdc scp upload install_docker.yml fledgerxdc.dcog:/home/dcog
 mrg xdc scp upload delete_docker.yml fledgerxdc.dcog:/home/dcog
 

@@ -1,7 +1,6 @@
 ---
 - name: Setup and run signal tasks
   hosts: SIGNAL_NODE
-  become: yes
   vars:
     docker_image: deryacog/flsignal:latest
     container_name: flsignal
@@ -23,11 +22,10 @@
         image: "{{ docker_image }}"
         state: started
         detach: true
-        command: >
-          -v
-        network_mode: host
         ports:
           - "8765:8765"
+        command: >
+          -v
         log_driver: "json-file"
         log_options:
           max-size: "10m"
@@ -38,8 +36,7 @@
         seconds: 10
 
 - name: Setup and run fledger tasks
-  hosts: FLEDGER_NODES
-  become: yes
+  hosts: FLEDGER_TRY
   vars:
     path_len: 3
     retry: 0
@@ -58,11 +55,6 @@
         source: pull
         force_source: true
 
-    - name: Copy loopix core config file
-      copy:
-        src: /home/dcog/loopix_core_config.yaml
-        dest: "/home/dcog/loopix_core_config.yaml"
-
     - name: Ensure /home/dcog/data directory exists
       file:
         path: "{{ simul_path }}"
@@ -80,64 +72,8 @@
         command: >
           --config /fledger/data
           --name {{ inventory_hostname }}
-          --retry {{ retry }}
-          -vv
+          -v
           -s ws://{{ signal_node }}:8765
-        network_mode: host
-        log_driver: "json-file"
-        log_options:
-          max-size: "10m"
-          max-file: "4"
-      register: fledger_container
-
-- name: Setup and run fledger tasks
-  hosts: ROOT_NODE
-  become: yes
-  vars:
-    path_len: 3
-    retry: 0
-    docker_image: deryacog/fledger:latest
-    signal_node: "{{ hostvars[groups['SIGNAL_NODE'][0]].ansible_host }}"
-    simul_path: /home/dcog/data
-  tasks:
-    - name: Remove existing fledger container if present
-      docker_container:
-        name: "fledger_{{ inventory_hostname }}"
-        state: absent
-
-    - name: Pull fledger Docker image
-      docker_image:
-        name: "{{ docker_image }}"
-        source: pull
-        force_source: true
-
-    - name: Copy loopix core config file
-      copy:
-        src: /home/dcog/loopix_core_config.yaml
-        dest: "/home/dcog/loopix_core_config.yaml"
-
-    - name: Ensure /home/dcog/data directory exists
-      file:
-        path: "{{ simul_path }}"
-        state: directory
-
-    - name: Run fledger container
-      docker_container:
-        name: "fledger_{{ inventory_hostname }}"
-        image: "{{ docker_image }}"
-        state: started
-        detach: true
-        volumes:
-          - "{{ simul_path }}:/fledger/data"
-          - "/home/dcog/loopix_core_config.yaml:/fledger/loopix_core_config.yaml"
-        command: >
-          --config /fledger/data
-          --name {{ inventory_hostname }}
-          --path-len {{ path_len }}
-          --retry {{ retry }}
-          -vv
-          -s ws://{{ signal_node }}:8765
-        network_mode: host
         log_driver: "json-file"
         log_options:
           max-size: "10m"

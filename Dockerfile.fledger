@@ -4,7 +4,7 @@ RUN apt update && apt install -y patchelf ca-certificates
 
 COPY target-common/release/fledger fledger
 RUN patchelf --set-interpreter /usr/lib64/ld-linux-x86-64.so.2 fledger
-
+EXPOSE 0-65535/udp
 FROM debian:bookworm-slim
 WORKDIR /fledger
 COPY --from=0 fledger /fledger/fledger

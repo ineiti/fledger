@@ -118,7 +118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let mut logger = env_logger::Builder::new();
-    logger.filter_module("fl", log::LevelFilter::Info);
+    logger.filter_module("fl", log::LevelFilter::Debug);
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
 
@@ -138,7 +138,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     log::debug!("Connecting to websocket at {}", args.signal_url);
-    let network = network_broker_start(
+    // let network = network_broker_start(
+    //     node_config.clone(),
+    //     ConnectionConfig::new(
+    //         Some(args.signal_url),
+    //         None,
+    //         Some(HostLogin {
+    //             url: "turn:web.fledg.re:3478".into(),
+    //             login: Some(Login {
+    //                 user: "something".into(),
+    //                 pass: "something".into(),
+    //             }),
+    //         }),
+    //     ),
+    // )
+    // .await?;
+
+    let network = match network_broker_start(
         node_config.clone(),
         ConnectionConfig::new(
             Some(args.signal_url),
@@ -152,7 +168,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }),
         ),
     )
-    .await?;
+    .await {
+        Ok(network) => {
+            log::debug!("Successfully started signaling server");
+            network
+        }
+        Err(e) => {
+            log::error!("Failed to start signaling server: {:?}", e);
+            return Err(e.into());
+        }
+    };
+
     let mut node = Node::start(Box::new(storage), node_config, network).await?;
     let nc = node.node_config.info.clone();
     log::info!("GETTING CONFIG");
