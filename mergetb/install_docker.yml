@@ -1,5 +1,5 @@
 ---
-- name: Install Docker on Debian
+- name: Install Docker on Ubuntu
   hosts: all
   become: true
   tasks:
@@ -22,13 +22,13 @@
 
     - name: Download Docker GPG key
       get_url:
-        url: https://download.docker.com/linux/debian/gpg
+        url: https://download.docker.com/linux/ubuntu/gpg
         dest: /etc/apt/keyrings/docker.asc
         mode: '0644'
 
     - name: Add Docker repository
       shell: |
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
       args:
         executable: /bin/bash
 

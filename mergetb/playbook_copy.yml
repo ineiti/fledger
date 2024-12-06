@@ -1,8 +1,9 @@
 ---
 - name: Setup and run signal tasks
   hosts: SIGNAL_NODE
+  become: yes
   vars:
-    docker_image: deryacog/flsignal:latest
+    docker_image: deryacog/flsignal-main:latest
     container_name: flsignal
   tasks:
     - name: Remove existing flsignal container if present
@@ -22,10 +23,11 @@
         image: "{{ docker_image }}"
         state: started
         detach: true
-        ports:
-          - "8765:8765"
         command: >
           -v
+        network_mode: host
+        ports:
+          - "8765:8765"
         log_driver: "json-file"
         log_options:
           max-size: "10m"
@@ -36,11 +38,10 @@
         seconds: 10
 
 - name: Setup and run fledger tasks
-  hosts: FLEDGER_TRY
+  hosts: FLEDGER_NODES
+  become: yes
   vars:
-    path_len: 3
-    retry: 0
-    docker_image: deryacog/fledger:latest
+    docker_image: deryacog/fledger-main:latest
     signal_node: "{{ hostvars[groups['SIGNAL_NODE'][0]].ansible_host }}"
     simul_path: /home/dcog/data
   tasks:
@@ -72,37 +73,11 @@
         command: >
           --config /fledger/data
           --name {{ inventory_hostname }}
-          -v
+          -vv
           -s ws://{{ signal_node }}:8765
+        network_mode: host
         log_driver: "json-file"
         log_options:
           max-size: "10m"
           max-file: "4"
       register: fledger_container
-
-    - name: Wait for 60 seconds
-      pause:
-        seconds: 60
-
-    - name: Save container logs to logs.txt
-      shell: "docker logs {{ fledger_container.container.Id }} > /home/dcog/data/logs.txt 2>&1"
-
-# - name: Cleanup signal processes
-#   hosts: SIGNAL_NODE
-#   become: yes
-#   tasks:
-#     - name: Stop flsignal container
-#       docker_container:
-#         name: flsignal
-#         state: stopped
-#       ignore_errors: true
-
-# - name: Cleanup fledger processes
-#   hosts: FLEDGER_NODES
-#   become: yes
-#   tasks:
-#     - name: Stop fledger container
-#       docker_container:
-#         name: "fledger_{{ inventory_hostname }}"
-#         state: stopped
-#       ignore_errors: true

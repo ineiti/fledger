@@ -77,14 +77,19 @@ async fn save_metrics_loop(
     }
     storage_path.push("loopix_storage.yaml");
 
+
     let mut metrics_path = PathBuf::from(".");
     metrics_path.push(path);
+
+    log::info!("Saving metrics to {}", metrics_path.display());
+
     if let Err(e) = std::fs::create_dir_all(&metrics_path) {
         log::error!("Failed to create directory: {}", e);
     }
     metrics_path.push("metrics.txt");
 
     loop {
+        log::info!("starting loop");
         std::thread::sleep(Duration::from_secs(5));
 
         // Save the loopix storage to a file
@@ -118,7 +123,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let mut logger = env_logger::Builder::new();
-    logger.filter_module("fl", log::LevelFilter::Debug);
+    logger.filter_module("fl", args.verbosity.log_level_filter());
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
 
@@ -138,23 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     log::debug!("Connecting to websocket at {}", args.signal_url);
-    // let network = network_broker_start(
-    //     node_config.clone(),
-    //     ConnectionConfig::new(
-    //         Some(args.signal_url),
-    //         None,
-    //         Some(HostLogin {
-    //             url: "turn:web.fledg.re:3478".into(),
-    //             login: Some(Login {
-    //                 user: "something".into(),
-    //                 pass: "something".into(),
-    //             }),
-    //         }),
-    //     ),
-    // )
-    // .await?;
-
-    let network = match network_broker_start(
+    let network = network_broker_start(
         node_config.clone(),
         ConnectionConfig::new(
             Some(args.signal_url),
@@ -168,26 +157,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }),
         ),
     )
-    .await {
-        Ok(network) => {
-            log::debug!("Successfully started signaling server");
-            network
-        }
-        Err(e) => {
-            log::error!("Failed to start signaling server: {:?}", e);
-            return Err(e.into());
-        }
-    };
+    .await?;
 
     let mut node = Node::start(Box::new(storage), node_config, network).await?;
     let nc = node.node_config.info.clone();
     log::info!("GETTING CONFIG");
     let mut state = match args.path_len {
         Some(len) => {
-            log::info!("Starting with path length {}", len);
+            log::info!("Starting Root Node with path length {}", len);
             LoopixSimul::Root(LSRoot::WaitNodes(len))
         }
-        None => LoopixSimul::Child(LSChild::WaitConfig),
+        None => {
+            log::info!("Starting Wait Node");
+            LoopixSimul::Child(LSChild::WaitConfig)
+        }
     };
     log::info!("GOT CONFIG");
     log::info!(
@@ -290,12 +273,15 @@ impl LSRoot {
             LSRoot::WaitNodes(n) => {
                 let path_len = *n;
                 let nodes = (path_len * path_len) + path_len * 2;
-                let mut node_infos = node.nodes_online().unwrap();
-                node_infos.insert(0, node.node_config.info.clone());
-                log::info!("Found {} of {} nodes", node_infos.len(), nodes);
-                if node_infos.len() == nodes {
+                let node_infos = node.nodes_online().unwrap();
+                // node_infos.insert(0, node.node_config.info.clone());
+                log::info!("Found {} of {} nodes", node_infos.len() + 1, nodes);
+                log::debug!("These are the node_infos: {:?}", node_infos.clone());
+
+                if node_infos.len() == nodes - 1 {
+                    log::debug!("WHY ISNT LOOPIX SETUP HERE");
                     let setup = LoopixSetup::new(path_len, node_infos);
-                    node.gossip
+                    match node.gossip
                         .as_mut()
                         .unwrap()
                         .add_event(Event {
@@ -304,7 +290,16 @@ impl LSRoot {
                             created: now(),
                             msg: serde_json::to_string(&setup).expect("serializing to string"),
                         })
-                        .await?;
+                        .await
+                    {
+                        Ok(_) => log::info!("Event added successfully {:?}", Event {
+                            category: Category::LoopixSetup,
+                            src: node.node_config.info.get_id(),
+                            created: now(),
+                            msg: serde_json::to_string(&setup).expect("serializing to string"),
+                        }),
+                        Err(e) => log::error!("Failed to add event: {:?}", e),
+                    }
                     return Ok(LSRoot::WaitConfig(nodes).into());
                 }
             }
@@ -431,6 +426,7 @@ impl LSChild {
                             dir_path,
                         ));
                     }
+                    log::info!("Child is ready");
                     return Ok(LSChild::ProxyReady.into());
                 }
             }

@@ -50,7 +50,7 @@ def write_inventory(node_ip_mapping, output_file):
             for node, ip in node_ip_mapping.items():
                 if not node.startswith('ifr'):
                     if node.lower() != "signal" and node.lower() != "node-1":
-                        ansible_hostname = f"{node}.infra.tryagain.fledgerfirst.dcog"
+                        ansible_hostname = f"{node}.infra.tryagain.fledger.dcog"
                         file.write(f"{node} ansible_host={ansible_hostname} ansible_user=dcog ansible_ssh_private_key_file=~/.ssh/id_mrg-0\n")
 
             file.write("\n[ALL_NODES:children]\nSIGNAL_NODE\nFLEDGER_NODES\nROOT_NODE")

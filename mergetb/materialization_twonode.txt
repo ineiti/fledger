@@ -1,0 +1,49 @@
+Metal:
+Vm:
+SIGNAL -> md02
+node-0 -> md01
+node-1 -> md01
+Links:
+  ENDPOINTS:
+    [101] node-0@md01 &{Phy:name:"eth1"  mac:"32:29:59:ce:6f:42"}
+    [101] node-1@md01 &{Phy:name:"eth1"  mac:"8e:42:56:4c:1a:f0"}
+  WAYPOINTS:
+    [101] md01: &{Tap:node:"node-0"  frontend:{name:"eth1"  mac:"32:29:59:ce:6f:42"}  vni:153}
+    [101] md01: &{Tap:node:"node-1"  frontend:{name:"eth1"  mac:"8e:42:56:4c:1a:f0"}  vni:153}
+  ENDPOINTS:
+    [102] SIGNAL@md02 &{Phy:name:"eth1"  mac:"72:d2:4f:b4:bc:d8"}
+    [102] node-0@md01 &{Phy:name:"eth2"  mac:"7a:d5:6c:79:0a:65"}
+    [102] node-0@md01 &{Vtep:name:"vtep411"  vni:411  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:60:ae"}  tunnel_ip:"10.99.1.3"}
+    [102] SIGNAL@md02 &{Vtep:name:"vtep411"  vni:411  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+  WAYPOINTS:
+    [102] md02: &{Tap:node:"SIGNAL"  frontend:{name:"eth1"  mac:"72:d2:4f:b4:bc:d8"}  vni:411}
+    [102] md01: &{Tap:node:"node-0"  frontend:{name:"eth2"  mac:"7a:d5:6c:79:0a:65"}  vni:411}
+    [102] md01: &{BgpPeer:interface:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:60:ae"}  local_asn:4210000002  remote_asn:4210000000  network:"10.99.1.3"}
+    [102] xl252r207s8-xleaf: &{BgpPeer:interface:{name:"swp2"}  local_asn:4210000000  remote_asn:4210000002  network:"10.99.1.1"}
+    [102] xl252r207s8-xleaf: &{BgpPeer:interface:{name:"swp3"}  local_asn:4210000000  remote_asn:4210000003  network:"10.99.1.1"}
+    [102] md02: &{BgpPeer:interface:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  local_asn:4210000003  remote_asn:4210000000  network:"10.99.1.4"}
+  ENDPOINTS:
+    [103] SIGNAL@md02 &{Phy:name:"eth2"  mac:"ca:6c:99:94:50:f6"}
+    [103] node-1@md01 &{Phy:name:"eth2"  mac:"fe:24:f5:03:9f:66"}
+    [103] node-1@md01 &{Vtep:name:"vtep420"  vni:420  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:60:ae"}  tunnel_ip:"10.99.1.3"}
+    [103] SIGNAL@md02 &{Vtep:name:"vtep420"  vni:420  parent:{name:"enp33s0f0np0"  mac:"08:c0:eb:ee:65:8e"}  tunnel_ip:"10.99.1.4"}
+  WAYPOINTS:
+    [103] md02: &{Tap:node:"SIGNAL"  frontend:{name:"eth2"  mac:"ca:6c:99:94:50:f6"}  vni:420}
+    [103] md01: &{Tap:node:"node-1"  frontend:{name:"eth2"  mac:"fe:24:f5:03:9f:66"}  vni:420}
+  ENDPOINTS:
+    [100] SIGNAL@md02 &{Phy:name:"eth0"  mac:"c6:6c:41:f6:3e:cd"}
+    [100] node-0@md01 &{Phy:name:"eth0"  mac:"8a:e1:ad:a2:c0:21"}
+    [100] node-1@md01 &{Phy:name:"eth0"  mac:"3e:d8:d3:38:58:41"}
+    [100] ifr1@ifr1 &{Vtep:name:"vtep130"  vni:130  parent:{name:"enp33s0f1np1"  mac:"08:c0:eb:af:42:6b"}  tunnel_ip:"10.99.0.3"}
+    [100] SIGNAL@md02 &{Vlan:name:"vlan256"  vid:256  parent:{name:"enp65s0f0np0"  mac:"10:70:fd:51:82:0c"}}
+    [100] node-0@md01 &{Vlan:name:"vlan256"  vid:256  parent:{name:"enp65s0f0np0"  mac:"10:70:fd:57:0e:58"}}
+  WAYPOINTS:
+    [100] md02: &{Tap:node:"SIGNAL"  frontend:{name:"eth0"  mac:"c6:6c:41:f6:3e:cd"}  vid:256}
+    [100] md01: &{Tap:node:"node-0"  frontend:{name:"eth0"  mac:"8a:e1:ad:a2:c0:21"}  vid:256}
+    [100] md01: &{Tap:node:"node-1"  frontend:{name:"eth0"  mac:"3e:d8:d3:38:58:41"}  vid:256}
+    [100] il252r207s10-ileaf: &{Trunk:port:{name:"swp3"}  vids:256}
+    [100] il252r207s10-ileaf: &{Vtep:name:"vtep130"  vni:130  tunnel_ip:"10.99.0.1"}
+    [100] il252r207s10-ileaf: &{BgpPeer:interface:{name:"swp52"}  local_asn:4200000000  remote_asn:4200000002  network:"10.99.0.1"}
+    [100] ifr1: &{BgpPeer:interface:{name:"enp33s0f1np1"  mac:"08:c0:eb:af:42:6b"}  local_asn:4200000002  remote_asn:4200000000  network:"10.99.0.3"}
+    [100] il252r207s10-ileaf: &{Trunk:port:{name:"swp2"}  vids:256}
+Infraserver: ifr1

@@ -7,8 +7,10 @@
 
 # generate inventory and send it to xdc
 mrg show materialization tryagain.fledgerfirst.dcog > materialization.txt
+# mrg show materialization twonode.fledgerfirst.dcog > materialization_twonode.txt
 python3 generate_inventory.py
 mrg xdc scp upload inventory.ini fledgerxdc.dcog:/home/dcog
+mrg xdc scp upload inventory_copy.ini fledgerxdc.dcog:/home/dcog
 mrg xdc scp upload playbook.yml fledgerxdc.dcog:/home/dcog
 mrg xdc scp upload playbook_copy.yml fledgerxdc.dcog:/home/dcog
 mrg xdc scp upload install_docker.yml fledgerxdc.dcog:/home/dcog
