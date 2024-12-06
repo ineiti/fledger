@@ -101,42 +101,56 @@ pub trait LoopixCore {
 
         // add client provider
         if let Some(start_provider) = start_provider {
-            let start_key = node_public_keys.get(&start_provider).unwrap();
-            let start_node = Node::new(
-                NodeAddressBytes::from_bytes(start_provider.to_bytes()),
-                *start_key,
-            );
-            route.push(start_node);
+            if let Some(start_key) = node_public_keys.get(&start_provider) {
+                let start_node = Node::new(
+                    NodeAddressBytes::from_bytes(start_provider.to_bytes()),
+                    *start_key,
+                );
+                route.push(start_node);
+            } else {
+                log::error!("Start provider key not found for {:?}", start_provider);
+                log::info!("List of node public keys: {:?}", node_public_keys);
+            }
         }
         // add mixnode route
         let mixnodes = self.get_storage().get_mixes().await;
         for i in 0..path_length {
-            let mixnode = mixnodes[i as usize]
-                .choose(&mut rand::thread_rng())
-                .unwrap();
-            let key = node_public_keys.get(mixnode).unwrap();
-            let node = Node::new(NodeAddressBytes::from_bytes(mixnode.to_bytes()), *key);
-            route.push(node);
+            if let Some(mixnode) = mixnodes[i as usize].choose(&mut rand::thread_rng()) {
+                let key = node_public_keys.get(mixnode).unwrap();
+                let node = Node::new(NodeAddressBytes::from_bytes(mixnode.to_bytes()), *key);
+                route.push(node);
+            } else {
+                log::error!("Failed to choose a mixnode at index {}", i);
+                log::info!("List of mixnodes: {:?}", mixnodes);
+            }
         }
 
         // add dst provider
         if let Some(dest_provider) = dest_provider {
-            let dest_key = node_public_keys.get(&dest_provider).unwrap();
-            let dest_node = Node::new(
-                NodeAddressBytes::from_bytes(dest_provider.to_bytes()),
-                *dest_key,
-            );
-            route.push(dest_node);
+            if let Some(dest_key) = node_public_keys.get(&dest_provider) {
+                let dest_node = Node::new(
+                    NodeAddressBytes::from_bytes(dest_provider.to_bytes()),
+                    *dest_key,  
+                );
+                route.push(dest_node);
+            } else {
+                log::error!("Destination provider key not found for {:?}", dest_provider);
+                log::info!("List of node public keys: {:?}", node_public_keys);
+            }
         }
 
         // add receiver
         if let Some(receiver) = receiver {
-            let receiver_key = node_public_keys.get(&receiver).unwrap();
-            let receiver_node = Node::new(
-                NodeAddressBytes::from_bytes(receiver.to_bytes()),
+            if let Some(receiver_key) = node_public_keys.get(&receiver) {
+                let receiver_node = Node::new(
+                    NodeAddressBytes::from_bytes(receiver.to_bytes()),
                 *receiver_key,
             );
-            route.push(receiver_node);
+                route.push(receiver_node);
+            } else {
+                log::error!("Receiver key not found for {:?}", receiver);
+                log::info!("List of node public keys: {:?}", node_public_keys);
+            }
         }
 
         route

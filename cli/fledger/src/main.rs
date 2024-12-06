@@ -1,9 +1,5 @@
-use flmodules::loopix::config::CoreConfig;
-use std::fs::File;
-use std::io::Write;
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
-use tokio::time::Duration;
-use prometheus::{gather, TextEncoder, Encoder};
+use core::time;
+use std::collections::HashMap;
 
 use clap::Parser;
 
@@ -28,7 +24,6 @@ use flmodules::{
 };
 use flnode::{node::Node, version::VERSION_STRING};
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 use x25519_dalek::{PublicKey, StaticSecret};
 
 /// Fledger node CLI binary
@@ -58,64 +53,6 @@ struct Args {
     /// Uptime interval - to stress test disconnections
     #[clap(short, long)]
     path_len: Option<usize>,
-
-    /// Reliability config
-    #[clap(long, default_value_t = 0)]
-    retry: u8,
-}
-
-async fn save_metrics_loop(
-    storage: Arc<LoopixStorage>,
-    path: PathBuf,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    log::info!("Saving loopix storage to {}", path.display());
-
-    let mut storage_path = PathBuf::from(".");
-    storage_path.push(path.clone());
-    if let Err(e) = std::fs::create_dir_all(&storage_path) {
-        log::error!("Failed to create directory: {}", e);
-    }
-    storage_path.push("loopix_storage.yaml");
-
-
-    let mut metrics_path = PathBuf::from(".");
-    metrics_path.push(path);
-
-    log::info!("Saving metrics to {}", metrics_path.display());
-
-    if let Err(e) = std::fs::create_dir_all(&metrics_path) {
-        log::error!("Failed to create directory: {}", e);
-    }
-    metrics_path.push("metrics.txt");
-
-    loop {
-        log::info!("starting loop");
-        std::thread::sleep(Duration::from_secs(5));
-
-        // Save the loopix storage to a file
-        let storage_bytes = storage.to_yaml_async().await.unwrap();
-
-        match File::create(&storage_path) {
-            Ok(mut file) => {
-                if let Err(e) = file.write_all(storage_bytes.as_bytes()) {
-                    log::error!("Failed to write storage file: {}", e);
-                }
-            }
-            Err(e) => {
-                log::error!("Failed to create storage file: {}", e);
-            }
-        }
-
-        // Gather the current metrics
-        let metric_families = gather();
-        let mut buffer = Vec::new();
-        let encoder = TextEncoder::new();
-        encoder.encode(&metric_families, &mut buffer).unwrap();
-
-        // Write metrics to a file
-        let mut file = File::create(&metrics_path).expect("Unable to create file");
-        file.write_all(&buffer).expect("Unable to write data");
-    }
 }
 
 #[tokio::main]
@@ -126,11 +63,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     logger.filter_module("fl", args.verbosity.log_level_filter());
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
-
-    let config = args.config.clone();
-
-    let mut config_path = PathBuf::new();
-    config_path.push(config);
 
     let storage = DataStorageFile::new(args.config, "fledger".into());
     let mut node_config = Node::get_config(storage.clone())?;
@@ -158,21 +90,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     )
     .await?;
-
     let mut node = Node::start(Box::new(storage), node_config, network).await?;
     let nc = node.node_config.info.clone();
-    log::info!("GETTING CONFIG");
     let mut state = match args.path_len {
-        Some(len) => {
-            log::info!("Starting Root Node with path length {}", len);
-            LoopixSimul::Root(LSRoot::WaitNodes(len))
-        }
-        None => {
-            log::info!("Starting Wait Node");
-            LoopixSimul::Child(LSChild::WaitConfig)
-        }
+        Some(len) => LoopixSimul::Root(LSRoot::WaitNodes(len)),
+        None => LoopixSimul::Child(LSChild::WaitConfig),
     };
-    log::info!("GOT CONFIG");
     log::info!(
         "Starting node with state {:?} {}: {}",
         state,
@@ -189,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .err()
             .map(|e| log::warn!("Couldn't process node: {e:?}"));
 
-        state = state.process(&mut node, i, config_path.clone(), args.retry).await?;
+        state = state.process(&mut node, i).await?;
 
         if i % 3 == 2 && false {
             log::info!("Nodes are: {:?}", node.nodes_online()?);
@@ -214,16 +137,10 @@ enum LoopixSimul {
 }
 
 impl LoopixSimul {
-    async fn process(
-        &self,
-        node: &mut Node,
-        i: u32,
-        dir_path: PathBuf,
-        retry: u8
-    ) -> Result<Self, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32) -> Result<Self, BrokerError> {
         let new_state = match &self {
-            LoopixSimul::Root(lsroot) => lsroot.process(node, i, dir_path, retry).await?,
-            LoopixSimul::Child(lschild) => lschild.process(node, dir_path, retry).await?,
+            LoopixSimul::Root(lsroot) => lsroot.process(node, i).await?,
+            LoopixSimul::Child(lschild) => lschild.process(node).await?,
         };
         if *self != new_state {
             log::info!(
@@ -258,30 +175,20 @@ enum LSRoot {
     WaitConfig(usize),
     // Sends a WebProx-request every 10 seconds
     SendProxyRequest(u32),
-    Done,
 }
 
 impl LSRoot {
-    async fn process(
-        &self,
-        node: &mut Node,
-        i: u32,
-        dir_path: PathBuf,
-        retry: u8
-    ) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSRoot::WaitNodes(n) => {
                 let path_len = *n;
                 let nodes = (path_len * path_len) + path_len * 2;
-                let node_infos = node.nodes_online().unwrap();
-                // node_infos.insert(0, node.node_config.info.clone());
-                log::info!("Found {} of {} nodes", node_infos.len() + 1, nodes);
-                log::debug!("These are the node_infos: {:?}", node_infos.clone());
-
-                if node_infos.len() == nodes - 1 {
-                    log::debug!("WHY ISNT LOOPIX SETUP HERE");
+                let mut node_infos = node.nodes_online().unwrap();
+                node_infos.insert(0, node.node_config.info.clone());
+                log::info!("Found {} of {} nodes", node_infos.len(), nodes);
+                if node_infos.len() == nodes {
                     let setup = LoopixSetup::new(path_len, node_infos);
-                    match node.gossip
+                    node.gossip
                         .as_mut()
                         .unwrap()
                         .add_event(Event {
@@ -290,101 +197,45 @@ impl LSRoot {
                             created: now(),
                             msg: serde_json::to_string(&setup).expect("serializing to string"),
                         })
-                        .await
-                    {
-                        Ok(_) => log::info!("Event added successfully {:?}", Event {
-                            category: Category::LoopixSetup,
-                            src: node.node_config.info.get_id(),
-                            created: now(),
-                            msg: serde_json::to_string(&setup).expect("serializing to string"),
-                        }),
-                        Err(e) => log::error!("Failed to add event: {:?}", e),
-                    }
+                        .await?;
                     return Ok(LSRoot::WaitConfig(nodes).into());
                 }
             }
             LSRoot::WaitConfig(n) => {
-                log::info!("Root is waiting for {} nodes to be configured", n);
-                let events = node
+                let node_configured = node
                     .gossip
                     .as_ref()
                     .unwrap()
                     .storage
-                    .events(Category::LoopixConfig);
-                let node_configured = events.len();
-                let configured_ids: Vec<_> = events.iter().map(|e| e.src).collect();
-                log::info!(
-                    "Root sees {} configured nodes: {:?}",
-                    node_configured,
-                    configured_ids
-                );
+                    .events(Category::LoopixConfig)
+                    .len();
+                log::info!("Root sees {} configured nodes", node_configured);
                 if node_configured + 1 == *n {
                     LoopixSetup::node_config(node).await?;
-                    let loopix = node.loopix.as_ref().map(|l| l.storage.clone());
-                    if let Some(loopix) = loopix {
-                        tokio::spawn(save_metrics_loop(
-                            Arc::clone(&loopix),
-                            dir_path,
-                        ));
-                    }
-                    log::info!("Root is starting to send requests");
                     return Ok(LSRoot::SendProxyRequest(i + 8).into());
                 }
             }
             LSRoot::SendProxyRequest(start) => {
-                if true {
-                    if (i - *start) % 10 == 0 {
-                        log::info!("Sending request through WebProxy");
-                        let start = now();
-                        match node
-                            .webproxy
-                            .as_mut()
-                            .unwrap()
-                            .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(4))
-                            .await
-                        {
-                            Ok(mut res) => match res.text().await {
-                                Ok(body) => {
-                                    let total_time = now() - start;
-                                    log::info!(
-                                        "----------------------------------------------------------------------- Total time for request: {}ms",
-                                        total_time
-                                    );
-                                    log::info!("----------------------------------------------------------------------- Got reply from webproxy: {}", body);
-                                }
-                                Err(e) => {
-                                    log::info!(" ----------------------------------------------------------------------- Couldn't get body: {e:?}");
-                                }
-                            },
-                            Err(e) => {
-                                log::info!("----------------------------------------------------------------------- Webproxy returned error: {e:?}");
-                            }
-                        }
-                    }
-                } else {
-                    log::info!("Sending single request through WebProxy");
+                if (i - *start) % 10 == 0 {
+                    log::info!("Sending request through WebProxy");
                     let start = now();
                     match node
                         .webproxy
                         .as_mut()
                         .unwrap()
-                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(4))
+                        .get_with_timeout("https://ipinfo.io", time::Duration::from_secs(60))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
                             Ok(body) => {
-                                log::info!("----------------------------------------------------------------------- Total time for request: {}ms", now() - start);
-                                log::info!("----------------------------------------------------------------------- Got reply from webproxy: {}", body);
+                                log::info!("Total time for request: {}ms", now() - start);
+                                log::info!("Got reply from webproxy: {}", body);
                             }
-                            Err(e) => log::info!(" ----------------------------------------------------------------------- Couldn't get body: {e:?}"),
+                            Err(e) => log::info!("Couldn't get body: {e:?}"),
                         },
-                        Err(e) => log::info!("----------------------------------------------------------------------- Webproxy returned error: {e:?}"),
+                        Err(e) => log::info!("Webproxy returned error: {e:?}"),
                     }
-                    return Ok(LSRoot::Done.into());
                 }
-            }
-            LSRoot::Done => {
-                log::info!("Root is done");
             }
         }
         Ok((*self).into())
@@ -399,34 +250,22 @@ enum LSChild {
 }
 
 impl LSChild {
-    async fn process(
-        &self,
-        node: &mut Node,
-        dir_path: PathBuf,
-        _retry: u8
-    ) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, _node: &mut Node) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSChild::WaitConfig => {
-                if LoopixSetup::node_config(node).await? {
-                    log::info!("{} got setup", node.node_config.info.name);
-                    node.gossip
+                if LoopixSetup::node_config(_node).await? {
+                    log::info!("{} got setup", _node.node_config.info.name);
+                    _node
+                        .gossip
                         .as_mut()
                         .unwrap()
                         .add_event(Event {
                             category: Category::LoopixConfig,
-                            src: node.node_config.info.get_id(),
+                            src: _node.node_config.info.get_id(),
                             created: now(),
                             msg: "Setup done".into(),
                         })
                         .await?;
-                    let loopix = node.loopix.as_ref().map(|l| l.storage.clone());
-                    if let Some(loopix) = loopix {
-                        tokio::spawn(save_metrics_loop(
-                            Arc::clone(&loopix),
-                            dir_path,
-                        ));
-                    }
-                    log::info!("Child is ready");
                     return Ok(LSChild::ProxyReady.into());
                 }
             }
@@ -481,17 +320,6 @@ impl LoopixSetup {
     pub fn new(path_length: usize, all_nodes: Vec<NodeInfo>) -> Self {
         let (node_public_keys, loopix_key_pairs) = Self::create_nodes_and_keys(all_nodes.clone());
 
-        let clients: Vec<_> = all_nodes.iter().take(path_length).collect();
-        let providers: Vec<_> = all_nodes.iter().skip(path_length).take(path_length).collect();
-        let mixnodes: Vec<_> = all_nodes.iter().skip(path_length * 2).collect();
-
-        log::info!(
-            "\n--------------------------------------------------------\nClients: {:#?}\nProviders: {:#?}\nMixnodes: {:#?}\n--------------------------------------------------------\n",
-            clients,
-            providers,
-            mixnodes
-        );
-
         Self {
             node_public_keys,
             loopix_key_pairs,
@@ -537,9 +365,17 @@ impl LoopixSetup {
         } else {
             LoopixRole::Mixnode
         };
+
         let config = self.get_config(node_id, role).await?;
         let loopix_broker = LoopixBroker::start(net, config).await?;
         let overlay = OverlayLoopix::start(loopix_broker.broker.clone()).await?;
+        // let config = self.get_config(node_id, role).await?;
+        // let loopix_broker = LoopixBroker::start(net, config).await?;
+        // Ok((
+        //     loopix_broker.clone(),
+        //     OverlayLoopix::start(loopix_broker).await?,
+        // ))
+
         wait_ms(3000).await;
         Ok((loopix_broker, overlay))
     }
@@ -551,28 +387,14 @@ impl LoopixSetup {
     ) -> Result<LoopixConfig, BrokerError> {
         let private_key = &self.loopix_key_pairs.get(&node_id).unwrap().1;
         let public_key = &self.loopix_key_pairs.get(&node_id).unwrap().0;
-        let current_dir = std::env::current_dir().unwrap();
-        log::info!("Current directory: {}", current_dir.display());
 
-        let entries = std::fs::read_dir(&current_dir).unwrap();
-        for entry in entries {
-            let entry = entry.unwrap();
-            log::info!("File: {}", entry.path().display());
-        }
-        let config_path = PathBuf::from("./loopix_core_config.yaml");
-
-        let config_str = std::fs::read_to_string(config_path.clone()).unwrap();
-
-        let core_config: CoreConfig = serde_yaml::from_str(&config_str).unwrap();
-
-        let config = LoopixConfig::default_with_core_config_and_path_length(
+        let config = LoopixConfig::default_with_path_length(
             role,
             node_id,
             self.path_length as usize,
             private_key.clone(),
             public_key.clone(),
             self.all_nodes.clone(),
-            core_config,
         );
 
         config
