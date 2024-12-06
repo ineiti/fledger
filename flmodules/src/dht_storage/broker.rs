@@ -55,7 +55,7 @@ impl DHTStorage {
     ) -> Result<Self, Box<dyn Error>> {
         let str = ds.get(MODULE_NAME).unwrap_or("".into());
         let storage = DHTStorageStorageSave::from_str(&str).unwrap_or_default();
-        let messages = DHTStorageMessages::new(storage.clone(), config)?;
+        let messages = DHTStorageMessages::new(storage.clone(), config);
         let (tx, storage) = watch::channel(storage);
 
         let mut dht_storage = BrokerIO::<InternIn, InternOut>::new();

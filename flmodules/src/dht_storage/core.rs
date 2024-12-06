@@ -24,8 +24,8 @@ impl Default for DHTStorageConfig {
 /// needed to persist over reloads of the node.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DHTStorageCore {
-    pub storage: DHTStorageBucket,
-    pub config: DHTStorageConfig,
+    storage: DHTStorageBucket,
+    config: DHTStorageConfig,
 }
 
 impl DHTStorageCore {
@@ -54,6 +54,26 @@ impl DHTStorageCore {
                 }
             }
         }
+    }
+
+    pub fn store_kv(&mut self, flo: DHTFlo) {
+        self.storage.flos.insert(flo.id(), flo);
+        // TODO: evict values which are furthest from us
+    }
+
+    pub fn flo_meta(&self) -> Vec<FloMeta> {
+        self.storage
+            .flos
+            .values()
+            .map(|df| FloMeta {
+                id: df.id(),
+                version: df.flo.version(),
+            })
+            .collect()
+    }
+
+    pub fn get_flo(&self, key: &U256) -> Option<&DHTFlo>{
+        self.storage.flos.get(key)
     }
 }
 
@@ -86,21 +106,6 @@ pub struct DHTStorageBucket {
 impl DHTStorageBucket {
     pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
         serde_yaml::to_string::<DHTStorageStorageSave>(&DHTStorageStorageSave::V1(self.clone()))
-    }
-
-    pub fn store_kv(&mut self, flo: DHTFlo) {
-        self.flos.insert(flo.id(), flo);
-        // TODO: evict values which are furthest from us
-    }
-
-    pub fn flo_meta(&self) -> Vec<FloMeta> {
-        self.flos
-            .values()
-            .map(|df| FloMeta {
-                id: df.id(),
-                version: df.flo.version(),
-            })
-            .collect()
     }
 }
 

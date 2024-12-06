@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use flarch::{
     broker_io::SubsystemHandler,
     nodeids::{NodeID, U256},
@@ -70,10 +68,10 @@ pub struct DHTStorageMessages {
 
 impl DHTStorageMessages {
     /// Returns a new chat module.
-    pub fn new(storage: DHTStorageBucket, cfg: DHTStorageConfig) -> Result<Self, Box<dyn Error>> {
-        Ok(Self {
+    pub fn new(storage: DHTStorageBucket, cfg: DHTStorageConfig) -> Self {
+        Self {
             core: DHTStorageCore::new(storage, cfg),
-        })
+        }
     }
 
     fn routing(&mut self, msg: DHTRoutingOut) -> Vec<InternOut> {
@@ -113,10 +111,10 @@ impl DHTStorageMessages {
     ) -> Vec<InternOut> {
         match msg {
             MessageNodeClosest::StoreFlo(dhtflo) => {
-                self.core.storage.store_kv(dhtflo);
+                self.core.store_kv(dhtflo);
             }
             MessageNodeClosest::ReadFlo => {
-                if let Some(df) = self.core.storage.flos.get(&key) {
+                if let Some(df) = self.core.get_flo(&key) {
                     if closest {
                         return MessageNodeDirect::ValueFlo(df.clone())
                             .to_intern_out(origin)
@@ -128,12 +126,12 @@ impl DHTStorageMessages {
         vec![]
     }
 
-    fn msg_dest(&self, origin: NodeID, msg: MessageNodeDirect) -> Vec<InternOut> {
+    fn msg_dest(&mut self, origin: NodeID, msg: MessageNodeDirect) -> Vec<InternOut> {
         match msg {
             MessageNodeDirect::ValueFlo(dhtflo) => Some(DHTStorageOut::Value(dhtflo).into()),
             MessageNodeDirect::UnknownFlo(key) => Some(DHTStorageOut::ValueMissing(key).into()),
             MessageNodeDirect::UpdateInquiry() => {
-                let metas = self.core.storage.flo_meta();
+                let metas = self.core.flo_meta();
                 NetworkWrapper::wrap_yaml(MODULE_NAME, &MessageNodeDirect::UpdateAvailable(metas))
                     .ok()
                     .map(|msg| InternOut::Routing(DHTRoutingIn::MessageDirect(origin, msg)))
@@ -203,10 +201,19 @@ pub struct DHTStorageStats {}
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::HashMap, error::Error};
+
     use super::*;
 
     #[test]
     fn test_something() -> Result<(), Box<dyn Error>> {
+        let [id1, id2, key1, key2] = [NodeID::rnd(), NodeID::rnd(), NodeID::rnd(), NodeID::rnd()];
+        let storage = DHTStorageBucket {
+            flos: HashMap::new(),
+        };
+        let mut msgs = DHTStorageMessages::new(storage, DHTStorageConfig::default());
+        msgs.routing(DHTRoutingOut::MessageClosest((), (), (), ()));
+
         Ok(())
     }
 }
