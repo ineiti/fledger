@@ -45,7 +45,7 @@ impl OverlayRandom {
                 if let OverlayMessage::Input(input) = msg {
                     let ret = match input {
                         OverlayIn::NetworkWrapperToNetwork(id, module_message) => {
-                            RandomIn::NetworkMapperToNetwork(id, module_message)
+                            RandomIn::NetworkWrapperToNetwork(id, module_message)
                         }
                     };
                     return Some(RandomMessage::Input(ret));

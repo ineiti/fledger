@@ -3,15 +3,45 @@
   "packages": {
     "darwin.apple_sdk.frameworks.CoreServices": {
       "resolved": "github:NixOS/nixpkgs/75a52265bda7fd25e06e3a67dee3f0354e73243c#darwin.apple_sdk.frameworks.CoreServices",
-      "source": "nixpkg"
+      "source": "nixpkg",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "path": "/nix/store/j343fncqfbb6wdlrwj6dnfmvx4hi1zki-apple-framework-CoreServices-11.0.0",
+              "default": true
+            }
+          ]
+        }
+      }
     },
     "darwin.apple_sdk.frameworks.Security": {
       "resolved": "github:NixOS/nixpkgs/75a52265bda7fd25e06e3a67dee3f0354e73243c#darwin.apple_sdk.frameworks.Security",
-      "source": "nixpkg"
+      "source": "nixpkg",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "path": "/nix/store/9jbhn62ld50znjqxll0q5gq9i4disc1s-apple-framework-Security-11.0.0",
+              "default": true
+            }
+          ]
+        }
+      }
     },
     "darwin.apple_sdk.frameworks.SystemConfiguration": {
       "resolved": "github:NixOS/nixpkgs/75a52265bda7fd25e06e3a67dee3f0354e73243c#darwin.apple_sdk.frameworks.SystemConfiguration",
-      "source": "nixpkg"
+      "source": "nixpkg",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "path": "/nix/store/jaxmz1dvsz8il7nkxwzw8xfxac3sfz5v-apple-framework-SystemConfiguration-11.0.0",
+              "default": true
+            }
+          ]
+        }
+      }
     },
     "git@latest": {
       "last_modified": "2024-08-14T11:41:26Z",
@@ -505,50 +535,50 @@
       }
     },
     "vscode@latest": {
-      "last_modified": "2024-08-16T17:05:30Z",
-      "resolved": "github:NixOS/nixpkgs/d4a7a4d0e066278bfb0d77bd2a7adde1c0ec9e3d#vscode",
+      "last_modified": "2024-11-03T14:18:04Z",
+      "resolved": "github:NixOS/nixpkgs/4ae2e647537bcdbb82265469442713d066675275#vscode",
       "source": "devbox-search",
-      "version": "1.92.2",
+      "version": "1.95.1",
       "systems": {
         "aarch64-darwin": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/w1vy2d50lcgvj24vmwl99cz81kvynhaj-vscode-1.92.2",
+              "path": "/nix/store/sqbxv8a4l117a4andxviqjz1xx6pp037-vscode-1.95.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/w1vy2d50lcgvj24vmwl99cz81kvynhaj-vscode-1.92.2"
+          "store_path": "/nix/store/sqbxv8a4l117a4andxviqjz1xx6pp037-vscode-1.95.1"
         },
         "aarch64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/1glwx946zpqqndf8q4pirg7nwl1zhga1-vscode-1.92.2",
+              "path": "/nix/store/2nzamhiwq5jyrr0ql102053xlj68n1f3-vscode-1.95.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/1glwx946zpqqndf8q4pirg7nwl1zhga1-vscode-1.92.2"
+          "store_path": "/nix/store/2nzamhiwq5jyrr0ql102053xlj68n1f3-vscode-1.95.1"
         },
         "x86_64-darwin": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/zsxk3wcy156yly0401a92dp8c5rwfdcx-vscode-1.92.2",
+              "path": "/nix/store/cflfy9px3sjzpf3dd0m9zplwwaxgybr1-vscode-1.95.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/zsxk3wcy156yly0401a92dp8c5rwfdcx-vscode-1.92.2"
+          "store_path": "/nix/store/cflfy9px3sjzpf3dd0m9zplwwaxgybr1-vscode-1.95.1"
         },
         "x86_64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/3xm62iszlb6q0fzpgcvyh5fc0p37amhz-vscode-1.92.2",
+              "path": "/nix/store/j33dz8i1c5i2i14ri376fv3nid2vflfq-vscode-1.95.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/3xm62iszlb6q0fzpgcvyh5fc0p37amhz-vscode-1.92.2"
+          "store_path": "/nix/store/j33dz8i1c5i2i14ri376fv3nid2vflfq-vscode-1.95.1"
         }
       }
     },
