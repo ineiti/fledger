@@ -242,7 +242,7 @@ impl FledgerWeb {
         );
         let network = network_broker_start(node_config.clone(), config).await?;
         node_config.info.modules = Modules::all() - Modules::ENABLE_WEBPROXY_REQUESTS;
-        Ok(Node::start(my_storage, node_config, network)
+        Ok(Node::start(my_storage, node_config, network, None)
             .await
             .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
     }

@@ -39,11 +39,11 @@ services:
     command:
       - "--config"
       - "/fledger"
-      - "-vv"
+      - "-v"
       - "-s"
       - "ws://flsignal:8765"
-      - "--retry"
-      - "${RETRY}"
+      # - "--retry"
+      # - "${RETRY}"
     logging:
       driver: "json-file"
       options:
@@ -60,7 +60,7 @@ services:
       dockerfile: Dockerfile.fledger
     environment:
       - PATH_LEN=${PATH_LEN}
-      - RETRY=${RETRY}
+      # - RETRY=${RETRY}
     deploy:
       mode: replicated
       replicas: 1
@@ -69,13 +69,13 @@ services:
     command:
       - "--config"
       - "/fledger"
-      - "-vv"
+      - "-v"
       - "-s"
       - "ws://flsignal:8765"
       - "--path-len"
       - "${PATH_LEN}"
-      - "--retry"
-      - "${RETRY}"
+      # - "--retry"
+      # - "${RETRY}"
     logging:
       driver: "json-file"
       options:

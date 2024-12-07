@@ -19,12 +19,13 @@ SIMUL=simul/
 rm -rf $SIMUL
 mkdir -p $SIMUL
 
-./target-common/release/flsignal -vv |& ts "Signal " &
+./target-common/release/flsignal |& ts "Signal " &
 
 for NODE in $( seq $NODES ); do
   NAME="NODE_$(printf "%02d" $NODE)"
   echo "Starting node $NAME"
   CONFIG="$SIMUL$NAME/"
+  VERBOSITY="-vvv"
   PATH_LEN_ARG=""
   RETRY_ARG=""
   if [ $NODE = "1" ]; then
@@ -33,7 +34,7 @@ for NODE in $( seq $NODES ); do
   if [ "$RETRY" -gt 0 ]; then
     RETRY_ARG="--retry $RETRY"
   fi
-  ./target-common/release/fledger --config $CONFIG --name $NAME -vv -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG |& ts "$NAME" &
+  RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG |& ts "$NAME" &
 done
 
 sleep 60

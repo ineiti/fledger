@@ -32,8 +32,9 @@
         log_options:
           max-size: "10m"
           max-file: "4"
+        output_logs: yes
         env:
-          RUST_BACKTRACE: "1"
+          RUST_BACKTRACE: "full"
 
     - name: Wait for 10 seconds to ensure flsignal is running
       pause:
@@ -41,9 +42,8 @@
 
 - name: Setup and run fledger tasks
   hosts: FLEDGER_NODES
-  become: yes
   vars:
-    path_len: "3"
+    path_len: "2"
     retry: "0"
     docker_image: deryacog/fledger:latest
     signal_node: "{{ hostvars[groups['SIGNAL_NODE'][0]].ansible_host }}"
@@ -82,37 +82,32 @@
         command: >
           --config /fledger/data
           --name {{ inventory_hostname }}
-          --retry {{ retry }}
           {% if inventory_hostname == 'node-1' %}
           --path-len {{ path_len }}
           {% endif %}
-          -v
           -s ws://{{ signal_node }}:8765
         network_mode: host
         log_driver: "json-file"
+        output_logs: yes
         log_options:
           max-size: "10m"
           max-file: "4"
         env:
-          RUST_BACKTRACE: "1"
+          RUST_BACKTRACE: "full"
       register: fledger_container
 
-# - name: Cleanup signal processes
-#   hosts: SIGNAL_NODE
-#   become: yes
-#   tasks:
-#     - name: Stop flsignal container
-#       docker_container:
-#         name: flsignal
-#         state: stopped
-#       ignore_errors: true
+    - name: Wait for 2 minutes while fledger runs
+      pause:
+        seconds: 120
 
-# - name: Cleanup fledger processes
-#   hosts: FLEDGER_NODES
-#   become: yes
-#   tasks:
-#     - name: Stop fledger container
-#       docker_container:
-#         name: "fledger_{{ inventory_hostname }}"
-#         state: stopped
-#       ignore_errors: true
+    - name: Stop existing fledger container if present
+      docker_container:
+        name: "fledger_{{ inventory_hostname }}"
+        state: stopped
+      ignore_errors: true
+
+    - name: Run a shell command
+      become: yes
+      shell: |
+        cp /var/lib/docker/containers/{{ fledger_container.container.Id }}/{{ fledger_container.container.Id }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
+        chmod 666 /home/dcog/data/{{ inventory_hostname }}.log

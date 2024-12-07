@@ -185,6 +185,7 @@ impl NodeTimer {
             Box::new(DataStorageTemp::new()),
             node_config,
             broker_net.clone(),
+            None,
         )
         .await?;
         let timer = Broker::new();

@@ -1,5 +1,4 @@
-use core::time;
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc, time::Duration};
 
 use clap::Parser;
 
@@ -14,7 +13,7 @@ use flmodules::{
     gossip_events::core::{Category, Event},
     loopix::{
         broker::LoopixBroker,
-        config::{LoopixConfig, LoopixRole},
+        config::{CoreConfig, LoopixConfig, LoopixRole},
         storage::LoopixStorage,
     },
     network::{messages::NetworkMessage, network_broker_start, signal::SIGNAL_VERSION},
@@ -23,6 +22,7 @@ use flmodules::{
     web_proxy::{broker::WebProxy, core::WebProxyConfig},
 };
 use flnode::{node::Node, version::VERSION_STRING};
+use prometheus::{gather, Encoder, TextEncoder};
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey, StaticSecret};
 
@@ -53,11 +53,57 @@ struct Args {
     /// Uptime interval - to stress test disconnections
     #[clap(short, long)]
     path_len: Option<usize>,
+
+    /// Reliability config
+    #[clap(long, default_value_t = 0)]
+    retry: u8,
+}
+
+async fn save_metrics_loop(
+    storage: Arc<LoopixStorage>,
+    dir_path: String,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let path = PathBuf::from(dir_path);
+
+    let mut storage_path = PathBuf::from(".");
+    storage_path.push(path.clone());
+    if let Err(e) = std::fs::create_dir_all(&storage_path) {
+        log::error!("Failed to create directory: {}", e);
+    }
+    storage_path.push("loopix_storage.yaml");
+
+    let mut metrics_path = PathBuf::from(".");
+    metrics_path.push(path);
+    if let Err(e) = std::fs::create_dir_all(&metrics_path) {
+        log::error!("Failed to create directory: {}", e);
+    }
+    metrics_path.push("metrics.txt");
+
+    loop {
+        std::thread::sleep(Duration::from_secs(5));
+
+        // Save the loopix storage to a file
+        let storage_bytes = storage.to_yaml_async().await.unwrap();
+        let mut file = File::create(&storage_path).expect("Unable to create file");
+        file.write_all(storage_bytes.as_bytes())
+            .expect("Unable to write data");
+
+        // Gather the current metrics
+        let metric_families = gather();
+        let mut buffer = Vec::new();
+        let encoder = TextEncoder::new();
+        encoder.encode(&metric_families, &mut buffer).unwrap();
+
+        // Write metrics to a file
+        let mut file = File::create(&metrics_path).expect("Unable to create file");
+        file.write_all(&buffer).expect("Unable to write data");
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+    let config = args.config.clone();
 
     let mut logger = env_logger::Builder::new();
     logger.filter_module("fl", args.verbosity.log_level_filter());
@@ -90,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     )
     .await?;
-    let mut node = Node::start(Box::new(storage), node_config, network).await?;
+    let mut node = Node::start(Box::new(storage), node_config, network, Some(config)).await?;
     let nc = node.node_config.info.clone();
     let mut state = match args.path_len {
         Some(len) => LoopixSimul::Root(LSRoot::WaitNodes(len)),
@@ -212,7 +258,13 @@ impl LSRoot {
                 log::info!("Root sees {} configured nodes", node_configured);
                 if node_configured + 1 == *n {
                     LoopixSetup::node_config(node).await?;
-                    return Ok(LSRoot::SendProxyRequest(i + 8).into());
+                    let loopix_storage = node.loopix.as_ref().unwrap().storage.clone();
+                    let save_path = node.data_save_path.as_ref().unwrap();
+                    tokio::spawn(save_metrics_loop(
+                        Arc::clone(&loopix_storage),
+                        save_path.clone(),
+                    ));
+                    return Ok(LSRoot::SendProxyRequest(i + 10).into());
                 }
             }
             LSRoot::SendProxyRequest(start) => {
@@ -223,17 +275,20 @@ impl LSRoot {
                         .webproxy
                         .as_mut()
                         .unwrap()
-                        .get_with_timeout("https://ipinfo.io", time::Duration::from_secs(60))
+                        .get_with_timeout("https://ipinfo.io", Duration::from_secs(60))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
                             Ok(body) => {
-                                log::info!("Total time for request: {}ms", now() - start);
-                                log::info!("Got reply from webproxy: {}", body);
+                                log::info!(
+                                    "---------------- Total time for request: {}ms",
+                                    now() - start
+                                );
+                                log::info!("---------------- Got reply from webproxy: {}", body);
                             }
-                            Err(e) => log::info!("Couldn't get body: {e:?}"),
+                            Err(e) => log::info!("---------------- Couldn't get body: {e:?}"),
                         },
-                        Err(e) => log::info!("Webproxy returned error: {e:?}"),
+                        Err(e) => log::info!("---------------- Webproxy returned error: {e:?}"),
                     }
                 }
             }
@@ -250,22 +305,28 @@ enum LSChild {
 }
 
 impl LSChild {
-    async fn process(&self, _node: &mut Node) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, node: &mut Node) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSChild::WaitConfig => {
-                if LoopixSetup::node_config(_node).await? {
-                    log::info!("{} got setup", _node.node_config.info.name);
-                    _node
-                        .gossip
+                if LoopixSetup::node_config(node).await? {
+                    log::info!("{} got setup", node.node_config.info.name);
+                    node.gossip
                         .as_mut()
                         .unwrap()
                         .add_event(Event {
                             category: Category::LoopixConfig,
-                            src: _node.node_config.info.get_id(),
+                            src: node.node_config.info.get_id(),
                             created: now(),
                             msg: "Setup done".into(),
                         })
                         .await?;
+
+                    let loopix_storage = node.loopix.as_ref().unwrap().storage.clone();
+                    let save_path = node.data_save_path.as_ref().unwrap();
+                    tokio::spawn(save_metrics_loop(
+                        Arc::clone(&loopix_storage),
+                        save_path.clone(),
+                    ));
                     return Ok(LSChild::ProxyReady.into());
                 }
             }
@@ -369,12 +430,6 @@ impl LoopixSetup {
         let config = self.get_config(node_id, role).await?;
         let loopix_broker = LoopixBroker::start(net, config).await?;
         let overlay = OverlayLoopix::start(loopix_broker.broker.clone()).await?;
-        // let config = self.get_config(node_id, role).await?;
-        // let loopix_broker = LoopixBroker::start(net, config).await?;
-        // Ok((
-        //     loopix_broker.clone(),
-        //     OverlayLoopix::start(loopix_broker).await?,
-        // ))
 
         wait_ms(3000).await;
         Ok((loopix_broker, overlay))
@@ -396,6 +451,22 @@ impl LoopixSetup {
             public_key.clone(),
             self.all_nodes.clone(),
         );
+
+        // let config_path = PathBuf::from("./loopix_core_config.yaml");
+
+        // let config_str = std::fs::read_to_string(config_path.clone()).unwrap();
+
+        // let core_config: CoreConfig = serde_yaml::from_str(&config_str).unwrap();
+
+        // let config = LoopixConfig::default_with_core_config_and_path_length(
+        //     role,
+        //     node_id,
+        //     self.path_length as usize,
+        //     private_key.clone(),
+        //     public_key.clone(),
+        //     self.all_nodes.clone(),
+        //     core_config,
+        // );
 
         config
             .storage_config
