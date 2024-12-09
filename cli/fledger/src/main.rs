@@ -233,7 +233,7 @@ impl LSRoot {
                 node_infos.insert(0, node.node_config.info.clone());
                 log::info!("Found {} of {} nodes", node_infos.len(), nodes);
                 if node_infos.len() == nodes {
-                    let setup = LoopixSetup::new(path_len, node_infos);
+                    let setup = LoopixSetup::new(path_len, node_infos, node.data_save_path.clone().unwrap());
                     node.gossip
                         .as_mut()
                         .unwrap()
@@ -348,6 +348,7 @@ pub struct LoopixSetup {
     pub loopix_key_pairs: HashMap<NodeID, (PublicKey, StaticSecret)>,
     pub path_length: usize,
     pub all_nodes: Vec<NodeInfo>,
+    pub config: String,
 }
 
 impl LoopixSetup {
@@ -378,7 +379,7 @@ impl LoopixSetup {
         Ok(false)
     }
 
-    pub fn new(path_length: usize, all_nodes: Vec<NodeInfo>) -> Self {
+    pub fn new(path_length: usize, all_nodes: Vec<NodeInfo>, config: String) -> Self {
         let (node_public_keys, loopix_key_pairs) = Self::create_nodes_and_keys(all_nodes.clone());
 
         Self {
@@ -386,6 +387,7 @@ impl LoopixSetup {
             loopix_key_pairs,
             path_length,
             all_nodes,
+            config
         }
     }
 
@@ -439,35 +441,26 @@ impl LoopixSetup {
         &self,
         node_id: NodeID,
         role: LoopixRole,
-        
     ) -> Result<LoopixConfig, BrokerError> {
         let private_key = &self.loopix_key_pairs.get(&node_id).unwrap().1;
         let public_key = &self.loopix_key_pairs.get(&node_id).unwrap().0;
 
-        let config = LoopixConfig::default_with_path_length(
+        let mut config_path = PathBuf::from(&self.config);
+        config_path.push("loopix_core_config.yaml");
+
+        let config_str = std::fs::read_to_string(config_path.clone()).unwrap();
+
+        let core_config: CoreConfig = serde_yaml::from_str(&config_str).unwrap();
+
+        let config = LoopixConfig::default_with_core_config_and_path_length(
             role,
             node_id,
             self.path_length as usize,
             private_key.clone(),
             public_key.clone(),
             self.all_nodes.clone(),
+            core_config,
         );
-
-        // let config_path = PathBuf::from("./loopix_core_config.yaml");
-
-        // let config_str = std::fs::read_to_string(config_path.clone()).unwrap();
-
-        // let core_config: CoreConfig = serde_yaml::from_str(&config_str).unwrap();
-
-        // let config = LoopixConfig::default_with_core_config_and_path_length(
-        //     role,
-        //     node_id,
-        //     self.path_length as usize,
-        //     private_key.clone(),
-        //     public_key.clone(),
-        //     self.all_nodes.clone(),
-        //     core_config,
-        // );
 
         config
             .storage_config

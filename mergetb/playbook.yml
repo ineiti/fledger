@@ -60,15 +60,15 @@
         source: pull
         force_source: true
 
-    - name: Copy loopix core config file
-      copy:
-        src: /home/dcog/loopix_core_config.yaml
-        dest: "/home/dcog/loopix_core_config.yaml"
-
     - name: Ensure /home/dcog/data directory exists
       file:
         path: "{{ simul_path }}"
         state: directory
+
+    - name: Copy loopix core config file
+      copy:
+        src: /home/dcog/loopix_core_config.yaml
+        dest: "/home/dcog/data/loopix_core_config.yaml"
 
     - name: Run fledger container
       docker_container:
@@ -78,7 +78,7 @@
         detach: true
         volumes:
           - "{{ simul_path }}:/fledger/data"
-          - "/home/dcog/loopix_core_config.yaml:/fledger/loopix_core_config.yaml"
+          # - "/home/dcog/loopix_core_config.yaml:/fledger/loopix_core_config.yaml"
         command: >
           --config /fledger/data
           --name {{ inventory_hostname }}

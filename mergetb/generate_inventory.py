@@ -1,71 +1,43 @@
-import re
+import random
+import sys
+import os
 
-# Input file containing materialization data
-materialization_file = "materialization.txt"
+def generate_inventory_file(path_length, reservation_name):
+    num_nodes = path_length * 2 + path_length * path_length
+    # SIGNAL_NODE section
+    inventory = "[SIGNAL_NODE]\n"
+    inventory += f"SIGNAL ansible_host=SIGNAL.infra.{reservation_name}.fledger.dcog ansible_user=dcog ansible_ssh_private_key_file=~/.ssh/id_mrg-0\n\n"
 
-# Output Ansible inventory file
-inventory_file = "inventory.ini"
+    # FLEDGER_NODES section
+    inventory += "[FLEDGER_NODES]\n"
+    nodes = [f"node-{i}" for i in range(num_nodes)]
+    random.shuffle(nodes)
+    for node in nodes:
+        inventory += f"{node} ansible_host={node}.infra.{reservation_name}.fledger.dcog ansible_user=dcog ansible_ssh_private_key_file=~/.ssh/id_mrg-0\n"
+    inventory += "\n"
 
-def parse_materialization(file_path):
-    """
-    Parses the materialization file to extract node mappings.
-    """
-    node_ip_mapping = {}
+    # ALL_NODES section
+    inventory += "[ALL_NODES:children]\n"
+    inventory += "SIGNAL_NODE\n"
+    inventory += "FLEDGER_NODES\n"
 
-    # Regular expression to match nodes and their metadata
-    node_pattern = re.compile(r"(\S+)@(\S+) &\{.*?tunnel_ip:\"(\d+\.\d+\.\d+\.\d+)\"")
-    
-    with open(file_path, "r") as file:
-        for line in file:
-            match = node_pattern.search(line)
-            if match:
-                node_name = match.group(1)
-                ip_address = match.group(3)
-                node_ip_mapping[node_name] = ip_address
+    filename = "inventory.ini"
 
-    return node_ip_mapping
+    # Save the inventory to a file
+    with open(filename, "w") as file:
+        file.write(inventory)
 
-def write_inventory(node_ip_mapping, output_file):
-    """
-    Writes the Ansible inventory file from the node mapping.
-    Separates the SIGNAL node into its own group.
-    """
-    with open(output_file, "w") as file:
-            # Write SIGNAL group
-            file.write("[SIGNAL_NODE]\n")
-            for node, ip in node_ip_mapping.items():
-                if node.lower() == "signal":
-                    ansible_hostname = f"{node}.infra.tryagain.fledgerfirst.dcog"
-                    file.write(f"{node} ansible_host={ansible_hostname} ansible_user=dcog ansible_ssh_private_key_file=~/.ssh/id_mrg-0\n")
-            
-            # Write ROOT_NODE group
-            file.write("\n[ROOT_NODE]\n")
-            for node, ip in node_ip_mapping.items():
-                if node.lower() == "node-1":
-                    ansible_hostname = f"{node}.infra.tryagain.fledgerfirst.dcog"
-                    file.write(f"{node} ansible_host={ansible_hostname} ansible_user=dcog ansible_ssh_private_key_file=~/.ssh/id_mrg-0\n")
-                               
-            # Write FLEDGER_NODES group
-            file.write("\n[FLEDGER_NODES]\n")
-            for node, ip in node_ip_mapping.items():
-                if not node.startswith('ifr'):
-                    if node.lower() != "signal" and node.lower() != "node-1":
-                        ansible_hostname = f"{node}.infra.tryagain.fledger.dcog"
-                        file.write(f"{node} ansible_host={ansible_hostname} ansible_user=dcog ansible_ssh_private_key_file=~/.ssh/id_mrg-0\n")
-
-            file.write("\n[ALL_NODES:children]\nSIGNAL_NODE\nFLEDGER_NODES\nROOT_NODE")
-
-def main():
-    # Parse the materialization file
-    node_ip_mapping = parse_materialization(materialization_file)
-    
-    if not node_ip_mapping:
-        print("No nodes found in the materialization file.")
-        return
-
-    # Write the inventory file
-    write_inventory(node_ip_mapping, inventory_file)
-    print(f"Inventory file '{inventory_file}' generated successfully.")
+    print(f"Inventory file generated and saved to {filename}")
 
 if __name__ == "__main__":
-    main()
+    # Check if the required arguments are provided
+    if len(sys.argv) != 3:
+        print("Usage: python script_name.py <path_length> <reservation_name>")
+        sys.exit(1)
+
+    # Get the arguments
+    path_length = int(sys.argv[1])
+    reservation_name = sys.argv[2]
+
+    # Generate and save the inventory file
+    generate_inventory_file(path_length, reservation_name)

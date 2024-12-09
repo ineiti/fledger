@@ -34,6 +34,8 @@ for NODE in $( seq $NODES ); do
   if [ "$RETRY" -gt 0 ]; then
     RETRY_ARG="--retry $RETRY"
   fi
+  mkdir -p $CONFIG
+  cp loopix_core_config.yaml $CONFIG
   RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG |& ts "$NAME" &
 done
 
