@@ -35,7 +35,9 @@ lazy_static::lazy_static! {
 
     pub static ref MIXNODE_DELAY: Histogram = match register_histogram!(
         "loopix_mixnode_delay_milliseconds",
-        "Delay introduced by a mixnode."
+        "Delay introduced by a mixnode.",
+        vec![0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 6.0, 10.0, 50.0, 200.0]
+        // vec![0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 6.0, 10.0, 50.0, 200.0]
     ) {
         Ok(histogram) => {
             log::info!("MIXNODE_DELAY histogram registered successfully.");
@@ -52,7 +54,8 @@ lazy_static::lazy_static! {
 
     pub static ref ENCRYPTION_LATENCY: Histogram = match register_histogram!(
         "loopix_encryption_latency_milliseconds",
-        "Time taken for encryption."
+        "Time taken for encryption.", // TODO maybe let's take all encryption latencies
+        vec![0.1, 0.25, 0.5, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 10.0, 50.0, 200.0] 
     ) {
         Ok(histogram) => {
             log::info!("ENCRYPTION_LATENCY histogram registered successfully.");
@@ -69,7 +72,8 @@ lazy_static::lazy_static! {
 
     pub static ref DECRYPTION_LATENCY: Histogram = match register_histogram!(
         "loopix_decryption_latency_milliseconds",
-        "Time taken for decryption."
+        "Time taken for decryption.",
+        vec![0.0001, 0.001, 0.0025, 0.005, 0.01, 0.5] // TODO maybe it makes more sense to do processing latency?
     ) {
         Ok(histogram) => {
             log::info!("DECRYPTION_LATENCY histogram registered successfully.");

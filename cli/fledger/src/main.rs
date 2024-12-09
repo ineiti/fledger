@@ -275,7 +275,7 @@ impl LSRoot {
                         .webproxy
                         .as_mut()
                         .unwrap()
-                        .get_with_timeout("https://ipinfo.io", Duration::from_secs(60))
+                        .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
                         .await
                     {
                         Ok(mut res) => match res.text().await {
@@ -439,6 +439,7 @@ impl LoopixSetup {
         &self,
         node_id: NodeID,
         role: LoopixRole,
+        
     ) -> Result<LoopixConfig, BrokerError> {
         let private_key = &self.loopix_key_pairs.get(&node_id).unwrap().1;
         let public_key = &self.loopix_key_pairs.get(&node_id).unwrap().0;

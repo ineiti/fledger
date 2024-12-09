@@ -281,7 +281,7 @@ mod test {
 
         tokio::time::sleep(Duration::from_secs(3)).await;
 
-        if let Err(e) = cl.get_with_timeout("https://fledg.re", Duration::from_secs(10)).await {
+        if let Err(e) = cl.get_with_timeout("https://fledg.re", Duration::from_secs(10), false).await {
             log::error!("Failed to fetch https://fledg.re: {:?}", e);
         } else {
             log::info!("Successfully fetched https://fledg.re");

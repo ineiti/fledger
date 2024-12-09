@@ -149,7 +149,7 @@ impl WebProxy {
         log::info!("Getting {url} with retry: {}", retry);
         let start_time = Instant::now();
         for i in 0..retry + 1 { // try at leasy once
-            match self.get_with_timeout(url, timeout_duration).await {
+            match self.get_with_timeout(url, timeout_duration, false).await {
                 Ok(resp) => {
                     log::info!("Successfully received response: {:?}", resp);
                     return Ok(resp);
@@ -174,9 +174,11 @@ impl WebProxy {
         &mut self,
         url: &str,
         timeout_duration: Duration,
+        add_latency: bool,
     ) -> Result<Response, WebProxyError> {
         // log::debug!("Getting {url}");
         let our_rnd = U256::rnd();
+        let start_time = Instant::now();
         let (tx, rx) = channel(128);
         self.web_proxy
             .emit_msg(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx).into())?;
@@ -186,6 +188,10 @@ impl WebProxy {
                 if let WebProxyMessage::Output(WebProxyOut::ResponseGet(proxy, rnd, header)) = msg {
                     if rnd == our_rnd {
                         self.web_proxy.remove_subsystem(id).await?;
+                        if add_latency {
+                            let end_to_end_time = start_time.elapsed().as_secs_f64();
+                            END_TO_END_LATENCY.observe(end_to_end_time);
+                        }
                         return Ok(Response::new(proxy, header, rx));
                     }
                 }
