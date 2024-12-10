@@ -400,7 +400,7 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
     /// It also calls all brokers that are signed up as forwarding targets.
     /// The caller argument is to be used when recursively settling, to avoid
     /// endless loops.
-    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
+    pub async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
         let (tx, mut rx) = unbounded_channel();
         self.intern_tx
             .send(InternMessage::Settle(callers.clone(), tx))

@@ -13,7 +13,7 @@ pub struct DHTStorageConfig {
     // Put the DHTFlos in round(DHTFlo.spread * over_provide) nodes
     pub over_provide: f32,
     // 16 exa bytes should be enough for everybody
-    pub max_space: u64,
+    pub max_space: usize,
 }
 
 impl DHTConfig {
@@ -65,8 +65,8 @@ pub struct DHTFlo {
 }
 
 impl DHTFlo {
-    pub fn new(flo: Flo, spread: u32) -> Result<Self, FloError> {
-        Ok(Self { flo, spread })
+    pub fn new(flo: Flo, spread: u32) -> Self {
+        Self { flo, spread }
     }
 
     pub fn to_string(&self) -> Result<String, FloError> {
@@ -82,6 +82,10 @@ impl DHTFlo {
 
     pub fn ace(&self) -> ACE {
         self.flo.ace()
+    }
+
+    pub fn size(&self) -> usize {
+        self.flo.updates.iter().map(|u| u.change.size()).sum()
     }
 }
 

@@ -91,15 +91,21 @@ impl DHTStorageMessages {
     }
 
     fn storage(&mut self, msg: DHTStorageIn) -> Vec<InternOut> {
-        if let Some(out) = match msg {
+        let mut out = vec![];
+        if let Some(msg) = match msg {
             DHTStorageIn::StoreValue(flo) => {
+                self.core.store_kv(flo.clone());
+                out.push(DHTStorageOut::UpdateStorage(self.core.storage_clone()).into());
                 MessageNodeClosest::StoreFlo(flo.clone()).to_intern_out(flo.id())
             }
-            DHTStorageIn::ReadValue(id) => MessageNodeClosest::ReadFlo.to_intern_out(id),
+            DHTStorageIn::ReadValue(id) => match self.core.get_flo(&id) {
+                Some(df) => Some(DHTStorageOut::Value(df.clone()).into()),
+                None => MessageNodeClosest::ReadFlo.to_intern_out(id),
+            },
         } {
-            return vec![out];
+            out.push(msg);
         }
-        vec![]
+        out
     }
 
     fn msg_routing(
@@ -162,10 +168,12 @@ impl SubsystemHandler<InternIn, InternOut> for DHTStorageMessages {
     async fn messages(&mut self, inputs: Vec<InternIn>) -> Vec<InternOut> {
         inputs
             .into_iter()
+            .inspect(|msg| log::trace!("In: {msg:?}"))
             .flat_map(|msg| match msg {
                 InternIn::Routing(dhtrouting_out) => self.routing(dhtrouting_out),
                 InternIn::Storage(dhtstorage_in) => self.storage(dhtstorage_in),
             })
+            .inspect(|msg| log::trace!("Out: {msg:?}"))
             .collect()
     }
 }
@@ -201,18 +209,30 @@ pub struct DHTStorageStats {}
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, error::Error};
+    use std::error::Error;
 
     use super::*;
 
+    use crate::flo::testing::{new_ace, new_msg_closest};
+
     #[test]
-    fn test_something() -> Result<(), Box<dyn Error>> {
-        let [id1, id2, key1, key2] = [NodeID::rnd(), NodeID::rnd(), NodeID::rnd(), NodeID::rnd()];
-        let storage = DHTStorageBucket {
-            flos: HashMap::new(),
-        };
-        let mut msgs = DHTStorageMessages::new(storage, DHTStorageConfig::default());
-        msgs.routing(DHTRoutingOut::MessageClosest((), (), (), ()));
+    fn test_choice() -> Result<(), Box<dyn Error>> {
+        let [origin, last] = [NodeID::rnd(), NodeID::rnd()];
+
+        let mut msgs = DHTStorageMessages::new(
+            DHTStorageBucket::new(origin),
+            DHTStorageConfig {
+                over_provide: 1.,
+                max_space: 1000,
+            },
+        );
+
+        let ace = new_ace()?;
+        for len in [1, 2, 2] {
+            let (_, dout) = new_msg_closest(MODULE_NAME, origin, last, &ace, "0".repeat(400))?;
+            msgs.routing(dout);
+            assert_eq!(len, msgs.core.flo_meta().len());
+        }
 
         Ok(())
     }

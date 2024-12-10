@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 
 use flarch::nodeids::U256;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::flo::dht::{DHTFlo, DHTStorageConfig};
+use crate::{
+    dht_routing::kademlia::KNode,
+    flo::dht::{DHTFlo, DHTStorageConfig},
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct FloMeta {
@@ -57,7 +61,10 @@ impl DHTStorageCore {
     }
 
     pub fn store_kv(&mut self, flo: DHTFlo) {
-        self.storage.flos.insert(flo.id(), flo);
+        self.storage.put(flo);
+        while self.storage.size() > self.config.max_space {
+            self.storage.remove_furthest();
+        }
         // TODO: evict values which are furthest from us
     }
 
@@ -72,8 +79,12 @@ impl DHTStorageCore {
             .collect()
     }
 
-    pub fn get_flo(&self, key: &U256) -> Option<&DHTFlo>{
+    pub fn get_flo(&self, key: &U256) -> Option<&DHTFlo> {
         self.storage.flos.get(key)
+    }
+
+    pub fn storage_clone(&self) -> DHTStorageBucket {
+        self.storage.clone()
     }
 }
 
@@ -98,14 +109,69 @@ impl DHTStorageStorageSave {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DHTStorageBucket {
-    pub flos: HashMap<U256, DHTFlo>,
+    root: U256,
+    flos: HashMap<U256, DHTFlo>,
+    distances: HashMap<usize, Vec<U256>>,
+    size: usize,
 }
 
 impl DHTStorageBucket {
+    pub fn new(root: U256) -> Self {
+        Self {
+            root,
+            flos: HashMap::new(),
+            distances: HashMap::new(),
+            size: 0,
+        }
+    }
+
     pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
         serde_yaml::to_string::<DHTStorageStorageSave>(&DHTStorageStorageSave::V1(self.clone()))
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn put(&mut self, df: DHTFlo) {
+        let id = df.id();
+        self.remove_entry(&id);
+        let depth = KNode::get_depth(&self.root, id);
+        self.distances
+            .entry(depth)
+            .or_insert_with(Vec::new)
+            .push(id);
+        self.size += df.size();
+        self.flos.insert(id, df);
+    }
+
+    pub fn get(&self, id: &U256) -> Option<DHTFlo> {
+        self.flos.get(id).cloned()
+    }
+
+    pub fn remove_furthest(&mut self) {
+        if let Some(furthest) = self.distances.keys().sorted().unique().last() {
+            if let Some(id) = self
+                .distances
+                .get(furthest)
+                .and_then(|ids| ids.first())
+                .map(|id| *id)
+            {
+                self.remove_entry(&id);
+            }
+        }
+    }
+
+    pub fn remove_entry(&mut self, id: &U256) {
+        if let Some(df) = self.flos.remove(id) {
+            let distance = KNode::get_depth(&self.root, *id);
+            self.distances
+                .entry(distance)
+                .and_modify(|v| v.retain(|i| i != id));
+            self.size -= df.size();
+        }
     }
 }
 
@@ -113,13 +179,59 @@ impl DHTStorageBucket {
 /// work the way you want them to.
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
+    use std::{error::Error, str::FromStr};
 
     use super::*;
 
+    use crate::flo::testing::{new_ace, new_dht_flo_depth};
+
     #[test]
-    fn test_increase() -> Result<(), Box<dyn Error>> {
-        let _tc = DHTStorageCore::new(DHTStorageBucket::default(), DHTStorageConfig::default());
+    fn test_furthest() -> Result<(), Box<dyn Error>> {
+        let root = U256::from_str("00").unwrap();
+        let ace = new_ace()?;
+        let flos1: Vec<DHTFlo> = (1..=3)
+            .map(|i| new_dht_flo_depth(ace.clone(), &root, i))
+            .collect();
+        let mut storage = DHTStorageBucket::new(root);
+        for df in flos1 {
+            storage.put(df);
+        }
+
+        assert_eq!(3, storage.distances.len());
+        assert_eq!(3, storage.flos.len());
+        let size = storage.size;
+
+        let flos2: Vec<DHTFlo> = (1..=3)
+            .map(|i| new_dht_flo_depth(ace.clone(), &root, i))
+            .collect();
+        for df in flos2 {
+            storage.put(df);
+        }
+        assert_eq!(3, storage.distances.len());
+        assert_eq!(2, storage.distances.get(&1).unwrap().len());
+        assert_eq!(2, storage.distances.get(&2).unwrap().len());
+        assert_eq!(2, storage.distances.get(&3).unwrap().len());
+        assert_eq!(6, storage.flos.len());
+        assert!(storage.size > size);
+        let size = storage.size;
+
+        storage.remove_furthest();
+        assert_eq!(3, storage.distances.len());
+        assert_eq!(2, storage.distances.get(&1).unwrap().len());
+        assert_eq!(2, storage.distances.get(&2).unwrap().len());
+        assert_eq!(1, storage.distances.get(&3).unwrap().len());
+        assert_eq!(5, storage.flos.len());
+        assert!(storage.size < size);
+        let size = storage.size;
+
+        storage.remove_furthest();
+        assert_eq!(3, storage.distances.len());
+        assert_eq!(2, storage.distances.get(&1).unwrap().len());
+        assert_eq!(2, storage.distances.get(&2).unwrap().len());
+        assert_eq!(0, storage.distances.get(&3).unwrap().len());
+        assert_eq!(4, storage.flos.len());
+        assert!(storage.size < size);
+
         Ok(())
     }
 }

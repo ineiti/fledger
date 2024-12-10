@@ -10,18 +10,14 @@
 
 -- seems to be more or less OK, at least if it's usable by DHT_storage --
 
-1. The KBucket.active should only be populated once a node has been confirmed.
+1. KBucket.active is only be populated once a node has been confirmed.
   - Needs more testing if nodes fail and how they will be replaced
 
 ### DHT_storage
 
 1. Link it correctly to DHT_routing
-  - check if dht_storage works like that by adding the following messages:
-    - Store (): which sends a store-request
-    - Load: which requests data
-    - Value: the requested data
-    - what to do with the `(Local|Request|Update)Flo`'s?
-      - Add `GetClosestNodes` / `ClosestNodes` messages to DHT_routing
+  - implement and test the `DHTStorage(In|Out)` messages for interaction with local modules
+  - Implement and test the `MessageNodeDirect` messages to automatically update the FLOs stored
 2. Store up to 1MB of data
 3. Delete oldest/farthest data
 
@@ -83,10 +79,10 @@
 
 # Dates
 
-2022-09-12:
+2024-09-12:
 - update to latest versions of wasm libraries
 
-2022-09-09:
+2024-09-09:
 - Clean up broker / network:
   - change enums with `((a, b))` arguments to simple `(a, b)` arguments
   - remove `Destination` from `SubsystemListener`

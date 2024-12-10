@@ -457,7 +457,7 @@ enum BucketStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct KNode {
+pub struct KNode {
     id: NodeID,
     depth: usize,
     ticks_active: u32,
@@ -479,7 +479,7 @@ impl KNode {
         self.ticks_last = 0;
     }
 
-    fn get_depth(root: &NodeID, id: NodeID) -> usize {
+    pub fn get_depth(root: &NodeID, id: NodeID) -> usize {
         for (index, (root_byte, id_byte)) in
             root.as_ref().iter().zip(id.as_ref().iter()).enumerate()
         {
@@ -519,6 +519,9 @@ mod test {
     use rand::seq::SliceRandom;
 
     use super::*;
+    use crate::dht_routing::testing::{
+        distance_str, kademlia_add_nodes, kademlia_add_nodes_cache, rnd_node_depth,
+    };
 
     const LOG_LVL: log::LevelFilter = log::LevelFilter::Info;
 
@@ -527,25 +530,6 @@ mod test {
         ping_interval: 2,
         ping_timeout: 4,
     };
-
-    fn rnd_node_depth(root: &NodeID, depth: usize) -> NodeID {
-        loop {
-            let node = NodeID::rnd();
-            let nd = KNode::get_depth(root, node);
-            if nd == depth {
-                return node;
-            }
-        }
-    }
-
-    fn rnd_nodes_depth(root: &NodeID, depth: usize, nbr: usize) -> Vec<NodeID> {
-        (0..nbr).map(|_| rnd_node_depth(root, depth)).collect()
-    }
-
-    fn distance_str(root: &NodeID, node_str: &str) -> usize {
-        let node = U256::from_str(node_str).expect("NodeID init");
-        KNode::get_depth(root, node)
-    }
 
     #[test]
     fn test_get_depth() {
@@ -562,14 +546,6 @@ mod test {
         assert_eq!(6, distance_str(&root, "02"));
         assert_eq!(7, distance_str(&root, "01"));
         assert_eq!(8, distance_str(&root, "0080"));
-    }
-
-    fn kademlia_add_nodes(kademlia: &mut Kademlia, depth: usize, nbr: usize) {
-        kademlia.add_nodes_active(rnd_nodes_depth(&kademlia.root, depth, nbr));
-    }
-
-    fn kademlia_add_nodes_cache(kademlia: &mut Kademlia, depth: usize, nbr: usize) {
-        kademlia.add_nodes(rnd_nodes_depth(&kademlia.root, depth, nbr));
     }
 
     #[test]

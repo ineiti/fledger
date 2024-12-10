@@ -37,7 +37,7 @@
         "cd cli && cargo run -p fledger"
       ],
       "code": [
-        "Code --user-data-dir .vscode"
+        "Code --user-data-dir .vscode ."
       ]
     }
   },

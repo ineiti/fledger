@@ -185,6 +185,13 @@ impl Change {
             Change::Data(_) => Err(FloError::UpdateNoACE),
         }
     }
+
+    pub fn size(&self) -> usize {
+        match self {
+            Change::Data(str) => str.len(),
+            Change::ACE(ace) => ace.rules.iter().map(|r| r.action.size()).sum(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -217,8 +224,17 @@ pub enum Action {
     Flo(String),
 }
 
+impl Action {
+    pub fn size(&self) -> usize {
+        match self {
+            Action::UpdateACE => 0,
+            Action::UpdateData => 0,
+            Action::Flo(str) => str.len(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Condition {
     Signature(EntityID),
 }
-

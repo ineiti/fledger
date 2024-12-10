@@ -8,6 +8,14 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 ## [Unreleased]
 
+### Added
+- flmodules::crypto for some basic cryptography wrappers around different types of signatures
+- flmodules::flo handling Fledger Objects
+
+#### WIP
+- flmodules::dht_routing implements a routing based on Kademlia
+- flmodules::dht_storage to store FLOs in a distributed hash table
+
 ### Fixed
 - reconnections should work better now, both for libc and wasm
 - removed mdns calls, so it doesn't flood my home network
