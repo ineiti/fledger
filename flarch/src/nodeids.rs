@@ -15,10 +15,9 @@ pub enum ParseError {
 }
 
 /// Nicely formatted 256 bit structure
-// #[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde_as]
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct U256(#[serde_as(as = "Hex")] [u8; 32]);
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub struct U256(#[serde_as(as = "Hex")][u8; 32]);
 
 impl fmt::Display for U256 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -209,6 +208,20 @@ impl From<Vec<U256>> for NodeIDs {
 impl From<&Vec<U256>> for NodeIDs {
     fn from(nodes: &Vec<U256>) -> Self {
         Self { 0: nodes.to_vec() }
+    }
+}
+
+impl fmt::Display for NodeIDs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "[{}]",
+            &self
+                .0
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        ))
     }
 }
 

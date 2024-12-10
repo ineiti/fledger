@@ -41,12 +41,12 @@ use std::{
     },
 };
 
-use flarch_macro::platform_async_trait;
 use futures::{future::BoxFuture, lock::Mutex};
 use thiserror::Error;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::{nodeids::U256, tasks::spawn_local};
+use flarch_macro::platform_async_trait;
 
 #[derive(Debug, Error)]
 /// The only error that can happen is that sending to another broker fails.
@@ -55,6 +55,8 @@ pub enum BrokerError {
     #[error("While sending to {0}")]
     /// Couldn't send to this queue.
     SendQueue(String),
+    #[error("Translation error")]
+    Translation,
 }
 
 /// Identifies a broker for loop detection.
@@ -94,7 +96,7 @@ mod asy {
     impl<T> Async for T {}
 }
 #[cfg(target_family = "unix")]
-mod asy {
+pub mod asy {
     pub trait Async: Sync + Send {}
     impl<T: Sync + Send> Async for T {}
 }
@@ -156,6 +158,16 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
             )))
             .map_err(|_| BrokerError::SendQueue("add_subsystem".into()))?;
         Ok(subsystem)
+    }
+
+    #[cfg(target_family = "wasm")]
+    pub async fn add_handler(&mut self, handler: Box<dyn SubsystemHandler<T> + Send>) -> Result<usize, BrokerError> {
+        self.add_subsystem(Subsystem::Handler(handler)).await
+    }
+
+    #[cfg(target_family = "unix")]
+    pub async fn add_handler(&mut self, handler: Box<dyn SubsystemHandler<T> + Send>) -> Result<usize, BrokerError> {
+        self.add_subsystem(Subsystem::Handler(handler)).await
     }
 
     /// Removes a subsystem from the list that will be applied to new messages.
@@ -251,7 +263,7 @@ impl<T: 'static + Async + Clone + fmt::Debug> Broker<T> {
     /// It also calls all brokers that are signed up as forwarding targets.
     /// The caller argument is to be used when recursively settling, to avoid
     /// endless loops.
-    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
+    pub async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
         let (tx, mut rx) = unbounded_channel();
         self.intern_tx
             .send(InternMessage::Settle(callers.clone(), tx))

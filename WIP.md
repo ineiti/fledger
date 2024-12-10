@@ -2,18 +2,40 @@
 
 ## Current high-level goal
 
+- Store a webpage in fledger
+
 ## Current concrete goal
+
+### DHT_routing
+
+-- seems to be more or less OK, at least if it's usable by DHT_storage --
+
+1. KBucket.active is only be populated once a node has been confirmed.
+  - Needs more testing if nodes fail and how they will be replaced
+
+### DHT_storage
+
+1. Link it correctly to DHT_routing
+  - implement and test the `DHTStorage(In|Out)` messages for interaction with local modules
+  - Implement and test the `MessageNodeDirect` messages to automatically update the FLOs stored
+2. Store up to 1MB of data
+3. Delete oldest/farthest data
+
+### Ledger
+
+1. Create simple DAG storage
+2. Store global state in DHT
+3. Store mana of node in DHT
+
+### User-facing
+
+1. Store configuration of node
+  1. Rename node
+  2. Show last updated nodes
 
 # TODO
 
 ## Features
-
-- Needed for semester project:
-  - Import library for html serving with callbacks for loading of elements
-  - Easy simulation 
-    - w/o network
-    - local network
-    - network with bw and delay -> on Deterlab
 
 ## Bugs
 
@@ -24,6 +46,20 @@
 
 ## Cleanups / improvements
 
+- flnode/src/node.rs changes:
+  - instead of calling `update`, use the `template` version with a tap and a watcher
+  - add the timer as an argument to the brokers which need it and remove the `add_timer` method
+- rewrite the flmodules/src/*/broker.rs :
+  - move dht_storage way of broker.rs/message.rs to other brokers, too
+  - think how the `Overlay` (should be renamed to `Adapter` or so) can be
+  redone. One possibility is to have the network module using a good
+  `NetworkMessage` which includes the `NetworkWrapper` and can also be used
+  by `Random` and `Loopix`.
+      - Question: how to handle special messages then? Like asking to reshuffle
+      connections in `random` or accessing the providers in `loopix`?
+      - Answer: they can be added as a broker with another message type, which is also
+      added to the broker structure
+        - add an internal message enum to separate them from the outside messages
 - yaml files are stored as .toml
   - make sure old files can be read as .toml
   - save new files as .yaml
@@ -31,15 +67,6 @@
 - serde_yaml is deprecated
   - use serde_yaml_ng with singleton_map_recursive
 - use matchbox from https://github.com/johanhelsing/matchbox
-- rewrite the flmodules/src/*/broker.rs :
-  - the returned broker should only represent the actual i/o messages
-  - add an internal message enum to separate them from the outside messages
-  - think how the `Overlay` (should be renamed to `Adapter` or so) can be
-  redone. One possibility is to have the network module using a good
-  `NetworkMessage` which includes the `NetworkWrapper` and can also be used
-  by `Random` and `Loopix`.
-    - Question: how to handle special messages then? Like asking to reshuffle
-    connections in `random` or accessing the providers in `loopix`?
 - Clean up broker / network:
   - Remove `Destination::{All,Others,This}` - Test it
     only `Destination::All` is ever used
@@ -50,14 +77,12 @@
 
 ## Reaching out
 
-- Sign up for dev6
-
 # Dates
 
-2022-09-12:
+2024-09-12:
 - update to latest versions of wasm libraries
 
-2022-09-09:
+2024-09-09:
 - Clean up broker / network:
   - change enums with `((a, b))` arguments to simple `(a, b)` arguments
   - remove `Destination` from `SubsystemListener`
