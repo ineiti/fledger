@@ -152,6 +152,8 @@ impl WebProxy {
             match self.get_with_timeout(url, timeout_duration, false).await {
                 Ok(resp) => {
                     log::info!("Successfully received response: {:?}", resp);
+                    let end_to_end_time = start_time.elapsed().as_secs_f64();
+                    END_TO_END_LATENCY.observe(end_to_end_time);
                     return Ok(resp);
                 }
                 Err(WebProxyError::ResponseTimeout) => {
@@ -165,8 +167,7 @@ impl WebProxy {
                 }
             }
         }
-        let end_to_end_time = start_time.elapsed().as_secs_f64();
-        END_TO_END_LATENCY.observe(end_to_end_time);
+
         Err(WebProxyError::ResponseTimeout)
     }
 

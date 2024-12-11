@@ -275,7 +275,8 @@ impl LSRoot {
                         .webproxy
                         .as_mut()
                         .unwrap()
-                        .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
+                        // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
+                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(6))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
@@ -447,6 +448,7 @@ impl LoopixSetup {
 
         let mut config_path = PathBuf::from(&self.config);
         config_path.push("loopix_core_config.yaml");
+        
 
         let config_str = std::fs::read_to_string(config_path.clone()).unwrap();
 
