@@ -104,6 +104,7 @@ async fn save_metrics_loop(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let config = args.config.clone();
+    let retry = args.retry;
 
     let mut logger = env_logger::Builder::new();
     logger.filter_module("fl", args.verbosity.log_level_filter());
@@ -158,7 +159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .err()
             .map(|e| log::warn!("Couldn't process node: {e:?}"));
 
-        state = state.process(&mut node, i).await?;
+        state = state.process(&mut node, i, retry).await?;
 
         if i % 3 == 2 && false {
             log::info!("Nodes are: {:?}", node.nodes_online()?);
@@ -183,9 +184,9 @@ enum LoopixSimul {
 }
 
 impl LoopixSimul {
-    async fn process(&self, node: &mut Node, i: u32) -> Result<Self, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32, retry: u8) -> Result<Self, BrokerError> {
         let new_state = match &self {
-            LoopixSimul::Root(lsroot) => lsroot.process(node, i).await?,
+            LoopixSimul::Root(lsroot) => lsroot.process(node, i, retry).await?,
             LoopixSimul::Child(lschild) => lschild.process(node).await?,
         };
         if *self != new_state {
@@ -224,7 +225,7 @@ enum LSRoot {
 }
 
 impl LSRoot {
-    async fn process(&self, node: &mut Node, i: u32) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32, retry: u8) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSRoot::WaitNodes(n) => {
                 let path_len = *n;
