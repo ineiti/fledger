@@ -1,6 +1,6 @@
 use std::fmt;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 use async_trait::async_trait;
 use sphinx_packet::header::delays::Delay;
@@ -15,6 +15,7 @@ use super::config::CoreConfig;
 use super::storage::LoopixStorage;
 use super::{DECRYPTION_LATENCY, MIXNODE_DELAY};
 use super::{client::Client, core::*, mixnode::Mixnode, provider::Provider, sphinx::*};
+use crate::loopix::PROVIDER_DELAY;
 use crate::nodeconfig::NodeInfo;
 use crate::overlay::messages::NetworkWrapper;
 
@@ -76,7 +77,7 @@ pub enum LoopixOut {
 #[derive(Debug)]
 pub struct LoopixMessages {
     pub role: NodeType,
-    pub network_sender: Sender<(NodeID, Sphinx)>,
+    pub network_sender: Sender<(NodeID, Sphinx, Option<SystemTime>)>,
     pub overlay_sender: Sender<(NodeID, NetworkWrapper)>,
 }
 
@@ -93,7 +94,7 @@ impl Clone for LoopixMessages {
 impl LoopixMessages {
     pub fn new(
         node_type: NodeType,
-        network_sender: Sender<(NodeID, Sphinx)>,
+        network_sender: Sender<(NodeID, Sphinx, Option<SystemTime>)>,
         overlay_sender: Sender<(NodeID, NetworkWrapper)>,
     ) -> Self {
         Self {
@@ -154,7 +155,7 @@ impl LoopixMessages {
         );
 
         self.network_sender
-            .send((next_node, sphinx))
+            .send((next_node, sphinx, Some(SystemTime::now())))
             .await
             .expect("while sending overlay message to network");
     }
@@ -238,15 +239,27 @@ impl LoopixMessages {
                     }
                     if let Some((node_id, messages)) = messages {
                         let message_details: Vec<_> =
-                            messages.iter().map(|sphinx| &sphinx.message_id).collect();
+                            messages.iter().map(|(sphinx, _)| &sphinx.message_id).collect();
                         log::trace!(
                             "Final hop was a pull request: {} -> {} with message IDs: {:?}",
                             node_id,
                             messages.len(),
                             message_details
                         );
-                        for message in messages {
-                            self.network_sender.send((node_id, message)).await.expect("while sending message");
+                        for (message, timestamp) in messages {
+                            if let Some(timestamp) = timestamp {
+                                let end_time = match timestamp.elapsed() {
+                                    Ok(elapsed) => elapsed.as_millis() as f64,
+                                    Err(e) => {
+                                        log::error!("Error: {:?}", e);
+                                        continue;
+                                    }
+                                };
+                                PROVIDER_DELAY.observe(end_time);
+                            } else {
+                                log::trace!("No timestamp found for message");
+                            }
+                            self.network_sender.send((node_id, message, None)).await.expect("while sending message");
                         }
                     }
                 }
@@ -304,7 +317,7 @@ impl LoopixCore for NodeType {
     ) -> (
         NodeID,
         Option<NetworkWrapper>,
-        Option<(NodeID, Vec<Sphinx>)>,
+        Option<(NodeID, Vec<(Sphinx, Option<SystemTime>)>)>,
         Option<MessageType>,
     ) {
         match self {
@@ -375,7 +388,7 @@ impl NodeType {
 
     async fn send_after_sphinx_packet(
         &self,
-        network_sender: Sender<(NodeID, Sphinx)>,
+        network_sender: Sender<(NodeID, Sphinx, Option<SystemTime>)>,
         delay: Delay,
         node_id: NodeID,
         sphinx: Sphinx,
@@ -388,7 +401,7 @@ impl NodeType {
                     let end_time = start_time.elapsed().as_millis() as f64;
                     MIXNODE_DELAY.observe(end_time);
                     network_sender
-                        .send((node_id, sphinx))
+                        .send((node_id, sphinx, None))
                         .await
                         .expect("while sending sphinx packet to network");
                 });

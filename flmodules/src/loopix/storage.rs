@@ -3,7 +3,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use flarch::nodeids::NodeID;
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
-use sphinx_packet::{header::delays::Delay, route::Node};
+use sphinx_packet::route::Node;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -120,14 +120,14 @@ pub struct ProviderStorage {
     //     serialize_with = "serialize_client_messages",
     //     deserialize_with = "deserialize_client_messages"
     // )]
-    client_messages: HashMap<NodeID, Vec<Sphinx>>,
+    client_messages: HashMap<NodeID, Vec<(Sphinx, Option<SystemTime>)>>,
     client_message_index: HashMap<NodeID, usize>,
 }
 
 impl ProviderStorage {
     pub fn new(
         subscribed_clients: HashSet<NodeID>,
-        client_messages: HashMap<NodeID, Vec<Sphinx>>,
+        client_messages: HashMap<NodeID, Vec<(Sphinx, Option<SystemTime>)>>,
     ) -> Self {
         ProviderStorage {
             subscribed_clients,
@@ -407,7 +407,7 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn get_all_client_messages(&self) -> HashMap<NodeID, Vec<Sphinx>> {
+    pub async fn get_all_client_messages(&self) -> HashMap<NodeID, Vec<(Sphinx, Option<SystemTime>)>> {
         if let Some(storage) = self.provider_storage.read().await.as_ref() {
             storage.client_messages.clone()
         } else {
@@ -415,7 +415,7 @@ impl LoopixStorage {
         }
     }
 
-    pub async fn get_client_messages(&self, node_id: NodeID) -> Vec<Sphinx> {
+    pub async fn get_client_messages(&self, node_id: NodeID) -> Vec<(Sphinx, Option<SystemTime>)> {
         if let Some(storage) = self.provider_storage.read().await.as_ref() {
             storage
                 .client_messages
@@ -433,7 +433,7 @@ impl LoopixStorage {
                 .client_messages
                 .entry(client_id)
                 .or_insert(Vec::new())
-                .push(sphinx);
+                .push((sphinx, Some(SystemTime::now())));
         } else {
             panic!("Provider storage not found");
         }
@@ -685,60 +685,58 @@ impl std::fmt::Debug for LoopixStorage {
 // endregion: Derived functions
 
 // region: Serde functions
-#[derive(Serialize, Deserialize)]
-struct SerializableMessage {
-    delay: [u8; 8],
-    sphinx: Sphinx,
-}
-pub fn serialize_client_messages<S>(
-    messages: &HashMap<NodeID, Vec<(Delay, Sphinx)>>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    let serializable_messages: HashMap<_, Vec<_>> = messages
-        .iter()
-        .map(|(node_id, messages)| {
-            let serialized_messages: Vec<_> = messages
-                .iter()
-                .map(|(delay, sphinx)| SerializableMessage {
-                    delay: delay.to_bytes(),
-                    sphinx: sphinx.clone(),
-                })
-                .collect();
-            (node_id.clone(), serialized_messages)
-        })
-        .collect();
+// #[derive(Serialize, Deserialize)]
+// struct SerializableMessage {
+//     sphinx: Sphinx,
+//     timestamp: SystemTime,
+// }
 
-    serializable_messages.serialize(serializer)
-}
+// pub fn serialize_client_messages<S>(
+//     messages: &HashMap<NodeID, Vec<(Sphinx, SystemTime)>>,
+//     serializer: S,
+// ) -> Result<S::Ok, S::Error>
+// where
+//     S: serde::Serializer,
+// {
+//     let serializable_messages: HashMap<_, Vec<_>> = messages
+//         .iter()
+//         .map(|(node_id, messages)| {
+//             let serialized_messages: Vec<_> = messages
+//                 .iter()
+//                 .map(|(sphinx, timestamp)| SerializableMessage {
+//                     sphinx: sphinx.clone(),
+//                     timestamp: *timestamp,
+//                 })
+//                 .collect();
+//             (node_id.clone(), serialized_messages)
+//         })
+//         .collect();
 
-pub fn deserialize_client_messages<'de, D>(
-    deserializer: D,
-) -> Result<HashMap<NodeID, Vec<(Delay, Sphinx)>>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let serializable_messages: HashMap<NodeID, Vec<SerializableMessage>> =
-        HashMap::deserialize(deserializer)?;
+//     serializable_messages.serialize(serializer)
+// }
 
-    let messages: HashMap<_, Vec<_>> = serializable_messages
-        .into_iter()
-        .map(|(node_id, messages)| {
-            let deserialized_messages = messages
-                .into_iter()
-                .map(|msg| {
-                    let delay = Delay::from_bytes(msg.delay);
-                    Ok((delay, msg.sphinx))
-                })
-                .collect::<Result<_, D::Error>>()?;
-            Ok((node_id, deserialized_messages))
-        })
-        .collect::<Result<_, D::Error>>()?;
+// pub fn deserialize_client_messages<'de, D>(
+//     deserializer: D,
+// ) -> Result<HashMap<NodeID, Vec<(Sphinx, Option<Instant>)>>, D::Error>
+// where
+//     D: serde::Deserializer<'de>,
+// {
+//     let serializable_messages: HashMap<NodeID, Vec<SerializableMessage>> =
+//         HashMap::deserialize(deserializer)?;
 
-    Ok(messages)
-}
+//     let messages: HashMap<_, Vec<_>> = serializable_messages
+//         .into_iter()
+//         .map(|(node_id, messages)| {
+//             let deserialized_messages = messages
+//                 .into_iter()
+//                 .map(|msg| Ok((msg.sphinx, msg.timestamp)))
+//                 .collect::<Result<_, D::Error>>()?;
+//             Ok((node_id, deserialized_messages))
+//         })
+//         .collect::<Result<_, D::Error>>()?;
+
+//     Ok(messages)
+// }
 
 pub fn serialize_public_key<S>(key: &PublicKey, serializer: S) -> Result<S::Ok, S::Error>
 where

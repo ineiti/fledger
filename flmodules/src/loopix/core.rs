@@ -5,7 +5,7 @@ use sphinx_packet::header::delays::generate_from_average_duration;
 use sphinx_packet::payload::Payload;
 use sphinx_packet::route::{Destination, Node, NodeAddressBytes};
 use sphinx_packet::{ProcessedPacket, SphinxPacket, SphinxPacketBuilder};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use crate::loopix::config::CoreConfig;
 use crate::loopix::sphinx::{destination_address_from_node_id, Sphinx};
@@ -49,7 +49,7 @@ pub trait LoopixCore {
     ) -> (
         NodeID,
         Option<NetworkWrapper>,
-        Option<(NodeID, Vec<Sphinx>)>,
+        Option<(NodeID, Vec<(Sphinx, Option<SystemTime>)>)>,
         Option<MessageType>,
     );
     async fn process_forward_hop(
@@ -204,7 +204,7 @@ mod tests {
         ) -> (
             NodeID,
             Option<NetworkWrapper>,
-            Option<(NodeID, Vec<Sphinx>)>,
+            Option<(NodeID, Vec<(Sphinx, Option<SystemTime>)>)>,
             Option<MessageType>,
         ) {
             todo!()

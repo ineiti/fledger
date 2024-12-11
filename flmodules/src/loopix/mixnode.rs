@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use crate::loopix::broker::MODULE_NAME;
 
@@ -63,7 +64,7 @@ impl LoopixCore for Mixnode {
     ) -> (
         NodeID,
         Option<NetworkWrapper>,
-        Option<(NodeID, Vec<Sphinx>)>,
+        Option<(NodeID, Vec<(Sphinx, Option<SystemTime>)>)>,
         Option<MessageType>,
     ) {
         if destination != self.get_our_id().await {

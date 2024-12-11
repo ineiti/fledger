@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use crate::overlay::messages::NetworkWrapper;
 
@@ -76,7 +77,7 @@ impl LoopixCore for Provider {
     ) -> (
         NodeID,
         Option<NetworkWrapper>,
-        Option<(NodeID, Vec<Sphinx>)>,
+        Option<(NodeID, Vec<(Sphinx, Option<SystemTime>)>)>,
         Option<MessageType>,
     ) {
         if destination != self.get_our_id().await {
@@ -95,12 +96,8 @@ impl LoopixCore for Provider {
                             (destination, None, None, Some(message))
                         }
                         MessageType::PullRequest(client_id) => {
-                            let messages = self.create_pull_reply(client_id).await;
-                            log::trace!(
-                                "Provider received pull request from client: {:?}",
-                                client_id
-                            );
-                            (client_id, None, Some(messages), Some(message))
+                            let (client_id, messages) = self.create_pull_reply(client_id).await;
+                            (client_id, None, Some((client_id, messages)), Some(message))
                         }
                         MessageType::SubscriptionRequest(client_id) => {
                             self.get_storage().add_subscribed_client(client_id).await;
@@ -199,7 +196,7 @@ impl Provider {
         self.get_storage().add_subscribed_client(client_id).await;
     }
 
-    pub async fn get_client_messages(&self, client_id: NodeID) -> Vec<Sphinx> {
+    pub async fn get_client_messages(&self, client_id: NodeID) -> Vec<(Sphinx, Option<SystemTime>)> {
         self.get_storage().get_client_messages(client_id).await
     }
 
@@ -229,7 +226,7 @@ impl Provider {
         sphinx
     }
 
-    pub async fn create_pull_reply(&self, client_id: NodeID) -> (NodeID, Vec<Sphinx>) {
+    pub async fn create_pull_reply(&self, client_id: NodeID) -> (NodeID, Vec<(Sphinx, Option<SystemTime>)>) {
         // get max send amount and messages
         log::trace!("Creating pull reply for client: {}", client_id);
         let max_retrieve = self.get_config().max_retrieve();
@@ -242,14 +239,6 @@ impl Provider {
             messages_to_send.push(message.clone());
         }
 
-        if !messages_to_send.is_empty() {
-            let message_details: Vec<_> = messages
-                .iter()
-                .map(|sphinx| &sphinx.message_id)
-                .collect();
-            log::debug!("Pull reply message IDs: {:?}", message_details);
-        }
-
         self.get_storage()
             .update_client_message_index(client_id, index + messages_to_send.len())
             .await;
@@ -257,7 +246,7 @@ impl Provider {
         // pad vec if not enough messages
         for _ in messages_to_send.len()..max_retrieve {
             let sphinx = self.create_dummy_message(client_id).await;
-            messages_to_send.push(sphinx);
+            messages_to_send.push((sphinx, None));
         } // TODO uncomment
 
         (client_id, messages_to_send)

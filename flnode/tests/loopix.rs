@@ -71,7 +71,7 @@ async fn proxy_nodes_n(path_length: usize) -> Result<(), Box<dyn Error>> {
     let client1_id = loopix_setup.all_nodes[0].get_id();
 
     let webproxy = net.nodes[&client1_id].node.webproxy.as_ref().expect("WebProxy is not available");
-    match webproxy.clone().get_with_timeout("https://fleg.re/", Duration::from_secs(60), false).await {
+    match webproxy.clone().get_with_timeout("https://fleg.re/", Duration::from_secs(60)).await {
         Ok(mut resp) => {
             log::debug!("Got response struct with headers: {resp:?}");
             let content = resp.text().await.expect("getting text");

@@ -310,8 +310,8 @@ impl LoopixSetup {
             println!("{:<60} {:<20} {:<20} {:<20}", "Client ID", "Message Type", "Message ID", "Message ID");
             println!("{:-<300}", "");
             for (client_id, messages) in client_messages {
-                for sphinx in messages {
-                    println!("{:<60} {:<20} {:<20} {:<20}", format!("{:x}", client_id), format!("{:?}", sphinx), format!("{:?}", sphinx.message_id.clone()), format!("{:?}", sphinx.message_id.clone()));
+                for (sphinx, timestamp) in messages {
+                    println!("{:<60} {:<20} {:<20} {:<20}", format!("{:x}", client_id), format!("{:?}", sphinx), format!("{:?}", sphinx.message_id.clone()), format!("{:?}", timestamp));
                 }
             }
         }

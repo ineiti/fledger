@@ -1,5 +1,5 @@
 use flarch::nodeids::NodeID;
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, time::{Duration, SystemTime}};
 use tokio::sync::{mpsc::{channel, Receiver, Sender}, Semaphore};
 
 use flarch::{
@@ -8,7 +8,7 @@ use flarch::{
 };
 
 use crate::{
-    loopix::BANDWIDTH, network::messages::{NetworkIn, NetworkMessage, NetworkOut}, overlay::messages::NetworkWrapper
+    loopix::{BANDWIDTH, CLIENT_DELAY}, network::messages::{NetworkIn, NetworkMessage, NetworkOut}, overlay::messages::NetworkWrapper
 };
 
 use super::{
@@ -59,8 +59,8 @@ impl LoopixBroker {
         };
 
         let (network_sender, network_receiver): (
-            Sender<(NodeID, Sphinx)>,
-            Receiver<(NodeID, Sphinx)>,
+            Sender<(NodeID, Sphinx, Option<SystemTime>)>,
+            Receiver<(NodeID, Sphinx, Option<SystemTime>)>,
         ) = channel(200);
 
         let (overlay_sender, overlay_receiver): (
@@ -339,11 +339,11 @@ impl LoopixBroker {
 
     pub fn mixnode_forward_thread(
         mut broker: Broker<LoopixMessage>,
-        mut receiver: Receiver<(NodeID, Sphinx)>,
+        mut receiver: Receiver<(NodeID, Sphinx, Option<SystemTime>)>,
     ) {
         tokio::spawn(async move {
             loop {
-                if let Some((node_id, sphinx)) = receiver.recv().await {
+                if let Some((node_id, sphinx, _)) = receiver.recv().await {
                     if let Err(e) = broker
                         .emit_msg(LoopixOut::SphinxToNetwork(node_id, sphinx.clone()).into())
                     {
@@ -364,10 +364,10 @@ impl LoopixBroker {
     pub fn client_payload_thread(
         loopix_messages: LoopixMessages,
         mut broker: Broker<LoopixMessage>,
-        mut receiver: Receiver<(NodeID, Sphinx)>,
+        mut receiver: Receiver<(NodeID, Sphinx, Option<SystemTime>)>,
     ) {
         tokio::spawn(async move {
-            let mut sphinx_messages: Vec<(NodeID, Sphinx)> = Vec::new();
+            let mut sphinx_messages: Vec<(NodeID, Sphinx, Option<SystemTime>)> = Vec::new();
             let lambda_payload = loopix_messages.role.get_config().lambda_payload();
             let wait_before_send = Duration::from_secs_f64(60.0 / lambda_payload);
 
@@ -381,29 +381,19 @@ impl LoopixBroker {
 
             loop {
                 // Receive new messages
-                while let Ok((node_id, sphinx)) = receiver.try_recv() {
+                while let Ok((node_id, sphinx, timestamp)) = receiver.try_recv() {
                     log::trace!("{}: Received message for node {}", our_id, node_id);
-                    sphinx_messages.push((node_id, sphinx));
+                    sphinx_messages.push((node_id, sphinx, timestamp));
                 }
 
-                if !sphinx_messages.is_empty() {
-                    let formatted_queue: Vec<String> = sphinx_messages
-                        .iter()
-                        .map(|(node_id, sphinx)| {
-                            format!("Node ID: {}, Message ID: {}", node_id, sphinx.message_id)
-                        })
-                        .collect();
-
-                    log::debug!("Sphinx message queue:\n{}", formatted_queue.join("\n"));
-                }
-
-                if let Some((node_id, sphinx)) = sphinx_messages.first() {
+                if let Some((node_id, sphinx, timestamp)) = sphinx_messages.first() {
                     log::trace!(
                         "{}: first message in queue: {:?}",
                         our_id,
                         sphinx.message_id
                     );
                     if let Err(e) =
+
                         broker.emit_msg(LoopixOut::SphinxToNetwork(*node_id, sphinx.clone()).into())
                     {
                         log::error!("Error emitting network message: {e:?}");
@@ -414,6 +404,21 @@ impl LoopixBroker {
                             sphinx.message_id,
                             node_id
                         );
+
+                        if let Some(timestamp) = timestamp {
+                            match timestamp.elapsed() {
+                                Ok(elapsed) => {
+                                    CLIENT_DELAY.observe(elapsed.as_millis() as f64);
+                                }
+                                Err(e) => {
+                                    log::error!("Error: {:?}", e);
+                                }
+                            }
+                        } else {
+                            log::error!("No timestamp found for message");
+                        }
+                        
+
                         BANDWIDTH.inc_by(sphinx.inner.to_bytes().len() as f64);
                         sphinx_messages.remove(0);
                     }

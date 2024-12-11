@@ -102,8 +102,41 @@ lazy_static::lazy_static! {
         }
     };
 
-    // TODO PROVIDER DELAY
-    // TODO CLIENT DELAY
+    pub static ref CLIENT_DELAY: Histogram = match register_histogram!(
+        "loopix_client_delay_milliseconds",
+        "Delay introduced by teh client queue.",
+        vec![1.0, 3.0, 5.0, 10.0, 20.0, 50.0, 200.0, 500.0, 1000.0, 5000.0, 10000.0, 20000.0, 50000.0, 100000.0]
+    ) {
+        Ok(histogram) => {
+            log::info!("CLIENT_DELAY histogram registered successfully.");
+            histogram
+        },
+        Err(e) => {
+            log::error!("Failed to register CLIENT_DELAY histogram: {:?}", e);
+            Histogram::with_opts(prometheus::HistogramOpts::new(
+                "loopix_client_delay_milliseconds",
+                "Delay introduced by a client."
+            )).unwrap()
+        }
+    };
+
+    pub static ref PROVIDER_DELAY: Histogram = match register_histogram!(
+        "loopix_provider_delay_milliseconds",
+        "Delay introduced by a provider.",
+        vec![1.0, 3.0, 5.0, 10.0, 20.0, 50.0, 200.0, 500.0, 1000.0, 5000.0, 10000.0, 20000.0, 50000.0, 100000.0]
+    ) {
+        Ok(histogram) => {
+            log::info!("PROVIDER_DELAY histogram registered successfully.");
+            histogram
+        },
+        Err(e) => {
+            log::error!("Failed to register PROVIDER_DELAY histogram: {:?}", e);
+            Histogram::with_opts(prometheus::HistogramOpts::new(
+                "loopix_provider_delay_milliseconds",
+            "Delay introduced by a provider."
+            )).unwrap()
+        }
+    };
 }
 
 #[cfg(feature = "testing")]

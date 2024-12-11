@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 use crate::loopix::config::CoreConfig;
 use crate::loopix::core::LoopixCore;
@@ -82,7 +82,7 @@ impl LoopixCore for Client {
     ) -> (
         NodeID,
         Option<NetworkWrapper>,
-        Option<(NodeID, Vec<Sphinx>)>,
+        Option<(NodeID, Vec<(Sphinx, Option<SystemTime>)>)>,
         Option<MessageType>,
     ) {
         if destination != self.get_our_id().await {

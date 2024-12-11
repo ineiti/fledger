@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc, time::{Duration, Instant}};
 
 use clap::Parser;
 
@@ -14,7 +14,7 @@ use flmodules::{
     loopix::{
         broker::LoopixBroker,
         config::{CoreConfig, LoopixConfig, LoopixRole},
-        storage::LoopixStorage,
+        storage::LoopixStorage, END_TO_END_LATENCY,
     },
     network::{messages::NetworkMessage, network_broker_start, signal::SIGNAL_VERSION},
     nodeconfig::NodeInfo,
@@ -272,6 +272,7 @@ impl LSRoot {
                 if (i - *start) % 10 == 0 {
                     log::info!("Sending request through WebProxy");
                     let start = now();
+                    let start_time = Instant::now();
                     match node
                         .webproxy
                         .as_mut()
@@ -282,6 +283,8 @@ impl LSRoot {
                     {
                         Ok(mut res) => match res.text().await {
                             Ok(body) => {
+                                let end_to_end_time = start_time.elapsed().as_secs_f64();
+                                END_TO_END_LATENCY.observe(end_to_end_time);
                                 log::info!(
                                     "---------------- Total time for request: {}ms",
                                     now() - start
