@@ -45,7 +45,7 @@ async fn test_loopix() -> Result<(), Box<dyn Error>> {
 
     tokio::time::sleep(Duration::from_secs(3)).await;
 
-    let resp_result = proxy_src.proxy.get_with_timeout("https://fledg.re/", Duration::from_secs(30), false).await;
+    let resp_result = proxy_src.proxy.get_with_timeout("https://fledg.re/", Duration::from_secs(30)).await;
 
     match resp_result {
         Ok(mut resp) => {

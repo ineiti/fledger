@@ -6,7 +6,7 @@ use flarch::{
     tasks::time::{timeout, Duration},
 };
 use thiserror::Error;
-use tokio::{sync::{mpsc::channel, watch}, time::Instant};
+use tokio::sync::{mpsc::channel, watch};
 
 use crate::overlay::messages::{NetworkWrapper, OverlayIn, OverlayMessage, OverlayOut};
 use flarch::{
@@ -19,8 +19,6 @@ use super::{
     messages::{WebProxyIn, WebProxyMessage, WebProxyMessages, WebProxyOut},
     response::Response,
 };
-
-use crate::loopix::END_TO_END_LATENCY;
 
 const MODULE_NAME: &str = "WebProxy";
 
@@ -147,13 +145,9 @@ impl WebProxy {
 
     pub async fn get_with_retry_and_timeout(&mut self, url: &str, retry: u8, timeout_duration: Duration) -> Result<Response, WebProxyError> {
         log::info!("Getting {url} with retry: {}", retry);
-        let start_time = Instant::now();
         for i in 0..retry + 1 { // try at leasy once
-            match self.get_with_timeout(url, timeout_duration, false).await {
+            match self.get_with_timeout(url, timeout_duration).await {
                 Ok(resp) => {
-                    log::info!("Successfully received response: {:?}", resp);
-                    let end_to_end_time = start_time.elapsed().as_secs_f64();
-                    END_TO_END_LATENCY.observe(end_to_end_time);
                     return Ok(resp);
                 }
                 Err(WebProxyError::ResponseTimeout) => {
@@ -174,12 +168,10 @@ impl WebProxy {
     pub async fn get_with_timeout(
         &mut self,
         url: &str,
-        timeout_duration: Duration,
-        add_latency: bool,
+        timeout_duration: Duration
     ) -> Result<Response, WebProxyError> {
         // log::debug!("Getting {url}");
         let our_rnd = U256::rnd();
-        let start_time = Instant::now();
         let (tx, rx) = channel(128);
         self.web_proxy
             .emit_msg(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx).into())?;
@@ -189,10 +181,7 @@ impl WebProxy {
                 if let WebProxyMessage::Output(WebProxyOut::ResponseGet(proxy, rnd, header)) = msg {
                     if rnd == our_rnd {
                         self.web_proxy.remove_subsystem(id).await?;
-                        if add_latency {
-                            let end_to_end_time = start_time.elapsed().as_secs_f64();
-                            END_TO_END_LATENCY.observe(end_to_end_time);
-                        }
+
                         return Ok(Response::new(proxy, header, rx));
                     }
                 }
