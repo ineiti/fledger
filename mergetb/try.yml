@@ -1,0 +1,64 @@
+- name: Setup and run signal tasks
+  hosts: SIGNAL_NODE
+  become: yes
+  vars:
+    docker_image: deryacog/flsignal:latest
+    container_name: flsignal
+  tasks:
+    - name: Remove existing flsignal container if present
+      docker_container:
+        name: "{{ container_name }}"
+        state: absent
+
+    - name: Pull flsignal Docker image
+      docker_image:
+        name: "{{ docker_image }}"
+        source: pull
+        force_source: true
+
+    - name: Run flsignal container
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ docker_image }}"
+        state: started
+        detach: true
+        command: >
+          -v
+        network_mode: host
+        ports:
+          - "8765:8765"
+        log_driver: "json-file"
+        log_options:
+          max-size: "10m"
+          max-file: "4"
+        output_logs: yes
+        env:
+          RUST_BACKTRACE: "full"
+
+    - name: Wait for 10 seconds to ensure flsignal is running
+      pause:
+        seconds: 10
+
+- name: Run simulations with different configurations
+  hosts: FLEDGER_NODES
+  vars:
+    configs_dir: /home/dcog/configs_dir
+    data_dir: /home/dcog/data
+    path_len: "2"
+    retry: "0"
+    docker_image: deryacog/fledger:latest
+    signal_node: "{{ hostvars[groups['SIGNAL_NODE'][0]].ansible_host }}"
+  tasks:
+    - name: Find all variable directories
+      find:
+        path: "{{ configs_dir }}"
+        file_type: directory
+        depth: 1
+      register: variable_dirs
+      delegate_to: localhost
+
+    - name: Process each variable directory
+      include_tasks: process_variable.yml
+      loop: "{{ variable_dirs.files }}"
+      loop_control:
+        label: "{{ item.path }}"

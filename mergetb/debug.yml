@@ -1,0 +1,20 @@
+- name: Process loopix_core_config files
+  hosts: FLEDGER_NODES
+
+  tasks:
+    - name: Find all files starting with loopix_core_config_
+      find:
+        path: /home/dcog/data
+        patterns: "loopix_core_config_*"
+        file_type: file
+      register: found_files
+
+    - name: Debug files found (optional)
+      debug:
+        var: found_files.files
+
+    # - name: Process each file with the binary
+    #   command: /path/to/binary --config {{ item.path }}
+    #   loop: "{{ found_files.files }}"
+    #   loop_control:
+    #     label: "{{ item.path }}"

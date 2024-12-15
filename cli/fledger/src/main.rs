@@ -278,7 +278,7 @@ impl LSRoot {
                         .as_mut()
                         .unwrap()
                         // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(6))
+                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(60))
                         .await
                     {
                         Ok(mut res) => match res.text().await {

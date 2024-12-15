@@ -1,0 +1,39 @@
+# HELP loopix_bandwidth_bytes Bandwidth usage in bytes
+# TYPE loopix_bandwidth_bytes counter
+loopix_bandwidth_bytes 15933856
+# HELP loopix_decryption_latency_milliseconds Time taken for decryption.
+# TYPE loopix_decryption_latency_milliseconds histogram
+loopix_decryption_latency_milliseconds_bucket{le="0.0001"} 1381
+loopix_decryption_latency_milliseconds_bucket{le="0.001"} 1381
+loopix_decryption_latency_milliseconds_bucket{le="0.0025"} 1381
+loopix_decryption_latency_milliseconds_bucket{le="0.005"} 1381
+loopix_decryption_latency_milliseconds_bucket{le="0.01"} 1381
+loopix_decryption_latency_milliseconds_bucket{le="0.5"} 1381
+loopix_decryption_latency_milliseconds_bucket{le="+Inf"} 1381
+loopix_decryption_latency_milliseconds_sum 0
+loopix_decryption_latency_milliseconds_count 1381
+# HELP loopix_mixnode_delay_milliseconds Delay introduced by a mixnode.
+# TYPE loopix_mixnode_delay_milliseconds histogram
+loopix_mixnode_delay_milliseconds_bucket{le="0.25"} 40
+loopix_mixnode_delay_milliseconds_bucket{le="0.5"} 40
+loopix_mixnode_delay_milliseconds_bucket{le="0.75"} 40
+loopix_mixnode_delay_milliseconds_bucket{le="1"} 354
+loopix_mixnode_delay_milliseconds_bucket{le="1.25"} 354
+loopix_mixnode_delay_milliseconds_bucket{le="1.5"} 354
+loopix_mixnode_delay_milliseconds_bucket{le="1.75"} 354
+loopix_mixnode_delay_milliseconds_bucket{le="2"} 674
+loopix_mixnode_delay_milliseconds_bucket{le="2.25"} 674
+loopix_mixnode_delay_milliseconds_bucket{le="2.5"} 674
+loopix_mixnode_delay_milliseconds_bucket{le="2.75"} 674
+loopix_mixnode_delay_milliseconds_bucket{le="3"} 846
+loopix_mixnode_delay_milliseconds_bucket{le="3.25"} 846
+loopix_mixnode_delay_milliseconds_bucket{le="3.5"} 846
+loopix_mixnode_delay_milliseconds_bucket{le="3.75"} 846
+loopix_mixnode_delay_milliseconds_bucket{le="4"} 946
+loopix_mixnode_delay_milliseconds_bucket{le="6"} 1045
+loopix_mixnode_delay_milliseconds_bucket{le="10"} 1115
+loopix_mixnode_delay_milliseconds_bucket{le="50"} 1123
+loopix_mixnode_delay_milliseconds_bucket{le="200"} 1123
+loopix_mixnode_delay_milliseconds_bucket{le="+Inf"} 1123
+loopix_mixnode_delay_milliseconds_sum 3075
+loopix_mixnode_delay_milliseconds_count 1123

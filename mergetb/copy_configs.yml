@@ -1,0 +1,17 @@
+---
+- name: Copy configurations to FLEDGER_NODES
+  hosts: FLEDGER_NODES
+  vars:
+    configs_dir: /home/dcog/configs_dir
+    data_dir: /home/dcog/data
+
+  tasks:
+    - name: Ensure the destination directory exists
+      file:
+        path: "{{ data_dir }}"
+        state: directory
+
+    - name: Copy contents of configs_dir to data_dir
+      copy:
+        src: "{{ configs_dir }}/"
+        dest: "{{ data_dir }}"

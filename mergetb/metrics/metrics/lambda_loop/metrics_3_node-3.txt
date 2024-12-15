@@ -1,0 +1,14 @@
+# HELP loopix_bandwidth_bytes Bandwidth usage in bytes
+# TYPE loopix_bandwidth_bytes counter
+loopix_bandwidth_bytes 51316896
+# HELP loopix_decryption_latency_milliseconds Time taken for decryption.
+# TYPE loopix_decryption_latency_milliseconds histogram
+loopix_decryption_latency_milliseconds_bucket{le="0.0001"} 14066
+loopix_decryption_latency_milliseconds_bucket{le="0.001"} 14066
+loopix_decryption_latency_milliseconds_bucket{le="0.0025"} 14066
+loopix_decryption_latency_milliseconds_bucket{le="0.005"} 14066
+loopix_decryption_latency_milliseconds_bucket{le="0.01"} 14066
+loopix_decryption_latency_milliseconds_bucket{le="0.5"} 14066
+loopix_decryption_latency_milliseconds_bucket{le="+Inf"} 14072
+loopix_decryption_latency_milliseconds_sum 5079
+loopix_decryption_latency_milliseconds_count 14072

@@ -6,11 +6,6 @@
     docker_image: deryacog/flsignal:latest
     container_name: flsignal
   tasks:
-    - name: Remove existing flsignal container if present
-      docker_container:
-        name: "{{ container_name }}"
-        state: absent
-
     - name: Pull flsignal Docker image
       docker_image:
         name: "{{ docker_image }}"
@@ -40,35 +35,22 @@
       pause:
         seconds: 10
 
-- name: Setup and run fledger tasks
+- name: Run simulations with different configurations
   hosts: FLEDGER_NODES
   vars:
+    configs_dir: "/home/dcog/"
+    data_dir: "/home/dcog/data"
     path_len: "{{ path_len }}"
     retry: "{{ retry }}"
     docker_image: deryacog/fledger:latest
     signal_node: "{{ hostvars[groups['SIGNAL_NODE'][0]].ansible_host }}"
-    simul_path: /home/dcog/data
-  tasks:
-    - name: Remove existing fledger container if present
-      docker_container:
-        name: "fledger_{{ inventory_hostname }}"
-        state: absent
 
+  tasks:
     - name: Pull fledger Docker image
       docker_image:
         name: "{{ docker_image }}"
         source: pull
         force_source: true
-
-    - name: Ensure /home/dcog/data directory exists
-      file:
-        path: "{{ simul_path }}"
-        state: directory
-
-    - name: Copy loopix core config file
-      copy:
-        src: /home/dcog/loopix_core_config.yaml
-        dest: "/home/dcog/data/loopix_core_config.yaml"
 
     - name: Run fledger container
       docker_container:
@@ -77,7 +59,7 @@
         state: started
         detach: true
         volumes:
-          - "{{ simul_path }}:/fledger/data"
+          - "{{ data_dir }}:/fledger/data"
         command: >
           --config /fledger/data
           --name {{ inventory_hostname }}
@@ -96,7 +78,7 @@
           RUST_BACKTRACE: "full"
       register: fledger_container
 
-    - name: Wait for 5 minutes while fledger runs
+    - name: Wait for 2 minutes while fledger runs
       pause:
         seconds: 120
 
@@ -104,24 +86,13 @@
       docker_container:
         name: "fledger_{{ inventory_hostname }}"
         state: stopped
-      ignore_errors: true
+      ignore_errors: false
 
-    - name: Run a shell command
-      become: yes
-      shell: |
-        cp /var/lib/docker/containers/{{ fledger_container.container.Id }}/{{ fledger_container.container.Id }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
-        chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
-
-    - name: Fetch metrics from the remote node
+    - name: Fetch a file from the remote node
       fetch:
-        src: /home/dcog/data/metrics.txt
-        dest: "./metrics/{{ variable }}/metrics_{{ index }}_{{ inventory_hostname }}.txt"
-        flat: yes
+        src: /fledger/data/metrics_{{ config_file_name }}.txt
+        dest: "./metrics/metrics_{{ config_file_name }}_{{ inventory_hostname }}.txt"
 
-    - name: Delete contents of /home/dcog/data
-      ansible.builtin.shell:
-        cmd: rm -rf /home/dcog/data/*
-
-    - name: Wait for 10 seconds
+    - name: Wait a bit before starting the next simulation
       pause:
         seconds: 10

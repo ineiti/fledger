@@ -84,7 +84,11 @@ impl WebProxyCore {
                 ResponseMessage::Body(body) => {
                     self.storage.counters.rx_packets += 1;
                     let tx = tx.clone();
-                    spawn_local(async move { tx.send(body).await.expect("sending body") })
+                    spawn_local(async move { 
+                        if let Err(e) = tx.send(body).await {
+                            log::error!("Failed to send body: {:?}", e);
+                        }
+                    })
                 }
                 ResponseMessage::Done => {
                     self.requests.remove(&nonce);

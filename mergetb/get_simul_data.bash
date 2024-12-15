@@ -12,7 +12,8 @@ path_length=$1
 n_nodes=$((path_length * path_length + path_length * 2))
 
 # copy data from each node
+simul_name="a"
 for node in $(seq 0 $((n_nodes - 1))); do
-   mkdir -p ./mergetb_data/node-${node}
-   mrg xdc scp download -x fledgerxdc.dcog -r node-${node}:/home/dcog/data/* ./mergetb_data/node-${node}
+   mkdir -p ./mergetb_data/${simul_name}
+   mrg xdc scp download -x fledgerxdc.dcog -r node-${node}:/home/dcog/data/metrics.txt ./mergetb_data/${simul_name}/node-${node}-metrics.txt
 done

@@ -16,6 +16,9 @@ mrg xdc scp upload playbook_copy.yml fledgerxdc.dcog:/home/dcog
 mrg xdc scp upload install_docker.yml fledgerxdc.dcog:/home/dcog
 mrg xdc scp upload delete_docker.yml fledgerxdc.dcog:/home/dcog
 
+nohup ansible-playbook -i inventory.ini delete_docker.yml > playbook.log 2>&1
+nohup ./get_simul_data.sh > logs.txt 2>&1 &
+
 # # build and upload binaries
 # (cd ../cli/fledger && cargo build -r)
 # (cd ../cli/flsignal && cargo build -r)

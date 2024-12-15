@@ -1,0 +1,46 @@
+# HELP loopix_bandwidth_bytes Bandwidth usage in bytes
+# TYPE loopix_bandwidth_bytes counter
+loopix_bandwidth_bytes 11671808
+# HELP loopix_client_delay_milliseconds Delay introduced by teh client queue.
+# TYPE loopix_client_delay_milliseconds histogram
+loopix_client_delay_milliseconds_bucket{le="1"} 0
+loopix_client_delay_milliseconds_bucket{le="3"} 0
+loopix_client_delay_milliseconds_bucket{le="5"} 0
+loopix_client_delay_milliseconds_bucket{le="10"} 0
+loopix_client_delay_milliseconds_bucket{le="20"} 0
+loopix_client_delay_milliseconds_bucket{le="50"} 0
+loopix_client_delay_milliseconds_bucket{le="200"} 0
+loopix_client_delay_milliseconds_bucket{le="500"} 0
+loopix_client_delay_milliseconds_bucket{le="1000"} 0
+loopix_client_delay_milliseconds_bucket{le="5000"} 3
+loopix_client_delay_milliseconds_bucket{le="10000"} 3
+loopix_client_delay_milliseconds_bucket{le="20000"} 3
+loopix_client_delay_milliseconds_bucket{le="50000"} 3
+loopix_client_delay_milliseconds_bucket{le="100000"} 3
+loopix_client_delay_milliseconds_bucket{le="+Inf"} 3
+loopix_client_delay_milliseconds_sum 3031
+loopix_client_delay_milliseconds_count 3
+# HELP loopix_encryption_latency_milliseconds Time taken for encryption.
+# TYPE loopix_encryption_latency_milliseconds histogram
+loopix_encryption_latency_milliseconds_bucket{le="0.1"} 0
+loopix_encryption_latency_milliseconds_bucket{le="0.25"} 0
+loopix_encryption_latency_milliseconds_bucket{le="0.5"} 0
+loopix_encryption_latency_milliseconds_bucket{le="1"} 0
+loopix_encryption_latency_milliseconds_bucket{le="1.25"} 0
+loopix_encryption_latency_milliseconds_bucket{le="1.5"} 0
+loopix_encryption_latency_milliseconds_bucket{le="1.75"} 0
+loopix_encryption_latency_milliseconds_bucket{le="2"} 0
+loopix_encryption_latency_milliseconds_bucket{le="2.25"} 0
+loopix_encryption_latency_milliseconds_bucket{le="2.5"} 0
+loopix_encryption_latency_milliseconds_bucket{le="2.75"} 0
+loopix_encryption_latency_milliseconds_bucket{le="3"} 3
+loopix_encryption_latency_milliseconds_bucket{le="3.25"} 3
+loopix_encryption_latency_milliseconds_bucket{le="3.5"} 3
+loopix_encryption_latency_milliseconds_bucket{le="3.75"} 3
+loopix_encryption_latency_milliseconds_bucket{le="4"} 3
+loopix_encryption_latency_milliseconds_bucket{le="10"} 3
+loopix_encryption_latency_milliseconds_bucket{le="50"} 3
+loopix_encryption_latency_milliseconds_bucket{le="200"} 3
+loopix_encryption_latency_milliseconds_bucket{le="+Inf"} 3
+loopix_encryption_latency_milliseconds_sum 9
+loopix_encryption_latency_milliseconds_count 3
