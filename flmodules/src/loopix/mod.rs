@@ -102,6 +102,20 @@ lazy_static::lazy_static! {
         }
     };
 
+    pub static ref NUMBER_OF_PROXY_REQUESTS: Counter = match register_counter!(
+        "loopix_number_of_proxy_requests",
+        "Number of proxy requests"
+    ) {
+        Ok(counter) => {
+            log::info!("NUMBER_OF_PROXY_REQUESTS counter registered successfully.");
+            counter
+        },
+        Err(e) => {
+            log::error!("Failed to register NUMBER_OF_PROXY_REQUESTS counter: {:?}", e);
+            Counter::new("loopix_number_of_proxy_requests", "Number of proxy requests").unwrap()
+        }
+    };
+
     pub static ref CLIENT_DELAY: Histogram = match register_histogram!(
         "loopix_client_delay_milliseconds",
         "Delay introduced by teh client queue.",

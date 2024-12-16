@@ -28,7 +28,6 @@ for NODE in $( seq $NODES ); do
   VERBOSITY="-vvv"
   PATH_LEN_ARG=""
   RETRY_ARG=""
-  CONFIG_NAME="loopix_core_config_0"
   if [ $NODE = "1" ]; then
     PATH_LEN_ARG="--path-len $PATH_LEN"
   fi
@@ -36,10 +35,8 @@ for NODE in $( seq $NODES ); do
     RETRY_ARG="--retry $RETRY"
   fi
   mkdir -p $CONFIG
-  # cp $LOOPIX_CONFIG_NAME $CONFIG
-  cp "$CONFIG_NAME.yaml" $CONFIG
-  RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG --config_file_name $CONFIG_NAME |& ts "$NAME" &
-  # RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG |& ts "$NAME" &
+  cp "loopix_core_config.yaml" $CONFIG
+  RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG |& ts "$NAME" &
 done
 
 # sleep 60

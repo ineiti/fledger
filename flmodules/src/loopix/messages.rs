@@ -167,8 +167,6 @@ impl LoopixMessages {
     ) {
         let start_time = Instant::now();
         let processed = self.role.process_sphinx_packet(sphinx_packet.clone()).await;
-        let end_time = start_time.elapsed().as_millis() as f64;
-        DECRYPTION_LATENCY.observe(end_time);
         if let Some(processed) = processed {
             match processed {
                 ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
@@ -206,6 +204,9 @@ impl LoopixMessages {
                     } else {
                         log::debug!("No message to forward to {}", next_node_id);
                     }
+
+                    let end_time = start_time.elapsed().as_millis() as f64;
+                    DECRYPTION_LATENCY.observe(end_time);
                 }
                 ProcessedPacket::FinalHop(destination, surb_id, payload) => {
                     let dest = node_id_from_destination_address(destination);
@@ -261,6 +262,9 @@ impl LoopixMessages {
                             }
                             self.network_sender.send((node_id, message, None)).await.expect("while sending message");
                         }
+
+                        let end_time = start_time.elapsed().as_millis() as f64;
+                        DECRYPTION_LATENCY.observe(end_time);
                     }
                 }
             }

@@ -14,7 +14,7 @@ use flmodules::{
     loopix::{
         broker::LoopixBroker,
         config::{CoreConfig, LoopixConfig, LoopixRole},
-        storage::LoopixStorage, END_TO_END_LATENCY,
+        storage::LoopixStorage, END_TO_END_LATENCY, NUMBER_OF_PROXY_REQUESTS,
     },
     network::{messages::NetworkMessage, network_broker_start, signal::SIGNAL_VERSION},
     nodeconfig::NodeInfo,
@@ -273,12 +273,13 @@ impl LSRoot {
                     log::info!("Sending request through WebProxy");
                     let start = now();
                     let start_time = Instant::now();
+                    NUMBER_OF_PROXY_REQUESTS.inc();
                     match node
                         .webproxy
                         .as_mut()
                         .unwrap()
                         // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(60))
+                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(10))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
