@@ -43,11 +43,11 @@ lambda_loop_mixes=(30 40 50 60 70 80 90 100 110 120 130 140 150)
 
 mkdir -p metrics/lambda_loop
 
-for i in "${!lambda_loops[@]}"; do
-    lambda_loop=${lambda_loops[$i]}
-    lambda_drop=${lambda_drops[$i]}
+for i in "${!lambda_payloads[@]}"; do
+    # lambda_loop=${lambda_loops[$i]}
+    # lambda_drop=${lambda_drops[$i]}
     lambda_payload=${lambda_payloads[$i]}
-    lambda_loop_mix=${lambda_loop_mixes[$i]}
+    # lambda_loop_mix=${lambda_loop_mixes[$i]}
 
     cat <<EOL > loopix_core_config.yaml
 ---

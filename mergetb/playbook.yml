@@ -112,6 +112,13 @@
         cp /var/lib/docker/containers/{{ fledger_container.container.Id }}/{{ fledger_container.container.Id }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
         chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
 
+    - name: Fetch log from node-1
+      when: inventory_hostname == 'node-1'
+      fetch:
+        src: /home/dcog/data/{{ inventory_hostname }}.log
+        dest: /home/dcog/metrics/{{ variable }}/{{ index }}_{{ inventory_hostname }}.log
+        flat: yes
+
     - name: Fetch metrics from the remote node
       fetch:
         src: /home/dcog/data/metrics.txt
@@ -121,6 +128,16 @@
     - name: Delete contents of /home/dcog/data
       ansible.builtin.shell:
         cmd: rm -rf /home/dcog/data/*
+
+- name: Stop signal container
+  hosts: SIGNAL_NODE
+  become: yes
+  tasks:
+    - name: Stop signal container
+      docker_container:
+        name: flsignal
+        state: stopped
+      ignore_errors: true
 
     - name: Wait for 10 seconds
       pause:

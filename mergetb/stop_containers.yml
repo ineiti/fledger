@@ -1,0 +1,18 @@
+---
+- name: Stop existing fledger container if present
+  hosts: FLEDGER_NODES
+  tasks:      
+    - name: STOP
+      docker_container:
+        name: "fledger_{{ inventory_hostname }}"
+        state: stopped
+      ignore_errors: true
+
+- name: Stop existing signal container if present
+  hosts: SIGNAL_NODE
+  tasks:      
+    - name: STOP
+      docker_container:
+        name: "flsignal"
+        state: stopped
+      ignore_errors: true

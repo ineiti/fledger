@@ -1,0 +1,250 @@
+{
+  "lambda_loop": {
+    "0": {
+      "loopix_bandwidth_bytes": 32522528.0,
+      "loopix_number_of_proxy_requests": 7.0,
+      "loopix_end_to_end_latency_seconds": 8.342026963166665,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 3308.233333333333,
+      "loopix_decryption_latency_milliseconds": 1.9402654867256637,
+      "loopix_mixnode_delay_milliseconds": 2.72136845956824,
+      "loopix_provider_delay_milliseconds": 53.62068965517241
+    },
+    "1": {
+      "loopix_bandwidth_bytes": 32325796.0,
+      "loopix_number_of_proxy_requests": 4.0,
+      "loopix_end_to_end_latency_seconds": 4.252567907666667,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 2420.0,
+      "loopix_decryption_latency_milliseconds": 1.2392258064516128,
+      "loopix_mixnode_delay_milliseconds": 2.658838293295088,
+      "loopix_provider_delay_milliseconds": 594.45
+    },
+    "2": {
+      "loopix_bandwidth_bytes": 29946344.0,
+      "loopix_number_of_proxy_requests": 5.0,
+      "loopix_end_to_end_latency_seconds": 11.50950691625,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 1960.3809523809523,
+      "loopix_decryption_latency_milliseconds": 5.707573325550854,
+      "loopix_mixnode_delay_milliseconds": 2.6247977346278315,
+      "loopix_provider_delay_milliseconds": 44.45
+    },
+    "3": {
+      "loopix_bandwidth_bytes": 29050280.0,
+      "loopix_number_of_proxy_requests": 6.0,
+      "loopix_end_to_end_latency_seconds": 6.2239574578,
+      "loopix_encryption_latency_milliseconds": 2.7333333333333334,
+      "loopix_client_delay_milliseconds": 1653.5666666666666,
+      "loopix_decryption_latency_milliseconds": 1.2294478527607362,
+      "loopix_mixnode_delay_milliseconds": 2.5821278154184215,
+      "loopix_provider_delay_milliseconds": 1953.103448275862
+    },
+    "4": {
+      "loopix_bandwidth_bytes": 26497072.0,
+      "loopix_number_of_proxy_requests": 5.0,
+      "loopix_end_to_end_latency_seconds": 6.4487974347499994,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 1330.12,
+      "loopix_decryption_latency_milliseconds": 2.86951871657754,
+      "loopix_mixnode_delay_milliseconds": 2.641739483844747,
+      "loopix_provider_delay_milliseconds": 511.23809523809524
+    },
+    "5": {
+      "loopix_bandwidth_bytes": 29274296.0,
+      "loopix_number_of_proxy_requests": 3.0,
+      "loopix_end_to_end_latency_seconds": 2.570218703,
+      "loopix_encryption_latency_milliseconds": 2.466666666666667,
+      "loopix_client_delay_milliseconds": 1246.5333333333333,
+      "loopix_decryption_latency_milliseconds": 4.1832049978207175,
+      "loopix_mixnode_delay_milliseconds": 2.6409740390420606,
+      "loopix_provider_delay_milliseconds": 1122.6153846153845
+    },
+    "6": {
+      "loopix_bandwidth_bytes": 32400468.0,
+      "loopix_number_of_proxy_requests": 7.0,
+      "loopix_end_to_end_latency_seconds": 6.277971270833333,
+      "loopix_encryption_latency_milliseconds": 2.7419354838709675,
+      "loopix_client_delay_milliseconds": 1089.9354838709678,
+      "loopix_decryption_latency_milliseconds": 5.004898266767144,
+      "loopix_mixnode_delay_milliseconds": 2.638487972508591,
+      "loopix_provider_delay_milliseconds": 47.96666666666667
+    },
+    "7": {
+      "loopix_bandwidth_bytes": 30684448.0,
+      "loopix_number_of_proxy_requests": 4.0,
+      "loopix_end_to_end_latency_seconds": 16.746727452666665,
+      "loopix_encryption_latency_milliseconds": 2.5,
+      "loopix_client_delay_milliseconds": 1084.8125,
+      "loopix_decryption_latency_milliseconds": 4.395615731785944,
+      "loopix_mixnode_delay_milliseconds": 2.6140713916192446,
+      "loopix_provider_delay_milliseconds": 1971.25
+    },
+    "8": {
+      "loopix_bandwidth_bytes": 33664148.0,
+      "loopix_number_of_proxy_requests": 4.0,
+      "loopix_end_to_end_latency_seconds": 9.611439907666666,
+      "loopix_encryption_latency_milliseconds": 1.8,
+      "loopix_client_delay_milliseconds": 856.95,
+      "loopix_decryption_latency_milliseconds": 8.409217370267328,
+      "loopix_mixnode_delay_milliseconds": 2.5807889090609013,
+      "loopix_provider_delay_milliseconds": 672.4375
+    },
+    "10": {
+      "loopix_bandwidth_bytes": 32024236.0,
+      "loopix_number_of_proxy_requests": 5.0,
+      "loopix_end_to_end_latency_seconds": 1.577628675,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 620.8095238095239,
+      "loopix_decryption_latency_milliseconds": 2.981081410960576,
+      "loopix_mixnode_delay_milliseconds": 2.6210253082414017,
+      "loopix_provider_delay_milliseconds": 1211.5294117647059
+    },
+    "11": {
+      "loopix_bandwidth_bytes": 30430276.0,
+      "loopix_number_of_proxy_requests": 4.0,
+      "loopix_end_to_end_latency_seconds": 5.0862684609999995,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 545.0,
+      "loopix_decryption_latency_milliseconds": 12.717450027012426,
+      "loopix_mixnode_delay_milliseconds": 2.5773047086415297,
+      "loopix_provider_delay_milliseconds": 49.9
+    }
+  },
+  "max_retrieve": {
+    "0": {
+      "loopix_bandwidth_bytes": 20911032.0,
+      "loopix_number_of_proxy_requests": 8.0,
+      "loopix_end_to_end_latency_seconds": 4.574799067624999,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 1094.075,
+      "loopix_decryption_latency_milliseconds": 1.4438399226212066,
+      "loopix_mixnode_delay_milliseconds": 2.6652994257588185,
+      "loopix_provider_delay_milliseconds": 243.65
+    },
+    "2": {
+      "loopix_bandwidth_bytes": 30634188.0,
+      "loopix_number_of_proxy_requests": 5.0,
+      "loopix_end_to_end_latency_seconds": 16.25361993475,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 899.8571428571429,
+      "loopix_decryption_latency_milliseconds": 10.66577000672495,
+      "loopix_mixnode_delay_milliseconds": 2.610826627651792,
+      "loopix_provider_delay_milliseconds": 888.1764705882352
+    },
+    "3": {
+      "loopix_bandwidth_bytes": 29965012.0,
+      "loopix_number_of_proxy_requests": 6.0,
+      "loopix_end_to_end_latency_seconds": 2.6559633858,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 1251.5384615384614,
+      "loopix_decryption_latency_milliseconds": 8.70503710721617,
+      "loopix_mixnode_delay_milliseconds": 2.5812371134020617,
+      "loopix_provider_delay_milliseconds": 60.0
+    }
+  },
+  "mean_delay": {
+    "0": {
+      "loopix_bandwidth_bytes": 27565456.0,
+      "loopix_number_of_proxy_requests": 5.0,
+      "loopix_end_to_end_latency_seconds": 12.59018021975,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 1200.4761904761904,
+      "loopix_decryption_latency_milliseconds": 2.7615395959298037,
+      "loopix_mixnode_delay_milliseconds": 1.1075205640423031,
+      "loopix_provider_delay_milliseconds": 2240.95
+    },
+    "1": {
+      "loopix_bandwidth_bytes": 32887272.0,
+      "loopix_number_of_proxy_requests": 8.0,
+      "loopix_end_to_end_latency_seconds": 4.631910187375,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 1235.0,
+      "loopix_decryption_latency_milliseconds": 0.5943521997333656,
+      "loopix_mixnode_delay_milliseconds": 1.684322728763529,
+      "loopix_provider_delay_milliseconds": 383.725
+    },
+    "2": {
+      "loopix_bandwidth_bytes": 32635972.0,
+      "loopix_number_of_proxy_requests": 6.0,
+      "loopix_end_to_end_latency_seconds": 8.463934862,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 1136.5806451612902,
+      "loopix_decryption_latency_milliseconds": 0.5650030807147258,
+      "loopix_mixnode_delay_milliseconds": 2.629598662207358,
+      "loopix_provider_delay_milliseconds": 1746.15625
+    },
+    "3": {
+      "loopix_bandwidth_bytes": 31884944.0,
+      "loopix_number_of_proxy_requests": 6.0,
+      "loopix_end_to_end_latency_seconds": 12.0779960958,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 1161.52,
+      "loopix_decryption_latency_milliseconds": 5.6633223266446535,
+      "loopix_mixnode_delay_milliseconds": 4.529615517838587,
+      "loopix_provider_delay_milliseconds": 53.92307692307692
+    },
+    "4": {
+      "loopix_bandwidth_bytes": 30133024.0,
+      "loopix_number_of_proxy_requests": 7.0,
+      "loopix_end_to_end_latency_seconds": 6.231606456285713,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 1230.3714285714286,
+      "loopix_decryption_latency_milliseconds": 0.5999468720945677,
+      "loopix_mixnode_delay_milliseconds": 20.707513416815743,
+      "loopix_provider_delay_milliseconds": 177.4857142857143
+    },
+    "5": {
+      "loopix_bandwidth_bytes": 34195468.0,
+      "loopix_number_of_proxy_requests": 6.0,
+      "loopix_end_to_end_latency_seconds": 12.038393261200001,
+      "loopix_encryption_latency_milliseconds": 2.6923076923076925,
+      "loopix_client_delay_milliseconds": 1141.88,
+      "loopix_decryption_latency_milliseconds": 5.416057519472738,
+      "loopix_mixnode_delay_milliseconds": 102.89144736842105,
+      "loopix_provider_delay_milliseconds": 44.72
+    },
+    "6": {
+      "loopix_bandwidth_bytes": 31161200.0,
+      "loopix_number_of_proxy_requests": 5.0,
+      "loopix_end_to_end_latency_seconds": 16.072517238499998,
+      "loopix_encryption_latency_milliseconds": 2.6,
+      "loopix_client_delay_milliseconds": 1169.05,
+      "loopix_decryption_latency_milliseconds": 4.3801949717804005,
+      "loopix_mixnode_delay_milliseconds": 301.4800276673007,
+      "loopix_provider_delay_milliseconds": 790.6315789473684
+    }
+  },
+  "time_pull": {
+    "1": {
+      "loopix_bandwidth_bytes": 40088812.0,
+      "loopix_number_of_proxy_requests": 6.0,
+      "loopix_end_to_end_latency_seconds": 4.649385207600001,
+      "loopix_encryption_latency_milliseconds": 198.03846153846155,
+      "loopix_client_delay_milliseconds": 1266.2692307692307,
+      "loopix_decryption_latency_milliseconds": 2.650931829328102,
+      "loopix_mixnode_delay_milliseconds": 2.557968204730516,
+      "loopix_provider_delay_milliseconds": 27.4
+    },
+    "2": {
+      "loopix_bandwidth_bytes": 28373924.0,
+      "loopix_number_of_proxy_requests": 4.0,
+      "loopix_end_to_end_latency_seconds": 4.742909248,
+      "loopix_encryption_latency_milliseconds": 3.0625,
+      "loopix_client_delay_milliseconds": 1149.5625,
+      "loopix_decryption_latency_milliseconds": 5.465772759350741,
+      "loopix_mixnode_delay_milliseconds": 2.6254510921177587,
+      "loopix_provider_delay_milliseconds": 54.142857142857146
+    },
+    "3": {
+      "loopix_bandwidth_bytes": 16585800.0,
+      "loopix_number_of_proxy_requests": 4.0,
+      "loopix_end_to_end_latency_seconds": 4.706700105333333,
+      "loopix_encryption_latency_milliseconds": 3.0,
+      "loopix_client_delay_milliseconds": 1055.8125,
+      "loopix_decryption_latency_milliseconds": 0.8995200959808038,
+      "loopix_mixnode_delay_milliseconds": 2.5936995153473346,
+      "loopix_provider_delay_milliseconds": 263.6666666666667
+    }
+  }
+}

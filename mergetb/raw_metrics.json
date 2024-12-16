@@ -1,90 +1,2146 @@
 {
-  "loopix_bandwidth_bytes": [
-    5250016.0,
-    28915296.0,
-    5410848.0,
-    59117248.0,
-    5135136.0,
-    5640608.0,
-    52442720.0,
-    21379168.0
-  ],
-  "loopix_end_to_end_latency_seconds": {
-    "sum": [
-      6.161952081
-    ],
-    "count": [
-      3.0
-    ]
+  "lambda_loop": {
+    "0": {
+      "loopix_bandwidth_bytes": [
+        28972736.0,
+        30270880.0,
+        12579360.0,
+        73534688.0,
+        12935488.0,
+        12636800.0,
+        76601984.0,
+        12648288.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        7.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          50.052161778999995
+        ],
+        "count": [
+          6.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          72.0,
+          21.0
+        ],
+        "count": [
+          24.0,
+          7.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          93324.0,
+          5923.0
+        ],
+        "count": [
+          24.0,
+          6.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          0.0,
+          2141.0,
+          0.0,
+          1.0,
+          12767.0,
+          0.0
+        ],
+        "count": [
+          904.0,
+          1950.0,
+          935.0,
+          909.0,
+          2061.0,
+          925.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2586.0,
+          2291.0,
+          2559.0,
+          2427.0,
+          2413.0,
+          2599.0
+        ],
+        "count": [
+          904.0,
+          874.0,
+          935.0,
+          909.0,
+          919.0,
+          925.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          205.0,
+          1350.0
+        ],
+        "count": [
+          6.0,
+          23.0
+        ]
+      }
+    },
+    "1": {
+      "loopix_bandwidth_bytes": [
+        77635904.0,
+        30489152.0,
+        12843584.0,
+        27846912.0,
+        13567328.0,
+        12349600.0,
+        71099232.0,
+        12774656.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        4.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          12.757703723
+        ],
+        "count": [
+          3.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          12.0,
+          48.0
+        ],
+        "count": [
+          4.0,
+          16.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          3473.0,
+          44927.0
+        ],
+        "count": [
+          4.0,
+          16.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          2540.0,
+          0.0,
+          0.0,
+          0.0,
+          7064.0,
+          0.0
+        ],
+        "count": [
+          2077.0,
+          927.0,
+          990.0,
+          884.0,
+          1936.0,
+          936.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2255.0,
+          2397.0,
+          2828.0,
+          2436.0,
+          2442.0,
+          2473.0
+        ],
+        "count": [
+          931.0,
+          927.0,
+          990.0,
+          884.0,
+          910.0,
+          936.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          761.0,
+          11128.0
+        ],
+        "count": [
+          16.0,
+          4.0
+        ]
+      }
+    },
+    "2": {
+      "loopix_bandwidth_bytes": [
+        32063008.0,
+        30684448.0,
+        12407040.0,
+        62161568.0,
+        12131328.0,
+        11740736.0,
+        66894624.0,
+        11488000.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        5.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          46.038027665
+        ],
+        "count": [
+          4.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          48.0,
+          15.0
+        ],
+        "count": [
+          16.0,
+          5.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          37773.0,
+          3395.0
+        ],
+        "count": [
+          16.0,
+          5.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          0.0,
+          6848.0,
+          0.0,
+          0.0,
+          32266.0,
+          0.0
+        ],
+        "count": [
+          889.0,
+          1630.0,
+          865.0,
+          831.0,
+          1814.0,
+          824.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2311.0,
+          1755.0,
+          2295.0,
+          2318.0,
+          2128.0,
+          2170.0
+        ],
+        "count": [
+          889.0,
+          715.0,
+          865.0,
+          831.0,
+          820.0,
+          824.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          247.0,
+          642.0
+        ],
+        "count": [
+          4.0,
+          16.0
+        ]
+      }
+    },
+    "3": {
+      "loopix_bandwidth_bytes": [
+        26858944.0,
+        24159264.0,
+        12878048.0,
+        68491456.0,
+        12717216.0,
+        12935488.0,
+        62161568.0,
+        12200256.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        6.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          31.119787289
+        ],
+        "count": [
+          5.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          64.0,
+          18.0
+        ],
+        "count": [
+          24.0,
+          6.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          49264.0,
+          343.0
+        ],
+        "count": [
+          24.0,
+          6.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          5.0,
+          6982.0,
+          1.0,
+          0.0,
+          2026.0,
+          4.0
+        ],
+        "count": [
+          930.0,
+          1899.0,
+          916.0,
+          935.0,
+          1769.0,
+          886.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2504.0,
+          2321.0,
+          2312.0,
+          2394.0,
+          2192.0,
+          2378.0
+        ],
+        "count": [
+          930.0,
+          920.0,
+          916.0,
+          935.0,
+          874.0,
+          886.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          8089.0,
+          48551.0
+        ],
+        "count": [
+          6.0,
+          23.0
+        ]
+      }
+    },
+    "4": {
+      "loopix_bandwidth_bytes": [
+        69525376.0,
+        31143968.0,
+        12131328.0,
+        20299296.0,
+        12234720.0,
+        11775200.0,
+        43459104.0,
+        11407584.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        5.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          25.795189738999998
+        ],
+        "count": [
+          4.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          15.0,
+          60.0
+        ],
+        "count": [
+          5.0,
+          20.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          3783.0,
+          29470.0
+        ],
+        "count": [
+          5.0,
+          20.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          2404.0,
+          0.0,
+          6.0,
+          0.0,
+          16371.0,
+          0.0
+        ],
+        "count": [
+          1997.0,
+          865.0,
+          874.0,
+          834.0,
+          1158.0,
+          817.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2494.0,
+          2433.0,
+          2361.0,
+          2234.0,
+          1313.0,
+          2165.0
+        ],
+        "count": [
+          1002.0,
+          865.0,
+          874.0,
+          834.0,
+          529.0,
+          817.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          865.0,
+          9871.0
+        ],
+        "count": [
+          16.0,
+          5.0
+        ]
+      }
+    },
+    "5": {
+      "loopix_bandwidth_bytes": [
+        28605120.0,
+        27226560.0,
+        12096864.0,
+        66343200.0,
+        9535040.0,
+        12705728.0,
+        12602336.0,
+        65079520.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        3.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          2.570218703
+        ],
+        "count": [
+          1.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          28.0,
+          9.0
+        ],
+        "count": [
+          12.0,
+          3.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          17654.0,
+          1044.0
+        ],
+        "count": [
+          12.0,
+          3.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          0.0,
+          1866.0,
+          0.0,
+          1.0,
+          0.0,
+          26926.0
+        ],
+        "count": [
+          862.0,
+          1892.0,
+          639.0,
+          915.0,
+          921.0,
+          1654.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2355.0,
+          2398.0,
+          1650.0,
+          2462.0,
+          2502.0,
+          1756.0
+        ],
+        "count": [
+          862.0,
+          951.0,
+          639.0,
+          915.0,
+          921.0,
+          681.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          1490.0,
+          13104.0
+        ],
+        "count": [
+          10.0,
+          3.0
+        ]
+      }
+    },
+    "6": {
+      "loopix_bandwidth_bytes": [
+        28811904.0,
+        30201952.0,
+        13050368.0,
+        73764448.0,
+        13486912.0,
+        13636256.0,
+        13084832.0,
+        73167072.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        7.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          37.667827624999994
+        ],
+        "count": [
+          6.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          64.0,
+          21.0
+        ],
+        "count": [
+          24.0,
+          7.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          30990.0,
+          2798.0
+        ],
+        "count": [
+          24.0,
+          7.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          0.0,
+          22759.0,
+          5008.0,
+          0.0,
+          0.0,
+          12082.0
+        ],
+        "count": [
+          945.0,
+          1933.0,
+          991.0,
+          996.0,
+          963.0,
+          2134.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2530.0,
+          2031.0,
+          2641.0,
+          2690.0,
+          2605.0,
+          2859.0
+        ],
+        "count": [
+          945.0,
+          818.0,
+          991.0,
+          996.0,
+          963.0,
+          1107.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          1213.0,
+          226.0
+        ],
+        "count": [
+          24.0,
+          6.0
+        ]
+      }
+    },
+    "7": {
+      "loopix_bandwidth_bytes": [
+        23481472.0,
+        31764320.0,
+        13291616.0,
+        77934592.0,
+        13119296.0,
+        13567328.0,
+        59174688.0,
+        13142272.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        4.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          50.240182358
+        ],
+        "count": [
+          3.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          28.0,
+          12.0
+        ],
+        "count": [
+          12.0,
+          4.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          16179.0,
+          1178.0
+        ],
+        "count": [
+          12.0,
+          4.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          1.0,
+          2330.0,
+          3.0,
+          0.0,
+          31753.0,
+          1.0
+        ],
+        "count": [
+          966.0,
+          2143.0,
+          951.0,
+          990.0,
+          1737.0,
+          968.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2465.0,
+          2574.0,
+          2452.0,
+          2636.0,
+          2464.0,
+          2568.0
+        ],
+        "count": [
+          966.0,
+          1012.0,
+          951.0,
+          990.0,
+          912.0,
+          968.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          790.0,
+          30750.0
+        ],
+        "count": [
+          12.0,
+          4.0
+        ]
+      }
+    },
+    "8": {
+      "loopix_bandwidth_bytes": [
+        33418592.0,
+        29179520.0,
+        13797088.0,
+        13601792.0,
+        13866016.0,
+        13774112.0,
+        80507904.0,
+        71168160.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        4.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          28.834319723
+        ],
+        "count": [
+          3.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          24.0,
+          12.0
+        ],
+        "count": [
+          16.0,
+          4.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          16162.0,
+          977.0
+        ],
+        "count": [
+          16.0,
+          4.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          2.0,
+          0.0,
+          2.0,
+          0.0,
+          57252.0,
+          12263.0
+        ],
+        "count": [
+          1010.0,
+          1008.0,
+          1016.0,
+          1008.0,
+          2249.0,
+          1976.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2580.0,
+          2672.0,
+          2559.0,
+          2710.0,
+          2715.0,
+          2401.0
+        ],
+        "count": [
+          1010.0,
+          1008.0,
+          1016.0,
+          1008.0,
+          1077.0,
+          940.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          25.0,
+          10734.0
+        ],
+        "count": [
+          4.0,
+          12.0
+        ]
+      }
+    },
+    "10": {
+      "loopix_bandwidth_bytes": [
+        70260608.0,
+        28180064.0,
+        13785600.0,
+        13613280.0,
+        14555296.0,
+        14015360.0,
+        29593088.0,
+        72190592.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        5.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          4.732886025
+        ],
+        "count": [
+          3.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          15.0,
+          48.0
+        ],
+        "count": [
+          5.0,
+          16.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          1476.0,
+          11561.0
+        ],
+        "count": [
+          5.0,
+          16.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          2394.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          22030.0
+        ],
+        "count": [
+          1998.0,
+          1009.0,
+          1009.0,
+          1076.0,
+          1029.0,
+          2072.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2536.0,
+          2694.0,
+          2646.0,
+          2788.0,
+          2818.0,
+          2674.0
+        ],
+        "count": [
+          993.0,
+          1009.0,
+          1009.0,
+          1076.0,
+          1029.0,
+          1048.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          20427.0,
+          169.0
+        ],
+        "count": [
+          13.0,
+          4.0
+        ]
+      }
+    },
+    "11": {
+      "loopix_bandwidth_bytes": [
+        34061920.0,
+        28352384.0,
+        13429472.0,
+        61644608.0,
+        13050368.0,
+        13222688.0,
+        12958464.0,
+        66722304.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        4.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          10.172536921999999
+        ],
+        "count": [
+          2.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          24.0,
+          12.0
+        ],
+        "count": [
+          8.0,
+          4.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          5750.0,
+          790.0
+        ],
+        "count": [
+          8.0,
+          4.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          0.0,
+          52035.0,
+          1.0,
+          0.0,
+          0.0,
+          42124.0
+        ],
+        "count": [
+          978.0,
+          1796.0,
+          945.0,
+          960.0,
+          952.0,
+          1773.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2611.0,
+          2319.0,
+          2479.0,
+          2375.0,
+          2494.0,
+          2008.0
+        ],
+        "count": [
+          978.0,
+          924.0,
+          945.0,
+          960.0,
+          952.0,
+          784.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          115.0,
+          384.0
+        ],
+        "count": [
+          2.0,
+          8.0
+        ]
+      }
+    }
   },
-  "loopix_encryption_latency_milliseconds": {
-    "sum": [
-      24.0,
-      60.0
-    ],
-    "count": [
-      8.0,
-      20.0
-    ]
+  "max_retrieve": {
+    "0": {
+      "loopix_bandwidth_bytes": [
+        28765952.0,
+        31477120.0,
+        14222144.0,
+        13555840.0,
+        13682208.0,
+        14187680.0,
+        26675136.0,
+        24722176.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        8.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          36.598392540999996
+        ],
+        "count": [
+          8.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          96.0,
+          24.0
+        ],
+        "count": [
+          32.0,
+          8.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          41916.0,
+          1847.0
+        ],
+        "count": [
+          32.0,
+          8.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          1.0,
+          0.0,
+          4.0,
+          1.0,
+          11365.0,
+          571.0
+        ],
+        "count": [
+          1047.0,
+          1004.0,
+          1000.0,
+          1044.0,
+          2192.0,
+          1984.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2885.0,
+          2751.0,
+          2720.0,
+          2750.0,
+          2652.0,
+          2487.0
+        ],
+        "count": [
+          1047.0,
+          1004.0,
+          1000.0,
+          1044.0,
+          1034.0,
+          966.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          1477.0,
+          8269.0
+        ],
+        "count": [
+          32.0,
+          8.0
+        ]
+      }
+    },
+    "2": {
+      "loopix_bandwidth_bytes": [
+        57267680.0,
+        31546048.0,
+        13429472.0,
+        77153408.0,
+        12498944.0,
+        13119296.0,
+        12636800.0,
+        27421856.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        5.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          65.014479739
+        ],
+        "count": [
+          4.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          15.0,
+          48.0
+        ],
+        "count": [
+          5.0,
+          16.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          1499.0,
+          17398.0
+        ],
+        "count": [
+          5.0,
+          16.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          26822.0,
+          3.0,
+          52475.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "count": [
+          1577.0,
+          978.0,
+          2108.0,
+          897.0,
+          951.0,
+          924.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          1950.0,
+          2657.0,
+          2483.0,
+          2295.0,
+          2572.0,
+          2319.0
+        ],
+        "count": [
+          752.0,
+          978.0,
+          966.0,
+          897.0,
+          951.0,
+          924.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          14589.0,
+          510.0
+        ],
+        "count": [
+          4.0,
+          13.0
+        ]
+      }
+    },
+    "3": {
+      "loopix_bandwidth_bytes": [
+        76590496.0,
+        21919104.0,
+        12027936.0,
+        32993536.0,
+        11786688.0,
+        11901568.0,
+        61150624.0,
+        11350144.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        6.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          13.279816928999999
+        ],
+        "count": [
+          5.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          18.0,
+          60.0
+        ],
+        "count": [
+          6.0,
+          20.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          3449.0,
+          29091.0
+        ],
+        "count": [
+          6.0,
+          20.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          2630.0,
+          0.0,
+          0.0,
+          0.0,
+          52499.0,
+          0.0
+        ],
+        "count": [
+          1800.0,
+          856.0,
+          835.0,
+          845.0,
+          1185.0,
+          812.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2522.0,
+          2321.0,
+          2191.0,
+          2218.0,
+          1179.0,
+          2088.0
+        ],
+        "count": [
+          995.0,
+          856.0,
+          835.0,
+          845.0,
+          507.0,
+          812.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          1230.0,
+          270.0
+        ],
+        "count": [
+          20.0,
+          5.0
+        ]
+      }
+    }
   },
-  "loopix_client_delay_milliseconds": {
-    "sum": [
-      3005.0,
-      23183.0
-    ],
-    "count": [
-      8.0,
-      20.0
-    ]
+  "mean_delay": {
+    "0": {
+      "loopix_bandwidth_bytes": [
+        52511648.0,
+        26077760.0,
+        12751680.0,
+        63827328.0,
+        12590848.0,
+        12062400.0,
+        28788928.0,
+        11913056.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        5.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          50.360720879
+        ],
+        "count": [
+          4.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          15.0,
+          48.0
+        ],
+        "count": [
+          5.0,
+          16.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          2401.0,
+          22809.0
+        ],
+        "count": [
+          5.0,
+          16.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          16509.0,
+          0.0,
+          2215.0,
+          0.0,
+          0.0,
+          2.0
+        ],
+        "count": [
+          1574.0,
+          919.0,
+          1663.0,
+          905.0,
+          859.0,
+          861.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          978.0,
+          1092.0,
+          656.0,
+          1016.0,
+          956.0,
+          957.0
+        ],
+        "count": [
+          848.0,
+          919.0,
+          714.0,
+          905.0,
+          859.0,
+          861.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          13136.0,
+          31683.0
+        ],
+        "count": [
+          4.0,
+          16.0
+        ]
+      }
+    },
+    "1": {
+      "loopix_bandwidth_bytes": [
+        65619456.0,
+        31569024.0,
+        14210656.0,
+        13636256.0,
+        13659232.0,
+        13934944.0,
+        83023776.0,
+        27444832.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        8.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          37.055281499
+        ],
+        "count": [
+          8.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          24.0,
+          96.0
+        ],
+        "count": [
+          8.0,
+          32.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          3359.0,
+          46041.0
+        ],
+        "count": [
+          8.0,
+          32.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          1963.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          2939.0
+        ],
+        "count": [
+          1615.0,
+          1046.0,
+          1011.0,
+          998.0,
+          1022.0,
+          2559.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          973.0,
+          1815.0,
+          1726.0,
+          1756.0,
+          1772.0,
+          2229.0
+        ],
+        "count": [
+          625.0,
+          1046.0,
+          1011.0,
+          998.0,
+          1022.0,
+          1396.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          13487.0,
+          1862.0
+        ],
+        "count": [
+          8.0,
+          32.0
+        ]
+      }
+    },
+    "2": {
+      "loopix_bandwidth_bytes": [
+        13199712.0,
+        26100736.0,
+        13866016.0,
+        32993536.0,
+        13601792.0,
+        13911968.0,
+        66389152.0,
+        81024864.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        6.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          50.783609172
+        ],
+        "count": [
+          6.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          18.0,
+          84.0
+        ],
+        "count": [
+          6.0,
+          28.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          3086.0,
+          32148.0
+        ],
+        "count": [
+          6.0,
+          25.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          1.0,
+          1.0,
+          9.0,
+          1.0,
+          2232.0,
+          2341.0
+        ],
+        "count": [
+          973.0,
+          1016.0,
+          993.0,
+          1020.0,
+          1910.0,
+          2203.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2466.0,
+          2675.0,
+          2599.0,
+          2846.0,
+          2434.0,
+          2705.0
+        ],
+        "count": [
+          973.0,
+          1016.0,
+          993.0,
+          1020.0,
+          952.0,
+          1026.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          55464.0,
+          413.0
+        ],
+        "count": [
+          25.0,
+          7.0
+        ]
+      }
+    },
+    "3": {
+      "loopix_bandwidth_bytes": [
+        26100736.0,
+        31569024.0,
+        13073344.0,
+        12832096.0,
+        68617824.0,
+        13475424.0,
+        76280320.0,
+        13130784.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        6.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          60.389980479
+        ],
+        "count": [
+          5.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          60.0,
+          18.0
+        ],
+        "count": [
+          20.0,
+          6.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          27144.0,
+          1894.0
+        ],
+        "count": [
+          20.0,
+          5.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          0.0,
+          0.0,
+          11883.0,
+          0.0,
+          32710.0,
+          0.0
+        ],
+        "count": [
+          947.0,
+          941.0,
+          2037.0,
+          982.0,
+          2000.0,
+          967.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          4420.0,
+          3990.0,
+          5056.0,
+          4466.0,
+          3521.0,
+          4701.0
+        ],
+        "count": [
+          947.0,
+          941.0,
+          1088.0,
+          982.0,
+          849.0,
+          967.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          282.0,
+          1120.0
+        ],
+        "count": [
+          6.0,
+          20.0
+        ]
+      }
+    },
+    "4": {
+      "loopix_bandwidth_bytes": [
+        76395200.0,
+        31569024.0,
+        13544352.0,
+        23332128.0,
+        12498944.0,
+        13946432.0,
+        57715712.0,
+        12062400.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        7.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          43.621245194
+        ],
+        "count": [
+          7.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          21.0,
+          84.0
+        ],
+        "count": [
+          7.0,
+          28.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          3991.0,
+          39072.0
+        ],
+        "count": [
+          7.0,
+          28.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          2856.0,
+          0.0,
+          0.0,
+          0.0,
+          1658.0,
+          3.0
+        ],
+        "count": [
+          2193.0,
+          988.0,
+          897.0,
+          1023.0,
+          1554.0,
+          874.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          22469.0,
+          19304.0,
+          19774.0,
+          21637.0,
+          14458.0,
+          18113.0
+        ],
+        "count": [
+          1086.0,
+          988.0,
+          897.0,
+          1023.0,
+          722.0,
+          874.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          1477.0,
+          4735.0
+        ],
+        "count": [
+          28.0,
+          7.0
+        ]
+      }
+    },
+    "5": {
+      "loopix_bandwidth_bytes": [
+        13670720.0,
+        31546048.0,
+        13854528.0,
+        31626464.0,
+        13888992.0,
+        13911968.0,
+        79600352.0,
+        75464672.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        6.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          60.191966306000005
+        ],
+        "count": [
+          5.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          18.0,
+          52.0
+        ],
+        "count": [
+          6.0,
+          20.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          1290.0,
+          27257.0
+        ],
+        "count": [
+          5.0,
+          20.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          6.0,
+          1.0,
+          0.0,
+          0.0,
+          17224.0,
+          27966.0
+        ],
+        "count": [
+          1015.0,
+          1015.0,
+          1018.0,
+          1020.0,
+          2299.0,
+          1978.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          103506.0,
+          103067.0,
+          101084.0,
+          107969.0,
+          122672.0,
+          87282.0
+        ],
+        "count": [
+          1014.0,
+          1015.0,
+          1018.0,
+          1020.0,
+          1174.0,
+          839.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          195.0,
+          923.0
+        ],
+        "count": [
+          5.0,
+          20.0
+        ]
+      }
+    },
+    "6": {
+      "loopix_bandwidth_bytes": [
+        28834880.0,
+        27421856.0,
+        13372032.0,
+        13337568.0,
+        13222688.0,
+        13509888.0,
+        69582816.0,
+        70007872.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        5.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          64.29006895399999
+        ],
+        "count": [
+          4.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          40.0,
+          12.0
+        ],
+        "count": [
+          16.0,
+          4.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          21724.0,
+          1657.0
+        ],
+        "count": [
+          16.0,
+          4.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          32100.0,
+          2048.0
+        ],
+        "count": [
+          973.0,
+          986.0,
+          960.0,
+          985.0,
+          1844.0,
+          2048.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          297507.0,
+          287669.0,
+          294733.0,
+          311742.0,
+          227368.0,
+          324440.0
+        ],
+        "count": [
+          973.0,
+          985.0,
+          960.0,
+          985.0,
+          818.0,
+          1062.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          14261.0,
+          761.0
+        ],
+        "count": [
+          4.0,
+          15.0
+        ]
+      }
+    }
   },
-  "loopix_decryption_latency_milliseconds": {
-    "sum": [
-      0.0,
-      0.0,
-      0.0,
-      3.0,
-      0.0,
-      0.0,
-      0.0,
-      10095.0
-    ],
-    "count": [
-      457.0,
-      1877.0,
-      468.0,
-      2571.0,
-      444.0,
-      488.0,
-      2315.0,
-      4106.0
-    ]
-  },
-  "loopix_mixnode_delay_milliseconds": {
-    "sum": [
-      502.0,
-      558.0,
-      469.0,
-      485.0,
-      537.0,
-      484.0
-    ],
-    "count": [
-      399.0,
-      408.0,
-      412.0,
-      384.0,
-      428.0,
-      391.0
-    ]
-  },
-  "loopix_provider_delay_milliseconds": {
-    "sum": [
-      57936.0,
-      29851.0
-    ],
-    "count": [
-      20.0,
-      7.0
-    ]
+  "time_pull": {
+    "1": {
+      "loopix_bandwidth_bytes": [
+        36715648.0,
+        41781856.0,
+        12027936.0,
+        89342176.0,
+        12119840.0,
+        12326624.0,
+        104414432.0,
+        11981984.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        6.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          23.246926038000005
+        ],
+        "count": [
+          5.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          60.0,
+          5089.0
+        ],
+        "count": [
+          20.0,
+          6.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          26610.0,
+          6313.0
+        ],
+        "count": [
+          20.0,
+          6.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          0.0,
+          7921.0,
+          1.0,
+          0.0,
+          13699.0,
+          0.0
+        ],
+        "count": [
+          856.0,
+          1909.0,
+          864.0,
+          882.0,
+          2778.0,
+          867.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2326.0,
+          1155.0,
+          2351.0,
+          2213.0,
+          2988.0,
+          2161.0
+        ],
+        "count": [
+          856.0,
+          477.0,
+          864.0,
+          882.0,
+          1212.0,
+          867.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          118.0,
+          567.0
+        ],
+        "count": [
+          5.0,
+          20.0
+        ]
+      }
+    },
+    "2": {
+      "loopix_bandwidth_bytes": [
+        32970560.0,
+        17794912.0,
+        12119840.0,
+        50386368.0,
+        12602336.0,
+        13142272.0,
+        76636448.0,
+        11338656.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        4.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          14.228727744
+        ],
+        "count": [
+          3.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          37.0,
+          12.0
+        ],
+        "count": [
+          12.0,
+          4.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          17449.0,
+          944.0
+        ],
+        "count": [
+          12.0,
+          4.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          2.0,
+          6311.0,
+          1.0,
+          0.0,
+          32409.0,
+          2.0
+        ],
+        "count": [
+          864.0,
+          1687.0,
+          906.0,
+          953.0,
+          1864.0,
+          811.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2231.0,
+          2792.0,
+          2415.0,
+          2548.0,
+          1749.0,
+          2088.0
+        ],
+        "count": [
+          864.0,
+          1039.0,
+          906.0,
+          953.0,
+          692.0,
+          811.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          502.0,
+          256.0
+        ],
+        "count": [
+          11.0,
+          3.0
+        ]
+      }
+    },
+    "3": {
+      "loopix_bandwidth_bytes": [
+        28294944.0,
+        10994016.0,
+        14486368.0,
+        13544352.0,
+        14130240.0,
+        14371488.0,
+        11499488.0,
+        25365504.0
+      ],
+      "loopix_number_of_proxy_requests": [
+        4.0
+      ],
+      "loopix_end_to_end_latency_seconds": {
+        "sum": [
+          14.120100315999998
+        ],
+        "count": [
+          3.0
+        ]
+      },
+      "loopix_encryption_latency_milliseconds": {
+        "sum": [
+          12.0,
+          36.0
+        ],
+        "count": [
+          4.0,
+          12.0
+        ]
+      },
+      "loopix_client_delay_milliseconds": {
+        "sum": [
+          1518.0,
+          15375.0
+        ],
+        "count": [
+          4.0,
+          12.0
+        ]
+      },
+      "loopix_decryption_latency_milliseconds": {
+        "sum": [
+          5522.0,
+          1.0,
+          1.0,
+          1.0,
+          2.0,
+          471.0
+        ],
+        "count": [
+          1401.0,
+          1070.0,
+          1003.0,
+          1039.0,
+          1060.0,
+          1095.0
+        ]
+      },
+      "loopix_mixnode_delay_milliseconds": {
+        "sum": [
+          2889.0,
+          2818.0,
+          2631.0,
+          2721.0,
+          2801.0,
+          2195.0
+        ],
+        "count": [
+          1161.0,
+          1070.0,
+          1003.0,
+          1039.0,
+          1060.0,
+          857.0
+        ]
+      },
+      "loopix_provider_delay_milliseconds": {
+        "sum": [
+          3141.0,
+          814.0
+        ],
+        "count": [
+          12.0,
+          3.0
+        ]
+      }
+    }
   }
 }
