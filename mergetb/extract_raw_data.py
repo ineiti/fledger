@@ -7,6 +7,7 @@ import sys
 metrics_to_extract = [
     "loopix_bandwidth_bytes",
     "loopix_number_of_proxy_requests",
+    "loopix_start_time_seconds",
     "loopix_end_to_end_latency_seconds",
     "loopix_encryption_latency_milliseconds",
     "loopix_client_delay_milliseconds",
@@ -40,7 +41,7 @@ def get_metrics_data(path_length, results, variable, index):
         return False
 
     for metric in metrics_to_extract:
-        if metric == "loopix_bandwidth_bytes" or metric == "loopix_number_of_proxy_requests":
+        if metric == "loopix_bandwidth_bytes" or metric == "loopix_number_of_proxy_requests" or metric == "loopix_start_time_seconds":
             results[metric] = []
         else:
             results[metric] = {"sum": [], "count": []}
@@ -62,7 +63,7 @@ def get_metrics_data(path_length, results, variable, index):
                     else:
                         print(f"Error for node-{i}: match {match}")
 
-                elif metric == "loopix_number_of_proxy_requests":
+                elif metric == "loopix_number_of_proxy_requests" or metric == "loopix_start_time_seconds":
                     pattern = rf"{metric}\s+([0-9.e+-]+)$"
                     match = re.search(pattern, content, re.MULTILINE)
                     if match:

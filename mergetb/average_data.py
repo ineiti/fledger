@@ -1,10 +1,10 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import json
+import sys
 
 metrics_to_extract = [
-    "loopix_bandwidth_bytes",
-    "loopix_number_of_proxy_requests",
+    "loopix_bandwidth_bytes_per_second",
+    "loopix_reliability",
     "loopix_end_to_end_latency_seconds",
     "loopix_encryption_latency_milliseconds",
     "loopix_client_delay_milliseconds",
@@ -18,62 +18,24 @@ def get_data():
         data = json.load(f)
     return data
 
-def calculate_average_data(data):
+def calculate_average_data(duration, data):
     results = {}
     for metric in metrics_to_extract:
-        if metric in ["loopix_bandwidth_bytes", "loopix_number_of_proxy_requests"]:
-            results[metric] = np.mean(data[metric])
+        if metric == "loopix_bandwidth_bytes_per_second":
+            results[metric] = np.mean(data["loopix_bandwidth_bytes"]/(np.full_like(data["loopix_bandwidth_bytes"], duration) - data["loopix_start_time_seconds"]))
+        elif metric == "loopix_reliability":
+            successful_requests = data["loopix_end_to_end_latency_seconds"]["count"]
+            results[metric] = np.mean(np.array(successful_requests)/np.array(data["loopix_number_of_proxy_requests"]))
         else:
             results[metric] = np.sum(data[metric]["sum"]) / np.sum(data[metric]["count"])
     return results
 
-def create_and_save_stacked_bar_chart(average_data):
-    categories = ['loopix_latency_milliseconds']
-    components = [
-        average_data["loopix_encryption_latency_milliseconds"],
-        average_data["loopix_client_delay_milliseconds"],
-        average_data["loopix_decryption_latency_milliseconds"],
-        average_data["loopix_mixnode_delay_milliseconds"],
-        average_data["loopix_provider_delay_milliseconds"]
-    ]
-
-    x = np.arange(len(categories))
-    bar_width = 0.5
-
-    bottom = np.zeros(len(categories))
-
-    colors = ['blue', 'orange', 'green', 'red', 'purple']
-    labels = [
-        "Encryption Latency",
-        "Client Delay",
-        "Decryption Latency",
-        "Mixnode Delay",
-        "Provider Delay",
-        "Network Latency"
-    ]
-    plt.figure(figsize=(3, 20))
-
-    for i, component in enumerate(components):
-        plt.bar(
-            x,
-            [component],
-            bottom=bottom,
-            color=colors[i],
-            width=bar_width,
-            label=labels[i]
-        )
-        bottom += [component]
-
-    plt.xlabel('Categories')
-    plt.ylabel('Values (Milliseconds)')
-    plt.title('Stacked Bar Chart for Latency Components')
-    plt.xticks(x, ['Total Latency'], rotation=0)
-    plt.legend()
-
-    plt.savefig('plot.png', dpi=300, bbox_inches='tight')
-
-
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python average_data.py <duration>")
+        sys.exit(1)
+
+    duration = int(sys.argv[1])
     data = get_data()
 
     average_data = {}
@@ -83,7 +45,7 @@ if __name__ == "__main__":
 
         for index, metrics_data in runs.items():
             print(f"Calculating average data for {variable_name} {index}")
-            average_data[variable_name][index] = calculate_average_data(metrics_data)
+            average_data[variable_name][index] = calculate_average_data(duration, metrics_data)
 
     with open('average_data.json', 'w') as f:
         json.dump(average_data, f, indent=2)

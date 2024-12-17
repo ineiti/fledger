@@ -11,7 +11,7 @@ pub mod messages;
 
 pub mod broker;
 
-use prometheus::{register_counter, register_histogram, Counter, Histogram};
+use prometheus::{register_counter, register_gauge, register_histogram, Counter, Gauge, Histogram};
 use log;
 
 lazy_static::lazy_static! {
@@ -149,6 +149,20 @@ lazy_static::lazy_static! {
                 "loopix_provider_delay_milliseconds",
             "Delay introduced by a provider."
             )).unwrap()
+        }
+    };
+
+    pub static ref LOOPIX_START_TIME: Gauge = match register_gauge!(
+        "loopix_start_time_seconds",
+        "Start time of the loopix service."
+    ) {
+        Ok(gauge) => {
+            log::info!("LOOPIX_START_TIME gauge registered successfully.");
+            gauge
+        },
+        Err(e) => {
+            log::error!("Failed to register LOOPIX_START_TIME gauge: {:?}", e);
+            Gauge::new("loopix_start_time_seconds", "Start time of the loopix service.").unwrap()
         }
     };
 }

@@ -39,6 +39,6 @@ for NODE in $( seq $NODES ); do
   RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG |& ts "$NAME" &
 done
 
-# sleep 60
+sleep 360
 
-# make kill
+make kill

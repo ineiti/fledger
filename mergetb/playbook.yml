@@ -96,9 +96,9 @@
           RUST_BACKTRACE: "full"
       register: fledger_container
 
-    - name: Wait for 5 minutes while fledger runs
+    - name: Wait for 6 minutes while fledger runs
       pause:
-        seconds: 120
+        seconds: 600
 
     - name: Stop existing fledger container if present
       docker_container:
@@ -139,6 +139,6 @@
         state: stopped
       ignore_errors: true
 
-    - name: Wait for 10 seconds
+    - name: Wait for 60 seconds
       pause:
-        seconds: 10
+        seconds: 60

@@ -12,9 +12,7 @@ use flarch::{
 use flmodules::{
     gossip_events::core::{Category, Event},
     loopix::{
-        broker::LoopixBroker,
-        config::{CoreConfig, LoopixConfig, LoopixRole},
-        storage::LoopixStorage, END_TO_END_LATENCY, NUMBER_OF_PROXY_REQUESTS,
+        broker::LoopixBroker, config::{CoreConfig, LoopixConfig, LoopixRole}, storage::LoopixStorage, END_TO_END_LATENCY, LOOPIX_START_TIME, NUMBER_OF_PROXY_REQUESTS
     },
     network::{messages::NetworkMessage, network_broker_start, signal::SIGNAL_VERSION},
     nodeconfig::NodeInfo,
@@ -102,6 +100,8 @@ async fn save_metrics_loop(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let start_time = Instant::now();
+    
     let args = Args::parse();
     let config = args.config.clone();
     let retry = args.retry;
@@ -159,7 +159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .err()
             .map(|e| log::warn!("Couldn't process node: {e:?}"));
 
-        state = state.process(&mut node, i, retry).await?;
+        state = state.process(&mut node, i, retry, start_time).await?;
 
         if i % 3 == 2 && false {
             log::info!("Nodes are: {:?}", node.nodes_online()?);
@@ -184,9 +184,9 @@ enum LoopixSimul {
 }
 
 impl LoopixSimul {
-    async fn process(&self, node: &mut Node, i: u32, retry: u8) -> Result<Self, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32, retry: u8, start_time: Instant) -> Result<Self, BrokerError> {
         let new_state = match &self {
-            LoopixSimul::Root(lsroot) => lsroot.process(node, i, retry).await?,
+            LoopixSimul::Root(lsroot) => lsroot.process(node, i, retry, start_time).await?,
             LoopixSimul::Child(lschild) => lschild.process(node).await?,
         };
         if *self != new_state {
@@ -225,7 +225,7 @@ enum LSRoot {
 }
 
 impl LSRoot {
-    async fn process(&self, node: &mut Node, i: u32, retry: u8) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32, retry: u8, start_time: Instant) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSRoot::WaitNodes(n) => {
                 let path_len = *n;
@@ -258,6 +258,7 @@ impl LSRoot {
                     .len();
                 log::info!("Root sees {} configured nodes", node_configured);
                 if node_configured + 1 == *n {
+                    LOOPIX_START_TIME.set(start_time.elapsed().as_secs_f64());
                     LoopixSetup::node_config(node).await?;
                     let loopix_storage = node.loopix.as_ref().unwrap().storage.clone();
                     let save_path = node.data_save_path.as_ref().unwrap();
@@ -279,7 +280,7 @@ impl LSRoot {
                         .as_mut()
                         .unwrap()
                         // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(10))
+                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(60))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
