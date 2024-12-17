@@ -90,7 +90,7 @@ def main():
 
     results = {}
 
-    variables = ["lambda_loop", "max_retrieve", "mean_delay", "time_pull"]
+    variables = ["lambda_payload", "max_retrieve", "mean_delay", "time_pull"]
 
     for variable in variables:
 

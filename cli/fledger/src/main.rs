@@ -271,7 +271,7 @@ impl LSRoot {
             }
             LSRoot::SendProxyRequest(start) => {
                 if (i - *start) % 10 == 0 {
-                    log::info!("Sending request through WebProxy");
+                    log::info!("Sending request through WebProxy at {} seconds since start", start_time.elapsed().as_secs_f64());
                     let start = now();
                     let start_time = Instant::now();
                     NUMBER_OF_PROXY_REQUESTS.inc();
@@ -280,7 +280,7 @@ impl LSRoot {
                         .as_mut()
                         .unwrap()
                         // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(60))
+                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(30))
                         .await
                     {
                         Ok(mut res) => match res.text().await {

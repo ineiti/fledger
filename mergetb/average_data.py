@@ -22,7 +22,7 @@ def calculate_average_data(duration, data):
     results = {}
     for metric in metrics_to_extract:
         if metric == "loopix_bandwidth_bytes_per_second":
-            results[metric] = np.mean(data["loopix_bandwidth_bytes"]/(np.full_like(data["loopix_bandwidth_bytes"], duration) - data["loopix_start_time_seconds"]))
+            results[metric] = np.sum(data["loopix_bandwidth_bytes"])/(duration - data["loopix_start_time_seconds"][0])
         elif metric == "loopix_reliability":
             successful_requests = data["loopix_end_to_end_latency_seconds"]["count"]
             results[metric] = np.mean(np.array(successful_requests)/np.array(data["loopix_number_of_proxy_requests"]))

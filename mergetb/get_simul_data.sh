@@ -23,7 +23,7 @@ initial_max_retrieve=$max_retrieve
 initial_pad_length=$pad_length
 
 # Try different lambda_payload values
-lambda_payloads=(30 40 50 60 70 80 90 100 110 120 130 140 150)
+lambda_payloads=(40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150 160 170 180 190 200)
 mkdir -p metrics/lambda_payload
 
 # Prepare JSON object
@@ -35,15 +35,15 @@ for i in "${!lambda_payloads[@]}"; do
 
     cat <<EOL > loopix_core_config.yaml
 ---
-lambda_loop: $lambda_loop
-lambda_drop: $lambda_drop
+lambda_loop: $initial_lambda_loop
+lambda_drop: $initial_lambda_drop
 lambda_payload: $lambda_payload
-path_length: $path_length
-mean_delay: $mean_delay
-lambda_loop_mix: $lambda_loop_mix
-time_pull: $time_pull
-max_retrieve: $max_retrieve
-pad_length: $pad_length
+path_length: $initial_path_length
+mean_delay: $initial_mean_delay
+lambda_loop_mix: $initial_lambda_loop_mix
+time_pull: $initial_time_pull
+max_retrieve: $initial_max_retrieve
+pad_length: $initial_pad_length
 EOL
 
     ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=2 variable=lambda_payload index=$i"
@@ -56,7 +56,7 @@ echo -e "$lambda_payload_json" > metrics/lambda_payload/lambda_payload.json
 
 # Try different max_retrieve values
 lambda_loop=$initial_lambda_loop
-max_retrieves=(1 3 5 7 9)
+max_retrieves=(1 2 3 4 5 6 7 8 9 10 11 12)
 mkdir -p metrics/max_retrieve
 max_retrieve_json="{"
 
@@ -66,15 +66,15 @@ for i in "${!max_retrieves[@]}"; do
 
     cat <<EOL > loopix_core_config.yaml
 ---
-lambda_loop: $lambda_loop
-lambda_drop: $lambda_drop
-lambda_payload: $lambda_payload
-path_length: $path_length
-mean_delay: $mean_delay
-lambda_loop_mix: $lambda_loop_mix
-time_pull: $time_pull
+lambda_loop: $initial_lambda_loop
+lambda_drop: $initial_lambda_drop
+lambda_payload: $initial_lambda_payload
+path_length: $initial_path_length
+mean_delay: $initial_mean_delay
+lambda_loop_mix: $initial_lambda_loop_mix
+time_pull: $initial_time_pull
 max_retrieve: $max_retrieve
-pad_length: $pad_length
+pad_length: $initial_pad_length
 EOL
 
     ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=2 variable=max_retrieve index=$i"
@@ -86,7 +86,7 @@ echo -e "$max_retrieve_json" > metrics/max_retrieve/max_retrieve.json
 
 # Try different mean_delay values
 lambda_loop=$initial_lambda_loop
-mean_delays=(500 1000 2000 4000 20000 100000 300000)
+mean_delays=(500 1000 1500 2000 2500 3000 3500 4000 4500 5000 5500 6000 6500 7000 7500 8000 8500 9000 9500 10000 20000 30000)
 mkdir -p metrics/mean_delay
 mean_delay_json="{"
 
@@ -96,15 +96,15 @@ for i in "${!mean_delays[@]}"; do
 
     cat <<EOL > loopix_core_config.yaml
 ---
-lambda_loop: $lambda_loop
-lambda_drop: $lambda_drop
-lambda_payload: $lambda_payload
-path_length: $path_length
+lambda_loop: $initial_lambda_loop
+lambda_drop: $initial_lambda_drop
+lambda_payload: $initial_lambda_payload
+path_length: $initial_path_length
 mean_delay: $mean_delay
-lambda_loop_mix: $lambda_loop_mix
-time_pull: $time_pull
-max_retrieve: $max_retrieve
-pad_length: $pad_length
+lambda_loop_mix: $initial_lambda_loop_mix
+time_pull: $initial_time_pull
+max_retrieve: $initial_max_retrieve
+pad_length: $initial_pad_length
 EOL
 
     ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=2 variable=mean_delay index=$i"
@@ -116,7 +116,7 @@ echo -e "$mean_delay_json" > metrics/mean_delay/mean_delay.json
 
 # Try different time_pull values
 lambda_loop=$initial_lambda_loop
-time_pulls=(0.01 0.05 0.1 0.5 1 2)
+time_pulls=(0.01 0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1 1.25 1.5 1.75 2)
 mkdir -p metrics/time_pull
 time_pull_json="{"
 
@@ -126,15 +126,15 @@ for i in "${!time_pulls[@]}"; do
 
     cat <<EOL > loopix_core_config.yaml
 ---
-lambda_loop: $lambda_loop
-lambda_drop: $lambda_drop
-lambda_payload: $lambda_payload
-path_length: $path_length
-mean_delay: $mean_delay
-lambda_loop_mix: $lambda_loop_mix
+lambda_loop: $initial_lambda_loop
+lambda_drop: $initial_lambda_drop
+lambda_payload: $initial_lambda_payload
+path_length: $initial_path_length
+mean_delay: $initial_mean_delay
+lambda_loop_mix: $initial_lambda_loop_mix
 time_pull: $time_pull
-max_retrieve: $max_retrieve
-pad_length: $pad_length
+max_retrieve: $initial_max_retrieve
+pad_length: $initial_pad_length
 EOL
 
     ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=2 variable=time_pull index=$i"
