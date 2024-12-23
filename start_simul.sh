@@ -25,7 +25,7 @@ for NODE in $( seq $NODES ); do
   NAME="NODE_$(printf "%02d" $NODE)"
   echo "Starting node $NAME"
   CONFIG="$SIMUL$NAME/"
-  VERBOSITY="-vvv"
+  VERBOSITY="-v"
   PATH_LEN_ARG=""
   RETRY_ARG=""
   if [ $NODE = "1" ]; then

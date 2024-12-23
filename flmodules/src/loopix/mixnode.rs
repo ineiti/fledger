@@ -80,15 +80,15 @@ impl LoopixCore for Mixnode {
                 if let Ok(message) = serde_yaml::from_str::<MessageType>(&module_message.msg) {
                     match message {
                         MessageType::Payload(_, _) => {
-                            log::error!("Mixnode shouldn't receive payloads!");
+                            log::warn!("Mixnode shouldn't receive payloads!");
                             (destination, None, None, Some(message))
                         }
                         MessageType::PullRequest(_) => {
-                            log::error!("Mixnode shouldn't receive pull requests!");
+                            log::warn!("Mixnode shouldn't receive pull requests!");
                             (destination, None, None, Some(message))
                         }
                         MessageType::SubscriptionRequest(_) => {
-                            log::error!("Mixnode shouldn't receive subscription requests!");
+                            log::warn!("Mixnode shouldn't receive subscription requests!");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Drop => {
@@ -100,7 +100,7 @@ impl LoopixCore for Mixnode {
                             (destination, None, None, Some(message))
                         }
                         MessageType::Dummy => {
-                            log::error!("Mixnode shouldn't receive dummy messages!");
+                            log::warn!("Mixnode shouldn't receive dummy messages!");
                             (destination, None, None, Some(message))
                         }
                     }

@@ -112,22 +112,23 @@ impl LoopixCore for Client {
                 if let Ok(message) = serde_yaml::from_str::<MessageType>(&module_message.msg) {
                     match message.clone() {
                         MessageType::Payload(source, msg) => {
+                            log::info!("Client received payload from {}: {:?}", source, msg);
                             (source, Some(msg), None, Some(message))
                         }
                         MessageType::PullRequest(client_id) => {
-                            log::error!("Client shouldn't receive pull requests!");
+                            log::warn!("Client shouldn't receive pull requests!");
                             (client_id, None, None, Some(message))
                         }
                         MessageType::SubscriptionRequest(client_id) => {
-                            log::error!("Client shouldn't receive subscription requests!");
+                            log::warn!("Client shouldn't receive subscription requests!");
                             (client_id, None, None, Some(message))
                         }
                         MessageType::Drop => {
-                            log::trace!("Client received drop");
+                            log::warn!("Client received drop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Loop => {
-                            log::trace!("Client received loop");
+                            log::warn!("Client received loop");
                             (destination, None, None, Some(message))
                         }
                         MessageType::Dummy => {
@@ -356,7 +357,7 @@ impl Client {
         // self.storage
         //     .add_sent_message(route, MessageType::Payload(our_id, msg), sphinx.message_id.clone())
         //     .await;
-        log::info!("Sent message {} to {}", sphinx.message_id, destination);
+        log::trace!("Sent message {} to {}", sphinx.message_id, destination);
         (our_provider.unwrap(), sphinx)
     }
 }

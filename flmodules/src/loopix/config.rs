@@ -159,12 +159,12 @@ impl LoopixConfig {
 //////////////////////////////////////// Core Config ////////////////////////////////////////
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct CoreConfig {
-    lambda_loop: f64, // Loop traffic rate (user) (per minute)
-    lambda_drop: f64, // Drop cover traffic rate (user) (per minute)
-    lambda_payload: f64, // Payload traffic rate (user) (per minute)
+    lambda_loop: f64, // Loop traffic rate (user) (per second)
+    lambda_drop: f64, // Drop cover traffic rate (user) (per second)
+    lambda_payload: f64, // Payload traffic rate (user) (per second)
     path_length: usize, // Path length (user)
     mean_delay: u64, // The mean delay at mix Mi (milliseconds)
-    lambda_loop_mix: f64, // Loop traffic rate (mix) (per minute)
+    lambda_loop_mix: f64, // Loop traffic rate (mix) (per second)
     time_pull: f64, // Time pull (user) (seconds)
     max_retrieve: usize, // Max retrieve (provider)
     pad_length: usize // TODO implement
@@ -173,12 +173,12 @@ pub struct CoreConfig {
 impl CoreConfig {
     pub fn default_mixnode(path_length: usize) -> Self {
         CoreConfig {
-            lambda_loop: 10.0, // loop rate (10 times per minute)
-            lambda_drop: 10.0, // drop rate (10 times per minute)
-            lambda_payload: 0.0, // payload rate (0 times per minute)
+            lambda_loop: 10.0, // loop rate (10 messages per second)
+            lambda_drop: 10.0, // drop rate (10 messages per second)
+            lambda_payload: 0.0, // payload rate (0 messages per second)
             path_length,
             mean_delay: 2, // mean delay (ms)
-            lambda_loop_mix: 10.0, // loop mix rate (10 times per minute)
+            lambda_loop_mix: 10.0, // loop mix rate (10 messages per second)
             time_pull: 0.0, // time pull (3 second)
             max_retrieve: 0, // messages sent to client per pull request
             pad_length: 150, // dummy, drop, loop messages are padded

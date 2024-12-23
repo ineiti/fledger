@@ -15,7 +15,7 @@ use super::config::CoreConfig;
 use super::storage::LoopixStorage;
 use super::{client::Client, core::*, mixnode::Mixnode, provider::Provider, sphinx::*};
 use super::{DECRYPTION_LATENCY, MIXNODE_DELAY};
-use crate::loopix::PROVIDER_DELAY;
+use crate::loopix::{INCOMING_MESSAGES, PROVIDER_DELAY};
 use crate::nodeconfig::NodeInfo;
 use crate::overlay::messages::NetworkWrapper;
 
@@ -122,12 +122,13 @@ impl LoopixMessages {
                 self.process_overlay_message(node_id, message).await;
             }
             LoopixIn::SphinxFromNetwork(node_id, sphinx) => {
-                log::info!(
+                log::trace!(
                     "{}: SphinxFromNetwork from node_id {} and sphinx {:?}",
                     self.role.get_our_id().await,
                     node_id,
                     sphinx.message_id
                 );
+                INCOMING_MESSAGES.inc();
                 self.process_sphinx_packet(node_id, sphinx).await;
             }
         }

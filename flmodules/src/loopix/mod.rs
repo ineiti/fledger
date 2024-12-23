@@ -102,6 +102,20 @@ lazy_static::lazy_static! {
         }
     };
 
+    pub static ref INCOMING_MESSAGES: Counter = match register_counter!(
+        "loopix_incoming_messages",
+        "Number of incoming messages"
+    ) {
+        Ok(counter) => {
+            log::info!("INCOMING_MESSAGES counter registered successfully.");
+            counter
+        },
+        Err(e) => {
+            log::error!("Failed to register INCOMING_MESSAGES counter: {:?}", e);
+            Counter::new("loopix_incoming_messages", "Number of incoming messages").unwrap()
+        }
+    };
+
     pub static ref NUMBER_OF_PROXY_REQUESTS: Counter = match register_counter!(
         "loopix_number_of_proxy_requests",
         "Number of proxy requests"

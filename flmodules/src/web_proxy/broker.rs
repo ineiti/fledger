@@ -223,7 +223,7 @@ impl Translate {
 
     fn link_overlay_proxy(msg: OverlayMessage) -> Option<WebProxyMessage> {
         if let OverlayMessage::Output(msg_out) = msg {
-            log::info!("WebProxy: Received message from overlay: {:?}", msg_out);
+            log::trace!("WebProxy: Received message from overlay: {:?}", msg_out);
             match msg_out {
                 OverlayOut::NodeInfosConnected(list) => {
                     Some(WebProxyIn::NodeInfoConnected(list).into())
@@ -239,7 +239,7 @@ impl Translate {
     }
 
     fn link_proxy_overlay(msg: WebProxyMessage) -> Option<OverlayMessage> {
-        log::info!("WebProxy: Sending message to overlay: {:?}", msg);
+        log::trace!("WebProxy: Sending message to overlay: {:?}", msg);
         if let WebProxyMessage::Output(WebProxyOut::ToNetwork(id, msg_node)) = msg {
             Some(
                 OverlayIn::NetworkWrapperToNetwork(

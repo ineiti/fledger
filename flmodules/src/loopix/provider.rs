@@ -94,7 +94,7 @@ impl LoopixCore for Provider {
                 if let Ok(message) = serde_yaml::from_str::<MessageType>(&module_message.msg) {
                     match message {
                         MessageType::Payload(_, _) => {
-                            log::error!("Provider shouldn't receive payloads!");
+                            log::warn!("Provider shouldn't receive payloads!");
                             (destination, None, None, Some(message))
                         }
                         MessageType::PullRequest(client_id) => {
@@ -152,7 +152,7 @@ impl LoopixCore for Provider {
             .await
             .contains(&next_node)
         {
-            log::debug!(
+            log::info!(
                 "Provider received message for subscribed client: {:?} {:?}",
                 next_node,
                 message_id

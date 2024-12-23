@@ -109,7 +109,7 @@ impl LoopixBroker {
                 // messages that get sent back to this node are distributed from the overlay
                 Self::start_overlay_send_thread(broker.clone(), overlay_receiver);
             }
-
+            // Mixnode and provider forwards messages immediately (after the delay has been introduced)
             NodeType::Provider(_) | NodeType::Mixnode(_) => {
                 Self::mixnode_forward_thread(broker.clone(), network_receiver);
             }
@@ -158,7 +158,7 @@ impl LoopixBroker {
                 {
                     log::error!("Failed to emit node infos connected message: {:?}", e);
                 } else {
-                    log::info!("Nodeinfos connected message emitted: {:?}", node_infos);
+                    log::debug!("Nodeinfos connected message emitted: {:?}", node_infos);
                 }
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
@@ -177,7 +177,7 @@ impl LoopixBroker {
                     {
                         log::error!("Error emitting overlay message: {e:?}");
                     } else {
-                        log::info!(
+                        log::debug!(
                             "Loopix to Overlay from {}, wrapper len: {:?}",
                             node_id,
                             wrapper
@@ -199,7 +199,7 @@ impl LoopixBroker {
         };
 
         let wait_before_send =
-            Duration::from_secs_f64(60.0 / lambda_loop);
+            Duration::from_secs_f64(1.0 / lambda_loop);
 
         log::debug!("Loop message rate: {:?}", wait_before_send);
 
@@ -237,7 +237,7 @@ impl LoopixBroker {
         }
 
         let wait_before_send =
-            Duration::from_secs_f64(60.0 / loopix_messages.role.get_config().lambda_drop());
+            Duration::from_secs_f64(1.0 / loopix_messages.role.get_config().lambda_drop());
 
         log::debug!("Drop message rate: {:?}", wait_before_send);
 
@@ -350,7 +350,7 @@ impl LoopixBroker {
                     {
                         log::error!("Error emitting forward message: {e:?}");
                     } else {
-                        log::info!(
+                        log::trace!(
                             "Loopix to Network from {}, message id: {:?}",
                             node_id,
                             sphinx.message_id
@@ -371,14 +371,15 @@ impl LoopixBroker {
             
             let mut sphinx_messages: Vec<(NodeID, Sphinx, Option<SystemTime>)> = Vec::new();
             let lambda_payload = loopix_messages.role.get_config().lambda_payload();
-            let wait_before_send = Duration::from_secs_f64(60.0 / lambda_payload);
+            let wait_before_send = Duration::from_secs_f64(1.0 / lambda_payload);
 
             let our_id = loopix_messages.role.get_our_id().await;
 
             log::info!(
-                "{}: Real message rate is {:?} per minute",
+                "{}: Real message rate is {:?} per second. Wait before send: {:?}",
                 our_id,
-                lambda_payload
+                lambda_payload,
+                wait_before_send
             );
 
             loop {
@@ -400,7 +401,7 @@ impl LoopixBroker {
                     {
                         log::error!("Error emitting network message: {e:?}");
                     } else {
-                        log::info!(
+                        log::trace!(
                             "{} emitted a message network {:?} to node {}",
                             our_id,
                             sphinx.message_id,
