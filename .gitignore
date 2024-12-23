@@ -10,3 +10,5 @@ mergetb/mergetb_data/
 mergetb/metrics/
 metrics/plots/
 simul_data/
+
+logs.txt
