@@ -109,6 +109,7 @@ impl LoopixBroker {
                 // messages that get sent back to this node are distributed from the overlay
                 Self::start_overlay_send_thread(broker.clone(), overlay_receiver);
             }
+
             NodeType::Provider(_) | NodeType::Mixnode(_) => {
                 Self::mixnode_forward_thread(broker.clone(), network_receiver);
             }
@@ -367,6 +368,7 @@ impl LoopixBroker {
         mut receiver: Receiver<(NodeID, Sphinx, Option<SystemTime>)>,
     ) {
         tokio::spawn(async move {
+            
             let mut sphinx_messages: Vec<(NodeID, Sphinx, Option<SystemTime>)> = Vec::new();
             let lambda_payload = loopix_messages.role.get_config().lambda_payload();
             let wait_before_send = Duration::from_secs_f64(60.0 / lambda_payload);

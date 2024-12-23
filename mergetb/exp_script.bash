@@ -25,6 +25,10 @@ nohup ./get_simul_data.sh > logs.txt 2>&1 &
 # mrg xdc scp upload ../target-common/release/flsignal fledgerxdc.dcog:/home/dcog
 # mrg xdc scp upload ../target-common/release/fledger fledgerxdc.dcog:/home/dcog
 
+
+nohup ./get_simul_data.sh > logs.txt 2>&1 &
+nohup ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=3 variable=lambda_payload index=0" > logs.txt 2>&1 > logs.txt 2>&1 &
+
 mrg xdc ssh fledgerxdc.dcog 
 
 

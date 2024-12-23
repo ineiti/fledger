@@ -1,0 +1,22 @@
+---
+- name: Docker Login and Restart on All Nodes
+  hosts: all
+  become: yes
+  vars_files:
+    - vault.yml 
+
+  vars:
+    docker_registry_url: "https://index.docker.io/v1/"
+    docker_username: "deryacog"
+
+  tasks:
+    - name: Log in to Docker Registry
+      ansible.builtin.command:
+        cmd: "docker login {{ docker_registry_url }} -u {{ docker_username }} -p {{ docker_password }}"
+      register: docker_login
+      no_log: true
+
+    - name: Check Docker Login Output
+      ansible.builtin.debug:
+        var: docker_login.stdout
+        verbosity: 1

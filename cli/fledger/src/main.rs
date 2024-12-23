@@ -53,13 +53,22 @@ struct Args {
     path_len: Option<usize>,
 
     /// Reliability config
-    #[clap(long, default_value_t = 0)]
+    #[clap(short = 'r', long="retry", default_value_t = 0)]
     retry: u8,
+
+    /// Save metrics to a new file every 10 seconds if true, otherwise overwrite
+    #[clap(short = 'm', long="save_new_metrics_file", default_value_t = false)]
+    save_new_metrics_file: bool,
+
+    /// Time to start loopix
+    #[clap(short = 't', long="start_loopix_time", default_value_t = 0)]
+    start_loopix_time: u64,
 }
 
 async fn save_metrics_loop(
     storage: Arc<LoopixStorage>,
     dir_path: String,
+    save_new_metrics_file: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let path = PathBuf::from(dir_path);
 
@@ -70,31 +79,41 @@ async fn save_metrics_loop(
     }
     storage_path.push("loopix_storage.yaml");
 
-    let mut metrics_path = PathBuf::from(".");
-    metrics_path.push(path);
-    if let Err(e) = std::fs::create_dir_all(&metrics_path) {
+    let mut metrics_base_path = PathBuf::from(".");
+    metrics_base_path.push(path);
+    if let Err(e) = std::fs::create_dir_all(&metrics_base_path) {
         log::error!("Failed to create directory: {}", e);
     }
-    metrics_path.push("metrics.txt");
 
+    let mut i: u32 = 0;
     loop {
-        std::thread::sleep(Duration::from_secs(5));
+        std::thread::sleep(Duration::from_secs(10));
 
-        // Save the loopix storage to a file
+        let mut metrics_path = metrics_base_path.clone();
+        if save_new_metrics_file {
+            metrics_path.push(format!("metrics_{}.txt", i));
+        } else {
+            metrics_path.push("metrics.txt");
+        }
+
         let storage_bytes = storage.to_yaml_async().await.unwrap();
-        let mut file = File::create(&storage_path).expect("Unable to create file");
-        file.write_all(storage_bytes.as_bytes())
-            .expect("Unable to write data");
+        {
+            let mut file = File::create(&storage_path).expect("Unable to create file");
+            file.write_all(storage_bytes.as_bytes())
+                .expect("Unable to write data");
+        }
 
-        // Gather the current metrics
         let metric_families = gather();
         let mut buffer = Vec::new();
         let encoder = TextEncoder::new();
         encoder.encode(&metric_families, &mut buffer).unwrap();
 
-        // Write metrics to a file
-        let mut file = File::create(&metrics_path).expect("Unable to create file");
-        file.write_all(&buffer).expect("Unable to write data");
+        {
+            let mut file = File::create(&metrics_path).expect("Unable to create file");
+            file.write_all(&buffer).expect("Unable to write data");
+        }
+
+        i += 1;
     }
 }
 
@@ -159,9 +178,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .err()
             .map(|e| log::warn!("Couldn't process node: {e:?}"));
 
-        state = state.process(&mut node, i, retry, start_time).await?;
+        state = state.process(&mut node, i, retry, start_time, args.start_loopix_time, args.save_new_metrics_file).await?;
 
-        if i % 3 == 2 && false {
+        if i % 3 == 2 {
             log::info!("Nodes are: {:?}", node.nodes_online()?);
             let ping = &node.ping.as_ref().unwrap().storage;
             log::info!("Nodes countdowns are: {:?}", ping.stats);
@@ -184,10 +203,10 @@ enum LoopixSimul {
 }
 
 impl LoopixSimul {
-    async fn process(&self, node: &mut Node, i: u32, retry: u8, start_time: Instant) -> Result<Self, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32, retry: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<Self, BrokerError> {
         let new_state = match &self {
-            LoopixSimul::Root(lsroot) => lsroot.process(node, i, retry, start_time).await?,
-            LoopixSimul::Child(lschild) => lschild.process(node).await?,
+            LoopixSimul::Root(lsroot) => lsroot.process(node, i, retry, start_time, loopix_start_time, save_new_metrics_file).await?,
+            LoopixSimul::Child(lschild) => lschild.process(node, start_time, loopix_start_time, save_new_metrics_file).await?,
         };
         if *self != new_state {
             log::info!(
@@ -225,9 +244,10 @@ enum LSRoot {
 }
 
 impl LSRoot {
-    async fn process(&self, node: &mut Node, i: u32, retry: u8, start_time: Instant) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32, retry: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSRoot::WaitNodes(n) => {
+                wait_ms(15000).await;
                 let path_len = *n;
                 let nodes = (path_len * path_len) + path_len * 2;
                 let mut node_infos = node.nodes_online().unwrap();
@@ -258,13 +278,16 @@ impl LSRoot {
                     .len();
                 log::info!("Root sees {} configured nodes", node_configured);
                 if node_configured + 1 == *n {
-                    LOOPIX_START_TIME.set(start_time.elapsed().as_secs_f64());
-                    LoopixSetup::node_config(node).await?;
+                    LoopixSetup::node_config(node, start_time, loopix_start_time).await?;
                     let loopix_storage = node.loopix.as_ref().unwrap().storage.clone();
                     let save_path = node.data_save_path.as_ref().unwrap();
+
+
+
                     tokio::spawn(save_metrics_loop(
                         Arc::clone(&loopix_storage),
                         save_path.clone(),
+                        save_new_metrics_file,
                     ));
                     return Ok(LSRoot::SendProxyRequest(i + 10).into());
                 }
@@ -312,27 +335,22 @@ enum LSChild {
 }
 
 impl LSChild {
-    async fn process(&self, node: &mut Node) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, node: &mut Node, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSChild::WaitConfig => {
-                if LoopixSetup::node_config(node).await? {
+                if LoopixSetup::node_config(node, start_time, loopix_start_time).await? {
                     log::info!("{} got setup", node.node_config.info.name);
-                    node.gossip
-                        .as_mut()
-                        .unwrap()
-                        .add_event(Event {
-                            category: Category::LoopixConfig,
-                            src: node.node_config.info.get_id(),
-                            created: now(),
-                            msg: "Setup done".into(),
-                        })
-                        .await?;
 
+                
                     let loopix_storage = node.loopix.as_ref().unwrap().storage.clone();
                     let save_path = node.data_save_path.as_ref().unwrap();
+
+
+
                     tokio::spawn(save_metrics_loop(
                         Arc::clone(&loopix_storage),
                         save_path.clone(),
+                        save_new_metrics_file,
                     ));
                     return Ok(LSChild::ProxyReady.into());
                 }
@@ -359,28 +377,50 @@ pub struct LoopixSetup {
 }
 
 impl LoopixSetup {
-    pub async fn node_config(node: &mut Node) -> Result<bool, BrokerError> {
+    pub async fn node_config(node: &mut Node, start_time: Instant, loopix_start_time: u64) -> Result<bool, BrokerError> {
         let events = node.gossip.as_ref().unwrap().events(Category::LoopixSetup);
         if let Some(event) = events.get(0) {
-            // DEBUG: if you set this to 'false', loopix will not be setup, and you'll just see
-            // how the rest of the system sets up.
-            if true {
-                let setup = serde_json::from_str::<LoopixSetup>(&event.msg)
-                    .expect("deserializing loopix setup");
-                let our_id = node.node_config.info.get_id();
-                let (loopix, overlay) = setup.get_brokers(our_id, node.broker_net.clone()).await?;
-                node.loopix = Some(loopix);
-                node.webproxy = Some(
-                    WebProxy::start(
-                        node.storage.clone(),
-                        our_id,
-                        overlay,
-                        WebProxyConfig::default(),
-                    )
-                    .await
-                    .expect("Starting new WebProxy"),
-                );
+            // get event and setup info
+            let setup = serde_json::from_str::<LoopixSetup>(&event.msg)
+            .expect("deserializing loopix setup");
+            let our_id = node.node_config.info.get_id();
+            let (loopix, overlay) = setup.get_brokers(our_id, node.broker_net.clone()).await?;
+
+            // let root know that node is ready
+            node.gossip
+            .as_mut()
+            .unwrap()
+            .add_event(Event {
+                category: Category::LoopixConfig,
+                src: node.node_config.info.get_id(),
+                created: now(),
+                msg: "Setup done".into(),
+            })
+            .await?;
+
+            log::info!("NodeID {} is ready, waiting for loopix start time", node.node_config.info.get_id());
+
+            // wait until scheduled start time
+            while start_time.elapsed().as_secs() < loopix_start_time {
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
+
+            log::info!("NodeID {} is ready, starting loopix", node.node_config.info.get_id());
+            LOOPIX_START_TIME.set(start_time.elapsed().as_secs_f64());
+
+            // start loopix and webproxy
+            node.loopix = Some(loopix);
+            node.webproxy = Some(
+                WebProxy::start(
+                    node.storage.clone(),
+                    our_id,
+                    overlay,
+                    WebProxyConfig::default(),
+                )
+                .await
+                .expect("Starting new WebProxy"),
+            );
+            
             return Ok(true);
         }
         Ok(false)

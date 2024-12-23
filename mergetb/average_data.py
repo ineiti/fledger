@@ -21,6 +21,8 @@ def get_data():
 def calculate_average_data(duration, data):
     results = {}
     for metric in metrics_to_extract:
+        # if metric == "loopix_bandwidth_bytes_per_second":
+        #     print(data)
         if metric == "loopix_bandwidth_bytes_per_second":
             results[metric] = np.sum(data["loopix_bandwidth_bytes"])/(duration - data["loopix_start_time_seconds"][0])
         elif metric == "loopix_reliability":
@@ -41,9 +43,14 @@ if __name__ == "__main__":
     average_data = {}
 
     for variable_name, runs in data.items():
+        print("Getting data for: ", variable_name)
+        print(runs.keys())
+
         average_data[variable_name] = {}
 
         for index, metrics_data in runs.items():
+            print(index)
+            print(type(index))
             print(f"Calculating average data for {variable_name} {index}")
             average_data[variable_name][index] = calculate_average_data(duration, metrics_data)
 

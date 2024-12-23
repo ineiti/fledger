@@ -34,9 +34,11 @@ for NODE in $( seq $NODES ); do
   if [ "$RETRY" -gt 0 ]; then
     RETRY_ARG="--retry $RETRY"
   fi
+  START_TIME="--start_loopix_time 45"
+  SAVE_NEW_METRICS_FILE=""
   mkdir -p $CONFIG
   cp "loopix_core_config.yaml" $CONFIG
-  RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG |& ts "$NAME" &
+  RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG $START_TIME $SAVE_NEW_METRICS_FILE --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG |& ts "$NAME" &
 done
 
 sleep 360

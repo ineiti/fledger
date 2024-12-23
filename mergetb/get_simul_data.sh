@@ -7,7 +7,7 @@ lambda_payload=90.0
 path_length=2
 mean_delay=2000
 lambda_loop_mix=30.0
-time_pull=0.1
+time_pull=0.7
 max_retrieve=3
 pad_length=150
 
@@ -53,6 +53,7 @@ done
 lambda_payload_json="${lambda_payload_json%,}}"
 echo -e "$lambda_payload_json" > metrics/lambda_payload/lambda_payload.json
 
+ansible-playbook -i inventory.ini delete_docker.yml 
 
 # Try different max_retrieve values
 lambda_loop=$initial_lambda_loop
@@ -83,10 +84,11 @@ done
 max_retrieve_json="${max_retrieve_json%,}}"
 echo -e "$max_retrieve_json" > metrics/max_retrieve/max_retrieve.json
 
+ansible-playbook -i inventory.ini delete_docker.yml 
 
 # Try different mean_delay values
 lambda_loop=$initial_lambda_loop
-mean_delays=(500 1000 1500 2000 2500 3000 3500 4000 4500 5000 5500 6000 6500 7000 7500 8000 8500 9000 9500 10000 20000 30000)
+mean_delays=(1 2 5 10 20 40 80 100 120 140 160 180 200 220 240 260 280 300 320 340 360 380 400 420 440 460 480 500)
 mkdir -p metrics/mean_delay
 mean_delay_json="{"
 
@@ -113,10 +115,11 @@ done
 mean_delay_json="${mean_delay_json%,}}"
 echo -e "$mean_delay_json" > metrics/mean_delay/mean_delay.json
 
+ansible-playbook -i inventory.ini delete_docker.yml 
 
 # Try different time_pull values
 lambda_loop=$initial_lambda_loop
-time_pulls=(0.01 0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1 1.25 1.5 1.75 2)
+time_pulls=(0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1 1.25 1.5 1.75 2 2.25 2.5 3)
 mkdir -p metrics/time_pull
 time_pull_json="{"
 
@@ -142,3 +145,34 @@ done
 
 time_pull_json="${time_pull_json%,}}"
 echo -e "$time_pull_json" > metrics/time_pull/time_pull.json
+
+ansible-playbook -i inventory.ini delete_docker.yml
+
+# Try multiple measurements with the same values
+lambda_loop=$initial_lambda_loop
+time_pulls=(0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7)
+mkdir -p metrics/control
+control_json="{"
+
+for i in "${!time_pulls[@]}"; do
+    time_pull=${time_pulls[$i]}
+    control_json+="\"$i\": $time_pull,"
+
+    cat <<EOL > loopix_core_config.yaml
+---
+lambda_loop: $initial_lambda_loop
+lambda_drop: $initial_lambda_drop
+lambda_payload: $initial_lambda_payload
+path_length: $initial_path_length
+mean_delay: $initial_mean_delay
+lambda_loop_mix: $initial_lambda_loop_mix
+time_pull: $time_pull
+max_retrieve: $initial_max_retrieve
+pad_length: $initial_pad_length
+EOL
+
+    ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=2 variable=control index=$i"
+done
+
+control_json="${control_json%,}}"
+echo -e "$control_json" > metrics/control_json/control_json.json

@@ -19,9 +19,9 @@ metrics_to_extract = [
 def simulation_ran_successfully(variable, index):
     dir = f"./metrics/{variable}"
     metrics_file = os.path.join(dir, f"metrics_{index}_node-1.txt")
-    print(metrics_file)
-    print(os.path.exists(metrics_file))
-    print(os.listdir(dir))
+    # print(metrics_file)
+    # print(os.path.exists(metrics_file))
+    # print(os.listdir(dir))
     if not os.path.exists(metrics_file):
         return False
 
@@ -88,24 +88,50 @@ def main():
 
     path_length = int(sys.argv[1])
 
-    results = {}
+    base_path = "./metrics"
 
-    variables = ["lambda_payload", "max_retrieve", "mean_delay", "time_pull"]
+    results = {}
+    variables = [d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))]
 
     for variable in variables:
 
-        directory = f"./metrics/{variable}"
+        directory = f"{base_path}/{variable}"
         suffix = "_node-0.txt"
 
-        runs = sum(1 for file in os.listdir(directory) 
-                    if file.endswith(suffix) and os.path.isfile(os.path.join(directory, file)))
+
+        try:
+            files = os.listdir(directory)
+        except:
+            print(f"Skipping {variable}")
+            continue
+
+        try:
+            runs = sum(1 for file in files
+                        if file.endswith(suffix) and os.path.isfile(os.path.join(directory, file)))
+            print(runs)
+
+            with open(os.path.join(directory, f'{variable}.json'), 'r') as f:
+                values = json.load(f)
+            results[variable] = {values[str(index)]: {} for index in range(runs)}
+
+        except:
+            if files:   
+                runs = sum(1 for file in files
+                            if file.endswith(suffix) and os.path.isfile(os.path.join(directory, file)))
+                results[variable] = {index: {} for index in range(runs)}
         
-        results[variable] = {index: {} for index in range(runs)}
-        for index in range(runs):
-            print(f"Getting metrics data from run {variable} {index}")
-            if not get_metrics_data(path_length, results[variable][index], variable, index):
-                results[variable].pop(index, None)
+
+        indices_to_remove = []
+        for index, value in enumerate(results[variable].keys()):
+            print(f"Getting metrics data from run {variable} {value}")
+            if not get_metrics_data(path_length, results[variable][value], variable, index):
+                indices_to_remove.append(value)
                 
+        print(indices_to_remove)
+        for index in indices_to_remove:
+            results[variable].pop(index, None)
+
+        print(results[variable].keys())
 
     with open('raw_metrics.json', 'w') as f:
         json.dump(results, f, indent=2)

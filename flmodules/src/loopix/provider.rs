@@ -45,6 +45,8 @@ impl LoopixCore for Provider {
         let random_provider = providers.iter().next().unwrap();
 
         // create route
+        // As a provider, the node routes it's loop message a random provider
+        // the destination is the node's own ID
         let route = self
             .create_route(
                 self.get_config().path_length(),
@@ -63,9 +65,9 @@ impl LoopixCore for Provider {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(our_id, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Loop, sphinx.message_id.clone())
-            .await; // TODO uncomment
+        // self.storage
+        //     .add_sent_message(route, MessageType::Loop, sphinx.message_id.clone())
+        //     .await; // TODO uncomment
         (node_id_from_node_address(next_node.address), sphinx)
     }
 
@@ -143,6 +145,7 @@ impl LoopixCore for Provider {
         next_node: NodeID,
         message_id: String,
     ) -> (NodeID, Option<Sphinx>) {
+        // check if the message is for one of our clients
         if self
             .get_storage()
             .get_subscribed_clients()
@@ -154,6 +157,8 @@ impl LoopixCore for Provider {
                 next_node,
                 message_id
             );
+
+            // store the message
             let sphinx = &Sphinx {
                 message_id,
                 inner: *next_packet,
@@ -161,6 +166,8 @@ impl LoopixCore for Provider {
             self.store_client_message(next_node, sphinx.clone()).await;
 
             (next_node, None)
+
+        // otherwise just forward the message
         } else {
             // THIS IS COPY PASTED FROM MIXNODE, I JUST DON'T KNOW HOW TO DO TRAITS IN RUST
             let sphinx = &Sphinx {
@@ -196,12 +203,17 @@ impl Provider {
         self.get_storage().add_subscribed_client(client_id).await;
     }
 
-    pub async fn get_client_messages(&self, client_id: NodeID) -> Vec<(Sphinx, Option<SystemTime>)> {
+    pub async fn get_client_messages(
+        &self,
+        client_id: NodeID,
+    ) -> Vec<(Sphinx, Option<SystemTime>)> {
         self.get_storage().get_client_messages(client_id).await
     }
 
     pub async fn store_client_message(&self, client_id: NodeID, message: Sphinx) {
-        self.get_storage().add_client_message(client_id, message).await
+        self.get_storage()
+            .add_client_message(client_id, message)
+            .await
     }
 
     pub async fn create_dummy_message(&self, client_id: NodeID) -> Sphinx {
@@ -218,15 +230,17 @@ impl Provider {
         // create sphinx packet
         let (_, sphinx) = self.create_sphinx_packet(client_id, msg, &route);
 
-        // create delay
-        self.storage
-            .add_sent_message(route, MessageType::Dummy, sphinx.message_id.clone()  )
-            .await; // TODO uncomment
+        // self.storage
+        //     .add_sent_message(route, MessageType::Dummy, sphinx.message_id.clone())
+        //     .await; // TODO uncomment
 
         sphinx
     }
 
-    pub async fn create_pull_reply(&self, client_id: NodeID) -> (NodeID, Vec<(Sphinx, Option<SystemTime>)>) {
+    pub async fn create_pull_reply(
+        &self,
+        client_id: NodeID,
+    ) -> (NodeID, Vec<(Sphinx, Option<SystemTime>)>) {
         // get max send amount and messages
         log::trace!("Creating pull reply for client: {}", client_id);
         let max_retrieve = self.get_config().max_retrieve();

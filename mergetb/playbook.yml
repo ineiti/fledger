@@ -35,6 +35,7 @@
         output_logs: yes
         env:
           RUST_BACKTRACE: "full"
+      register: flsignal_container
 
     - name: Wait for 10 seconds to ensure flsignal is running
       pause:
@@ -85,6 +86,7 @@
           --path-len {{ path_len }}
           {% endif %}
           -s ws://{{ signal_node }}:8765
+          --start_loopix_time 60
           --retry {{ retry }}
         network_mode: host
         log_driver: "json-file"
@@ -98,7 +100,7 @@
 
     - name: Wait for 12 minutes while fledger runs
       pause:
-        seconds: 720
+        seconds: 120
 
     - name: Stop existing fledger container if present
       docker_container:
@@ -113,7 +115,7 @@
         chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
 
     - name: Fetch log from node-1
-      when: inventory_hostname == 'node-1'
+      # when: inventory_hostname == 'node-1'
       fetch:
         src: /home/dcog/data/{{ inventory_hostname }}.log
         dest: /home/dcog/metrics/{{ variable }}/{{ index }}_{{ inventory_hostname }}.log
@@ -138,6 +140,18 @@
         name: flsignal
         state: stopped
       ignore_errors: true
+    
+    - name: Run a shell command
+      become: yes
+      shell: |
+        cp /var/lib/docker/containers/{{ flsignal_container.container.Id }}/{{ flsignal_container.container.Id }}-json.log /home/dcog/{{ inventory_hostname }}.log
+        chmod 666 /home/dcog/{{ inventory_hostname }}.log
+
+    - name: Fetch log from signal
+      fetch:
+        src: /home/dcog/{{ inventory_hostname }}.log
+        dest: /home/dcog/metrics/{{ variable }}/{{ index }}_{{ inventory_hostname }}.log
+        flat: yes
 
     - name: Wait for 60 seconds
       pause:

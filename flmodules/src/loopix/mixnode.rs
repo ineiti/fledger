@@ -129,6 +129,8 @@ impl LoopixCore for Mixnode {
         let random_provider = providers.iter().next().unwrap();
 
         // create route
+        // As a mixnode, the node routes it's loop message through a random provider
+        // the destination is the node's own ID
         let route = self
             .create_route(
                 self.get_config().path_length(),
@@ -147,9 +149,9 @@ impl LoopixCore for Mixnode {
 
         // create sphinx packet
         let (next_node, sphinx) = self.create_sphinx_packet(our_id, msg, &route);
-        self.storage
-            .add_sent_message(route, MessageType::Loop, sphinx.message_id.clone())
-            .await; // TODO uncomment
+        // self.storage
+        //     .add_sent_message(route, MessageType::Loop, sphinx.message_id.clone())
+        //     .await; // TODO uncomment
         (node_id_from_node_address(next_node.address), sphinx)
     }
 

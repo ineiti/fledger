@@ -13,8 +13,8 @@ use sphinx_packet::{packet::*, payload::*};
 
 use super::config::CoreConfig;
 use super::storage::LoopixStorage;
-use super::{DECRYPTION_LATENCY, MIXNODE_DELAY};
 use super::{client::Client, core::*, mixnode::Mixnode, provider::Provider, sphinx::*};
+use super::{DECRYPTION_LATENCY, MIXNODE_DELAY};
 use crate::loopix::PROVIDER_DELAY;
 use crate::nodeconfig::NodeInfo;
 use crate::overlay::messages::NetworkWrapper;
@@ -160,37 +160,31 @@ impl LoopixMessages {
             .expect("while sending overlay message to network");
     }
 
-    async fn process_sphinx_packet(
-        &self,
-        node_id: NodeID,
-        sphinx_packet: Sphinx,
-    ) {
+    async fn process_sphinx_packet(&self, node_id: NodeID, sphinx_packet: Sphinx) {
         let start_time = Instant::now();
         let processed = self.role.process_sphinx_packet(sphinx_packet.clone()).await;
         if let Some(processed) = processed {
             match processed {
                 ProcessedPacket::ForwardHop(next_packet, next_address, delay) => {
-                    log::info!(
-                        "ForwardHop from node_id {} and sphinx {:?}",
-                        node_id,
-                        sphinx_packet.message_id
-                    );
-                    let next_node_id = node_id_from_node_address(next_address);
+                    log::debug!("ForwardHop from node_id {} and sphinx {:?}", node_id, sphinx_packet.message_id);
 
+                    // process the message
+                    let next_node_id = node_id_from_node_address(next_address);
                     let (next_node_id, sphinx) = self
                         .role
                         .process_forward_hop(next_packet, next_node_id, sphinx_packet.message_id)
                         .await;
 
+                    // if there is any packets to forward, send it after the delay
                     if let Some(sphinx) = sphinx {
-                        self.role
-                            .get_storage()
-                            .add_forwarded_message((
-                                node_id,
-                                next_node_id,
-                                sphinx.message_id.clone(),
-                            ))
-                            .await; // from node_id to next_node_id
+                        // self.role
+                        //     .get_storage()
+                        //     .add_forwarded_message((
+                        //         node_id,
+                        //         next_node_id,
+                        //         sphinx.message_id.clone(),
+                        //     ))
+                        //     .await; // from node_id to next_node_id
 
                         // send the message after the delay passes
                         self.role
@@ -205,27 +199,29 @@ impl LoopixMessages {
                         log::debug!("No message to forward to {}", next_node_id);
                     }
 
+                    // observe the decryption latency
                     let end_time = start_time.elapsed().as_millis() as f64;
                     DECRYPTION_LATENCY.observe(end_time);
                 }
                 ProcessedPacket::FinalHop(destination, surb_id, payload) => {
+                    // process the message
                     let dest = node_id_from_destination_address(destination);
-
-                    let (source, msg, messages, message_type) =
+                    let (source, msg, messages, _message_type) =
                         self.role.process_final_hop(dest, surb_id, payload).await;
 
-                    if let Some(message_type) = message_type {
-                        self.role
-                            .get_storage()
-                            .add_received_message((
-                                source,
-                                dest,
-                                message_type,
-                                sphinx_packet.message_id.clone(),
-                            ))
-                            .await;
-                    }
+                    // if let Some(message_type) = _message_type {
+                    //     self.role
+                    //         .get_storage()
+                    //         .add_received_message((
+                    //             source,
+                    //             dest,
+                    //             message_type,
+                    //             sphinx_packet.message_id.clone(),
+                    //         ))
+                    //         .await;
+                    // }
 
+                    // case 1: message is a payload
                     if let Some(msg) = msg {
                         log::debug!(
                             "Final hop was a payload message with id: {} -> {}: {:?}",
@@ -238,19 +234,27 @@ impl LoopixMessages {
                             .await
                             .expect("while sending message");
                     }
+
+                    // case 2: message is a pull request
                     if let Some((node_id, messages)) = messages {
-                        let message_details: Vec<_> =
-                            messages.iter().map(|(sphinx, _)| &sphinx.message_id).collect();
+                        let message_details: Vec<_> = messages
+                            .iter()
+                            .map(|(sphinx, _)| &sphinx.message_id)
+                            .collect();
                         log::trace!(
                             "Final hop was a pull request: {} -> {} with message IDs: {:?}",
                             node_id,
                             messages.len(),
                             message_details
                         );
+
                         for (message, timestamp) in messages {
+
+                            // observe time since provider saved the message to it's storage
                             if let Some(timestamp) = timestamp {
                                 let end_time = match timestamp.elapsed() {
                                     Ok(elapsed) => elapsed.as_millis() as f64,
+
                                     Err(e) => {
                                         log::error!("Error: {:?}", e);
                                         continue;
@@ -260,9 +264,15 @@ impl LoopixMessages {
                             } else {
                                 log::trace!("No timestamp found for message");
                             }
-                            self.network_sender.send((node_id, message, None)).await.expect("while sending message");
+
+                            // send to the network (immediate)
+                            self.network_sender
+                                .send((node_id, message, None))
+                                .await
+                                .expect("while sending message");
                         }
 
+                        // observe the decryption latency
                         let end_time = start_time.elapsed().as_millis() as f64;
                         DECRYPTION_LATENCY.observe(end_time);
                     }
