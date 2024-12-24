@@ -83,6 +83,7 @@
               -s ws://{{ signal_node }}:8765
               --start_loopix_time 30
               --retry {{ retry }}
+              --n-clients {{ n_clients }}
             network_mode: host
             log_driver: "json-file"
             output_logs: yes

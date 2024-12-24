@@ -60,7 +60,6 @@ impl LoopixCore for Client {
             .await;
 
         // create the networkmessage
-
         let loop_msg = serde_yaml::to_string(&MessageType::Loop).unwrap();
         let msg = NetworkWrapper {
             module: MODULE_NAME.into(),

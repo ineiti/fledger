@@ -8,6 +8,10 @@
         state: stopped
       ignore_errors: true
 
+    - name: Delete contents of /home/dcog/data
+      ansible.builtin.shell:
+        cmd: rm -rf /home/dcog/data/*
+
 - name: Stop existing signal container if present
   hosts: SIGNAL_NODE
   tasks:      

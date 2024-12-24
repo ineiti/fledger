@@ -154,6 +154,66 @@ impl LoopixConfig {
             storage_config: storage,
         }
     }
+
+    pub fn default_with_path_length_and_n_clients(
+        role: LoopixRole,
+        our_node_id: NodeID,
+        path_length: usize,
+        n_clients: usize,
+        private_key: StaticSecret,
+        public_key: PublicKey,
+        all_nodes: Vec<NodeInfo>,
+        core_config: CoreConfig,
+    ) -> Self {
+        let client_storage = match role {
+            LoopixRole::Client => {
+                Some(ClientStorage::default_with_path_length_and_n_clients(
+                    our_node_id,
+                    all_nodes.clone(),
+                    path_length,
+                    n_clients,
+                ))
+            }
+            _ => None,
+        };
+
+        let provider_storage = match role {
+            LoopixRole::Provider => {
+                Some(ProviderStorage::default_with_path_length())
+            }
+            _ => None,
+        };
+
+        if (client_storage.is_none() 
+            && provider_storage.is_none() 
+            && !all_nodes
+                .clone()
+                .into_iter()
+                .skip(path_length * 2)
+                .any(|node| node.get_id() == our_node_id))
+            && (role == LoopixRole::Mixnode)
+        {
+            log::error!("Node ID {} not found in {:?}", our_node_id, all_nodes);
+            panic!("Our node id must be between the path length and 2 times the path length");
+        }
+        
+        let storage = LoopixStorage::default_with_path_length_and_n_clients(
+            our_node_id,
+            path_length,
+            n_clients,
+            private_key,
+            public_key,
+            client_storage,
+            provider_storage,
+            all_nodes,
+        );
+
+        LoopixConfig {
+            role,
+            core_config,
+            storage_config: storage,
+        }
+    }
 }
 
 //////////////////////////////////////// Core Config ////////////////////////////////////////

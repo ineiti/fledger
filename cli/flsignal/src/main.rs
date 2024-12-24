@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     logger.try_init().expect("Failed to initialize logger");
 
     let wss = WebSocketServer::new(8765).await?;
-    let mut signal_server = SignalServer::new(wss, 2).await?;
+    let mut signal_server = SignalServer::new(wss, 5).await?;
     let (msgs, _) = signal_server.get_tap_sync().await?;
 
     log::info!("Started listening on port 8765");

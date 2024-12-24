@@ -82,6 +82,37 @@ impl ClientStorage {
         }
     }
 
+    pub fn default_with_path_length_and_n_clients(
+        our_node_id: NodeID,
+        all_nodes: Vec<NodeInfo>,
+        path_length: usize,
+        n_clients: usize,
+    ) -> Self {
+        let mut our_provider: Option<NodeID> = None;
+
+        let mut client_to_provider_map: HashMap<NodeID, NodeID> = HashMap::new();
+        let mut clients = Vec::new();
+
+        for i in 0..n_clients {
+            let client = all_nodes.get(i).unwrap().get_id();
+            let index_provider = n_clients + i % path_length;
+            let provider = all_nodes.get(index_provider).unwrap().get_id();
+
+            if client == our_node_id {
+                our_provider = Some(provider);
+            } else {
+                clients.push(all_nodes.get(i).unwrap().clone());
+                client_to_provider_map.insert(client, provider);
+            }
+        }
+
+        ClientStorage {
+            clients,
+            our_provider,
+            client_to_provider_map,
+        }
+    }
+
     /// Client IDs are chosen randomly
     pub fn default_with_path_length(
         our_node_id: NodeID,
@@ -602,6 +633,67 @@ impl LoopixStorage {
 
         // mix generation
         let mix_infos = all_nodes.iter().skip(path_length * 2);
+        let mut mixes = Vec::new();
+        for i in 0..path_length {
+            mixes.push(
+                mix_infos
+                    .clone()
+                    .skip(i * path_length)
+                    .take(path_length)
+                    .collect::<Vec<&NodeInfo>>()
+                    .iter()
+                    .map(|node| node.get_id())
+                    .collect::<Vec<NodeID>>(),
+            );
+        }
+
+        for mix_layer in &mut mixes {
+            if let Some(index) = mix_layer.iter().position(|&r| r == node_id) {
+                mix_layer.remove(index);
+            }
+        }
+
+        LoopixStorage {
+            network_storage: Arc::new(RwLock::new(NetworkStorage {
+                node_id: NodeID::from(node_id),
+                private_key,
+                public_key,
+                mixes,
+                providers,
+                node_public_keys: HashMap::new(),
+                forwarded_messages: Vec::new(),
+                received_messages: Vec::new(),
+                sent_messages: Vec::new(),
+            })),
+            client_storage: Arc::new(RwLock::new(client_storage)),
+            provider_storage: Arc::new(RwLock::new(provider_storage)),
+        }
+    }
+
+    pub fn default_with_path_length_and_n_clients(
+        node_id: NodeID,
+        path_length: usize,
+        n_clients: usize,
+        private_key: StaticSecret,
+        public_key: PublicKey,
+        client_storage: Option<ClientStorage>,
+        provider_storage: Option<ProviderStorage>,
+        all_nodes: Vec<NodeInfo>,
+    ) -> Self {
+        //provider generation
+        let provider_infos = all_nodes
+            .iter()
+            .skip(n_clients)
+            .take(path_length)
+            .collect::<Vec<&NodeInfo>>();
+
+        let mut providers = HashSet::from_iter(provider_infos.iter().map(|node| node.get_id()));
+        if providers.contains(&node_id) {
+            providers.remove(&node_id);
+        }
+
+        // mix generation
+        let mix_infos = all_nodes.iter().skip(n_clients + path_length);
         let mut mixes = Vec::new();
         for i in 0..path_length {
             mixes.push(

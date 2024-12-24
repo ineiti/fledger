@@ -3,7 +3,8 @@
 make kill
 
 PATH_LEN=$1
-RETRY=$2
+N_CLIENTS=$2
+RETRY=$3
 
 if ! [[ "$RETRY" =~ ^[0-9]+$ ]]; then
   echo "Usage: $0 path_len retry"
@@ -14,7 +15,7 @@ fi
 (cd cli/fledger && cargo build -r)
 (cd cli/flsignal && cargo build -r)
 
-NODES=$(( ( $PATH_LEN * 2 ) + $PATH_LEN * $PATH_LEN ))
+NODES=$(( ( $PATH_LEN + $N_CLIENTS ) + $PATH_LEN * $PATH_LEN ))
 SIMUL=simul/
 rm -rf $SIMUL
 mkdir -p $SIMUL
@@ -34,11 +35,12 @@ for NODE in $( seq $NODES ); do
   if [ "$RETRY" -gt 0 ]; then
     RETRY_ARG="--retry $RETRY"
   fi
-  START_TIME="--start_loopix_time 45"
+  START_TIME="--start_loopix_time 20"
+  N_CLIENTS_ARG="--n-clients $N_CLIENTS"
   SAVE_NEW_METRICS_FILE=""
   mkdir -p $CONFIG
   cp "loopix_core_config.yaml" $CONFIG
-  RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG $START_TIME $SAVE_NEW_METRICS_FILE --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG |& ts "$NAME" &
+  RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG $START_TIME $SAVE_NEW_METRICS_FILE --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG $N_CLIENTS_ARG |& ts "$NAME" &
 done
 
 sleep 360
