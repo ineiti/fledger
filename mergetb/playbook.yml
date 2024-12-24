@@ -23,15 +23,9 @@
         image: "{{ docker_image }}"
         state: started
         detach: true
-        command: >
-          -v
         network_mode: host
         ports:
           - "8765:8765"
-        log_driver: "json-file"
-        log_options:
-          max-size: "10m"
-          max-file: "4"
         output_logs: yes
         env:
           RUST_BACKTRACE: "full"
@@ -50,86 +44,88 @@
     signal_node: "{{ hostvars[groups['SIGNAL_NODE'][0]].ansible_host }}"
     simul_path: /home/dcog/data
   tasks:
-    - name: Remove existing fledger container if present
-      docker_container:
-        name: "fledger_{{ inventory_hostname }}"
-        state: absent
+    - block:
+        - name: Remove existing fledger container if present
+          docker_container:
+            name: "fledger_{{ inventory_hostname }}"
+            state: absent
 
-    - name: Pull fledger Docker image
-      docker_image:
-        name: "{{ docker_image }}"
-        source: pull
-        force_source: true
+        - name: Pull fledger Docker image
+          docker_image:
+            name: "{{ docker_image }}"
+            source: pull
+            force_source: true
 
-    - name: Ensure /home/dcog/data directory exists
-      file:
-        path: "{{ simul_path }}"
-        state: directory
+        - name: Ensure /home/dcog/data directory exists
+          file:
+            path: "{{ simul_path }}"
+            state: directory
 
-    - name: Copy loopix core config file
-      copy:
-        src: /home/dcog/loopix_core_config.yaml
-        dest: "/home/dcog/data/loopix_core_config.yaml"
+        - name: Copy loopix core config file
+          copy:
+            src: /home/dcog/loopix_core_config.yaml
+            dest: "/home/dcog/data/loopix_core_config.yaml"
 
-    - name: Run fledger container
-      docker_container:
-        name: "fledger_{{ inventory_hostname }}"
-        image: "{{ docker_image }}"
-        state: started
-        detach: true
-        volumes:
-          - "{{ simul_path }}:/fledger/data"
-        command: >
-          --config /fledger/data
-          --name {{ inventory_hostname }}
-          {% if inventory_hostname == 'node-1' %}
-          --path-len {{ path_len }}
-          {% endif %}
-          -s ws://{{ signal_node }}:8765
-          --start_loopix_time 60
-          --retry {{ retry }}
-        network_mode: host
-        log_driver: "json-file"
-        output_logs: yes
-        log_options:
-          max-size: "10m"
-          max-file: "4"
-        env:
-          RUST_BACKTRACE: "full"
-      register: fledger_container
+        - name: Run fledger container
+          docker_container:
+            name: "fledger_{{ inventory_hostname }}"
+            image: "{{ docker_image }}"
+            state: started
+            detach: true
+            volumes:
+              - "{{ simul_path }}:/fledger/data"
+            command: >
+              --config /fledger/data
+              --name {{ inventory_hostname }}
+              {% if inventory_hostname == 'node-1' %}
+              --path-len {{ path_len }}
+              {% endif %}
+              -s ws://{{ signal_node }}:8765
+              --start_loopix_time 30
+              --retry {{ retry }}
+            network_mode: host
+            log_driver: "json-file"
+            output_logs: yes
+            log_options:
+              max-size: "10m"
+              max-file: "4"
+            env:
+              RUST_BACKTRACE: "full"
+          register: fledger_container
 
-    - name: Wait for 12 minutes while fledger runs
-      pause:
-        seconds: 120
+        - name: Wait for 12 minutes while fledger runs
+          pause:
+            seconds: 360
 
-    - name: Stop existing fledger container if present
-      docker_container:
-        name: "fledger_{{ inventory_hostname }}"
-        state: stopped
-      ignore_errors: true
+        - name: Stop existing fledger container if present
+          docker_container:
+            name: "fledger_{{ inventory_hostname }}"
+            state: stopped
+          ignore_errors: true
 
-    - name: Run a shell command
-      become: yes
-      shell: |
-        cp /var/lib/docker/containers/{{ fledger_container.container.Id }}/{{ fledger_container.container.Id }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
-        chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
+        - name: Run a shell command
+          become: yes
+          shell: |
+            cp /var/lib/docker/containers/{{ fledger_container.container.Id }}/{{ fledger_container.container.Id }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
+            chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
 
-    - name: Fetch log from node-1
-      # when: inventory_hostname == 'node-1'
-      fetch:
-        src: /home/dcog/data/{{ inventory_hostname }}.log
-        dest: /home/dcog/metrics/{{ variable }}/{{ index }}_{{ inventory_hostname }}.log
-        flat: yes
+        - name: Fetch log from node-1
+          # when: inventory_hostname == 'node-1'
+          fetch:
+            src: /home/dcog/data/{{ inventory_hostname }}.log
+            dest: /home/dcog/metrics/{{ variable }}/{{ index }}_{{ inventory_hostname }}.log
+            flat: yes
 
-    - name: Fetch metrics from the remote node
-      fetch:
-        src: /home/dcog/data/metrics.txt
-        dest: "./metrics/{{ variable }}/metrics_{{ index }}_{{ inventory_hostname }}.txt"
-        flat: yes
-
-    - name: Delete contents of /home/dcog/data
-      ansible.builtin.shell:
-        cmd: rm -rf /home/dcog/data/*
+        - name: Fetch metrics from the remote node
+          fetch:
+            src: /home/dcog/data/metrics.txt
+            dest: "./metrics/{{ variable }}/metrics_{{ index }}_{{ inventory_hostname }}.txt"
+            flat: yes
+          
+      always:
+        - name: Delete contents of /home/dcog/data
+          ansible.builtin.shell:
+            cmd: rm -rf /home/dcog/data/*
 
 - name: Stop signal container
   hosts: SIGNAL_NODE
@@ -155,4 +151,4 @@
 
     - name: Wait for 60 seconds
       pause:
-        seconds: 60
+        seconds: 2
