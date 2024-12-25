@@ -2,8 +2,8 @@ import random
 import sys
 import os
 
-def generate_inventory_file(path_length, reservation_name):
-    num_nodes = path_length * 2 + path_length * path_length
+def generate_inventory_file(path_length, n_clients, reservation_name):
+    num_nodes = path_length + n_clients + path_length * path_length
     # SIGNAL_NODE section
     inventory = "[SIGNAL_NODE]\n"
     inventory += f"SIGNAL ansible_host=SIGNAL.infra.{reservation_name}.fledger.dcog ansible_user=dcog ansible_ssh_private_key_file=~/.ssh/id_mrg-0\n\n"
@@ -31,13 +31,14 @@ def generate_inventory_file(path_length, reservation_name):
 
 if __name__ == "__main__":
     # Check if the required arguments are provided
-    if len(sys.argv) != 3:
-        print("Usage: python script_name.py <path_length> <reservation_name>")
+    if len(sys.argv) != 4:
+        print("Usage: python script_name.py <path_length> <n_clients> <reservation_name>")
         sys.exit(1)
 
     # Get the arguments
     path_length = int(sys.argv[1])
-    reservation_name = sys.argv[2]
+    n_clients = int(sys.argv[2])
+    reservation_name = sys.argv[3]
 
     # Generate and save the inventory file
-    generate_inventory_file(path_length, reservation_name)
+    generate_inventory_file(path_length, n_clients, reservation_name)

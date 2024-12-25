@@ -81,14 +81,16 @@
               --path-len {{ path_len }}
               {% endif %}
               -s ws://{{ signal_node }}:8765
-              --start_loopix_time 30
+              --start_loopix_time 60
               --retry {{ retry }}
               --n-clients {{ n_clients }}
+              --duplicates {{ duplicates }}
+              -v
             network_mode: host
             log_driver: "json-file"
             output_logs: yes
             log_options:
-              max-size: "10m"
+              max-size: "50m"
               max-file: "4"
             env:
               RUST_BACKTRACE: "full"
@@ -96,7 +98,7 @@
 
         - name: Wait for 12 minutes while fledger runs
           pause:
-            seconds: 360
+            seconds: 300
 
         - name: Stop existing fledger container if present
           docker_container:
@@ -115,6 +117,20 @@
           fetch:
             src: /home/dcog/data/{{ inventory_hostname }}.log
             dest: /home/dcog/metrics/{{ variable }}/{{ index }}_{{ inventory_hostname }}.log
+            flat: yes
+
+        - name: Fetch storage from node-1
+          when: inventory_hostname == 'node-1'
+          fetch:
+            src: /home/dcog/data/loopix_storage.yaml
+            dest: /home/dcog/metrics/{{ variable }}/{{ index }}_storage.yaml
+            flat: yes
+        
+        - name: Fetch config from node-1
+          when: inventory_hostname == 'node-1'
+          fetch:
+            src: /home/dcog/data/loopix_core_config.yaml
+            dest: /home/dcog/metrics/{{ variable }}/{{ index }}_config.yaml
             flat: yes
 
         - name: Fetch metrics from the remote node
