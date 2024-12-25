@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use bytes::Bytes;
 use flarch::tasks::spawn_local;
@@ -28,6 +29,8 @@ pub struct WebProxyCore {
     our_id: NodeID,
     node_index: usize,
     requests: HashMap<U256, (NodeID, Sender<Bytes>)>,
+    responded_nonces: HashSet<U256>,
+    request_done: HashSet<U256>
 }
 
 impl WebProxyCore {
@@ -40,16 +43,22 @@ impl WebProxyCore {
             node_index: 0,
             requests: HashMap::new(),
             our_id,
+            responded_nonces: HashSet::new(),
+            request_done: HashSet::new(),
         }
     }
 
-    pub fn start_request(&mut self, request: String, tx: Sender<Bytes>) {
-        spawn_local(async move {
-            println!("{request}");
-            tx.send(Bytes::from("something"))
-                .await
-                .expect("sending reply");
-        });
+    pub fn start_request(&mut self, request: String, tx: Sender<Bytes>, count: usize) {
+        for _ in 0..count {
+            let tx_clone = tx.clone();
+            let request_clone = request.clone();
+            spawn_local(async move {
+                println!("{request_clone}");
+                if let Err(e) = tx_clone.send(Bytes::from("something")).await {
+                    log::error!("Failed to send reply: {:?}", e);
+                }
+            });
+        }
     }
 
     pub fn node_list(&mut self, mut nodes: NodeIDs) {
@@ -91,6 +100,7 @@ impl WebProxyCore {
                     })
                 }
                 ResponseMessage::Done => {
+                    self.mark_as_done(nonce);
                     self.requests.remove(&nonce);
                 }
                 ResponseMessage::Error(err) => {
@@ -99,6 +109,22 @@ impl WebProxyCore {
             }
         }
         None
+    }
+
+    pub fn has_responded(&self, nonce: U256) -> bool {
+        self.responded_nonces.contains(&nonce)
+    }
+
+    pub fn mark_as_responded(&mut self, nonce: U256) {
+        self.responded_nonces.insert(nonce);
+    }
+
+    pub fn request_done(&self, nonce: U256) -> bool {
+        self.request_done.contains(&nonce)
+    }
+
+    pub fn mark_as_done(&mut self, nonce: U256) {
+        self.request_done.insert(nonce);
     }
 }
 

@@ -46,7 +46,7 @@ pub struct LoopixNode {
 impl LoopixNode {
     pub async fn new(loopix_cfg: LoopixConfig, config: NodeConfig) -> Result<Self, BrokerError> {
         let net = Broker::new();
-        let loopix_broker = LoopixBroker::start(net.clone(), loopix_cfg).await?;
+        let loopix_broker = LoopixBroker::start(net.clone(), loopix_cfg, 1).await?;
 
         let overlay = OverlayLoopix::start(loopix_broker.broker.clone()).await?;
         Ok(Self {

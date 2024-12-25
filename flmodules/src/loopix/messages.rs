@@ -79,6 +79,7 @@ pub struct LoopixMessages {
     pub role: NodeType,
     pub network_sender: Sender<(NodeID, Sphinx, Option<SystemTime>)>,
     pub overlay_sender: Sender<(NodeID, NetworkWrapper)>,
+    pub n_duplicates: u8,
 }
 
 impl Clone for LoopixMessages {
@@ -87,6 +88,7 @@ impl Clone for LoopixMessages {
             role: self.role.arc_clone(),
             network_sender: self.network_sender.clone(),
             overlay_sender: self.overlay_sender.clone(),
+            n_duplicates: self.n_duplicates,
         }
     }
 }
@@ -96,11 +98,13 @@ impl LoopixMessages {
         node_type: NodeType,
         network_sender: Sender<(NodeID, Sphinx, Option<SystemTime>)>,
         overlay_sender: Sender<(NodeID, NetworkWrapper)>,
+        n_duplicates: u8,
     ) -> Self {
         Self {
             role: node_type,
             network_sender: network_sender,
             overlay_sender: overlay_sender,
+            n_duplicates: n_duplicates,
         }
     }
 
@@ -147,18 +151,20 @@ impl LoopixMessages {
     }
 
     async fn process_overlay_message(&self, node_id: NodeID, message: NetworkWrapper) {
-        let (next_node, sphinx) = self.role.process_overlay_message(node_id, message).await;
+        for _ in 0..self.n_duplicates {
+            let (next_node, sphinx) = self.role.process_overlay_message(node_id, message.clone()).await;
 
-        log::trace!(
-            "{}: Overlay message to {:?}",
-            self.role.get_our_id().await,
-            next_node,
-        );
+            log::trace!(
+                "{}: Overlay message to {:?}",
+                self.role.get_our_id().await,
+                next_node,
+            );
 
-        self.network_sender
-            .send((next_node, sphinx, Some(SystemTime::now())))
-            .await
-            .expect("while sending overlay message to network");
+            self.network_sender
+                .send((next_node, sphinx, Some(SystemTime::now())))
+                .await
+                .expect("while sending overlay message to network");
+        }
     }
 
     async fn process_sphinx_packet(&self, node_id: NodeID, sphinx_packet: Sphinx) {

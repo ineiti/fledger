@@ -33,6 +33,7 @@ impl LoopixBroker {
     pub async fn start(
         network: Broker<NetworkMessage>,
         config: LoopixConfig,
+        n_duplicates: u8,
     ) -> Result<LoopixBroker, BrokerError> {
         let mut broker = Broker::new();
 
@@ -72,6 +73,7 @@ impl LoopixBroker {
             node_type.arc_clone(),
             network_sender.clone(),
             overlay_sender.clone(),
+            n_duplicates,
         );
 
         let max_workers = Arc::new(Semaphore::new(20));
@@ -390,9 +392,10 @@ impl LoopixBroker {
                 }
 
                 if let Some((node_id, sphinx, timestamp)) = sphinx_messages.first() {
-                    log::trace!(
-                        "{}: first message in queue: {:?}",
-                        our_id,
+                    log::info!(
+                        "The queue is of length {:?}, first message is to node {} with id {:?}",
+                        sphinx_messages.len(),
+                        node_id,
                         sphinx.message_id
                     );
                     if let Err(e) =
@@ -522,7 +525,7 @@ mod tests {
 
         let network = Broker::<NetworkMessage>::new();
 
-        let loopix_broker = LoopixBroker::start(network.clone(), config).await?;
+        let loopix_broker = LoopixBroker::start(network.clone(), config, 1).await?;
 
         Ok((
             loopix_broker.broker,
@@ -565,7 +568,7 @@ mod tests {
 
         let network = Broker::<NetworkMessage>::new();
 
-        let _loopix_broker = LoopixBroker::start(network, config).await?;
+        let _loopix_broker = LoopixBroker::start(network, config, 1).await?;
 
         Ok(())
     }

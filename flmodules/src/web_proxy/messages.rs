@@ -26,6 +26,8 @@ pub enum ModuleMessage {
     /// The reply uses the random ID from the request and returns blocks of the
     /// reply, indexed by the second argument.
     Response(U256, ResponseMessage),
+
+    RequestWithDuplicates(U256, String, u8),
 }
 
 /// First wrap all messages coming into this module and all messages going out in
@@ -42,6 +44,7 @@ pub enum WebProxyIn {
     FromNetwork(NodeID, ModuleMessage),
     NodeInfoConnected(Vec<NodeInfo>),
     RequestGet(U256, String, Sender<Bytes>),
+    RequestWithDuplicates(U256, String, Sender<Bytes>, u8),
 }
 
 /// All possible replies FROM this module.
@@ -80,6 +83,7 @@ impl WebProxyMessages {
                 WebProxyIn::FromNetwork(src, node_msg) => self.process_node_message(src, node_msg),
                 WebProxyIn::NodeInfoConnected(ids) => self.node_list(ids),
                 WebProxyIn::RequestGet(rnd, url, tx) => self.request_get(rnd, url, tx),
+                WebProxyIn::RequestWithDuplicates(rnd, url, tx, count) => self.request_with_duplicates(rnd, url, tx, count),
             })
             .flatten()
             .collect()
@@ -89,8 +93,9 @@ impl WebProxyMessages {
     /// MessageOut.
     pub fn process_node_message(&mut self, src: NodeID, msg: ModuleMessage) -> Vec<WebProxyOut> {
         let mut out = match msg {
-            ModuleMessage::Request(nonce, request) => self.start_request(src, nonce, request),
+            ModuleMessage::Request(nonce, request) => self.start_request(src, nonce, request, 1),
             ModuleMessage::Response(nonce, response) => self.handle_response(src, nonce, response),
+            ModuleMessage::RequestWithDuplicates(nonce, request, count) => self.start_request(src, nonce, request, count),
         };
         out.push(WebProxyOut::UpdateStorage(self.core.storage.clone()));
         out
@@ -116,55 +121,69 @@ impl WebProxyMessages {
         })
     }
 
-    fn start_request(&mut self, src: NodeID, nonce: U256, request: String) -> Vec<WebProxyOut> {
-        let mut broker = self.broker.clone();
-        spawn_local(async move {
-            match reqwest::get(request).await {
-                Ok(resp) => {
-                    broker
-                        .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
-                            src,
-                            ModuleMessage::Response(nonce, ResponseMessage::Header((&resp).into())),
-                        )))
-                        .expect("sending header");
-                    let mut stream = resp.bytes_stream().chunks(1024);
-                    while let Some(chunks) = stream.next().await {
-                        for chunk in chunks {
-                            broker
-                                .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
-                                    src,
-                                    ModuleMessage::Response(
-                                        nonce,
-                                        ResponseMessage::Body(chunk.expect("getting chunk")),
-                                    ),
-                                )))
-                                .expect("sending body");
-                        }
-                    }
-                    broker
-                        .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
-                            src,
-                            ModuleMessage::Response(nonce, ResponseMessage::Done),
-                        )))
-                        .expect("sending done");
-                }
-                Err(e) => {
-                    broker
-                        .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
-                            src,
-                            ModuleMessage::Response(nonce, ResponseMessage::Error(e.to_string())),
-                        )))
-                        .expect("Sending done message for");
-                    return;
-                }
+    fn request_with_duplicates(&mut self, rnd: U256, url: String, tx: Sender<Bytes>, count: u8) -> Vec<WebProxyOut> {
+        for _ in 0..count {
+            if let Some(node) = self.core.request_get(rnd, tx.clone()) {
+                return vec![WebProxyOut::ToNetwork(node, ModuleMessage::RequestWithDuplicates(rnd, url, count))];
             }
-            broker
-                .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
-                    src,
-                    ModuleMessage::Response(nonce, ResponseMessage::Done),
-                )))
-                .expect("Sending done message for");
-        });
+        }
+        vec![]
+    }
+
+    fn start_request(&mut self, src: NodeID, nonce: U256, request: String, count: u8) -> Vec<WebProxyOut> {
+        if self.core.has_responded(nonce) {
+            log::info!("Request already responded for nonce: {}", nonce);
+            return vec![];
+        }
+
+        for _ in 0..count {
+            let mut broker_clone = self.broker.clone(); // Clone the broker for each duplicate
+            let src_clone = src; // Clone the source node ID
+            let request_clone = request.clone(); // Clone the request string
+            let nonce_clone = nonce; // Clone the nonce
+
+            spawn_local(async move {
+                match reqwest::get(request_clone).await {
+                    Ok(resp) => {
+                        broker_clone
+                            .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
+                                src_clone,
+                                ModuleMessage::Response(nonce_clone, ResponseMessage::Header((&resp).into())),
+                            )))
+                            .expect("sending header");
+                        let mut stream = resp.bytes_stream().chunks(1024);
+                        while let Some(chunks) = stream.next().await {
+                            for chunk in chunks {
+                                broker_clone
+                                    .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
+                                        src_clone,
+                                        ModuleMessage::Response(
+                                            nonce_clone,
+                                            ResponseMessage::Body(chunk.expect("getting chunk")),
+                                        ),
+                                    )))
+                                    .expect("sending body");
+                            }
+                        }
+                        broker_clone
+                            .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
+                                src_clone,
+                                ModuleMessage::Response(nonce_clone, ResponseMessage::Done),
+                            )))
+                            .expect("sending done");
+                    }
+                    Err(e) => {
+                        broker_clone
+                            .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
+                                src_clone,
+                                ModuleMessage::Response(nonce_clone, ResponseMessage::Error(e.to_string())),
+                            )))
+                            .expect("Sending error message");
+                    }
+                }
+            });
+        }
+        self.core.mark_as_responded(nonce);
         vec![]
     }
 
@@ -174,12 +193,18 @@ impl WebProxyMessages {
         nonce: U256,
         msg: ResponseMessage,
     ) -> Vec<WebProxyOut> {
+        if self.core.request_done(nonce) {
+            log::info!("Request already done for nonce: {}", nonce);
+            return vec![];
+        }
+
         self.core
             .handle_response(nonce, msg)
             .map_or(vec![], |header| {
                 vec![WebProxyOut::ResponseGet(src, nonce, header)]
             })
     }
+
 }
 
 /// Convenience method to reduce long lines.

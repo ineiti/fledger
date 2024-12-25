@@ -121,7 +121,7 @@ mod test {
 
         let network = Broker::<NetworkMessage>::new();
         
-        let loopix_broker = match LoopixBroker::start(network.clone(), config).await {
+        let loopix_broker = match LoopixBroker::start(network.clone(), config, 1).await {
             Ok(broker) => broker,
             Err(e) => {
                 log::error!("Error starting LoopixBroker: {}", e);
@@ -281,7 +281,7 @@ mod test {
 
         tokio::time::sleep(Duration::from_secs(3)).await;
 
-        if let Err(e) = cl.get_with_timeout("https://fledg.re", Duration::from_secs(10)).await {
+        if let Err(e) = cl.get_with_timeout("https://fledg.re", Duration::from_secs(10), 1).await {
             log::error!("Failed to fetch https://fledg.re: {:?}", e);
         } else {
             log::info!("Successfully fetched https://fledg.re");

@@ -67,7 +67,92 @@ struct Args {
     #[clap(short = 't', long="start_loopix_time", default_value_t = 0)]
     start_loopix_time: u64,
 
+    /// Number of duplicates to send
+    #[clap(short = 'd', long="duplicates", default_value_t = 1)]
+    duplicates: u8,
 
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let start_time = Instant::now();
+    
+    let args = Args::parse();
+    let config = args.config.clone();
+    let retry = args.retry;
+    let duplicates = args.duplicates;
+    let n_clients = if let Some(n_clients) = args.n_clients {
+        n_clients
+    } else {
+        panic!("Number of clients must be provided");
+    };
+
+    let mut logger = env_logger::Builder::new();
+    logger.filter_module("fl", args.verbosity.log_level_filter());
+    logger.parse_env("RUST_LOG");
+    logger.try_init().expect("Failed to initialize logger");
+
+    let storage = DataStorageFile::new(args.config, "fledger".into());
+    let mut node_config = Node::get_config(storage.clone())?;
+    args.name.map(|name| node_config.info.name = name);
+
+    log::info!(
+        "Starting app with version {}/{}",
+        SIGNAL_VERSION,
+        VERSION_STRING
+    );
+
+    log::debug!("Connecting to websocket at {}", args.signal_url);
+    let network = network_broker_start(
+        node_config.clone(),
+        ConnectionConfig::new(
+            Some(args.signal_url),
+            None,
+            Some(HostLogin {
+                url: "turn:web.fledg.re:3478".into(),
+                login: Some(Login {
+                    user: "something".into(),
+                    pass: "something".into(),
+                }),
+            }),
+        ),
+    )
+    .await?;
+    let mut node = Node::start(Box::new(storage), node_config, network, Some(config)).await?;
+    let nc = node.node_config.info.clone();
+    let mut state = match args.path_len {
+        Some(len) => LoopixSimul::Root(LSRoot::WaitNodes(len, n_clients)),
+        None => LoopixSimul::Child(LSChild::WaitConfig),
+    };
+    log::info!(
+        "Starting node with state {:?} {}: {}",
+        state,
+        nc.get_id(),
+        nc.name
+    );
+
+    log::info!("Started successfully");
+    let mut i: u32 = 0;
+    loop {
+        i += 1;
+        node.process()
+            .await
+            .err()
+            .map(|e| log::warn!("Couldn't process node: {e:?}"));
+
+        state = state.process(&mut node, i, retry, duplicates, start_time, args.start_loopix_time, args.save_new_metrics_file).await?;
+
+        if i % 3 == 2 {
+            log::info!("Nodes are: {:?}", node.nodes_online()?);
+            let ping = &node.ping.as_ref().unwrap().storage;
+            log::info!("Nodes countdowns are: {:?}", ping.stats);
+            log::debug!(
+                "Chat messages are: {:?}",
+                node.gossip.as_ref().unwrap().chat_events()
+            );
+        }
+        wait_ms(1000).await;
+    }
 }
 
 async fn save_metrics_loop(
@@ -122,88 +207,6 @@ async fn save_metrics_loop(
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let start_time = Instant::now();
-    
-    let args = Args::parse();
-    let config = args.config.clone();
-    let retry = args.retry;
-
-    let n_clients = if let Some(n_clients) = args.n_clients {
-        n_clients
-    } else {
-        panic!("Number of clients must be provided");
-    };
-
-    let mut logger = env_logger::Builder::new();
-    logger.filter_module("fl", log::LevelFilter::Info);
-    logger.parse_env("RUST_LOG");
-    logger.try_init().expect("Failed to initialize logger");
-
-    let storage = DataStorageFile::new(args.config, "fledger".into());
-    let mut node_config = Node::get_config(storage.clone())?;
-    args.name.map(|name| node_config.info.name = name);
-
-    log::info!(
-        "Starting app with version {}/{}",
-        SIGNAL_VERSION,
-        VERSION_STRING
-    );
-
-    log::debug!("Connecting to websocket at {}", args.signal_url);
-    let network = network_broker_start(
-        node_config.clone(),
-        ConnectionConfig::new(
-            Some(args.signal_url),
-            None,
-            Some(HostLogin {
-                url: "turn:web.fledg.re:3478".into(),
-                login: Some(Login {
-                    user: "something".into(),
-                    pass: "something".into(),
-                }),
-            }),
-        ),
-    )
-    .await?;
-    let mut node = Node::start(Box::new(storage), node_config, network, Some(config)).await?;
-    let nc = node.node_config.info.clone();
-    let mut state = match args.path_len {
-        Some(len) => LoopixSimul::Root(LSRoot::WaitNodes(len, n_clients)),
-        None => LoopixSimul::Child(LSChild::WaitConfig),
-    };
-    log::info!(
-        "Starting node with state {:?} {}: {}",
-        state,
-        nc.get_id(),
-        nc.name
-    );
-
-    log::info!("Started successfully");
-    let mut i: u32 = 0;
-    loop {
-        i += 1;
-        node.process()
-            .await
-            .err()
-            .map(|e| log::warn!("Couldn't process node: {e:?}"));
-
-        state = state.process(&mut node, i, retry, start_time, args.start_loopix_time, args.save_new_metrics_file).await?;
-
-        if i % 3 == 2 {
-            log::info!("Nodes are: {:?}", node.nodes_online()?);
-            let ping = &node.ping.as_ref().unwrap().storage;
-            log::info!("Nodes countdowns are: {:?}", ping.stats);
-            log::debug!(
-                "Chat messages are: {:?}",
-                node.gossip.as_ref().unwrap().chat_events()
-            );
-        }
-        wait_ms(1000).await;
-    }
-}
-
 // State-machine for the loopix simulation
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum LoopixSimul {
@@ -214,10 +217,10 @@ enum LoopixSimul {
 }
 
 impl LoopixSimul {
-    async fn process(&self, node: &mut Node, i: u32, retry: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<Self, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32, retry: u8, duplicates: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<Self, BrokerError> {
         let new_state = match &self {
-            LoopixSimul::Root(lsroot) => lsroot.process(node, i, retry, start_time, loopix_start_time, save_new_metrics_file).await?,
-            LoopixSimul::Child(lschild) => lschild.process(node, i, retry, start_time, loopix_start_time, save_new_metrics_file).await?,
+            LoopixSimul::Root(lsroot) => lsroot.process(node, i, retry,  duplicates, start_time, loopix_start_time, save_new_metrics_file).await?,
+            LoopixSimul::Child(lschild) => lschild.process(node, i, retry, duplicates, start_time, loopix_start_time, save_new_metrics_file).await?,
         };
         if *self != new_state {
             log::info!(
@@ -255,7 +258,7 @@ enum LSRoot {
 }
 
 impl LSRoot {
-    async fn process(&self, node: &mut Node, i: u32, retry: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32, retry: u8, duplicates: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSRoot::WaitNodes(n, n_clients) => {
                 let path_len = *n;
@@ -288,20 +291,16 @@ impl LSRoot {
                     .events(Category::LoopixConfig)
                     .len();
                 log::info!("Root sees {} configured nodes", node_configured);
-                if node_configured + 1 == *n {
-                    LoopixSetup::node_config(node, start_time, loopix_start_time).await?;
-                    let loopix_storage = node.loopix.as_ref().unwrap().storage.clone();
-                    let save_path = node.data_save_path.as_ref().unwrap();
+                LoopixSetup::node_config(node, duplicates, start_time, loopix_start_time).await?;
+                let loopix_storage = node.loopix.as_ref().unwrap().storage.clone();
+                let save_path = node.data_save_path.as_ref().unwrap();
 
-
-
-                    tokio::spawn(save_metrics_loop(
-                        Arc::clone(&loopix_storage),
-                        save_path.clone(),
-                        save_new_metrics_file,
-                    ));
-                    return Ok(LSRoot::SendProxyRequest(i + 10).into());
-                }
+                tokio::spawn(save_metrics_loop(
+                    Arc::clone(&loopix_storage),
+                    save_path.clone(),
+                    save_new_metrics_file,
+                ));
+                return Ok(LSRoot::SendProxyRequest(i + 10).into());
             }
             LSRoot::SendProxyRequest(start) => {
                 if (i - *start) % 10 == 0 {
@@ -314,7 +313,7 @@ impl LSRoot {
                         .as_mut()
                         .unwrap()
                         // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(30))
+                        .get_with_retry_and_timeout_with_duplicates("https://web.fledg.re/", retry, duplicates, Duration::from_secs(30))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
@@ -347,10 +346,10 @@ enum LSChild {
 }
 
 impl LSChild {
-    async fn process(&self, node: &mut Node, i: u32, retry: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, node: &mut Node, i: u32, retry: u8, duplicates: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSChild::WaitConfig => {
-                let setup = LoopixSetup::node_config(node, start_time, loopix_start_time).await?;
+                let setup = LoopixSetup::node_config(node, duplicates, start_time, loopix_start_time).await?;
                 if let Some(setup) = setup {
                     log::info!("{} got setup", node.node_config.info.name);
 
@@ -382,7 +381,7 @@ impl LSChild {
                         .as_mut()
                         .unwrap()
                         // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout("https://ipinfo.io", retry, Duration::from_secs(30))
+                        .get_with_retry_and_timeout_with_duplicates("https://web.fledg.re/", retry, duplicates, Duration::from_secs(30))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
@@ -426,7 +425,7 @@ pub struct LoopixSetup {
 }
 
 impl LoopixSetup {
-    pub async fn node_config(node: &mut Node, start_time: Instant, loopix_start_time: u64) -> Result<Option<LoopixSetup>, BrokerError> {
+    pub async fn node_config(node: &mut Node, duplicates: u8, start_time: Instant, loopix_start_time: u64) -> Result<Option<LoopixSetup>, BrokerError> {
         // TODO case where loopix storage exists, so we're loading an already existign node
         
         let events = node.gossip.as_ref().unwrap().events(Category::LoopixSetup);
@@ -435,7 +434,7 @@ impl LoopixSetup {
             let mut setup = serde_json::from_str::<LoopixSetup>(&event.msg)
             .expect("deserializing loopix setup");
             let our_id = node.node_config.info.get_id();
-            let (loopix, overlay) = setup.get_brokers(our_id, node.broker_net.clone()).await?;
+            let (loopix, overlay) = setup.get_brokers(our_id, node.broker_net.clone(), duplicates).await?;
 
             // let root know that node is ready
             node.gossip
@@ -514,6 +513,7 @@ impl LoopixSetup {
         &mut self,
         node_id: NodeID,
         net: Broker<NetworkMessage>,
+        duplicates: u8,
     ) -> Result<(LoopixBroker, Broker<OverlayMessage>), BrokerError> {
         let pos = self
             .all_nodes
@@ -530,7 +530,7 @@ impl LoopixSetup {
 
         self.role = role.clone();
         let config = self.get_config(node_id, role).await?;
-        let loopix_broker = LoopixBroker::start(net, config).await?;
+        let loopix_broker = LoopixBroker::start(net, config, duplicates).await?;
         let overlay = OverlayLoopix::start(loopix_broker.broker.clone()).await?;
 
         wait_ms(3000).await;

@@ -146,7 +146,29 @@ impl WebProxy {
     pub async fn get_with_retry_and_timeout(&mut self, url: &str, retry: u8, timeout_duration: Duration) -> Result<Response, WebProxyError> {
         log::info!("Getting {url} with retry: {}", retry);
         for i in 0..retry + 1 { // try at leasy once
-            match self.get_with_timeout(url, timeout_duration).await {
+            match self.get_with_timeout(url, timeout_duration, 1).await {
+                Ok(resp) => {
+                    return Ok(resp);
+                }
+                Err(WebProxyError::ResponseTimeout) => {
+                    log::warn!("Response timed out for URL: {}", url);
+                    log::debug!("Response timed out for try {}.", i);
+                    continue;
+                }
+                Err(e) => {
+                    log::error!("Error occurred: {:?}", e);
+                    return Err(e);
+                }
+            }
+        }
+
+        Err(WebProxyError::ResponseTimeout)
+    }
+
+    pub async fn get_with_retry_and_timeout_with_duplicates(&mut self, url: &str, retry: u8, duplicates: u8, timeout_duration: Duration) -> Result<Response, WebProxyError> {
+        log::info!("Getting {url} with retry: {}", retry);
+        for i in 0..retry + 1 { // try at leasy once
+            match self.get_with_timeout(url, timeout_duration, duplicates).await {
                 Ok(resp) => {
                     return Ok(resp);
                 }
@@ -168,13 +190,14 @@ impl WebProxy {
     pub async fn get_with_timeout(
         &mut self,
         url: &str,
-        timeout_duration: Duration
+        timeout_duration: Duration,
+        duplicates: u8
     ) -> Result<Response, WebProxyError> {
         // log::debug!("Getting {url}");
         let our_rnd = U256::rnd();
         let (tx, rx) = channel(128);
         self.web_proxy
-            .emit_msg(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx).into())?;
+            .emit_msg(WebProxyIn::RequestWithDuplicates(our_rnd, url.to_string(), tx, duplicates).into())?;
         let (mut tap, id) = self.web_proxy.get_tap().await?;
         timeout(timeout_duration, async move {
             while let Some(msg) = tap.recv().await {
