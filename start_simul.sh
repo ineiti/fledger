@@ -5,6 +5,7 @@ make kill
 PATH_LEN=$1
 N_CLIENTS=$2
 RETRY=$3
+DUPLICATES=$4
 
 if ! [[ "$RETRY" =~ ^[0-9]+$ ]]; then
   echo "Usage: $0 path_len retry"
@@ -26,7 +27,8 @@ for NODE in $( seq $NODES ); do
   NAME="NODE_$(printf "%02d" $NODE)"
   echo "Starting node $NAME"
   CONFIG="$SIMUL$NAME/"
-  VERBOSITY="-v"
+  VERBOSITY="-vv"
+  DUPLICATES_ARG="--duplicates $DUPLICATES"
   PATH_LEN_ARG=""
   RETRY_ARG=""
   if [ $NODE = "1" ]; then
@@ -40,9 +42,9 @@ for NODE in $( seq $NODES ); do
   SAVE_NEW_METRICS_FILE=""
   mkdir -p $CONFIG
   cp "loopix_core_config.yaml" $CONFIG
-  RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG $START_TIME $SAVE_NEW_METRICS_FILE --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG $N_CLIENTS_ARG |& ts "$NAME" &
+  RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG $DUPLICATES_ARG $START_TIME $SAVE_NEW_METRICS_FILE --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG $N_CLIENTS_ARG |& ts "$NAME" &
 done
 
-sleep 360
+sleep 120
 
 make kill

@@ -1,10 +1,10 @@
 ---
-lambda_loop: 5.0
-lambda_drop: 5.0
-lambda_payload: 10.0
+lambda_loop: 0.1
+lambda_drop: 0.1
+lambda_payload: 1
 path_length: 2
 mean_delay: 50
-lambda_loop_mix: 5.0
-time_pull: 0.7
+lambda_loop_mix: 0.1
+time_pull: 2
 max_retrieve: 3
 pad_length: 150

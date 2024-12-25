@@ -313,7 +313,7 @@ impl LSRoot {
                         .as_mut()
                         .unwrap()
                         // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout_with_duplicates("https://web.fledg.re/", retry, duplicates, Duration::from_secs(30))
+                        .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs(30))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
@@ -381,7 +381,7 @@ impl LSChild {
                         .as_mut()
                         .unwrap()
                         // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout_with_duplicates("https://web.fledg.re/", retry, duplicates, Duration::from_secs(30))
+                        .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs(30))
                         .await
                     {
                         Ok(mut res) => match res.text().await {

@@ -103,10 +103,10 @@ impl LoopixBroker {
                 Self::start_drop_message_thread(loopix_messages.clone(), broker.clone());
 
                 // // client subscribe loop
-                Self::client_subscribe_loop(loopix_messages.clone(), broker.clone());
+                Self::client_subscribe_thread(loopix_messages.clone(), broker.clone());
 
                 // client pull loop
-                Self::client_pull_loop(loopix_messages.clone(), broker.clone());
+                Self::client_pull_thread(loopix_messages.clone(), broker.clone());
 
                 // messages that get sent back to this node are distributed from the overlay
                 Self::start_overlay_send_thread(broker.clone(), overlay_receiver);
@@ -267,7 +267,7 @@ impl LoopixBroker {
         });
     }
 
-    pub fn client_subscribe_loop(
+    pub fn client_subscribe_thread(
         mut loopix_messages: LoopixMessages,
         mut broker: Broker<LoopixMessage>,
     ) {
@@ -303,7 +303,7 @@ impl LoopixBroker {
         });
     }
 
-    pub fn client_pull_loop(loopix_messages: LoopixMessages, mut broker: Broker<LoopixMessage>) {
+    pub fn client_pull_thread(loopix_messages: LoopixMessages, mut broker: Broker<LoopixMessage>) {
         let pull_request_rate =
             Duration::from_secs_f64(loopix_messages.role.get_config().time_pull());
 
