@@ -118,18 +118,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     )
     .await?;
-    let mut node = Node::start(Box::new(storage), node_config, network, Some(config)).await?;
+    let mut node = Node::start(Box::new(storage), node_config, network, Some(config.clone())).await?;
     let nc = node.node_config.info.clone();
-    let mut state = match args.path_len {
-        Some(len) => LoopixSimul::Root(LSRoot::WaitNodes(len, n_clients)),
-        None => LoopixSimul::Child(LSChild::WaitConfig),
-    };
-    log::info!(
-        "Starting node with state {:?} {}: {}",
-        state,
-        nc.get_id(),
-        nc.name
-    );
+
+
+    let mut storage_path = PathBuf::from(".");
+    storage_path.push(config.clone());
+    storage_path.push("loopix_storage.yaml");
+
+    let mut state;
+    if storage_path.exists() {
+        state = LoopixSimul::Child(LSChild::WaitConfig);
+        log::info!(
+            "Starting node with previous state {:?} {}: {}",
+            state,
+            nc.get_id(),
+            nc.name
+        );
+
+    } else {
+        state = match args.path_len {
+            Some(len) => LoopixSimul::Root(LSRoot::WaitNodes(len, n_clients)),
+            None => LoopixSimul::Child(LSChild::WaitConfig),
+        };
+        log::info!(
+            "Starting new node with state {:?} {}: {}",
+            state,
+            nc.get_id(),
+            nc.name
+        );
+    }
 
     log::info!("Started successfully");
     let mut i: u32 = 0;
@@ -175,6 +193,13 @@ async fn save_metrics_loop(
         log::error!("Failed to create directory: {}", e);
     }
 
+    let storage_bytes = storage.to_yaml_async().await.unwrap();
+    {
+        let mut file = File::create(&storage_path).expect("Unable to create file");
+        file.write_all(storage_bytes.as_bytes())
+            .expect("Unable to write data");
+    }
+
     let mut i: u32 = 0;
     loop {
         std::thread::sleep(Duration::from_secs(10));
@@ -184,13 +209,6 @@ async fn save_metrics_loop(
             metrics_path.push(format!("metrics_{}.txt", i));
         } else {
             metrics_path.push("metrics.txt");
-        }
-
-        let storage_bytes = storage.to_yaml_async().await.unwrap();
-        {
-            let mut file = File::create(&storage_path).expect("Unable to create file");
-            file.write_all(storage_bytes.as_bytes())
-                .expect("Unable to write data");
         }
 
         let metric_families = gather();
@@ -520,11 +538,16 @@ impl LoopixSetup {
             .iter()
             .position(|node| node.get_id() == node_id)
             .expect("node_id in list");
+        log::info!("Node list: {:?}", self.all_nodes);
+        log::info!("NodeID {} is at position {}", node_id, pos);
         let role = if pos < self.n_clients {
+            log::info!("Role: Client");
             LoopixRole::Client
         } else if pos < self.n_clients + self.path_length {
+            log::info!("Role: Provider");
             LoopixRole::Provider
         } else {
+            log::info!("Role: Mixnode");
             LoopixRole::Mixnode
         };
 
