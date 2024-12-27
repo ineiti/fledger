@@ -33,8 +33,8 @@ impl LoopixConfig {
         }
     }
 
-    pub fn new(role: LoopixRole, storage: LoopixStorage, core_config: CoreConfig) -> Self {
-        let network_storage = storage.network_storage.blocking_read().clone();
+    pub async fn new(role: LoopixRole, storage: LoopixStorage, core_config: CoreConfig) -> Self {
+        let network_storage = storage.network_storage.read().await.clone();
         let mixes = network_storage.get_mixes();
         if core_config.path_length() != mixes.len() {
             panic!("Path length in core config does not match path length in storage");

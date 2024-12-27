@@ -582,7 +582,7 @@ impl LoopixSetup {
         if storage_path.exists() {
             let storage_str = std::fs::read_to_string(storage_path.clone()).unwrap();
             let storage: LoopixStorage = serde_yaml::from_str(&storage_str).unwrap();
-            config = LoopixConfig::new(role, storage, core_config);
+            config = LoopixConfig::new(role, storage, core_config).await;
         } else {
             config = LoopixConfig::default_with_path_length_and_n_clients(
                 role,

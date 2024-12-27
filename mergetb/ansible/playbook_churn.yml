@@ -1,0 +1,216 @@
+---
+- name: Setup and run signal tasks
+  hosts: SIGNAL_NODE
+  become: yes
+  vars:
+    docker_image: deryacog/flsignal:latest
+    container_name: flsignal
+  tasks:
+    - name: Remove existing flsignal container if present
+      docker_container:
+        name: "{{ container_name }}"
+        state: absent
+
+    - name: Pull flsignal Docker image
+      docker_image:
+        name: "{{ docker_image }}"
+        source: pull
+        force_source: true
+
+    - name: Run flsignal container
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ docker_image }}"
+        state: started
+        detach: true
+        network_mode: host
+        ports:
+          - "8765:8765"
+        output_logs: yes
+        env:
+          RUST_BACKTRACE: "full"
+      register: flsignal_container
+
+    - name: Wait for 10 seconds to ensure flsignal is running
+      pause:
+        seconds: 10
+
+- name: Setup and run fledger tasks
+  hosts: FLEDGER_NODES
+  vars:
+    path_len: "{{ path_len }}"
+    retry: "{{ retry }}"
+    docker_image: deryacog/fledger:latest
+    signal_node: "{{ hostvars[groups['SIGNAL_NODE'][0]].ansible_host }}"
+    simul_path: /home/dcog/data
+  tasks:
+    - block:
+        - name: Remove existing fledger container if present
+          docker_container:
+            name: "fledger_{{ inventory_hostname }}"
+            state: absent
+
+        - name: Pull fledger Docker image
+          docker_image:
+            name: "{{ docker_image }}"
+            source: pull
+            force_source: true
+
+        - name: Ensure /home/dcog/data directory exists
+          file:
+            path: "{{ simul_path }}"
+            state: directory
+
+        - name: Copy loopix core config file
+          copy:
+            src: /home/dcog/loopix_core_config.yaml
+            dest: "/home/dcog/data/loopix_core_config.yaml"
+
+        - name: Run fledger container
+          docker_container:
+            name: "fledger_{{ inventory_hostname }}"
+            image: "{{ docker_image }}"
+            state: started
+            detach: true
+            volumes:
+              - "{{ simul_path }}:/fledger/data"
+            command: >
+              --config /fledger/data
+              --name {{ inventory_hostname }}
+              {% if inventory_hostname == 'node-1' %}
+              --path-len {{ path_len }}
+              {% endif %}
+              -s ws://{{ signal_node }}:8765
+              --start_loopix_time 60
+              --retry {{ retry }}
+              --n-clients {{ n_clients }}
+              --save_new_metrics_file
+              --duplicates {{ duplicates }}
+              -v
+            network_mode: host
+            log_driver: "json-file"
+            output_logs: yes
+            log_options:
+              max-size: "50m"
+              max-file: "4"
+            env:
+              RUST_BACKTRACE: "full"
+          register: fledger_container
+
+        - name: Wait for 2 minutes while fledger runs (60 seconds until start time and then 60 seconds of normal operation)
+          pause:
+            seconds: 120
+          
+        - name: Stop first mixnode
+          if: inventory_hostname == 'node-2'
+          become: yes
+          shell: |
+            docker stop {{ fledger_container.container.Id }}
+
+        - name: Wait for 1 minute (until 3rd minute)
+          pause:
+            seconds: 60
+        
+        - name: Stop second mixnode
+          if: inventory_hostname == 'node-3'
+          become: yes
+          shell: |
+            docker stop {{ fledger_container.container.Id }}
+        
+        - name: Wait for 1 minute (until 4th minute)
+          pause:
+            seconds: 60 
+
+        - name: Stop third mixnode
+          if: inventory_hostname == 'node-4'
+          become: yes
+          shell: |
+            docker stop {{ fledger_container.container.Id }}
+
+        - name: Wait for 1 minute (until 5th minute)
+          pause:
+            seconds: 60
+
+        - name: Stop fourth mixnode
+          if: inventory_hostname == 'node-5'
+          become: yes
+          shell: |
+            docker stop {{ fledger_container.container.Id }}
+
+        - name: Wait for 1 minute (until 6th minute)
+          pause:
+            seconds: 60
+
+        - name: Stop fifth mixnode
+          if: inventory_hostname == 'node-6'
+          become: yes
+          shell: |
+            docker stop {{ fledger_container.container.Id }}
+
+        - name: Wait for 1 minute (until 7th minute)
+          pause:
+            seconds: 60
+
+        - name: Stop sixth mixnode
+          if: inventory_hostname == 'node-7'
+          become: yes
+          shell: |
+            docker stop {{ fledger_container.container.Id }}
+
+        - name: Wait for 1 minute (until 8th minute)
+          pause:
+            seconds: 70
+
+        - name: Stop existing fledger container if present
+          docker_container:
+            name: "fledger_{{ inventory_hostname }}"
+            state: stopped
+          ignore_errors: true
+
+        - name: Run a shell command
+          become: yes
+          shell: |
+            cp /var/lib/docker/containers/{{ fledger_container.container.Id }}/{{ fledger_container.container.Id }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
+            chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
+
+        - name: Compress the data directory on the remote host
+          shell: tar -czf /tmp/data_{{ inventory_hostname }}.tar.gz -C /home/dcog data
+          args:
+            creates: /tmp/data_{{ inventory_hostname }}.tar.gz
+
+        - name: Fetch the compressed file to the controller
+          fetch:
+            src: "/tmp/data_{{ inventory_hostname }}.tar.gz"
+            dest: "/home/dcog/metrics/{{ variable }}/{{ index }}/{{ inventory_hostname }}/data.tar.gz"
+            flat: yes
+
+        - name: Remove the compressed file from the remote host
+          file:
+            path: "/tmp/data_{{ inventory_hostname }}.tar.gz"
+            state: absent
+
+- name: Stop signal container
+  hosts: SIGNAL_NODE
+  become: yes
+  tasks:
+    - name: Stop signal container
+      docker_container:
+        name: flsignal
+        state: stopped
+      ignore_errors: true
+    
+    - name: Run a shell command
+      become: yes
+      shell: |
+        cp /var/lib/docker/containers/{{ flsignal_container.container.Id }}/{{ flsignal_container.container.Id }}-json.log /home/dcog/{{ inventory_hostname }}.log
+        chmod 666 /home/dcog/{{ inventory_hostname }}.log
+
+    - name: Fetch log from signal
+      fetch:
+        src: /home/dcog/{{ inventory_hostname }}.log
+        dest: /home/dcog/metrics/{{ variable }}/{{ index }}_{{ inventory_hostname }}.log
+        flat: yes
+
+    - name: Wait for 60 seconds
+      pause:
+        seconds: 2

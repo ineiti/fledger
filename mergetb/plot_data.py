@@ -71,7 +71,7 @@ def plot_reliability(variable, run):
 
 def plot_bandwidth(variable, run):
     indices = list(run.keys())
-    bandwidth = [run[i]["loopix_bandwidth_bytes_per_second"] for i in indices]
+    bandwidth = [run[i]["loopix_total_bandwidth_mb"] for i in indices]
 
     plt.plot(indices, bandwidth, marker='o', linestyle='-', color='green', label='Bandwidth')
     plt.xlabel("Run Index")

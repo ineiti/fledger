@@ -31,7 +31,7 @@ mrg xdc scp upload ../../loopix_core_config.yaml fledgerxdc2.dcog:/home/dcog
 # run experiment
 nohup ansible-playbook -i inventory.ini delete_docker.yml > playbook.log 2>&1
 nohup ./get_simul_data.sh > logs.txt 2>&1 &
-nohup ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=3 variable=lambda_payload index=0" > logs.txt 2>&1 > logs.txt 2>&1 &
+nohup ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=3 variable=lambda_payload index=0" > logs.txt 2>&1 &
 
 
 

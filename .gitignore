@@ -11,4 +11,8 @@ mergetb/metrics/
 metrics/plots/
 simul_data/
 
+mergetb/max_retrieve_vs_time_pull/*.txt
+mergetb/max_retrieve_vs_time_pull/*.log
+mergetb/max_retrieve_vs_time_pull/*.yaml
+
 logs.txt

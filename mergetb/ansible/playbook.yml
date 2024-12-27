@@ -65,7 +65,6 @@
           copy:
             src: /home/dcog/loopix_core_config.yaml
             dest: "/home/dcog/data/loopix_core_config.yaml"
-
         - name: Run fledger container
           docker_container:
             name: "fledger_{{ inventory_hostname }}"
@@ -98,7 +97,7 @@
 
         - name: Wait for 12 minutes while fledger runs
           pause:
-            seconds: 300
+            seconds: 360
 
         - name: Stop existing fledger container if present
           docker_container:

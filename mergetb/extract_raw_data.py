@@ -8,6 +8,7 @@ metrics_to_extract = [
     "loopix_bandwidth_bytes",
     "loopix_number_of_proxy_requests",
     "loopix_start_time_seconds",
+    "loopix_incoming_messages"
     "loopix_end_to_end_latency_seconds",
     "loopix_encryption_latency_milliseconds",
     "loopix_client_delay_milliseconds",
@@ -16,8 +17,8 @@ metrics_to_extract = [
     "loopix_provider_delay_milliseconds",
 ]
 
-def simulation_ran_successfully(variable, index):
-    dir = f"./metrics/{variable}"
+def simulation_ran_successfully(data_dir, variable, index):
+    dir = f"{data_dir}/{variable}"
     metrics_file = os.path.join(dir, f"metrics_{index}_node-1.txt")
     # print(metrics_file)
     # print(os.path.exists(metrics_file))
@@ -34,9 +35,9 @@ def simulation_ran_successfully(variable, index):
         return False
 
 
-def get_metrics_data(path_length, results, variable, index):
+def get_metrics_data(data_dir, path_length, results, variable, index):
 
-    if not simulation_ran_successfully(variable, index):
+    if not simulation_ran_successfully(data_dir, variable, index):
         print(f"Skipping run {variable} {index}, no end-to-end latency data found")
         return False
 
@@ -47,7 +48,7 @@ def get_metrics_data(path_length, results, variable, index):
             results[metric] = {"sum": [], "count": []}
 
     for i in range(path_length*path_length + path_length * 2):
-        dir = f"./metrics/{variable}"
+        dir = f"{data_dir}/{variable}"
         metrics_file = os.path.join(dir, f"metrics_{index}_node-{i}.txt")
         
         if os.path.exists(metrics_file):
@@ -68,6 +69,13 @@ def get_metrics_data(path_length, results, variable, index):
                     match = re.search(pattern, content, re.MULTILINE)
                     if match:
                         results[metric].append(float(match.group(1)))
+                elif metric == "loopix_incoming_messages":
+                    pattern = rf"{metric}\s+([0-9.e+-]+)$"
+                    match = re.search(pattern, content, re.MULTILINE)
+                    provider_pattern = "loopix_provider_delay_milliseconds"
+                    client_pattern = "loopix_number_of_proxy_requests"
+                    if not provider_pattern in content and not client_pattern in content:
+                        results[metric].append(float(match.group(1)))
                 else:
                     pattern_sum = rf"^{metric}_sum\s+([0-9.e+-]+)"
                     pattern_count = rf"^{metric}_count\s+([0-9.e+-]+)"
@@ -82,13 +90,14 @@ def get_metrics_data(path_length, results, variable, index):
     return True
           
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python extract_raw_data.py <path_length>")
+    if len(sys.argv) != 3:
+        print("Usage: python extract_raw_data.py <data_dir> <path_length>")
         sys.exit(1)
 
-    path_length = int(sys.argv[1])
+    data_dir = sys.argv[1]
+    path_length = int(sys.argv[2])
 
-    base_path = "./metrics"
+    base_path = data_dir
 
     results = {}
     variables = [d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))]
@@ -124,7 +133,7 @@ def main():
         indices_to_remove = []
         for index, value in enumerate(results[variable].keys()):
             print(f"Getting metrics data from run {variable} {value}")
-            if not get_metrics_data(path_length, results[variable][value], variable, index):
+            if not get_metrics_data(data_dir, path_length, results[variable][value], variable, index):
                 indices_to_remove.append(value)
                 
         print(indices_to_remove)
@@ -133,7 +142,7 @@ def main():
 
         print(results[variable].keys())
 
-    with open('raw_metrics.json', 'w') as f:
+    with open(f'{data_dir}/raw_metrics.json', 'w') as f:
         json.dump(results, f, indent=2)
 
 if __name__ == "__main__":

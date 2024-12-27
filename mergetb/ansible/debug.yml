@@ -1,0 +1,21 @@
+- name: Setup and run fledger tasks
+  hosts: FLEDGER_NODES
+  vars:
+    variable: lambda_payload
+    index: 0
+  tasks:
+    - name: Compress the data directory on the remote host
+      shell: tar -czf /tmp/data_{{ inventory_hostname }}.tar.gz -C /home/dcog data
+      args:
+        creates: /tmp/data_{{ inventory_hostname }}.tar.gz
+
+    - name: Fetch the compressed file to the controller
+      fetch:
+        src: "/tmp/data_{{ inventory_hostname }}.tar.gz"
+        dest: "/home/dcog/metrics/{{ variable }}/{{ index }}/{{ inventory_hostname }}/data.tar.gz"
+        flat: yes
+
+    - name: Remove the compressed file from the remote host
+      file:
+        path: "/tmp/data_{{ inventory_hostname }}.tar.gz"
+        state: absent
