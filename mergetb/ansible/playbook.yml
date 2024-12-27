@@ -112,7 +112,7 @@
             chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
 
         - name: Fetch log from node-1
-          # when: inventory_hostname == 'node-1'
+          when: inventory_hostname == 'node-1'
           fetch:
             src: /home/dcog/data/{{ inventory_hostname }}.log
             dest: /home/dcog/metrics/{{ variable }}/{{ index }}_{{ inventory_hostname }}.log

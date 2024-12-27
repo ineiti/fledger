@@ -48,7 +48,7 @@ def get_metrics_data(data_dir, path_length, results, time_index, retrieve_index)
 
     for i in range(path_length*path_length + path_length * 2):
         print(f"Getting metrics data for node-{i}")
-        dir = f"{data_dir}/"
+        dir = f"{data_dir}"
         metrics_file = os.path.join(dir, f"metrics_{time_index}-{retrieve_index}_node-{i}.txt")
         
         if os.path.exists(metrics_file):
@@ -98,23 +98,22 @@ def main():
         print("Usage: python extract_raw_data.py <data_dir> <path_length>")
         sys.exit(1)
 
-    data_dir = sys.argv[1]
+    base_path = sys.argv[1]
     path_length = int(sys.argv[2])
 
-    base_path = data_dir
-    directory = f"{base_path}/"
+    data_dir = os.path.join(base_path, "raw_data")
 
     # get n times
     times_suffix = "-3_node-0.txt"
-    files = os.listdir(directory)
+    files = os.listdir(data_dir)
     
     n_times = sum(1 for file in files
-                if file.endswith(times_suffix) and os.path.isfile(os.path.join(directory, file)))
+                if file.endswith(times_suffix) and os.path.isfile(os.path.join(data_dir, file)))
     print("n_times: ", n_times)
     
     retreives_prefix = "metrics_3-"
     n_retrieves = sum(1 for file in files
-                if re.match(rf"{retreives_prefix}\d+_node-1\.txt$", file) and os.path.isfile(os.path.join(directory, file)))
+                if re.match(rf"{retreives_prefix}\d+_node-1\.txt$", file) and os.path.isfile(os.path.join(data_dir, file)))
     print("n_retrieves: ", n_retrieves)
 
     results = {}
@@ -122,7 +121,7 @@ def main():
     for time_index in range(n_times):
         for retrieve_index in range(n_retrieves):
             print(f'{time_index}-{retrieve_index}_config.yaml')
-            with open(os.path.join(directory, f'{time_index}-{retrieve_index}_config.yaml'), 'r') as file:
+            with open(os.path.join(data_dir, f'{time_index}-{retrieve_index}_config.yaml'), 'r') as file:
                 data = yaml.safe_load(file)
 
             time_pull = data["time_pull"]
@@ -146,7 +145,7 @@ def main():
 
         print(results[time_pull][max_retrieve].keys())
 
-    with open(f'{data_dir}/raw_metrics.json', 'w') as f:
+    with open(os.path.join(base_path, 'raw_metrics.json'), 'w') as f:
         json.dump(results, f, indent=2)
 
 if __name__ == "__main__":

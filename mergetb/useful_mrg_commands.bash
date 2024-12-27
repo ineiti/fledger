@@ -34,6 +34,8 @@ nohup ./get_simul_data.sh > logs.txt 2>&1 &
 nohup ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=3 variable=lambda_payload index=0" > logs.txt 2>&1 &
 
 
+# compress metrics data
+tar -cvf - metrics/grid_search | pigz -p $(nproc) > metrics_grid_search.tar.gz
 
 
 

@@ -91,7 +91,7 @@ def plot_bandwidth(directory, variable, run):
 def plot_heatmap_bandwidth(directory, data):
 
     x_labels = data.keys()
-    y_labels = range(1, 12)
+    y_labels = range(1, 13)
     Z = np.zeros((len(y_labels), len(x_labels)))
     
     for i, x in enumerate(x_labels):
@@ -100,7 +100,7 @@ def plot_heatmap_bandwidth(directory, data):
 
     plt.figure(figsize=(10, 8))
 
-    threshold = 500
+    threshold = 750
     masked_Z = np.ma.masked_less(Z, threshold)
     heatmap = plt.imshow(masked_Z, aspect='auto', cmap='viridis', origin='lower')
 
@@ -118,10 +118,8 @@ def plot_heatmap_bandwidth(directory, data):
 def plot_heatmap_latency(directory, data):
 
     x_labels = data.keys()
-    y_labels = range(1, 12)
+    y_labels = range(1, 13)
 
-
-    
     Z = np.zeros((len(y_labels), len(x_labels)))
     
     for i, x in enumerate(x_labels):
@@ -151,7 +149,7 @@ def plot_heatmap_latency(directory, data):
 def plot_average_reliability(directory, data):
 
     x_labels = data.keys()
-    y_labels = range(1, 12)
+    y_labels = range(1, 13)
     Z = np.zeros((len(y_labels), len(x_labels)))
 
     average_reliability = []
@@ -160,14 +158,14 @@ def plot_average_reliability(directory, data):
         for max_retrieve, data in max_retrieves.items():
             reliability = data["loopix_reliability"]
             if reliability != 0:
-                reliability_per_time_pull.append(reliability)
+                reliability_per_time_pull.append(reliability*100)
 
         average_reliability.append(np.mean(reliability_per_time_pull))
 
     plt.plot(x_labels, average_reliability, marker='o', linestyle='-', color='blue', label='Reliability')
     plt.xlabel("Time Pull")
     plt.ylabel("Reliability (%)")
-    plt.ylim(0, 1)
+    plt.ylim(0, 100)
     plt.title("Average Reliability")
     plt.legend()
     plt.tight_layout()
