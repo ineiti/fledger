@@ -2,7 +2,7 @@
 lambda_loop: 2
 lambda_drop: 2
 lambda_payload: 4 
-path_length: 3
+path_length: 2
 mean_delay: 100
 lambda_loop_mix: 2
 time_pull: 1

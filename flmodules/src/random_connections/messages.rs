@@ -159,20 +159,22 @@ impl RandomConnections {
         if drop.len() > 0 {
             log::debug!("Dropping connections: {drop:?}");
         }
-        drop
+        // drop
+        vec![]
     }
 
     fn churn(&mut self) -> Vec<RandomOut> {
-        self.storage
-            .choose_new(
-                self.storage
-                    .connected
-                    .count_expired(self.cfg.churn_connected),
-            )
-            .0
-            .into_iter()
-            .map(|n| RandomOut::ConnectNode(n))
-            .collect()
+        // self.storage
+        //     .choose_new(
+        //         self.storage
+        //             .connected
+        //             .count_expired(self.cfg.churn_connected),
+        //     )
+        //     .0
+        //     .into_iter()
+        //     .map(|n| RandomOut::ConnectNode(n))
+        //     .collect()
+        vec![]
     }
 
     fn fill_connection(&mut self) -> Vec<RandomOut> {

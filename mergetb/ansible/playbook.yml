@@ -105,18 +105,18 @@
             state: stopped
           ignore_errors: true
 
-        - name: Run a shell command
-          become: yes
-          shell: |
-            cp /var/lib/docker/containers/{{ fledger_container.container.Id }}/{{ fledger_container.container.Id }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
-            chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
+        # - name: Run a shell command
+        #   become: yes
+        #   shell: |
+        #     cp /var/lib/docker/containers/{{ fledger_container.container.Id }}/{{ fledger_container.container.Id }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
+        #     chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
 
-        - name: Fetch log from node-1
-          when: inventory_hostname == 'node-1'
-          fetch:
-            src: /home/dcog/data/{{ inventory_hostname }}.log
-            dest: /home/dcog/metrics/{{ variable }}/{{ index }}_{{ inventory_hostname }}.log
-            flat: yes
+        # - name: Fetch log from node-1
+        #   when: inventory_hostname == 'node-1'
+        #   fetch:
+        #     src: /home/dcog/data/{{ inventory_hostname }}.log
+        #     dest: /home/dcog/metrics/{{ variable }}/{{ index }}_{{ inventory_hostname }}.log
+        #     flat: yes
 
         - name: Fetch storage from node-1
           when: inventory_hostname == 'node-1'
@@ -167,4 +167,4 @@
 
     - name: Wait for 60 seconds
       pause:
-        seconds: 2
+        seconds: 30

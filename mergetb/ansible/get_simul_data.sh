@@ -25,6 +25,8 @@ initial_pad_length=$pad_length
 # Try different lambda_payload values
 lambda_payloads=(2 2.25 2.5 2.75 3 3.25 3.5 3.75 4 4.25 4.5 4.75 5 5.25 5.5 5.75 6 6.25 6.5 6.75 7 7.25 7.5 7.75 8 8.25 8.5 8.75 9 9.25 9.5 9.75 10)
 chaff_lambdas=(2.2 2.175 2.15 2.125 2.1 2.075 2.05 2.025 2 1.975 1.95 1.925 1.9 1.875 1.85 1.825 1.8 1.775 1.75 1.725 1.7 1.675 1.65 1.625 1.6 1.575 1.55 1.525 1.5 1.475 1.45 1.425 1.4 1.375 1.35 1.325)
+# lambda_payloads=(2 2.25)
+# chaff_lambdas=(2.2 2.175)
 mkdir -p metrics/lambdas
 
 # Prepare JSON object
@@ -51,7 +53,10 @@ max_retrieve: $initial_max_retrieve
 pad_length: $initial_pad_length
 EOL
 
-    ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=2 variable=lambdas index=$i"
+    ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 variable=lambdas index=$i"
+    wait
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
 done
 
 # Finalize JSON (remove trailing comma and close)
@@ -65,6 +70,10 @@ mean_delays=(50 60 70 80 90 100 110 120 130 140 150 160 170 180 190 200)
 chaff_values=(4 3.3 2.79 2.45 2.2 2 1.79 1.62 1.48 1.37 1.27 1.18 1.11 1.05 0.99 0.95)
 payload_values=(8 7.2 6.4 5.6 4.8 4 3.83333333 3.66666667 3.5 3.33333333 3.16666667 3 2.83333333 2.66666667 2.5)
 
+# mean_delays=(50 60)
+# chaff_values=(4 3.3)
+# payload_values=(8 7.2)
+
 # mu value = 20 16.67 14.29 12.5 11.11 10 9.09 8.33 7.69 7.14 6.67 6.25 5.88 5.56 5.26 5
 # required number of messages per second = 48 24
 
@@ -77,7 +86,7 @@ for i in "${!mean_delays[@]}"; do
     lambda_loop=${chaff_values[$i]}
     lambda_loop_mix=${chaff_values[$i]}
     lambda_payload=${payload_values[$i]}
-    mean_delay_json+="\"$i\": $mean_delay,"
+    mean_delay_json+="\"$i\": {\"mean_delay\": $mean_delay, \"chaff_value\": $lambda_drop, \"payload_value\": $lambda_payload},"
 
     cat <<EOL > loopix_core_config.yaml
 ---
@@ -92,7 +101,10 @@ max_retrieve: $initial_max_retrieve
 pad_length: $initial_pad_length
 EOL
 
-    ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=2 variable=mean_delay index=$i"
+    ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 variable=mean_delay index=$i"
+    wait
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
 done
 
 mean_delay_json="${mean_delay_json%,}}"
@@ -122,7 +134,10 @@ max_retrieve: $initial_max_retrieve
 pad_length: $initial_pad_length
 EOL
 
-    ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=2 variable=control index=$i"
+    ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 variable=control index=$i"
+    wait
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
 done
 
 control_json="${control_json%,}}"
