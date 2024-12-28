@@ -39,7 +39,7 @@ for NODE in $( seq $NODES ); do
   fi
   START_TIME="--start_loopix_time 20"
   N_CLIENTS_ARG="--n-clients $N_CLIENTS"
-  SAVE_NEW_METRICS_FILE=""
+  SAVE_NEW_METRICS_FILE="--save_new_metrics_file"
   mkdir -p $CONFIG
   cp "loopix_core_config.yaml" $CONFIG
   RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG $DUPLICATES_ARG $START_TIME $SAVE_NEW_METRICS_FILE --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG $N_CLIENTS_ARG |& ts "$NAME" &

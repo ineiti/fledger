@@ -32,6 +32,7 @@ def plot_latency_components(directory, path_length, variable, run):
 
     bar_width = 0.6
     x = np.arange(n_runs)
+    plt.figure(figsize=(20, 6))
 
     plt.bar(x, encryption_delay, width=bar_width, label="Encryption Delay", bottom=0)
     plt.bar(x, client_delay, width=bar_width, label="Client Delay", bottom=encryption_delay)
@@ -49,24 +50,38 @@ def plot_latency_components(directory, path_length, variable, run):
     plt.legend()
     plt.tight_layout()
 
-    save_plot_directory(f"plots/{variable}")
-    plt.savefig(f"plots/{variable}/latency.png")
+    save_plot_directory(f"{directory}/plots/{variable}")
+    plt.savefig(f"{directory}/plots/{variable}/latency.png")
     plt.clf()
 
 def plot_reliability(directory, variable, run):
     indices = list(run.keys())
-    reliability = [run[i]["loopix_reliability"] for i in indices]
+    reliability = [run[i]["loopix_reliability"]*100 for i in indices]
 
     plt.plot(indices, reliability, marker='o', linestyle='-', color='blue', label='Reliability')
     plt.xlabel("Run Index")
     plt.ylabel("Reliability (%)")
-    plt.ylim(0, 1)
     plt.title(f"Reliability for {variable}")
     plt.legend()
     plt.tight_layout()
 
     save_plot_directory(f"{directory}/plots/{variable}")
     plt.savefig(f"{directory}/plots/{variable}/reliability.png")
+    plt.clf()
+
+def plot_incoming_messages(directory, variable, run):
+    indices = list(run.keys())
+    incoming_messages = [run[i]["loopix_incoming_messages"] for i in indices]
+
+    plt.plot(indices, incoming_messages, marker='o', linestyle='-', color='blue', label='Incoming Messages')
+    plt.xlabel("Run Index")
+    plt.ylabel("Incoming Messages")
+    plt.title(f"Incoming Messages for {variable}")
+    plt.legend()
+    plt.tight_layout()
+
+    save_plot_directory(f"{directory}/plots/{variable}")
+    plt.savefig(f"{directory}/plots/{variable}/incoming_messages.png")
     plt.clf()
 
 def plot_bandwidth(directory, variable, run):
@@ -97,4 +112,5 @@ if __name__ == "__main__":
     for variable, run in data.items():
         plot_latency_components(directory, path_length, variable, run)
         plot_reliability(directory, variable, run)
+        plot_incoming_messages(directory, variable, run)
         plot_bandwidth(directory, variable, run)

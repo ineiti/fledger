@@ -24,6 +24,8 @@ use prometheus::{gather, Encoder, TextEncoder};
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey, StaticSecret};
 
+const TIMEOUT: f64 = 6.5; // second (a bit over twice the average end-to-end latency)
+
 /// Fledger node CLI binary
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -300,7 +302,7 @@ impl LSRoot {
                     return Ok(LSRoot::WaitConfig(nodes).into());
                 }
             }
-            LSRoot::WaitConfig(n) => {
+            LSRoot::WaitConfig(_n) => {
                 let node_configured = node
                     .gossip
                     .as_ref()
@@ -331,7 +333,7 @@ impl LSRoot {
                         .as_mut()
                         .unwrap()
                         // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs(30))
+                        .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs_f64(TIMEOUT))
                         .await
                     {
                         Ok(mut res) => match res.text().await {
@@ -399,7 +401,7 @@ impl LSChild {
                         .as_mut()
                         .unwrap()
                         // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs(30))
+                        .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs_f64(TIMEOUT))
                         .await
                     {
                         Ok(mut res) => match res.text().await {

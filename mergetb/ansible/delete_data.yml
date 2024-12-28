@@ -1,0 +1,7 @@
+---
+- name: Delete contents of /home/dcog/data
+  hosts: FLEDGER_NODES
+  tasks:      
+    - name: Delete contents of /home/dcog/data
+      ansible.builtin.shell:
+        cmd: rm -rf /home/dcog/data/*

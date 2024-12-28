@@ -1,0 +1,16 @@
+- name: Delete metrics files 
+  hosts: FLEDGER_NODES
+  become: yes
+  tasks:
+    - name: Find files with the specific prefix
+      ansible.builtin.find:
+        paths: /home/dcog/data
+        patterns: "metrics*"
+      register: files_to_delete
+
+    - name: Delete the files
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ files_to_delete.files }}"
+      when: files_to_delete.matched > 0

@@ -12,7 +12,3 @@
       shell: |
         docker images -q | xargs -r docker rmi
 
-    - name: Remove local data directory
-      file:
-        path: /home/dcog/data
-        state: absent

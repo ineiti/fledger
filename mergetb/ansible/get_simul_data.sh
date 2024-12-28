@@ -105,6 +105,8 @@ EOL
     wait
     ansible-playbook -i inventory.ini stop_containers.yml 
     wait
+    ansible-playbook -i inventory.ini delete_data.yml
+    wait
 done
 
 mean_delay_json="${mean_delay_json%,}}"
@@ -137,6 +139,8 @@ EOL
     ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 variable=control index=$i"
     wait
     ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
+    ansible-playbook -i inventory.ini delete_data.yml
     wait
 done
 

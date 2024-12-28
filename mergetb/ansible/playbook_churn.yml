@@ -99,67 +99,67 @@
 
         - name: Wait for 2 minutes while fledger runs (60 seconds until start time and then 60 seconds of normal operation)
           pause:
-            seconds: 120
+            seconds: 155
           
         - name: Stop first mixnode
-          if: inventory_hostname == 'node-2'
+          when: inventory_hostname == 'node-10'
           become: yes
           shell: |
             docker stop {{ fledger_container.container.Id }}
 
         - name: Wait for 1 minute (until 3rd minute)
           pause:
-            seconds: 60
+            seconds: 90
         
         - name: Stop second mixnode
-          if: inventory_hostname == 'node-3'
+          when: inventory_hostname == 'node-13'
           become: yes
           shell: |
             docker stop {{ fledger_container.container.Id }}
         
         - name: Wait for 1 minute (until 4th minute)
           pause:
-            seconds: 60 
+            seconds: 90
 
         - name: Stop third mixnode
-          if: inventory_hostname == 'node-4'
+          when: inventory_hostname == 'node-4'
           become: yes
           shell: |
             docker stop {{ fledger_container.container.Id }}
 
         - name: Wait for 1 minute (until 5th minute)
           pause:
-            seconds: 60
+            seconds: 90
 
         - name: Stop fourth mixnode
-          if: inventory_hostname == 'node-5'
+          when: inventory_hostname == 'node-2'
           become: yes
           shell: |
             docker stop {{ fledger_container.container.Id }}
 
         - name: Wait for 1 minute (until 6th minute)
           pause:
-            seconds: 60
+            seconds: 90
 
         - name: Stop fifth mixnode
-          if: inventory_hostname == 'node-6'
+          when: inventory_hostname == 'node-14'
           become: yes
           shell: |
             docker stop {{ fledger_container.container.Id }}
 
         - name: Wait for 1 minute (until 7th minute)
           pause:
-            seconds: 60
+            seconds: 90
 
         - name: Stop sixth mixnode
-          if: inventory_hostname == 'node-7'
+          when: inventory_hostname == 'node-5'
           become: yes
           shell: |
             docker stop {{ fledger_container.container.Id }}
 
         - name: Wait for 1 minute (until 8th minute)
           pause:
-            seconds: 70
+            seconds: 90
 
         - name: Stop existing fledger container if present
           docker_container:
@@ -213,4 +213,4 @@
 
     - name: Wait for 60 seconds
       pause:
-        seconds: 2
+        seconds: 20

@@ -17,4 +17,7 @@ mergetb/max_retrieve_vs_time_pull/raw_data/*
 mergetb/mean_delay_lambdas/raw_data/*
 !mergetb/mean_delay_lambdas/raw_data/.gitkeep
 
+mergetb/churn_kill_only/raw_data/*
+!mergetb/churn_kill_only/raw_data/.gitkeep
+
 logs.txt
