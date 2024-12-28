@@ -144,7 +144,7 @@ impl WebProxy {
     }
 
     pub async fn get_with_retry_and_timeout(&mut self, url: &str, retry: u8, timeout_duration: Duration) -> Result<Response, WebProxyError> {
-        log::info!("Getting {url} with retry: {}", retry);
+        log::info!("Getting {url} with retry: {} and timeout: {:?}", retry, timeout_duration);
         for i in 0..retry + 1 { // try at leasy once
             match self.get_with_timeout(url, timeout_duration, 1).await {
                 Ok(resp) => {

@@ -309,13 +309,18 @@ impl Node {
 
     /// Fetches the config
     pub fn get_config(storage: Box<dyn DataStorage>) -> Result<NodeConfig, NodeError> {
+        log::info!("Getting config from {}", STORAGE_CONFIG);
         let config_str = match storage.get(STORAGE_CONFIG) {
-            Ok(s) => s,
+            Ok(s) => {
+                log::info!("Loaded configuration: {}", s);
+                s
+            },
             Err(_) => {
                 log::info!("Couldn't load configuration - start with empty");
                 "".to_string()
             }
         };
+        log::info!("Here is the config: {}", config_str);
         let mut config = NodeConfig::decode(&config_str)?;
         #[cfg(target_family = "wasm")]
         let enable_webproxy_request = false;

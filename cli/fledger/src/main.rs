@@ -24,7 +24,7 @@ use prometheus::{gather, Encoder, TextEncoder};
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey, StaticSecret};
 
-const TIMEOUT: f64 = 6.5; // second (a bit over twice the average end-to-end latency)
+const TIMEOUT: f64 = 5.0;
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug)]
@@ -91,6 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut logger = env_logger::Builder::new();
     logger.filter_module("fl", args.verbosity.log_level_filter());
+    
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
 
@@ -103,6 +104,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         SIGNAL_VERSION,
         VERSION_STRING
     );
+    log::info!("timeout is {:?}", Duration::from_secs_f64(TIMEOUT));
+    log::info!("start loopix time is {}", args.start_loopix_time);
+    log::info!("retry is {}", retry);
+    log::info!("duplicates is {}", duplicates);
 
     log::debug!("Connecting to websocket at {}", args.signal_url);
     let network = network_broker_start(
@@ -130,6 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut state;
     if storage_path.exists() {
+
         state = LoopixSimul::Child(LSChild::WaitConfig);
         log::info!(
             "Starting node with previous state {:?} {}: {}",
@@ -180,6 +186,7 @@ async fn save_metrics_loop(
     dir_path: String,
     save_new_metrics_file: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    log::info!("Starting save metrics thread!");
     let path = PathBuf::from(dir_path);
 
     let mut storage_path = PathBuf::from(".");
@@ -204,12 +211,14 @@ async fn save_metrics_loop(
 
     let mut i: u32 = 0;
     loop {
-        std::thread::sleep(Duration::from_secs(10));
+        std::thread::sleep(Duration::from_secs(20));
 
         let mut metrics_path = metrics_base_path.clone();
         if save_new_metrics_file {
+            log::info!("Saving metrics to new file {}", i);
             metrics_path.push(format!("metrics_{}.txt", i));
         } else {
+            log::info!("Saving metrics to existing file for the {}th time", i);
             metrics_path.push("metrics.txt");
         }
 
@@ -303,6 +312,7 @@ impl LSRoot {
                 }
             }
             LSRoot::WaitConfig(_n) => {
+                log::info!("Waiting for config");
                 let node_configured = node
                     .gossip
                     .as_ref()
@@ -310,7 +320,7 @@ impl LSRoot {
                     .storage
                     .events(Category::LoopixConfig)
                     .len();
-                log::info!("Root sees {} configured nodes", node_configured);
+                log::info!("Child sees {} configured nodes", node_configured);
                 LoopixSetup::node_config(node, duplicates, start_time, loopix_start_time).await?;
                 let loopix_storage = node.loopix.as_ref().unwrap().storage.clone();
                 let save_path = node.data_save_path.as_ref().unwrap();
@@ -447,14 +457,13 @@ pub struct LoopixSetup {
 impl LoopixSetup {
     pub async fn node_config(node: &mut Node, duplicates: u8, start_time: Instant, loopix_start_time: u64) -> Result<Option<LoopixSetup>, BrokerError> {
         // TODO case where loopix storage exists, so we're loading an already existign node
-        
+        log::info!("Current time since start: {}", start_time.elapsed().as_secs_f64());
         let events = node.gossip.as_ref().unwrap().events(Category::LoopixSetup);
         if let Some(event) = events.get(0) {
             // get event and setup info
             let mut setup = serde_json::from_str::<LoopixSetup>(&event.msg)
             .expect("deserializing loopix setup");
             let our_id = node.node_config.info.get_id();
-            let (loopix, overlay) = setup.get_brokers(our_id, node.broker_net.clone(), duplicates).await?;
 
             // let root know that node is ready
             node.gossip
@@ -474,6 +483,7 @@ impl LoopixSetup {
             while start_time.elapsed().as_secs() < loopix_start_time {
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
+            let (loopix, overlay) = setup.get_brokers(our_id, node.broker_net.clone(), duplicates).await?;
 
             log::info!("NodeID {} is ready, starting loopix", node.node_config.info.get_id());
             LOOPIX_START_TIME.set(start_time.elapsed().as_secs_f64());
@@ -582,8 +592,10 @@ impl LoopixSetup {
 
         let config;
         if storage_path.exists() {
+            log::info!("Storage path: {:?}", storage_path);
             let storage_str = std::fs::read_to_string(storage_path.clone()).unwrap();
             let storage: LoopixStorage = serde_yaml::from_str(&storage_str).unwrap();
+            log::info!("Storage: {}", storage_str);
             config = LoopixConfig::new(role, storage, core_config).await;
         } else {
             config = LoopixConfig::default_with_path_length_and_n_clients(

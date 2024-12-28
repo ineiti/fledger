@@ -7,7 +7,7 @@ use crate::loopix::storage::LoopixStorage;
 
 use crate::loopix::broker::MODULE_NAME;
 use crate::loopix::messages::MessageType;
-use crate::loopix::sphinx::Sphinx;
+use crate::loopix::sphinx::{node_id_from_node_address, Sphinx};
 use crate::overlay::messages::NetworkWrapper;
 use async_trait::async_trait;
 use flarch::nodeids::NodeID;
@@ -356,7 +356,24 @@ impl Client {
         // self.storage
         //     .add_sent_message(route, MessageType::Payload(our_id, msg), sphinx.message_id.clone())
         //     .await;
-        log::trace!("Sent message {} to {}", sphinx.message_id, destination);
+        let route_copy = route.clone();
+
+        let mut keys = Vec::new();
+        let mut route_with_id: Vec<NodeID> = Vec::new();
+        for node_address in route_copy {
+            let node_id = node_id_from_node_address(node_address.address);
+            route_with_id.push(node_id);
+            keys.push(node_address.pub_key);
+        }
+        
+        log::trace!(
+            "Destination: {}, with ID: {}, route: {:?}, keys: {:?}",
+            destination,
+            sphinx.message_id,
+            route_with_id,
+            keys
+        );
+        // log::trace!("Sent message {} to {}", sphinx.message_id, destination);
         (our_provider.unwrap(), sphinx)
     }
 }
