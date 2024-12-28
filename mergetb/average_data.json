@@ -1,0 +1,14 @@
+{
+  "lambda_payload": {
+    "0": {
+      "loopix_bandwidth_bytes_per_second": 2368238.4732783,
+      "loopix_reliability": 0.46153846153846156,
+      "loopix_end_to_end_latency_seconds": 5.928977878,
+      "loopix_encryption_latency_milliseconds": 55.204081632653065,
+      "loopix_client_delay_milliseconds": 1030.438775510204,
+      "loopix_decryption_latency_milliseconds": 2.6154210668832927,
+      "loopix_mixnode_delay_milliseconds": 11.349762961848144,
+      "loopix_provider_delay_milliseconds": 313.0952380952381
+    }
+  }
+}

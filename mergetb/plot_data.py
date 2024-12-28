@@ -4,8 +4,8 @@ import json
 import sys
 import os
 
-def get_data():
-    with open('average_data.json', 'r') as f:
+def get_data(directory):
+    with open(os.path.join(directory, 'raw_average_data.json'), 'r') as f:
         return json.load(f)
 
 def convert_to_milliseconds(seconds):
@@ -14,7 +14,7 @@ def convert_to_milliseconds(seconds):
 def save_plot_directory(directory):
     os.makedirs(directory, exist_ok=True)
 
-def plot_latency_components(path_length, variable, run):
+def plot_latency_components(directory, path_length, variable, run):
     indices = list(run.keys())
     n_runs = len(indices)
 
@@ -53,7 +53,7 @@ def plot_latency_components(path_length, variable, run):
     plt.savefig(f"plots/{variable}/latency.png")
     plt.clf()
 
-def plot_reliability(variable, run):
+def plot_reliability(directory, variable, run):
     indices = list(run.keys())
     reliability = [run[i]["loopix_reliability"] for i in indices]
 
@@ -65,11 +65,11 @@ def plot_reliability(variable, run):
     plt.legend()
     plt.tight_layout()
 
-    save_plot_directory(f"plots/{variable}")
-    plt.savefig(f"plots/{variable}/reliability.png")
+    save_plot_directory(f"{directory}/plots/{variable}")
+    plt.savefig(f"{directory}/plots/{variable}/reliability.png")
     plt.clf()
 
-def plot_bandwidth(variable, run):
+def plot_bandwidth(directory, variable, run):
     indices = list(run.keys())
     bandwidth = [run[i]["loopix_total_bandwidth_mb"] for i in indices]
 
@@ -81,19 +81,20 @@ def plot_bandwidth(variable, run):
     plt.legend()
     plt.tight_layout()
 
-    save_plot_directory(f"plots/{variable}")
-    plt.savefig(f"plots/{variable}/bandwidth.png")
+    save_plot_directory(f"{directory}/plots/{variable}")
+    plt.savefig(f"{directory}/plots/{variable}/bandwidth.png")
     plt.clf()
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python plot_data.py <path_length>")
+    if len(sys.argv) != 3:
+        print("Usage: python plot_data.py <directory> <path_length>")
         sys.exit(1)
 
-    path_length = int(sys.argv[1])
-    data = get_data()
+    directory = sys.argv[1]
+    path_length = int(sys.argv[2])
+    data = get_data(directory)
 
     for variable, run in data.items():
-        plot_latency_components(path_length, variable, run)
-        plot_reliability(variable, run)
-        plot_bandwidth(variable, run)
+        plot_latency_components(directory, path_length, variable, run)
+        plot_reliability(directory, variable, run)
+        plot_bandwidth(directory, variable, run)

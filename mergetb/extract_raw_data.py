@@ -2,13 +2,13 @@ import os
 import re
 import json
 import sys
-
+import yaml
 
 metrics_to_extract = [
     "loopix_bandwidth_bytes",
     "loopix_number_of_proxy_requests",
     "loopix_start_time_seconds",
-    "loopix_incoming_messages"
+    "loopix_incoming_messages",
     "loopix_end_to_end_latency_seconds",
     "loopix_encryption_latency_milliseconds",
     "loopix_client_delay_milliseconds",
@@ -20,16 +20,14 @@ metrics_to_extract = [
 def simulation_ran_successfully(data_dir, variable, index):
     dir = f"{data_dir}/{variable}"
     metrics_file = os.path.join(dir, f"metrics_{index}_node-1.txt")
-    # print(metrics_file)
-    # print(os.path.exists(metrics_file))
-    # print(os.listdir(dir))
+
     if not os.path.exists(metrics_file):
         return False
 
     with open(metrics_file, 'r') as f:
         content = f.read()
 
-    if "loopix_end_to_end_latency_seconds" in content:
+    if "loopix_number_of_proxy_requests" in content:
         return True
     else:
         return False
@@ -42,12 +40,13 @@ def get_metrics_data(data_dir, path_length, results, variable, index):
         return False
 
     for metric in metrics_to_extract:
-        if metric == "loopix_bandwidth_bytes" or metric == "loopix_number_of_proxy_requests" or metric == "loopix_start_time_seconds":
+        if metric == "loopix_bandwidth_bytes" or metric == "loopix_number_of_proxy_requests" or metric == "loopix_start_time_seconds" or metric == "loopix_incoming_messages":
             results[metric] = []
         else:
             results[metric] = {"sum": [], "count": []}
 
     for i in range(path_length*path_length + path_length * 2):
+        print(f"Getting metrics data for node-{i}")
         dir = f"{data_dir}/{variable}"
         metrics_file = os.path.join(dir, f"metrics_{index}_node-{i}.txt")
         
@@ -70,11 +69,12 @@ def get_metrics_data(data_dir, path_length, results, variable, index):
                     if match:
                         results[metric].append(float(match.group(1)))
                 elif metric == "loopix_incoming_messages":
-                    pattern = rf"{metric}\s+([0-9.e+-]+)$"
-                    match = re.search(pattern, content, re.MULTILINE)
                     provider_pattern = "loopix_provider_delay_milliseconds"
                     client_pattern = "loopix_number_of_proxy_requests"
                     if not provider_pattern in content and not client_pattern in content:
+                        pattern = rf"{metric}\s+([0-9.e+-]+)$"
+                        match = re.search(pattern, content, re.MULTILINE)
+
                         results[metric].append(float(match.group(1)))
                 else:
                     pattern_sum = rf"^{metric}_sum\s+([0-9.e+-]+)"
@@ -94,59 +94,51 @@ def main():
         print("Usage: python extract_raw_data.py <data_dir> <path_length>")
         sys.exit(1)
 
-    data_dir = sys.argv[1]
+    base_path = sys.argv[1]
+    data_dir = os.path.join(base_path, "raw_data")
     path_length = int(sys.argv[2])
 
-    base_path = data_dir
-    print(base_path)
-    print(os.listdir(base_path))
-
     results = {}
-    variables = [d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))]
-    print("AAAAAAAAAAAAAA")
-    print(results)
+    variables = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
+
     for variable in variables:
 
-        directory = f"{base_path}/{variable}"
+        directory = f"{data_dir}/{variable}"
         suffix = "_node-0.txt"
 
-        try:
-            files = os.listdir(directory)
-        except:
-            print(f"Skipping {variable}")
-            continue
+        files = os.listdir(directory)
 
-        try:
-            runs = sum(1 for file in files
-                        if file.endswith(suffix) and os.path.isfile(os.path.join(directory, file)))
-            print(runs)
+        runs = sum(1 for file in files
+                    if file.endswith(suffix) and os.path.isfile(os.path.join(directory, file)))
 
-            with open(os.path.join(directory, f'{variable}.json'), 'r') as f:
-                values = json.load(f)
-            results[variable] = {values[str(index)]: {} for index in range(runs)}
-
-        except:
-            if files:   
-                runs = sum(1 for file in files
-                            if file.endswith(suffix) and os.path.isfile(os.path.join(directory, file)))
-
-                results[variable] = {index: {} for index in range(runs)}
-        
+        print(runs)
 
         if runs > 0:
             indices_to_remove = []
-            for index, value in enumerate(results[variable].keys()):
-                print(f"Getting metrics data from run {variable} {value}")
-                if not get_metrics_data(data_dir, path_length, results[variable][value], variable, index):
-                    indices_to_remove.append(value)
+            for index in range(runs):
+                with open(os.path.join(directory, f'{index}_config.yaml'), 'r') as f:
+                    config = yaml.safe_load(f)
+
+                print(variable == 'control')
+
+                if variable == 'control':
+                    run_value = index
+                else:
+                    run_value = config[variable]
+
+                if variable not in results.keys():
+                    results[variable] = {str(run_value): {}}
+                else:
+                    results[variable][str(run_value)] = {}
+
+                print(f"Getting metrics data from run {variable} {index}")
+
+                if not get_metrics_data(data_dir, path_length, results[variable][str(run_value)], variable, index):
+                    indices_to_remove.append(index)
                     
-            print(indices_to_remove)
-            for index in indices_to_remove:
-                results[variable].pop(index, None)
 
-            print(results[variable].keys())
-
-    with open(f'{data_dir}/raw_metrics.json', 'w') as f:
+        print(results)
+    with open(f'{base_path}/raw_metrics.json', 'w') as f:
         json.dump(results, f, indent=2)
 
 if __name__ == "__main__":

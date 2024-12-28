@@ -1,10 +1,11 @@
 import numpy as np
 import json
 import sys
-
+import os
 metrics_to_extract = [
-    "loopix_bandwidth_bytes_per_second",
+    "loopix_total_bandwidth_mb",
     "loopix_reliability",
+    "loopix_incoming_messages",
     "loopix_end_to_end_latency_seconds",
     "loopix_encryption_latency_milliseconds",
     "loopix_client_delay_milliseconds",
@@ -13,48 +14,61 @@ metrics_to_extract = [
     "loopix_provider_delay_milliseconds",
 ]
 
-def get_data():
-    with open('raw_metrics.json', 'r') as f:
+def get_data(directory):
+    with open(os.path.join(directory, 'raw_metrics.json'), 'r') as f:
         data = json.load(f)
     return data
 
-def calculate_average_data(duration, data):
+def calculate_average_data(data):
     results = {}
     for metric in metrics_to_extract:
-        # if metric == "loopix_bandwidth_bytes_per_second":
-        #     print(data)
-        if metric == "loopix_bandwidth_bytes_per_second":
-            results[metric] = np.sum(data["loopix_bandwidth_bytes"])/(duration - data["loopix_start_time_seconds"][0])
-        elif metric == "loopix_reliability":
-            successful_requests = data["loopix_end_to_end_latency_seconds"]["count"]
-            results[metric] = np.mean(np.array(successful_requests)/np.array(data["loopix_number_of_proxy_requests"]))
-        else:
-            results[metric] = np.sum(data[metric]["sum"]) / np.sum(data[metric]["count"])
+        try:
+            if metric == "loopix_total_bandwidth_mb":
+                results["loopix_total_bandwidth_mb"] = np.sum(data["loopix_bandwidth_bytes"]) / (1024 * 1024)
+            elif metric == "loopix_reliability":
+                successful_requests = np.sum(data["loopix_end_to_end_latency_seconds"]["count"])
+                total_requests = np.sum(np.array(data["loopix_number_of_proxy_requests"]))
+                print(f"successful_requests: {successful_requests}, total_requests: {total_requests}")
+                print(f"successful_requests / total_requests: {successful_requests / total_requests}")
+                results[metric] = successful_requests / total_requests
+            elif metric == "loopix_incoming_messages":
+                results[metric] = np.mean(data[metric])
+            else:
+                if len(data[metric]["count"]) == 0:
+                    results[metric] = 0
+                else:
+                    results[metric] = np.sum(data[metric]["sum"]) / np.sum(data[metric]["count"])
+        except Exception as e:
+            print(f"Error for metric {metric}: {e}")
+            results[metric] = 0
     return results
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python average_data.py <duration>")
+    if len(sys.argv) < 1:
+        print("Usage: python average_data.py <directory>")
         sys.exit(1)
 
-    duration = int(sys.argv[1])
-    data = get_data()
+    directory = sys.argv[1]
+    data = get_data(directory)
 
     average_data = {}
 
-    for variable_name, runs in data.items():
-        print("Getting data for: ", variable_name)
-        print(runs.keys())
+    print(f"variables: {data.keys()}")
 
-        average_data[variable_name] = {}
+    for variable, runs in data.items():
+        print(f"runs: {runs.keys()}")
+        for run, runs in runs.items():
 
-        for index, metrics_data in runs.items():
-            print(index)
-            print(type(index))
-            print(f"Calculating average data for {variable_name} {index}")
-            average_data[variable_name][index] = calculate_average_data(duration, metrics_data)
+            if variable not in average_data:
+                average_data[variable] = {run: {}}
+            else:
+                average_data[variable][run] = {}
 
-    with open('average_data.json', 'w') as f:
+            print("Getting data for: ", variable, run)
+            
+            average_data[variable][run] = calculate_average_data(runs)
+
+    with open(os.path.join(directory, 'raw_average_data.json'), 'w') as f:
         json.dump(average_data, f, indent=2)
 
    
