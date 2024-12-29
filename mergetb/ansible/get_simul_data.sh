@@ -27,18 +27,22 @@ lambda_payloads=(2 2.25 2.5 2.75 3 3.25 3.5 3.75 4 4.25 4.5 4.75 5 5.25 5.5 5.75
 chaff_lambdas=(2.2 2.175 2.15 2.125 2.1 2.075 2.05 2.025 2 1.975 1.95 1.925 1.9 1.875 1.85 1.825 1.8 1.775 1.75 1.725 1.7 1.675 1.65 1.625 1.6 1.575 1.55 1.525 1.5 1.475 1.45 1.425 1.4 1.375 1.35 1.325)
 # lambda_payloads=(2 2.25)
 # chaff_lambdas=(2.2 2.175)
-mkdir -p metrics/lambdas
+mkdir -p metrics/lambda_payload
 
-# Prepare JSON object
 lambdas="{"
+for i in "${!lambda_payloads[@]}"; do
+    lambda_payload=${lambda_payloads[$i]}
+    lambda_drop=${chaff_lambdas[$i]}
+    lambdas+="\"$i\": {\"lambda_payload\": $lambda_payload, \"chaff_lambda\": $lambda_drop},"
+done
+lambdas="${lambdas%,}}"
+echo -e "$lambdas" > metrics/lambda_payload/lambda_payload.json  >&2
 
 for i in "${!lambda_payloads[@]}"; do
     lambda_payload=${lambda_payloads[$i]}
     lambda_drop=${chaff_lambdas[$i]}
     lambda_loop=${chaff_lambdas[$i]}
     lambda_loop_mix=${chaff_lambdas[$i]}
-
-    lambdas+="\"$i\": {\"lambda_payload\": $lambda_payload, \"chaff_lambda\": $lambda_drop},"
 
     cat <<EOL > loopix_core_config.yaml
 ---
@@ -53,17 +57,15 @@ max_retrieve: $initial_max_retrieve
 pad_length: $initial_pad_length
 EOL
 
-    ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 variable=lambdas index=$i"
+    ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 variable=lambda_payload index=$i"
     wait
+
     ansible-playbook -i inventory.ini stop_containers.yml 
     wait
+
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
+    wait
 done
-
-# Finalize JSON (remove trailing comma and close)
-lambdas="${lambdas%,}}"
-echo -e "$lambdas" > metrics/lambdas/lambdas.json
-
-ansible-playbook -i inventory.ini delete_docker.yml 
 
 # Try different mean_delay values
 mean_delays=(50 60 70 80 90 100 110 120 130 140 150 160 170 180 190 200)
@@ -83,10 +85,19 @@ mean_delay_json="{"
 for i in "${!mean_delays[@]}"; do
     mean_delay=${mean_delays[$i]}
     lambda_drop=${chaff_values[$i]}
+    lambda_payload=${payload_values[$i]}
+    mean_delay_json+="\"$i\": {\"mean_delay\": $mean_delay, \"chaff_value\": $lambda_drop, \"payload_value\": $lambda_payload},"
+done
+
+mean_delay_json="${mean_delay_json%,}}"
+echo -e "$mean_delay_json" > metrics/mean_delay/mean_delay.json  >&2
+
+for i in "${!mean_delays[@]}"; do
+    mean_delay=${mean_delays[$i]}
+    lambda_drop=${chaff_values[$i]}
     lambda_loop=${chaff_values[$i]}
     lambda_loop_mix=${chaff_values[$i]}
     lambda_payload=${payload_values[$i]}
-    mean_delay_json+="\"$i\": {\"mean_delay\": $mean_delay, \"chaff_value\": $lambda_drop, \"payload_value\": $lambda_payload},"
 
     cat <<EOL > loopix_core_config.yaml
 ---
@@ -103,26 +114,20 @@ EOL
 
     ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 variable=mean_delay index=$i"
     wait
+
     ansible-playbook -i inventory.ini stop_containers.yml 
     wait
-    ansible-playbook -i inventory.ini delete_data.yml
+
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
     wait
 done
-
-mean_delay_json="${mean_delay_json%,}}"
-echo -e "$mean_delay_json" > metrics/mean_delay/mean_delay.json
-
-ansible-playbook -i inventory.ini delete_docker.yml 
 
 # Try multiple measurements with the same values
 time_pulls=(0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7)
 mkdir -p metrics/control
-control_json="{"
 
 for i in "${!time_pulls[@]}"; do
     time_pull=${time_pulls[$i]}
-    control_json+="\"$i\": $time_pull,"
-
     cat <<EOL > loopix_core_config.yaml
 ---
 lambda_loop: $initial_lambda_loop
@@ -138,11 +143,10 @@ EOL
 
     ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 variable=control index=$i"
     wait
+
     ansible-playbook -i inventory.ini stop_containers.yml 
     wait
-    ansible-playbook -i inventory.ini delete_data.yml
+
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
     wait
 done
-
-control_json="${control_json%,}}"
-echo -e "$control_json" > metrics/control_json/control_json.json

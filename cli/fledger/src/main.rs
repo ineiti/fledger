@@ -332,37 +332,36 @@ impl LSRoot {
                 ));
                 return Ok(LSRoot::SendProxyRequest(i + 10).into());
             }
-            LSRoot::SendProxyRequest(start) => {
-                if (i - *start) % 10 == 0 {
-                    log::info!("Sending request through WebProxy at {} seconds since start", start_time.elapsed().as_secs_f64());
-                    let start = now();
-                    let start_time = Instant::now();
-                    NUMBER_OF_PROXY_REQUESTS.inc();
-                    match node
-                        .webproxy
-                        .as_mut()
-                        .unwrap()
-                        // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs_f64(TIMEOUT))
-                        .await
-                    {
-                        Ok(mut res) => match res.text().await {
-                            Ok(body) => {
-                                let end_to_end_time = start_time.elapsed().as_secs_f64();
-                                END_TO_END_LATENCY.observe(end_to_end_time);
-                                log::info!(
-                                    "---------------- Total time for request: {}ms",
-                                    now() - start
-                                );
-                                log::info!("---------------- Got reply from webproxy: {}", body);
-                            }
-                            Err(e) => log::info!("---------------- Couldn't get body: {e:?}"),
-                        },
-                        Err(e) => log::info!("---------------- Webproxy returned error: {e:?}"),
-                    }
+            LSRoot::SendProxyRequest(_start) => {
+                log::info!("Sending request through WebProxy at {} seconds since start", start_time.elapsed().as_secs_f64());
+                let start = now();
+                let start_time = Instant::now();
+                NUMBER_OF_PROXY_REQUESTS.inc();
+                match node
+                    .webproxy
+                    .as_mut()
+                    .unwrap()
+                    // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
+                    .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs_f64(TIMEOUT))
+                    .await
+                {
+                    Ok(mut res) => match res.text().await {
+                        Ok(body) => {
+                            let end_to_end_time = start_time.elapsed().as_secs_f64();
+                            END_TO_END_LATENCY.observe(end_to_end_time);
+                            log::info!(
+                                "---------------- Total time for request: {}ms",
+                                now() - start
+                            );
+                            log::info!("---------------- Got reply from webproxy: {}", body);
+                        }
+                        Err(e) => log::info!("---------------- Couldn't get body: {e:?}"),
+                    },
+                    Err(e) => log::info!("---------------- Webproxy returned error: {e:?}"),
                 }
             }
         }
+        
         Ok((*self).into())
     }
 }
@@ -401,33 +400,31 @@ impl LSChild {
             } 
 
             LSChild::ProxyRequesting(start) => {
-                if (i - *start) % 10 == 0 {
-                    log::info!("Sending request through WebProxy at {} seconds since start", start_time.elapsed().as_secs_f64());
-                    let start = now();
-                    let start_time = Instant::now();
-                    NUMBER_OF_PROXY_REQUESTS.inc();
-                    match node
-                        .webproxy
-                        .as_mut()
-                        .unwrap()
-                        // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                        .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs_f64(TIMEOUT))
-                        .await
-                    {
-                        Ok(mut res) => match res.text().await {
-                            Ok(body) => {
-                                let end_to_end_time = start_time.elapsed().as_secs_f64();
-                                END_TO_END_LATENCY.observe(end_to_end_time);
-                                log::info!(
-                                    "---------------- Total time for request: {}ms",
-                                    now() - start
-                                );
-                                log::info!("---------------- Got reply from webproxy: {}", body);
-                            }
-                            Err(e) => log::info!("---------------- Couldn't get body: {e:?}"),
-                        },
-                        Err(e) => log::info!("---------------- Webproxy returned error: {e:?}"),
-                    }
+                log::info!("Sending request through WebProxy at {} seconds since start", start_time.elapsed().as_secs_f64());
+                let start = now();
+                let start_time = Instant::now();
+                NUMBER_OF_PROXY_REQUESTS.inc();
+                match node
+                    .webproxy
+                    .as_mut()
+                    .unwrap()
+                    // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
+                    .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs_f64(TIMEOUT))
+                    .await
+                {
+                    Ok(mut res) => match res.text().await {
+                        Ok(body) => {
+                            let end_to_end_time = start_time.elapsed().as_secs_f64();
+                            END_TO_END_LATENCY.observe(end_to_end_time);
+                            log::info!(
+                                "---------------- Total time for request: {}ms",
+                                now() - start
+                            );
+                            log::info!("---------------- Got reply from webproxy: {}", body);
+                        }
+                        Err(e) => log::info!("---------------- Couldn't get body: {e:?}"),
+                    },
+                    Err(e) => log::info!("---------------- Webproxy returned error: {e:?}"),
                 }
             }
             LSChild::ProxyReady => {}

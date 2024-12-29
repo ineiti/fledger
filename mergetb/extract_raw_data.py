@@ -32,6 +32,48 @@ def simulation_ran_successfully(data_dir, variable, index):
     else:
         return False
 
+def create_results_dict(results, metrics_to_extract):
+    for metric in metrics_to_extract:
+        if metric == "loopix_bandwidth_bytes" or metric == "loopix_number_of_proxy_requests" or metric == "loopix_start_time_seconds" or metric == "loopix_incoming_messages":
+            results[metric] = []
+        else:
+            results[metric] = {"sum": [], "count": []}
+
+def get_bandwidth_bytes(results, content, metric, i):
+    pattern = rf"{metric}\s+([0-9.e+-]+)$"
+    match = re.search(pattern, content, re.MULTILINE)
+    if match:
+        results[metric].append(float(match.group(1)))
+    else:
+        print(f"Error for node-{i}: match {match}")
+
+def get_proxy_request_or_start_time(results, content, metric, i):
+    pattern = rf"{metric}\s+([0-9.e+-]+)$"
+    match = re.search(pattern, content, re.MULTILINE)
+    if match:
+        results[metric].append(float(match.group(1)))
+    else:
+        print(f"Error for node-{i}: match {match}")
+
+def get_incoming_messages(results, content, metric, i):
+    provider_pattern = "loopix_provider_delay_milliseconds"
+    client_pattern = "loopix_number_of_proxy_requests"
+    if not provider_pattern in content and not client_pattern in content:
+        pattern = rf"{metric}\s+([0-9.e+-]+)$"
+        match = re.search(pattern, content, re.MULTILINE)
+
+        results[metric].append(float(match.group(1)))
+
+def get_histogram_metrics(results, content, metric, i):
+    pattern_sum = rf"^{metric}_sum\s+([0-9.e+-]+)"
+    pattern_count = rf"^{metric}_count\s+([0-9.e+-]+)"
+    match_sum = re.search(pattern_sum, content, re.MULTILINE)
+    match_count = re.search(pattern_count, content, re.MULTILINE)
+    if match_count and match_sum:
+        results[metric][f"sum"].append(float(match_sum.group(1)))
+        results[metric][f"count"].append(float(match_count.group(1)))
+    elif match_count or match_sum:
+        print(f"Error for node-{i}: match_sum {match_sum}, match_count {match_count}")
 
 def get_metrics_data(data_dir, path_length, results, variable, index):
 
@@ -39,11 +81,7 @@ def get_metrics_data(data_dir, path_length, results, variable, index):
         print(f"Skipping run {variable} {index}, no end-to-end latency data found")
         return False
 
-    for metric in metrics_to_extract:
-        if metric == "loopix_bandwidth_bytes" or metric == "loopix_number_of_proxy_requests" or metric == "loopix_start_time_seconds" or metric == "loopix_incoming_messages":
-            results[metric] = []
-        else:
-            results[metric] = {"sum": [], "count": []}
+    create_results_dict(results, metrics_to_extract)
 
     for i in range(path_length*path_length + path_length * 2):
         print(f"Getting metrics data for node-{i}")
@@ -56,36 +94,16 @@ def get_metrics_data(data_dir, path_length, results, variable, index):
             
             for metric in metrics_to_extract:
                 if metric == "loopix_bandwidth_bytes":
-                    pattern = rf"{metric}\s+([0-9.e+-]+)$"
-                    match = re.search(pattern, content, re.MULTILINE)
-                    if match:
-                        results[metric].append(float(match.group(1)))
-                    else:
-                        print(f"Error for node-{i}: match {match}")
+                    get_bandwidth_bytes(results, content, metric, i)
 
                 elif metric == "loopix_number_of_proxy_requests" or metric == "loopix_start_time_seconds":
-                    pattern = rf"{metric}\s+([0-9.e+-]+)$"
-                    match = re.search(pattern, content, re.MULTILINE)
-                    if match:
-                        results[metric].append(float(match.group(1)))
-                elif metric == "loopix_incoming_messages":
-                    provider_pattern = "loopix_provider_delay_milliseconds"
-                    client_pattern = "loopix_number_of_proxy_requests"
-                    if not provider_pattern in content and not client_pattern in content:
-                        pattern = rf"{metric}\s+([0-9.e+-]+)$"
-                        match = re.search(pattern, content, re.MULTILINE)
+                    get_proxy_request_or_start_time(results, content, metric, i)
 
-                        results[metric].append(float(match.group(1)))
+                elif metric == "loopix_incoming_messages":
+                    get_incoming_messages(results, content, metric, i)
+
                 else:
-                    pattern_sum = rf"^{metric}_sum\s+([0-9.e+-]+)"
-                    pattern_count = rf"^{metric}_count\s+([0-9.e+-]+)"
-                    match_sum = re.search(pattern_sum, content, re.MULTILINE)
-                    match_count = re.search(pattern_count, content, re.MULTILINE)
-                    if match_count and match_sum:
-                        results[metric][f"sum"].append(float(match_sum.group(1)))
-                        results[metric][f"count"].append(float(match_count.group(1)))
-                    elif match_count or match_sum:
-                        print(f"Error for node-{i}: match_sum {match_sum}, match_count {match_count}")
+                    get_histogram_metrics(results, content, metric, i)
 
     return True
           
@@ -100,6 +118,7 @@ def main():
 
     results = {}
     variables = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
+    print(variables)
 
     for variable in variables:
 
