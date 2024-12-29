@@ -5,7 +5,7 @@ import sys
 import os
 
 def get_data(directory):
-    with open(os.path.join(directory, 'raw_average_data.json'), 'r') as f:
+    with open(os.path.join(directory, 'average_data.json'), 'r') as f:
         return json.load(f)
 
 def convert_to_milliseconds(seconds):

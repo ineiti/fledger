@@ -1,5 +1,3 @@
-#!/bin/bash -e
-
 make kill
 
 PATH_LEN=$1
@@ -18,10 +16,10 @@ fi
 
 NODES=$(( ( $PATH_LEN + $N_CLIENTS ) + $PATH_LEN * $PATH_LEN ))
 SIMUL=simul/
-# rm -rf $SIMUL
-# mkdir -p $SIMUL
+rm -rf $SIMUL
+mkdir -p $SIMUL
 
-# ./target-common/release/flsignal |& ts "Signal " &
+./target-common/release/flsignal |& ts "Signal " &
 
 for NODE in $( seq $NODES ); do
   NAME="NODE_$(printf "%02d" $NODE)"
@@ -44,11 +42,8 @@ for NODE in $( seq $NODES ); do
   cp "loopix_core_config.yaml" $CONFIG
   LOG_FILE="$CONFIG/log.txt"
   RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG $DUPLICATES_ARG $START_TIME $SAVE_NEW_METRICS_FILE --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG $N_CLIENTS_ARG |& ts "$NAME" >> "$LOG_FILE" 2>&1 &
-# # ... existing code ...
-#   RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG $DUPLICATES_ARG $START_TIME $SAVE_NEW_METRICS_FILE --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG $N_CLIENTS_ARG >> "$LOG_FILE" 2>&1 &
-#   RUST_BACKTRACE=full ./target-common/release/fledger --config $CONFIG $DUPLICATES_ARG $START_TIME $SAVE_NEW_METRICS_FILE --name $NAME $VERBOSITY -s ws://localhost:8765 $PATH_LEN_ARG $RETRY_ARG $N_CLIENTS_ARG |& ts "$NAME" &
 done
 
-sleep 120
+sleep 360
 
 make kill

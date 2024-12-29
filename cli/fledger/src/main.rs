@@ -399,7 +399,7 @@ impl LSChild {
                 }
             } 
 
-            LSChild::ProxyRequesting(start) => {
+            LSChild::ProxyRequesting(_start) => {
                 log::info!("Sending request through WebProxy at {} seconds since start", start_time.elapsed().as_secs_f64());
                 let start = now();
                 let start_time = Instant::now();

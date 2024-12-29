@@ -68,7 +68,7 @@ if __name__ == "__main__":
             # print(runs.keys())
             average_data[time_pull][max_retrieve] = calculate_average_data(runs)
 
-    with open(os.path.join(directory, 'raw_average_data.json'), 'w') as f:
+    with open(os.path.join(directory, 'average_data.json'), 'w') as f:
         json.dump(average_data, f, indent=2)
 
    

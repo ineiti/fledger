@@ -61,6 +61,7 @@ update_version:
 	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > flnode/src/version.rs
 
 kill:
+	$(call PKILL,flsignal)
 	$(call PKILL,fledger)
 	$(call PKILL,trunk serve)
 
