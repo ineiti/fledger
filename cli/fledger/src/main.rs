@@ -24,7 +24,7 @@ use prometheus::{gather, Encoder, TextEncoder};
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey, StaticSecret};
 
-const TIMEOUT: f64 = 5.0;
+const TIMEOUT: f64 = 20.0;
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug)]

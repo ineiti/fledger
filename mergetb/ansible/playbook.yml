@@ -80,7 +80,7 @@
               --path-len {{ path_len }}
               {% endif %}
               -s ws://{{ signal_node }}:8765
-              --start_loopix_time 60
+              --start_loopix_time 15
               --retry {{ retry }}
               --n-clients {{ n_clients }}
               --duplicates {{ duplicates }}
@@ -95,9 +95,9 @@
               RUST_BACKTRACE: "full"
           register: fledger_container
 
-        - name: Wait for 12 minutes while fledger runs
+        - name: Wait
           pause:
-            seconds: 360
+            seconds: 200
 
         - name: Stop existing fledger container if present
           docker_container:
@@ -142,28 +142,25 @@
   hosts: node-1
   become: yes
   tasks:
-    - name: Get the name or ID of the running container
-      command: docker ps --format "{{.ID}}" --no-trunc
+    - name: Get the container ID using the container name
+      shell: docker inspect --format='{% raw %}{{.Id}}{% endraw %}' fledger_node-1
       register: container_id
 
-    - name: Check if a container is running
-      fail:
-        msg: "No container is running on this node."
-      when: container_id.stdout_lines | length == 0
+    - name: Debug container ID
+      debug:
+        msg: "Container ID: {{ container_id.stdout.strip() }}"
 
-    - name: Fetch logs from the container
-      command: docker logs {{ container_id.stdout }}
-      register: container_logs
+    - name: Run a shell command
+      become: yes
+      shell: |
+        cp /var/lib/docker/containers/{{ container_id.stdout.strip() }}/{{ container_id.stdout.strip() }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
+        chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
 
-    - name: Save logs to a file
-      copy:
-        dest: /home/dcog/data/docker_logs.txt
-        content: "{{ container_logs.stdout }}"
-
-    - name: Copy logs to the XDC
+    - name: Fetch log from node-1
+      when: inventory_hostname == 'node-1'
       fetch:
-        src: /home/dcog/data/docker_logs.txt
-        dest: /home/dcog/metrics/{{ variable }}/{{ index }}_logs_node-1.txt
+        src: /home/dcog/data/{{ inventory_hostname }}.log
+        dest: /home/dcog/metrics/{{ variable }}/log_{{ index }}_{{ inventory_hostname }}.log
         flat: yes
 
 - name: Stop signal container

@@ -23,18 +23,28 @@ initial_max_retrieve=$max_retrieve
 initial_pad_length=$pad_length
 
 # Try different time_pull and max_retrieve values
-time_pulls=(0.2 0.5 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.7 2.0)
-max_retrieves=(1 2 3 4 5 6 7 8 9 10 11 12)
+# time_pulls=(0.2 0.5 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.7 2.0)
+# max_retrieves=(1 2 3 4 5 6 7 8 9 10 11 12)
+
+time_pulls=(0.2 0.5)
+max_retrieves=(1)
 mkdir -p metrics/grid_search
 
-# Prepare JSON object
 grid_search_json="{"
-
 for i in "${!time_pulls[@]}"; do
     for j in "${!max_retrieves[@]}"; do
         time_pull=${time_pulls[$i]}
         max_retrieve=${max_retrieves[$j]}
         grid_search_json+="\"$i-$j\": {\"time_pull\": $time_pull, \"max_retrieve\": $max_retrieve},"
+    done
+done
+grid_search_json="${grid_search_json%,}}"
+echo -e "$grid_search_json" > metrics/grid_search/grid_search.json
+
+for i in "${!time_pulls[@]}"; do
+    for j in "${!max_retrieves[@]}"; do
+        time_pull=${time_pulls[$i]}
+        max_retrieve=${max_retrieves[$j]}
 
         cat <<EOL > loopix_core_config.yaml
 ---
@@ -49,9 +59,14 @@ max_retrieve: $max_retrieve
 pad_length: $initial_pad_length
 EOL
         ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 variable=grid_search index=\"$i-$j\""
+        wait
+
+        ansible-playbook -i inventory.ini stop_containers.yml 
+        wait
+
+        ansible-playbook -i inventory.ini delete_only_metrics.yml
+        wait
     done
 done
 
-# Finalize JSON (remove trailing comma and close)
-grid_search_json="${grid_search_json%,}}"
-echo -e "$grid_search_json" > metrics/grid_search/grid_search.json
+
