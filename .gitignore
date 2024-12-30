@@ -13,13 +13,9 @@ mergetb/metrics/
 metrics/plots/
 simul_data/
 
-mergetb/max_retrieve_vs_time_pull/raw_data/*
-!mergetb/max_retrieve_vs_time_pull/raw_data/.gitkeep
-
-mergetb/mean_delay_lambdas/raw_data/*
-!mergetb/mean_delay_lambdas/raw_data/.gitkeep
-
-mergetb/churn_kill_only/raw_data/*
-!mergetb/churn_kill_only/raw_data/.gitkeep
+mergetb/*/raw_data/*
+!mergetb/*/raw_data/.gitkeep
+mergetb/rename/*
+!mergetb/rename/.gitkeep
 
 logs.txt
