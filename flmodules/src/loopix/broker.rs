@@ -76,7 +76,7 @@ impl LoopixBroker {
             n_duplicates,
         );
 
-        let max_workers = Arc::new(Semaphore::new(20));
+        let max_workers = Arc::new(Semaphore::new(8));
 
         broker
             .add_subsystem(Subsystem::Handler(Box::new(LoopixTranslate {
@@ -200,6 +200,11 @@ impl LoopixBroker {
             NodeType::Provider(_) => loopix_messages.role.get_config().lambda_loop_mix(),
         };
 
+        if lambda_loop == 0.0 {
+            log::info!("Loop message rate: 0.0, skipping thread");
+            return;
+        }
+
         let wait_before_send =
             Duration::from_secs_f64(1.0 / lambda_loop);
 
@@ -233,13 +238,14 @@ impl LoopixBroker {
         loopix_messages: LoopixMessages,
         mut broker: Broker<LoopixMessage>,
     ) {
-        if loopix_messages.role.get_config().lambda_drop() == 0.0 {
-            log::trace!("Drop message rate: 0.0, skipping thread");
+        let lambda_drop = loopix_messages.role.get_config().lambda_drop();
+        if lambda_drop == 0.0 {
+            log::info!("Drop message rate: 0.0, skipping thread");
             return;
         }
 
         let wait_before_send =
-            Duration::from_secs_f64(1.0 / loopix_messages.role.get_config().lambda_drop());
+            Duration::from_secs_f64(1.0 / lambda_drop);
 
         log::debug!("Drop message rate: {:?}", wait_before_send);
 
@@ -369,11 +375,17 @@ impl LoopixBroker {
         mut broker: Broker<LoopixMessage>,
         mut receiver: Receiver<(NodeID, Sphinx, Option<SystemTime>)>,
     ) {
+        let lambda_payload = loopix_messages.role.get_config().lambda_payload();
+
+        if lambda_payload == 0.0 {
+            panic!("Lambda payload cannot be 0.0");
+        }
+
+        let wait_before_send = Duration::from_secs_f64(1.0 / lambda_payload);
+
         tokio::spawn(async move {
             
             let mut sphinx_messages: Vec<(NodeID, Sphinx, Option<SystemTime>)> = Vec::new();
-            let lambda_payload = loopix_messages.role.get_config().lambda_payload();
-            let wait_before_send = Duration::from_secs_f64(1.0 / lambda_payload);
 
             let our_id = loopix_messages.role.get_our_id().await;
 

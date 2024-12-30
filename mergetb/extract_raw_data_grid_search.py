@@ -3,7 +3,7 @@ import re
 import json
 import sys
 import yaml
-from extract_raw_data import metrics_to_extract, create_results_dict, get_bandwidth_bytes, get_proxy_request_or_start_time, get_incoming_messages, get_histogram_metrics
+from extract_raw_data import metrics_to_extract, create_results_dict, get_bandwidth_bytes_or_start_time, get_proxy_request, get_incoming_messages, get_histogram_metrics
 
 
 metrics_to_extract = [
@@ -35,7 +35,7 @@ def simulation_ran_successfully(data_dir, time_index, retrieve_index):
         return False
 
 
-def get_metrics_data(data_dir, path_length, results, time_index, retrieve_index):
+def get_metrics_data(data_dir, path_length, n_clients, results, time_index, retrieve_index):
 
     if not simulation_ran_successfully(data_dir, time_index, retrieve_index):
         print(f"Skipping run {time_index}-{retrieve_index}, no end-to-end latency data found")
@@ -43,7 +43,7 @@ def get_metrics_data(data_dir, path_length, results, time_index, retrieve_index)
 
     create_results_dict(results, metrics_to_extract)
 
-    for i in range(path_length*path_length + path_length * 2):
+    for i in range(path_length*path_length + path_length + n_clients):
         print(f"Getting metrics data for node-{i}")
         dir = f"{data_dir}"
         metrics_file = os.path.join(dir, f"metrics_{time_index}-{retrieve_index}_node-{i}.txt")
@@ -53,11 +53,11 @@ def get_metrics_data(data_dir, path_length, results, time_index, retrieve_index)
                 content = f.read()
             
             for metric in metrics_to_extract:
-                if metric == "loopix_bandwidth_bytes":
-                    get_bandwidth_bytes(results, content, metric, i)
+                if metric == "loopix_bandwidth_bytes" or metric == "loopix_start_time_seconds":
+                    get_bandwidth_bytes_or_start_time(results, content, metric, i)
 
-                elif metric == "loopix_number_of_proxy_requests" or metric == "loopix_start_time_seconds":
-                    get_proxy_request_or_start_time(results, content, metric, i)
+                elif metric == "loopix_number_of_proxy_requests":
+                    get_proxy_request(results, content, metric, i)
                 
                 elif metric == "loopix_incoming_messages":
                     get_incoming_messages(results, content, metric, i)
@@ -69,13 +69,13 @@ def get_metrics_data(data_dir, path_length, results, time_index, retrieve_index)
     return True
           
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python extract_raw_data.py <data_dir> <path_length>")
+    if len(sys.argv) != 4:
+        print("Usage: python extract_raw_data_grid_search.py <data_dir> <path_length> <n_clients>")
         sys.exit(1)
 
     base_path = sys.argv[1]
     path_length = int(sys.argv[2])
-
+    n_clients = int(sys.argv[3])
     data_dir = os.path.join(base_path, "raw_data")
 
     # get n times
@@ -111,7 +111,7 @@ def main():
             
 
             indices_to_remove = []
-            if not get_metrics_data(data_dir, path_length, results[time_pull][max_retrieve], time_index, retrieve_index):
+            if not get_metrics_data(data_dir, path_length, n_clients, results[time_pull][max_retrieve], time_index, retrieve_index):
                 indices_to_remove.append(max_retrieve)
                 
             print(indices_to_remove)

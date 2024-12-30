@@ -62,6 +62,7 @@ def plot_reliability(directory, variable, run):
     plt.xlabel("Run Index")
     plt.ylabel("Reliability (%)")
     plt.title(f"Reliability for {variable}")
+    plt.ylim(0, 100)
     plt.legend()
     plt.tight_layout()
 

@@ -80,11 +80,11 @@
               --path-len {{ path_len }}
               {% endif %}
               -s ws://{{ signal_node }}:8765
+              --token {{ token }}
               --start_loopix_time 15
               --retry {{ retry }}
               --n-clients {{ n_clients }}
               --duplicates {{ duplicates }}
-              -v
             network_mode: host
             log_driver: "json-file"
             output_logs: yes
@@ -97,7 +97,7 @@
 
         - name: Wait
           pause:
-            seconds: 200
+            seconds: 300
 
         - name: Stop existing fledger container if present
           docker_container:

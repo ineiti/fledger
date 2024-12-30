@@ -24,7 +24,7 @@ use prometheus::{gather, Encoder, TextEncoder};
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey, StaticSecret};
 
-const TIMEOUT: f64 = 20.0;
+const TIMEOUT: u64 = 20;
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug)]
@@ -73,6 +73,9 @@ struct Args {
     #[clap(short = 'd', long="duplicates", default_value_t = 1)]
     duplicates: u8,
 
+    /// Token to use for the request
+    #[clap(short = 'k', long="token", default_value = "")]
+    token: String,
 }
 
 #[tokio::main]
@@ -104,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         SIGNAL_VERSION,
         VERSION_STRING
     );
-    log::info!("timeout is {:?}", Duration::from_secs_f64(TIMEOUT));
+    log::info!("timeout is {:?}", Duration::from_secs(TIMEOUT));
     log::info!("start loopix time is {}", args.start_loopix_time);
     log::info!("retry is {}", retry);
     log::info!("duplicates is {}", duplicates);
@@ -161,22 +164,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut i: u32 = 0;
     loop {
         i += 1;
+        log::info!("We go to process!");
         node.process()
             .await
             .err()
             .map(|e| log::warn!("Couldn't process node: {e:?}"));
 
-        state = state.process(&mut node, i, retry, duplicates, start_time, args.start_loopix_time, args.save_new_metrics_file).await?;
+        state = state.process(args.token.clone(), &mut node, i, retry, duplicates, start_time, args.start_loopix_time, args.save_new_metrics_file).await?;
 
-        if i % 3 == 2 {
-            log::info!("Nodes are: {:?}", node.nodes_online()?);
-            let ping = &node.ping.as_ref().unwrap().storage;
-            log::info!("Nodes countdowns are: {:?}", ping.stats);
-            log::debug!(
-                "Chat messages are: {:?}",
-                node.gossip.as_ref().unwrap().chat_events()
-            );
-        }
         wait_ms(1000).await;
     }
 }
@@ -208,10 +203,15 @@ async fn save_metrics_loop(
         file.write_all(storage_bytes.as_bytes())
             .expect("Unable to write data");
     }
+    let sleep_time = if save_new_metrics_file {
+        20
+    } else {
+        5
+    };
 
     let mut i: u32 = 0;
     loop {
-        std::thread::sleep(Duration::from_secs(20));
+        std::thread::sleep(Duration::from_secs(sleep_time));
 
         let mut metrics_path = metrics_base_path.clone();
         if save_new_metrics_file {
@@ -246,10 +246,10 @@ enum LoopixSimul {
 }
 
 impl LoopixSimul {
-    async fn process(&self, node: &mut Node, i: u32, retry: u8, duplicates: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<Self, BrokerError> {
+    async fn process(&self, token: String, node: &mut Node, i: u32, retry: u8, duplicates: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<Self, BrokerError> {
         let new_state = match &self {
-            LoopixSimul::Root(lsroot) => lsroot.process(node, i, retry,  duplicates, start_time, loopix_start_time, save_new_metrics_file).await?,
-            LoopixSimul::Child(lschild) => lschild.process(node, i, retry, duplicates, start_time, loopix_start_time, save_new_metrics_file).await?,
+            LoopixSimul::Root(lsroot) => lsroot.process(token, node, i, retry,  duplicates, start_time, loopix_start_time, save_new_metrics_file).await?,
+            LoopixSimul::Child(lschild) => lschild.process(token, node, i, retry, duplicates, start_time, loopix_start_time, save_new_metrics_file).await?,
         };
         if *self != new_state {
             log::info!(
@@ -287,11 +287,12 @@ enum LSRoot {
 }
 
 impl LSRoot {
-    async fn process(&self, node: &mut Node, i: u32, retry: u8, duplicates: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, token: String, node: &mut Node, i: u32, retry: u8, duplicates: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSRoot::WaitNodes(n, n_clients) => {
                 let path_len = *n;
                 let nodes = (path_len * path_len) + path_len + *n_clients;
+                log::info!("Waiting for {} nodes", *n);
                 let mut node_infos = node.nodes_online().unwrap();
                 node_infos.insert(0, node.node_config.info.clone());
                 log::info!("Found {} of {} nodes", node_infos.len(), nodes);
@@ -333,7 +334,7 @@ impl LSRoot {
                 return Ok(LSRoot::SendProxyRequest(i + 10).into());
             }
             LSRoot::SendProxyRequest(_start) => {
-                log::info!("Sending request through WebProxy at {} seconds since start", start_time.elapsed().as_secs_f64());
+                log::info!("Sending request through WebProxy at {} seconds since start with timeout {:?}", start_time.elapsed().as_secs_f64(), Duration::from_secs(TIMEOUT));
                 let start = now();
                 let start_time = Instant::now();
                 NUMBER_OF_PROXY_REQUESTS.inc();
@@ -342,7 +343,9 @@ impl LSRoot {
                     .as_mut()
                     .unwrap()
                     // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                    .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs_f64(TIMEOUT))
+                    .get_with_retry_and_timeout_with_duplicates(&format!("https://ipinfo.io?token={}", token), retry, duplicates, Duration::from_secs(TIMEOUT))
+                    // .get_with_timeout("https://ipinfo.io", Duration::from_secs_f64(TIMEOUT))
+                    // .get(&format!("https://ipinfo.io?token={}", token))
                     .await
                 {
                     Ok(mut res) => match res.text().await {
@@ -359,6 +362,7 @@ impl LSRoot {
                     },
                     Err(e) => log::info!("---------------- Webproxy returned error: {e:?}"),
                 }
+                log::info!("---------------- Webproxy returned!");
             }
         }
         
@@ -375,9 +379,10 @@ enum LSChild {
 }
 
 impl LSChild {
-    async fn process(&self, node: &mut Node, i: u32, retry: u8, duplicates: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<LoopixSimul, BrokerError> {
+    async fn process(&self, token: String, node: &mut Node, i: u32, retry: u8, duplicates: u8, start_time: Instant, loopix_start_time: u64, save_new_metrics_file: bool) -> Result<LoopixSimul, BrokerError> {
         match self {
             LSChild::WaitConfig => {
+                log::info!("Child is waiting for config");
                 let setup = LoopixSetup::node_config(node, duplicates, start_time, loopix_start_time).await?;
                 if let Some(setup) = setup {
                     log::info!("{} got setup", node.node_config.info.name);
@@ -400,7 +405,7 @@ impl LSChild {
             } 
 
             LSChild::ProxyRequesting(_start) => {
-                log::info!("Sending request through WebProxy at {} seconds since start", start_time.elapsed().as_secs_f64());
+                log::info!("Sending request through WebProxy at {} seconds since start with timeout {:?}", start_time.elapsed().as_secs_f64(), Duration::from_secs(TIMEOUT));
                 let start = now();
                 let start_time = Instant::now();
                 NUMBER_OF_PROXY_REQUESTS.inc();
@@ -409,7 +414,9 @@ impl LSChild {
                     .as_mut()
                     .unwrap()
                     // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                    .get_with_retry_and_timeout_with_duplicates("https://ipinfo.io", retry, duplicates, Duration::from_secs_f64(TIMEOUT))
+                    .get_with_retry_and_timeout_with_duplicates(&format!("https://ipinfo.io?token={}", token), retry, duplicates, Duration::from_secs(TIMEOUT))
+                    // .get(&format!("https://ipinfo.io?token={}", token))
+                    // .get_with_timeout("https://ipinfo.io", )
                     .await
                 {
                     Ok(mut res) => match res.text().await {
@@ -427,7 +434,9 @@ impl LSChild {
                     Err(e) => log::info!("---------------- Webproxy returned error: {e:?}"),
                 }
             }
-            LSChild::ProxyReady => {}
+            LSChild::ProxyReady => {
+                log::info!("Child is proxy ready");
+            }
 
         }
 

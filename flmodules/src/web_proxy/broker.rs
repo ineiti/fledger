@@ -166,7 +166,7 @@ impl WebProxy {
     }
 
     pub async fn get_with_retry_and_timeout_with_duplicates(&mut self, url: &str, retry: u8, duplicates: u8, timeout_duration: Duration) -> Result<Response, WebProxyError> {
-        log::info!("Getting {url} with retry: {}", retry);
+        log::info!("Getting {url} with retry: {}, duplicates: {} and timeout: {:?}", retry, duplicates, timeout_duration);
         for i in 0..retry + 1 { // try at leasy once
             match self.get_with_timeout(url, timeout_duration, duplicates).await {
                 Ok(resp) => {
@@ -193,8 +193,8 @@ impl WebProxy {
         timeout_duration: Duration,
         duplicates: u8
     ) -> Result<Response, WebProxyError> {
-        // log::debug!("Getting {url}");
         let our_rnd = U256::rnd();
+        log::info!("Getting {url} with id: {} and timeout: {:?} and duplicates: {}", our_rnd, timeout_duration, duplicates);
         let (tx, rx) = channel(128);
         self.web_proxy
             .emit_msg(WebProxyIn::RequestWithDuplicates(our_rnd, url.to_string(), tx, duplicates).into())?;
@@ -203,13 +203,26 @@ impl WebProxy {
             while let Some(msg) = tap.recv().await {
                 if let WebProxyMessage::Output(WebProxyOut::ResponseGet(proxy, rnd, header)) = msg {
                     if rnd == our_rnd {
-                        self.web_proxy.remove_subsystem(id).await?;
+                        timeout(Duration::from_secs(5), async {
+                            match self.web_proxy.remove_subsystem(id).await {
+                                Ok(_) => log::info!("Successfully removed subsystem for id: {}", id),
+                                Err(e) => log::error!("Failed to remove subsystem for id: {}: {}", id, e),
+                            }
+                        }).await.map_err(|_| WebProxyError::ResponseTimeout)?;
+                        log::warn!("Removed subsystem for id: {}", our_rnd);
 
                         return Ok(Response::new(proxy, header, rx));
                     }
                 }
             }
-            self.web_proxy.remove_subsystem(id).await?;
+            log::warn!("Timeout reached for id: {}", our_rnd); 
+            timeout(Duration::from_secs(5), async {
+                match self.web_proxy.remove_subsystem(id).await {
+                    Ok(_) => log::info!("Successfully removed subsystem for id: {}", id),
+                    Err(e) => log::error!("Failed to remove subsystem for id: {}: {}", id, e),
+                }
+            }).await.map_err(|_| WebProxyError::ResponseTimeout)?;
+            log::warn!("Removed subsystem for id: {}", our_rnd);
             return Err(WebProxyError::ResponseTimeout);
         })
         .await

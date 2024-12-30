@@ -193,11 +193,6 @@ impl WebProxyMessages {
         nonce: U256,
         msg: ResponseMessage,
     ) -> Vec<WebProxyOut> {
-        if self.core.request_done(nonce) {
-            log::info!("Request already done for nonce: {}", nonce);
-            return vec![];
-        }
-
         self.core
             .handle_response(nonce, msg)
             .map_or(vec![], |header| {

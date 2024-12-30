@@ -19,20 +19,23 @@ def get_data(directory):
         data = json.load(f)
     return data
 
-def calculate_average_data(data):
+def calculate_average_data(data, duration):
     results = {}
     for metric in metrics_to_extract:
         try:
             if metric == "loopix_total_bandwidth_mb":
                 results["loopix_total_bandwidth_mb"] = np.sum(data["loopix_bandwidth_bytes"]) / (1024 * 1024)
+                results["loopix_total_bandwidth_mb_std"] = np.std(data["loopix_bandwidth_bytes"]) / (1024 * 1024)
             elif metric == "loopix_reliability":
-                successful_requests = np.sum(data["loopix_end_to_end_latency_seconds"]["count"])
-                total_requests = np.sum(np.array(data["loopix_number_of_proxy_requests"]))
-                print(f"successful_requests: {successful_requests}, total_requests: {total_requests}")
-                print(f"successful_requests / total_requests: {successful_requests / total_requests}")
-                results[metric] = successful_requests / total_requests
+                latency_data = np.array(data["loopix_end_to_end_latency_seconds"]["count"])
+                total_requests = np.array(data["loopix_number_of_proxy_requests"])
+                print(f"latency_data: {latency_data}, total_requests: {total_requests}")
+                print(f"latency_data / total_requests: {latency_data / total_requests}")
+                results[metric] = np.sum(latency_data) / np.sum(total_requests)
+                results[f"{metric}_std"] = np.std(latency_data / total_requests)
             elif metric == "loopix_incoming_messages":
-                results[metric] = np.mean(data[metric])
+                results[metric] = np.mean(data[metric]) / (duration - np.mean(data["loopix_start_time_seconds"]))
+                results[f"{metric}_std"] = np.std(data[metric]) / (duration - np.mean(data["loopix_start_time_seconds"]))
             else:
                 if len(data[metric]["count"]) == 0:
                     results[metric] = 0
@@ -41,14 +44,16 @@ def calculate_average_data(data):
         except Exception as e:
             print(f"Error for metric {metric}: {e}")
             results[metric] = 0
+            results[f"{metric}_std"] = 0
     return results
 
 if __name__ == "__main__":
     if len(sys.argv) < 1:
-        print("Usage: python average_data.py <directory>")
+        print("Usage: python average_data.py <directory> <duration>")
         sys.exit(1)
 
     directory = sys.argv[1]
+    duration = float(sys.argv[2])
     data = get_data(directory)
 
     average_data = {}
@@ -66,7 +71,7 @@ if __name__ == "__main__":
 
             print("Getting data for: ", variable, run)
             
-            average_data[variable][run] = calculate_average_data(runs)
+            average_data[variable][run] = calculate_average_data(runs, duration)
 
     with open(os.path.join(directory, 'average_data.json'), 'w') as f:
         json.dump(average_data, f, indent=2)
