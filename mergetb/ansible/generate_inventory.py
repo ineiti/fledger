@@ -3,7 +3,7 @@ import sys
 import os
 
 def generate_inventory_file(path_length, n_clients, reservation_name):
-    num_nodes = path_length + n_clients + path_length * path_length
+    num_nodes = path_length + n_clients + path_length * (path_length - 1)
     # SIGNAL_NODE section
     inventory = "[SIGNAL_NODE]\n"
     inventory += f"SIGNAL ansible_host=SIGNAL.infra.{reservation_name}.fledger.dcog ansible_user=dcog ansible_ssh_private_key_file=~/.ssh/id_mrg-0\n\n"

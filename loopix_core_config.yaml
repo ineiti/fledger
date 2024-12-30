@@ -2,7 +2,7 @@
 lambda_loop: 1.79
 lambda_drop: 1.79
 lambda_payload: 3.83333333
-path_length: 2
+path_length: 3
 mean_delay: 110
 lambda_loop_mix: 1.79
 time_pull: 0.8

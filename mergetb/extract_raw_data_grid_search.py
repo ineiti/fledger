@@ -5,20 +5,6 @@ import sys
 import yaml
 from extract_raw_data import metrics_to_extract, create_results_dict, get_bandwidth_bytes_or_start_time, get_proxy_request, get_incoming_messages, get_histogram_metrics
 
-
-metrics_to_extract = [
-    "loopix_bandwidth_bytes",
-    "loopix_number_of_proxy_requests",
-    "loopix_start_time_seconds",
-    "loopix_incoming_messages",
-    "loopix_end_to_end_latency_seconds",
-    "loopix_encryption_latency_milliseconds",
-    "loopix_client_delay_milliseconds",
-    "loopix_decryption_latency_milliseconds",
-    "loopix_mixnode_delay_milliseconds",
-    "loopix_provider_delay_milliseconds",
-]
-
 def simulation_ran_successfully(data_dir, time_index, retrieve_index):
     dir = f"{data_dir}/"
     metrics_file = os.path.join(dir, f"metrics_{time_index}-{retrieve_index}_node-1.txt")
@@ -43,7 +29,7 @@ def get_metrics_data(data_dir, path_length, n_clients, results, time_index, retr
 
     create_results_dict(results, metrics_to_extract)
 
-    for i in range(path_length*path_length + path_length + n_clients):
+    for i in range(path_length*(path_length - 1) + path_length + n_clients):
         print(f"Getting metrics data for node-{i}")
         dir = f"{data_dir}"
         metrics_file = os.path.join(dir, f"metrics_{time_index}-{retrieve_index}_node-{i}.txt")

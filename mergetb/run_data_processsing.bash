@@ -16,4 +16,4 @@ python3 extract_raw_data.py "$DATA_DIR" "$PATH_LENGTH" "$N_CLIENTS"
 
 python3 average_data.py "$DATA_DIR" "$DURATION"
 
-python3 plot_data.py "$DATA_DIR" "$PATH_LENGTH"
+python3 plot_data.py "$DATA_DIR" "$PATH_LENGTH" "$DURATION"

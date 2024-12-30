@@ -14,7 +14,7 @@ fi
 (cd cli/fledger && cargo build -r)
 (cd cli/flsignal && cargo build -r)
 
-NODES=$(( ( $PATH_LEN + $N_CLIENTS ) + $PATH_LEN * $PATH_LEN ))
+NODES=$(( ( $PATH_LEN + $N_CLIENTS ) + $PATH_LEN * ($PATH_LEN - 1) ))
 SIMUL=simul/
 rm -rf $SIMUL
 mkdir -p $SIMUL

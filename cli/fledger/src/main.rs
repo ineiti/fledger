@@ -291,7 +291,7 @@ impl LSRoot {
         match self {
             LSRoot::WaitNodes(n, n_clients) => {
                 let path_len = *n;
-                let nodes = (path_len * path_len) + path_len + *n_clients;
+                let nodes = (path_len * (path_len - 1)) + path_len + *n_clients;
                 log::info!("Waiting for {} nodes", *n);
                 let mut node_infos = node.nodes_online().unwrap();
                 node_infos.insert(0, node.node_config.info.clone());
@@ -514,6 +514,7 @@ impl LoopixSetup {
 
     pub fn new(path_length: usize, all_nodes: Vec<NodeInfo>, config: String, n_clients: usize) -> Self {
         let (node_public_keys, loopix_key_pairs) = Self::create_nodes_and_keys(all_nodes.clone());
+        log::info!("New loopix setup with {} nodes", all_nodes.len());
         Self {
             node_public_keys,
             loopix_key_pairs,

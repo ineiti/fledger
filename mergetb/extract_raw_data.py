@@ -83,7 +83,7 @@ def get_metrics_data(data_dir, path_length, n_clients, results, variable, index)
 
     create_results_dict(results, metrics_to_extract)
 
-    for i in range(path_length*path_length + path_length + n_clients):
+    for i in range(path_length*(path_length - 1) + path_length + n_clients):
 
         print(f"Getting metrics data for node-{i}")
         dir = f"{data_dir}/{variable}"

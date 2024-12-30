@@ -699,8 +699,8 @@ impl LoopixStorage {
             mixes.push(
                 mix_infos
                     .clone()
-                    .skip(i * path_length)
-                    .take(path_length)
+                    .skip(i * (path_length - 1))
+                    .take(path_length - 1)
                     .collect::<Vec<&NodeInfo>>()
                     .iter()
                     .map(|node| node.get_id())

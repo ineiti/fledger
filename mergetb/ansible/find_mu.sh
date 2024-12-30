@@ -35,17 +35,10 @@ initial_pad_length=$pad_length
 # # Try different lambda_payload values
 # lambda/mu values: 10 11 12 13 14 15 16 17 18 19 20 21 22
 # messages sent per second: 30 33 36 39 42 45 48 51 54 57 60 63 66
-chaff_lambdas=(0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 1.1 1.2 1.3 1.4 1.5)
+# chaff_lambdas=(0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 1.1 1.2 1.3 1.4 1.5)
+chaff_lambdas=(0.6 1.0 1.6 1.7 1.8 1.9 2.0 )
 
 mkdir -p metrics/lambda_loop
-
-lambdas="{"
-for i in "${!chaff_lambdas[@]}"; do
-    lambda_loop=${chaff_lambdas[$i]}
-    lambdas+="\"$i\": {\"lambda_loop\": $lambda_loop},"
-done
-lambdas="${lambdas%,}}"
-echo -e "$lambdas" > metrics/lambda_loop/lambda_loop.json  >&2
 
 for i in "${!chaff_lambdas[@]}"; do
     lambda_loop=${chaff_lambdas[$i]}

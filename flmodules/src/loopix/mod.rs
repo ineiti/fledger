@@ -18,7 +18,7 @@ lazy_static::lazy_static! {
     pub static ref END_TO_END_LATENCY: Histogram = match register_histogram!(
         "loopix_end_to_end_latency_seconds",
         "End-to-end latency web proxy request.",
-        vec![1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+        vec![1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 11.0]
     ) {
         Ok(histogram) => {
             log::info!("END_TO_END_LATENCY histogram registered successfully.");
@@ -36,7 +36,7 @@ lazy_static::lazy_static! {
     pub static ref MIXNODE_DELAY: Histogram = match register_histogram!(
         "loopix_mixnode_delay_milliseconds",
         "Delay introduced by a mixnode.",
-        vec![0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 6.0, 10.0, 50.0, 200.0]
+        vec![1.0, 10.0, 20.0, 50.0, 75.0, 100.0, 125.0, 150.0, 175.0, 200.0, 250.0, 300.0, 350.0, 400.0, 450.0, 500.0]
         // vec![0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 6.0, 10.0, 50.0, 200.0]
     ) {
         Ok(histogram) => {

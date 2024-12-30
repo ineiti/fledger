@@ -25,7 +25,6 @@ def calculate_average_data(data, duration):
         try:
             if metric == "loopix_total_bandwidth_mb":
                 results["loopix_total_bandwidth_mb"] = np.sum(data["loopix_bandwidth_bytes"]) / (1024 * 1024)
-                results["loopix_total_bandwidth_mb_std"] = np.std(data["loopix_bandwidth_bytes"]) / (1024 * 1024)
             elif metric == "loopix_reliability":
                 latency_data = np.array(data["loopix_end_to_end_latency_seconds"]["count"])
                 total_requests = np.array(data["loopix_number_of_proxy_requests"])

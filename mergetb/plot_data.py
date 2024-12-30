@@ -44,9 +44,9 @@ def plot_latency_components(directory, path_length, variable, run):
     plt.bar(x, total_latency, width=bar_width, color='none', edgecolor='red', linestyle='--', linewidth=2, label="End-to-End Latency")
 
     plt.xticks(x, indices)
-    plt.xlabel("Run Index")
+    plt.xlabel(variable)
     plt.ylabel("Latency (milliseconds)")
-    plt.title(f"Stacked Latency Components for {variable}")
+    plt.title(f"End-to-End Latency with different components")
     plt.legend()
     plt.tight_layout()
 
@@ -57,11 +57,13 @@ def plot_latency_components(directory, path_length, variable, run):
 def plot_reliability(directory, variable, run):
     indices = list(run.keys())
     reliability = [run[i]["loopix_reliability"]*100 for i in indices]
+    reliability_std = [run[i]["loopix_reliability_std"]*100 for i in indices]
 
     plt.plot(indices, reliability, marker='o', linestyle='-', color='blue', label='Reliability')
-    plt.xlabel("Run Index")
+    plt.errorbar(indices, reliability, yerr=reliability_std, fmt='o', color='blue')
+    plt.xlabel(variable)
     plt.ylabel("Reliability (%)")
-    plt.title(f"Reliability for {variable}")
+    plt.title(f"Percentage of Successful Web Proxy Requests")
     plt.ylim(0, 100)
     plt.legend()
     plt.tight_layout()
@@ -73,11 +75,13 @@ def plot_reliability(directory, variable, run):
 def plot_incoming_messages(directory, variable, run):
     indices = list(run.keys())
     incoming_messages = [run[i]["loopix_incoming_messages"] for i in indices]
-
+    incoming_messages_std = [run[i]["loopix_incoming_messages_std"] for i in indices]
+    
     plt.plot(indices, incoming_messages, marker='o', linestyle='-', color='blue', label='Incoming Messages')
-    plt.xlabel("Run Index")
+    plt.errorbar(indices, incoming_messages, yerr=incoming_messages_std, fmt='o', color='blue')
+    plt.xlabel(variable)
     plt.ylabel("Incoming Messages")
-    plt.title(f"Incoming Messages for {variable}")
+    plt.title(f"Number of Incoming Messages per Second per Mixnode")
     plt.legend()
     plt.tight_layout()
 
@@ -85,15 +89,16 @@ def plot_incoming_messages(directory, variable, run):
     plt.savefig(f"{directory}/plots/{variable}/incoming_messages.png")
     plt.clf()
 
-def plot_bandwidth(directory, variable, run):
+def plot_bandwidth(directory, duration, variable, run):
     indices = list(run.keys())
     bandwidth = [run[i]["loopix_total_bandwidth_mb"] for i in indices]
 
     plt.plot(indices, bandwidth, marker='o', linestyle='-', color='green', label='Bandwidth')
-    plt.xlabel("Run Index")
-    plt.ylabel("Bandwidth (Bytes/Second)")
+
+    plt.xlabel(variable)
+    plt.ylabel("Bytes")
     plt.ylim(0, max(bandwidth) * 1.1)
-    plt.title(f"Bandwidth for {variable}")
+    plt.title(f"Total Network Usage over {duration} seconds")
     plt.legend()
     plt.tight_layout()
 
@@ -102,16 +107,17 @@ def plot_bandwidth(directory, variable, run):
     plt.clf()
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python plot_data.py <directory> <path_length>")
+    if len(sys.argv) != 4:
+        print("Usage: python plot_data.py <directory> <path_length> <duration>")
         sys.exit(1)
 
     directory = sys.argv[1]
     path_length = int(sys.argv[2])
+    duration = int(sys.argv[3])
     data = get_data(directory)
 
     for variable, run in data.items():
         plot_latency_components(directory, path_length, variable, run)
         plot_reliability(directory, variable, run)
         plot_incoming_messages(directory, variable, run)
-        plot_bandwidth(directory, variable, run)
+        plot_bandwidth(directory, duration, variable, run)
