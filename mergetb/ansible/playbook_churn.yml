@@ -86,6 +86,7 @@
               --n-clients {{ n_clients }}
               --save_new_metrics_file
               --duplicates {{ duplicates }}
+              --token {{ token }}
               -v
             network_mode: host
             log_driver: "json-file"
@@ -99,10 +100,10 @@
 
         - name: Wait 
           pause:
-            seconds: 300
+            seconds: 260
 
 - name: Stop first mixnode
-  hosts: node-14
+  hosts: node-10
   tasks:
     - name: Stop first mixnode
       shell: |
@@ -113,7 +114,7 @@
         seconds: 240
 
 - name: Stop second mixnode
-  hosts: node-2
+  hosts: node-3
   tasks:
     - name: Stop second mixnode
       shell: |
@@ -124,42 +125,9 @@
         seconds: 240
 
 - name: Stop third mixnode
-  hosts: node-12
+  hosts: node-6
   tasks:
     - name: Stop third mixnode
-      shell: |
-        docker stop $(docker ps -q)
-
-    - name: Wait
-      pause:
-        seconds: 240
-
-- name: Stop fourth mixnode
-  hosts: node-10
-  tasks:
-    - name: Stop fourth mixnode
-      shell: |
-        docker stop $(docker ps -q)
-
-    - name: Wait
-      pause:
-        seconds: 240
-
-- name: Stop fifth mixnode
-  hosts: node-7
-  tasks:
-    - name: Stop fifth mixnode
-      shell: |
-        docker stop $(docker ps -q)
-
-    - name: Wait
-      pause:
-        seconds: 240
-
-- name: Stop sixth mixnode
-  hosts: node-5
-  tasks:
-    - name: Stop sixth mixnode
       shell: |
         docker stop $(docker ps -q)
 
