@@ -62,12 +62,13 @@ def main():
     base_path = sys.argv[1]
     path_length = int(sys.argv[2])
     n_clients = int(sys.argv[3])
-    data_dir = os.path.join(base_path, "raw_data")
+    data_dir = os.path.join(base_path, "raw_data", "grid_search")
+
+    print(data_dir)
 
     # get n times
     times_suffix = "-3_node-0.txt"
     files = os.listdir(data_dir)
-    
     n_times = sum(1 for file in files
                 if file.endswith(times_suffix) and os.path.isfile(os.path.join(data_dir, file)))
     print("n_times: ", n_times)
@@ -106,7 +107,7 @@ def main():
 
         print(results[time_pull][max_retrieve].keys())
 
-    with open(os.path.join(base_path, 'raw_metrics.json'), 'w') as f:
+    with open(os.path.join(data_dir, 'raw_metrics.json'), 'w') as f:
         json.dump(results, f, indent=2)
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ def plot_heatmap_bandwidth(directory, data):
 
     plt.figure(figsize=(10, 8))
 
-    threshold = 750
+    threshold = 500
     masked_Z = np.ma.masked_less(Z, threshold)
     heatmap = plt.imshow(masked_Z, aspect='auto', cmap='viridis', origin='lower')
 
@@ -92,12 +92,13 @@ def plot_average_reliability(directory, data):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python plot_data.py <data_dir> <path_length>")
+    if len(sys.argv) != 4:
+        print("Usage: python plot_data.py <data_dir> <path_length> <duration>")
         sys.exit(1)
 
     data_dir = sys.argv[1]
     path_length = int(sys.argv[2])
+    duration = float(sys.argv[3])
     data = get_data(data_dir)
     
     plots_dir = os.path.join(data_dir, "plots")
@@ -107,7 +108,7 @@ if __name__ == "__main__":
         print(run.keys())
         plot_latency_components(plots_dir, path_length, variable, run)
         plot_reliability(plots_dir, variable, run)
-        plot_bandwidth(plots_dir, variable, run)
+        plot_bandwidth(plots_dir, duration, variable, run)
         plot_incoming_messages(plots_dir, variable, run)
 
     plot_heatmap_bandwidth(plots_dir, data)

@@ -89,11 +89,24 @@ def plot_incoming_messages(directory, variable, run):
     plt.savefig(f"{directory}/plots/{variable}/incoming_messages.png")
     plt.clf()
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 def plot_bandwidth(directory, duration, variable, run):
     indices = list(run.keys())
-    bandwidth = [run[i]["loopix_total_bandwidth_mb"] for i in indices]
+    print(indices)
+    indices = [float(i) for i in indices]
+    bandwidth = [run[str(int(i))]["loopix_total_bandwidth_mb"] for i in indices]
+
+    coefficients = np.polyfit(indices, bandwidth, 1)
+    fitted_line = np.poly1d(coefficients)
 
     plt.plot(indices, bandwidth, marker='o', linestyle='-', color='green', label='Bandwidth')
+    plt.plot(indices, fitted_line(indices), linestyle='--', color='blue', label='Fit Line')
+
+    equation_text = f"y = {coefficients[0]:.2f}x + {coefficients[1]:.2f}"
+    plt.text(0.05, 0.95, equation_text, transform=plt.gca().transAxes, fontsize=10,
+             verticalalignment='top', bbox=dict(boxstyle="round", facecolor="white", alpha=0.5))
 
     plt.xlabel(variable)
     plt.ylabel("Bytes")
@@ -105,6 +118,7 @@ def plot_bandwidth(directory, duration, variable, run):
     save_plot_directory(f"{directory}/plots/{variable}")
     plt.savefig(f"{directory}/plots/{variable}/bandwidth.png")
     plt.clf()
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:

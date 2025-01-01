@@ -1,12 +1,19 @@
 #!/bin/bash
 
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <token>"
+    exit 1
+fi
+
+token=$1
+
 # Define initial values
-lambda_loop=2
-lambda_drop=2
-lambda_payload=4
+lambda_loop=1.65
+lambda_drop=1.65
+lambda_payload=6.1
 path_length=3
-mean_delay=100
-lambda_loop_mix=2
+mean_delay=80
+lambda_loop_mix=1.65
 time_pull=1.0
 max_retrieve=3
 pad_length=150
@@ -23,11 +30,11 @@ initial_max_retrieve=$max_retrieve
 initial_pad_length=$pad_length
 
 # Try different time_pull and max_retrieve values
-# time_pulls=(0.2 0.5 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.7 2.0)
-# max_retrieves=(1 2 3 4 5 6 7 8 9 10 11 12)
+time_pulls=(0.2 0.5 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.7 2.0)
+max_retrieves=(1 2 3 4 5 6 7 8 9 10 11 12)
 
-time_pulls=(0.2 0.5)
-max_retrieves=(1)
+# time_pulls=(0.2 0.5)
+# max_retrieves=(1)
 mkdir -p metrics/grid_search
 
 grid_search_json="{"
@@ -58,7 +65,7 @@ time_pull: $time_pull
 max_retrieve: $max_retrieve
 pad_length: $initial_pad_length
 EOL
-        ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 variable=grid_search index=\"$i-$j\""
+        ansible-playbook -i inventory.ini playbook.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 token=$token duplicates=1 variable=grid_search index=\"$i-$j\""
         wait
 
         ansible-playbook -i inventory.ini stop_containers.yml 
