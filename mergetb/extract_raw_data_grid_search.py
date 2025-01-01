@@ -62,7 +62,7 @@ def main():
     base_path = sys.argv[1]
     path_length = int(sys.argv[2])
     n_clients = int(sys.argv[3])
-    data_dir = os.path.join(base_path, "raw_data", "grid_search")
+    data_dir = os.path.join(base_path, "raw_data")
 
     print(data_dir)
 
@@ -107,7 +107,7 @@ def main():
 
         print(results[time_pull][max_retrieve].keys())
 
-    with open(os.path.join(data_dir, 'raw_metrics.json'), 'w') as f:
+    with open(os.path.join(base_path, 'raw_metrics.json'), 'w') as f:
         json.dump(results, f, indent=2)
 
 if __name__ == "__main__":
