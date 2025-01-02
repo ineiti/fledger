@@ -93,7 +93,7 @@ mkdir -p metrics/control
 for i in "${!time_pulls[@]}"; do
     time_pull=${time_pulls[$i]}
 
-    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 token=$token variable=control index=$i"
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "retry=1 path_len=$initial_path_length n_clients=3 duplicates=2 token=$token variable=control index=$i"
     wait
     ansible-playbook -i inventory.ini stop_containers.yml 
     wait

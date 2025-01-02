@@ -26,10 +26,10 @@ for file in files:
     config_file = os.path.join(directory, f"{current_index}_config.yaml")
     storage_file = os.path.join(directory, f"{current_index}_storage.yaml")
 
-new_logs_file = os.path.join(directory, f"log_{new_index}_node-1.log")
-new_signal_file = os.path.join(directory, f"{new_index}_SIGNAL.log")
 new_config_file = os.path.join(directory, f"{new_index}_config.yaml")
 new_storage_file = os.path.join(directory, f"{new_index}_storage.yaml")
+new_logs_file = os.path.join(directory, f"log_{new_index}_node-1.log")
+new_signal_file = os.path.join(directory, f"{new_index}_SIGNAL.log")
 os.rename(logs_file, new_logs_file)
 os.rename(signal_file, new_signal_file)
 os.rename(config_file, new_config_file)

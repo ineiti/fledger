@@ -13,6 +13,7 @@ mergetb/metrics/
 metrics/plots/
 simul_data/
 
+mergetb/*/plots/*
 mergetb/*/raw_data/*
 !mergetb/*/raw_data/.gitkeep
 mergetb/rename/*

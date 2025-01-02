@@ -74,6 +74,8 @@ def plot_average_reliability(directory, data):
     for time_pull, max_retrieves in data.items():
         reliability_per_time_pull = []
         for max_retrieve, data in max_retrieves.items():
+            print(f"keys: {data.keys()}")
+
             reliability = data["loopix_reliability"]
             if reliability != 0:
                 reliability_per_time_pull.append(reliability*100)
@@ -90,7 +92,6 @@ def plot_average_reliability(directory, data):
     plt.savefig(f"{directory}/average_reliability.png")
     plt.clf()
 
-
 if __name__ == "__main__":
     if len(sys.argv) != 4:
         print("Usage: python plot_data.py <data_dir> <path_length> <duration>")
@@ -103,14 +104,27 @@ if __name__ == "__main__":
     
     plots_dir = os.path.join(data_dir, "plots")
 
-    for variable, run in data.items():
-        print(f"Plotting data for {variable}")
+    max_retrieves = {i: [] for i in range(0, 13)}
+
+    time_pulls = data["time_pulls"]
+    for variable, run in time_pulls.items():
+        print(f"Plotting data for time pull {variable}")
         print(run.keys())
         plot_latency_components(plots_dir, path_length, variable, run)
         plot_reliability(plots_dir, variable, run)
         plot_bandwidth(plots_dir, duration, variable, run)
         plot_incoming_messages(plots_dir, variable, run)
+        plot_latency_and_bandwidth(plots_dir, variable, run)
 
-    plot_heatmap_bandwidth(plots_dir, data)
-    plot_heatmap_latency(plots_dir, data)
-    plot_average_reliability(plots_dir, data)
+    max_retrieves = data["max_retrieves"]
+    for max_retrieve, run in max_retrieves.items():
+        print(f"Plotting data for max retrieve {max_retrieve}")
+        plot_latency_components(plots_dir, path_length, max_retrieve, run)
+        plot_reliability(plots_dir, max_retrieve, run)
+        plot_bandwidth(plots_dir, duration, max_retrieve, run)
+        plot_incoming_messages(plots_dir, max_retrieve, run)
+        plot_latency_and_bandwidth(plots_dir, max_retrieve, run)
+    
+    plot_heatmap_bandwidth(plots_dir, time_pulls)
+    plot_heatmap_latency(plots_dir, time_pulls)
+    plot_average_reliability(plots_dir, time_pulls)
