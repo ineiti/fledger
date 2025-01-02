@@ -71,16 +71,19 @@ In conclusion:
 
 % This section is usually 3-5 pages.
 
+%-------------------
 \section{Fledger}
-
+%-------------------
 Fledger is a P2P network run entirely using browsers, it's goal is to enable user to share resources such as CPU, bandwidth, disk space etc. It uses WebRTC to commnunicate between browsers and uses a Signaling Server to enable nodes to discover each other. Signaling server is currently a centralized component, although in the future the plan is to replace this server with a DHT???
 
+%-------------------
 \subsection{Communication between nodes}
 
 \textbf{Talk about web rtc, maybe a figure here.}
 
 When a new fledger node is created it creates a keypair for itself. And from it's public key it derives a nodeID, this nodeID is the main routing information for fledger nodes.
 
+%-------------------
 \subsection{Modular Design}
 
 Fledger has a very modular design, for each functionality it has a module that can be enabled within the Fledger node.
@@ -99,25 +102,28 @@ Here are the module relevant to this project:
     In this project we have created a loopix module that can be used as a middle man between any module and the network module. The main purpose is to be used with web proxy but it can be used to send other kinds of messages from fledger modules.
 \end{itemize}
 
+%-------------------
 \section{Loopix Anonymity System}
+%-------------------
 Loopix is an anonymous communication system that ... It is called a continuous time mixnet as the messages are not delayed between rounds.
 
 \textbf{explain the general idea here}
-
+%-------------------
 \subsection{Client}
 The users in Loopix are called "clients" these are the nodes that are trying to communicate between each other without being observed.
 
 To achieve this has a send queue. and constantly sends cover traffic.
-
+%-------------------
 \subsection{Provider}
 
 Providers in loopix are the entry nodes for the client. Each client has one chosen provider and needs to "subscribe" to this provider. A client will send any message that will go through the mixnet through its provider. If a client receives a message, the provider will store this message and send it to the client only when the client sends a message to retreieve its messages.
-
+%-------------------
 \subsection{Mixnodes}
 
+%-------------------
 \subsection{Thread Model???}
 
-
+%-------------------
 \subsection{Parameters}
 There are many parameters to the Loopix Anonymity System. Which let's us finetune the system to our needs.
 
@@ -139,7 +145,8 @@ Rate at which clients asks its provider to send its stored messages. The client 
 The number of messages the provider sends each time it receives a pull request. It always sends this number of messages. If there aren't enough messages for the client, it will send dummy messages to send exactly "max retreieve" number of messages.
 \end{itemize}
 
-\subsection{<ean number of messages in the mix}
+%-------------------
+\subsection{Mean number of messages in the mix}
 One important security parameter here is lambda/mu. It is essentially number of messages that are at a mixnode being "mixed" at a time. This is an estimate where lambda is the number of incoming messages every second. And mu is the inverse of the mean delay. One can thing of it as the number of messages that are "leaving" the mixnode on average per second. It is important to note that this estimate assumes that there are no loop messages \textbf{and drop?} being send by the mixnode. The Loopix paper recommends lambda/mu of 2. 
 
 
@@ -152,9 +159,9 @@ One important security parameter here is lambda/mu. It is essentially number of 
 % how the design fits together.
 
 % This section is usually 5-10 pages.
-
+%-------------------
 \section{Mix Network Literature Review}
-
+%-------------------
 First step in this project was to find a suitable mixer or an anonymous communcation system that can be used in the context of web proxying.
 
 We looked at a multitude of different systems. Here is some of the more relevant ones:
@@ -174,7 +181,9 @@ Low latency DC net with 100ms latency, but only supports up to 100 clients.
 \subsection{Loopix}
 As we have talked about Loopix we will not go into further detail here. We chose loopix for it's low latency, scalability, availablility of reference implementations and the tunability of the system. There are also many works that have built on top of loopix which attests to it's extensibility, such as larmix which uses latency aware routing to reduce the network latency between nodes. \textbf{make this a better paraphraph}.
 
+%-------------------
 \section{Loopix Integration into Fledger}
+%-------------------
 \subsection{Loopix as a fledger module}
 We we talked about in the background section, fledger contains many modules to communicate between nodes and is very extensible. For this reason we wanted make a loopix module that can fit between any fledger module and the network. Although primary focus of this projec thas been web proxy module, we took care to make sure this module is extensible.
 
@@ -194,8 +203,10 @@ The web proxy module receives the request, gets the url requested and sends all 
 
 After choosing the mixnet to implement, we integrated fledger into 
 
+%-------------------
 \subsection{Assumptions}
 
+%-------------------
 \subsection{Bootstrapping}
 - signalling server
 - nodeID in message
@@ -239,10 +250,9 @@ and there was something else but we'll see
 
 \textbf{PRETTIFY THE GRAPHS AND ADD STD LINES}
 \textbf{Talk about what each part in the stacked bar graph represent etc}
-
-
+%-------------------
 \section{Experiental Setup}
-
+%-------------------
 \subsection{}
 Talk about setup etc and how I wasn't able to setup a massive experiment
 
@@ -254,20 +264,19 @@ Experiments where run with 3 clients 6 mix nodes with path length of 3 (2 mixnod
 
 Each node runs Ubuntu 20.04 LTS with 4 GB RAM and 4 cores on Sphere Testbed \textbf{cite?}. The singal node is running 32 RAM and 32 cores to make sure that it is indeed not a bottleneck.
 
-\textbf{Talk aboout the setup and what thte nodes are doing during the experiment for how long, how many proxy requests over the 5 mins (expect churn stuff)}
+\textbf{Talk aboout the setup and what the nodes are doing during the experiment for how long, how many proxy requests over the 5 mins (expect churn stuff)}
 
-\section{Stacked Graph}
 
-\textbf{talk about the different components that contribute to the end to end latency}
-
-\section{Mean number of messages in the mix}
+%-------------------
+\section{Fine tuning Loopix Parameters for Web Proxy}
+%-------------------
+\subsection{Mean number of messages in the mix}
 As mentioned in section \textbf{cite section}, one important security parameters for loopix system is the mean number of message in the mix. One issue with the Loopix paper is that in their experiments, they used providers and mixnodes with essentially unlimited resources. \textbf{Quote from the paper here}. Which makes it easy to reach their recommendation of lambda over mu. \\
 However, Fledger is designed as a lightweight program, user that want to participate in as mixnode should not need to have \textbf{X amount of RAM and Y cores}. And so keeping in mind that the lambda over mu estimate does not take into account loop messages and the fact that using loopix as already gives up some privacy properties of the original system, we first look into choosing a suitable value for the incoming that a \textbf{low specced machine} can handle.
 
-
 In this section we keep all parameters of the loopix system stable expect the \textbf{lambda loop drop} etc. This is used to adjust the incoming messages per second while keeping the latency the same, which in turn changes the value of the mean number of message in the mix the mix.
 
-We set mean delay to 100ms which correcsonds to a 1/mu of 1/10, so according to the loopix paper, the target value incoming messages per second is 20. lambda/mu = 2. \textbf{with payload =6?}
+The mean delay is set to 100ms which correcsonds to a 1/mu of 1/10, so according to the loopix paper, the target value incoming messages per second is 20. lambda/mu = 2. \textbf{with payload =6?}
 
 \begin{figure}[htbp]
     \centering
@@ -288,35 +297,110 @@ In \autoref{fig:mu_incoming}, we see that we can adjust the value of the the inc
 \textbf{say something about randomness and the measurement is approximate}
 This let's us use the recommended lambda/mu value of 2.
 
-\section{Lambda Payload and Mean Delay}
-As the most binding limitation in our setup is the end to end latency (a user should be able to surf the internet without waiting too long). In this section try to find lambda payload and mean delay values.
+%-------------------
+\subsection{Latency Components}
+It is important to talk about what contributes to the end to end latency of a proxy request. We will show these components through a control run, where all configuration parameters are the same and the simulation is run 12 times for 5 minutes. While showing that given a certain configuration, the system latencies are quite stable, it is important to note that there is a variation of 200-400ms between the averages of run. 
+
+\textbf{talk about the different components that contribute to the end to end latency}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{plots/control_latency_components.png}
+    \caption{}
+    \label{fig:control_lambdas}
+\end{figure}
+
+In \autoref{fig:control_lambdas} each stacked bar represents the average end to end latency in each simulation of 5 minutes. The dotted red line being the actual end-to-end latency, it is slightly higher than the combination of all the listed components, these components are are parts of the loopix configuration (plus network delay) and everything between the dotted red line and the bars are things like the time for a proxy node to get a website, for the nodes to prepare and send web rtc messages between each other etc. Looking at the figure, one can see 4 big components that contribute to the end-to-end latency.
+
+\begin{itemize}
+    \item \textbf{Client Delay} \\
+    This is the time that a message waits in the client queue after being created. The system parameter that it corresponds  to lambda paylaod \textbf{autoref{}}. 
+    \item \textbf{Mixnode Delay} \\
+    This is how long the message spends time being "mixed", namely the total amount of time it is delayed at each layer of the mix network. It more or less corresponds to number of layers in the mix network + 1 (provider of the initiating client) * mean delay \textbf{autoref}
+    \item \textbf{Provider Delay} \\
+    This is the amount of time the message spends time at the storage of the (end provider) before being sent to the client with a pull requeset reply. It is affected mostly by time pull \textbf{autoref} and a bit by maxretreive parameters.
+    \item \textbf{Network Delay} \\
+    The amount of time a packet spends traveling between nodes. In our emulated network, the network delay is set to 15ms, which corresponds to 15 ms per hop, which is path length + 4. 
+\end{itemize}
+
+\autoref{fig:control_lambdas} shows the averages of these values over the course of the simulation for both ways. It is also posisble to see decryption delay and encryption delay in the \textbf{legend} of the graph, which are total amount of time decrypting the sphinx packets and total amount of tiem to encrypt the payload messages respectively, however as they contribute to a very small amount of the end-to-end latency, they are not very visible on the stacked bars. 
+It is also important to note one caviat with these measurements. For mixnode and decrytion delays, the values are average time for all (including cover traffic) as it is not possible for a mixnode to tell the difference between a payload or a cover message.
+
+%-------------------
+\subsection{Lambda Payload and Mean Delay}
+As the most binding limitation in our setup is the end to end latency (a user should be able to surf the internet without waiting too long). In this we section try to find mean delay and lambda payload values that reduces the end to end latency without comprimising too much bandwidth\textbf{(!}.
 
 \textbf{Here is how we calculate the lambda over mu values: emprical lol}
-\subsection{Lambda payload}
+
+\textbf{Talk about the timeout!}
+
+\subsubsection{Lambda payload}
 
 First we adjust the payload value, this warrants a change in the cover traffic rate to keep the mean number of messages one mixnode stable. \textbf{Here we use these values: }
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{plots/lambdas_latency_components.png}
+    \caption{}
+    \label{fig:lambdas_latency}
+\end{figure}
+
+In \autoref{fig:lambdas_latency} one can see that as payload rate increase the client delay, so the latency decrease, however after a payload rate of 6 messages per second the returns are diminishing. We believe this stems from the fact that creation of these packets puts a a load on the client and the provider. This is supported by \autoref{fig:lambdas_realibility} where as the payload increases the success rate of a web proxy request decreases possibly due to dropped packets.
+
+In \autoref{fig:lambdas_bandwidth}, we see that increasing the payload rate increases the bandwidth marginally. And \autoref{fig:lambdas_messages} shows that increasing the payload rate while adjusting the cover traffic does lead to a stable number of incoming messages per mixnode.
+
+\textbf{TODO: I NEED TO RERUN SOME OF THESE}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/lambdas_reliability_latency.png} % Replace with your file
+        \caption{}
+        \label{fig:lambdas_realibility}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/lambdas_bandwidth.png}
+        \caption{}
+        \label{fig:lambdas_bandwidth}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/lambdas_incoming_messages.png}
+        \caption{}
+        \label{fig:lambdas_messages}
+    \end{subfigure}
+\end{figure}
 
 
+\subsubsection{Mean Delay}
+\textbf{The worker pool causes the reduction in mean delay to increase reliability }
 
-
-\section{Choosing Max Retrieve and Time pull}
+%-------------------
+\subsection{Choosing Max Retrieve and Time pull}
 
 Looking at \textbf{figure X} we can see that provider delay quite a lot.
 In this section we choose the max retreive and time pull parameters. essentially, we believe that as we are tuning our system to browse the internet, we do not need to have a very big max retrieve value but the time pull should be low.
 
 \textbf{Talk about how we believe removing/replacing the providers would be beneficial and not retract from the anonymity}
 
-\section{? Why this should work with more nodes}
+%-------------------
+\subsection{? Why this should work with more nodes}
 Although we were not able to set up a experiments with larger number of nodes, in this section we try to demonstrate that our design is scalable:
 
+%-------------------
 \section{Reliability Mechanisms}
+%-------------------
+\subsubsection{Retry}
 
-\subsection{Retry}
+%-------------------
+\subsubsection{Duplicate}
 
-\subsection{Duplicate}
-
-\subsection{Combination of Retry and Duplicate}
+%-------------------
+\subsubsection{Combination of Retry and Duplicate}
 
 
 %%%%%%%%%%%%%%%%%%%%%%

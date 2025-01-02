@@ -88,7 +88,7 @@ def plot_reliability(directory, variable, run):
 def plot_latency(directory, variable, run):
     plt.rcParams.update({'font.size': 16})
     keys = list(run.keys())
-    latency = [run[i]["loopix_end_to_end_latency_seconds"] for i in keys]
+    latency = [convert_to_milliseconds(run[i]["loopix_end_to_end_latency_seconds"]) for i in keys]
     plt.figure(figsize=(20, 6))
 
     plt.plot(keys, latency, marker='o', linestyle='-', color='green', label='Latency')
@@ -97,7 +97,7 @@ def plot_latency(directory, variable, run):
         plt.xlabel(x_axis_name[variable])
     else:
         plt.xlabel(variable)
-    plt.ylabel("Latency (seconds)")
+    plt.ylabel("Latency (milliseconds)")
     plt.ylim(0, max(latency) * 1.1)
     plt.title(f"End-to-End Latency")
     plt.legend()
@@ -114,7 +114,7 @@ def plot_latency_and_bandwidth(directory, variable, run):
     keys = list(run.keys()) 
     x_values = np.array([float(k) for k in keys])  
     
-    latency = [run[k]["loopix_end_to_end_latency_seconds"] for k in keys]
+    latency = [convert_to_milliseconds(run[k]["loopix_end_to_end_latency_seconds"]) for k in keys]
     
     bandwidth = [run[k]["loopix_total_bandwidth_mb"] for k in keys]
 
@@ -127,7 +127,7 @@ def plot_latency_and_bandwidth(directory, variable, run):
         ax1.set_xlabel(x_axis_name[variable])
     else:
         ax1.set_xlabel(variable)
-    ax1.set_ylabel("Latency (seconds)", color='green')
+    ax1.set_ylabel("Latency (milliseconds)", color='green')
     ax1.tick_params(axis='y', labelcolor='green')
 
     ax1.set_xticks(x_values)
@@ -156,7 +156,7 @@ def plot_reliability_latency(directory, variable, run):
     keys = list(run.keys()) 
     x_values = np.array([float(k) for k in keys])  
     
-    latency = [run[k]["loopix_end_to_end_latency_seconds"] for k in keys]
+    latency = [convert_to_milliseconds(run[k]["loopix_end_to_end_latency_seconds"]) for k in keys]
     
     reliability = [run[k]["loopix_reliability"] * 100 for k in keys]
 
@@ -175,8 +175,8 @@ def plot_reliability_latency(directory, variable, run):
     ax1.set_xticks(x_values)
 
     ax2 = ax1.twinx()
-    ax2.plot(x_values, latency, marker='o', linestyle='--', color='blue', label='Latency (s)')
-    ax2.set_ylabel("Latency (seconds)", color='blue')
+    ax2.plot(x_values, latency, marker='o', linestyle='--', color='blue', label='Latency')
+    ax2.set_ylabel("Latency (milliseconds)", color='blue')
     ax2.tick_params(axis='y', labelcolor='blue')
 
 
@@ -198,7 +198,7 @@ def plot_reliability_incoming_latency(directory, variable, run):
     keys = list(run.keys())  
     x_values = np.array([float(k) for k in keys])  
     
-    latency = [run[k]["loopix_end_to_end_latency_seconds"] for k in keys]
+    latency = [convert_to_milliseconds(run[k]["loopix_end_to_end_latency_seconds"]) for k in keys]
     reliability = [run[k]["loopix_reliability"] * 100 for k in keys] 
     incoming_messages = [run[k]["loopix_incoming_messages"] for k in keys]
 
@@ -214,8 +214,8 @@ def plot_reliability_incoming_latency(directory, variable, run):
     ax2.tick_params(axis='y', labelcolor='green')
 
     ax3 = ax1.twinx()
-    ax3.plot(x_values, latency, marker='o', linestyle='-', color='red', label='Latency (s)')
-    ax3.set_ylabel("End-to-End Latency (seconds)", color='red')
+    ax3.plot(x_values, latency, marker='o', linestyle='-', color='red', label='Latency')
+    ax3.set_ylabel("End-to-End Latency (milliseconds)", color='red')
     ax3.tick_params(axis='y', labelcolor='red')
 
     fig.suptitle(f"Reliability, Incoming Messages, and Latency")
