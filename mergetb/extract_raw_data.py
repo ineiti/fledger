@@ -20,8 +20,9 @@ metrics_to_extract = [
 def simulation_ran_successfully(data_dir, variable, index):
     dir = f"{data_dir}/{variable}"
     metrics_file = os.path.join(dir, f"metrics_{index}_node-1.txt")
+    metrics_file_2 = os.path.join(dir, f"metrics_{index}.txt")
 
-    if not os.path.exists(metrics_file):
+    if not os.path.exists(metrics_file) and not os.path.exists(metrics_file_2):
         return False
 
     with open(metrics_file, 'r') as f:
@@ -88,23 +89,31 @@ def get_metrics_data(data_dir, path_length, n_clients, results, variable, index)
         print(f"Getting metrics data for node-{i}")
         dir = f"{data_dir}/{variable}"
         metrics_file = os.path.join(dir, f"metrics_{index}_node-{i}.txt")
-        
+        metrics_file_2 = os.path.join(dir, f"metrics_{index}.txt")
+
         if os.path.exists(metrics_file):
             with open(metrics_file, 'r') as f:
                 content = f.read()
+
+        elif os.path.exists(metrics_file_2):
+            with open(metrics_file_2, 'r') as f:
+                content = f.read()
+        else:
+            print(f"Metrics file not found")
+            return False
             
-            for metric in metrics_to_extract:
-                if metric == "loopix_bandwidth_bytes" or metric == "loopix_start_time_seconds":
-                    get_bandwidth_bytes_or_start_time(results, content, metric, i)
+        for metric in metrics_to_extract:
+            if metric == "loopix_bandwidth_bytes" or metric == "loopix_start_time_seconds":
+                get_bandwidth_bytes_or_start_time(results, content, metric, i)
 
-                elif metric == "loopix_number_of_proxy_requests":
-                    get_proxy_request(results, content, metric, i)
+            elif metric == "loopix_number_of_proxy_requests":
+                get_proxy_request(results, content, metric, i)
 
-                elif metric == "loopix_incoming_messages":
-                    get_incoming_messages(results, content, metric, i)
+            elif metric == "loopix_incoming_messages":
+                get_incoming_messages(results, content, metric, i)
 
-                else:
-                    get_histogram_metrics(results, content, metric, i)
+            else:
+                get_histogram_metrics(results, content, metric, i)
 
     return True
           

@@ -3,14 +3,18 @@ import re
 import json
 import sys
 import yaml
+from extract_raw_data import get_bandwidth_bytes_or_start_time, get_proxy_request, get_incoming_messages, get_histogram_metrics, 
 
-from extract_raw_data import metrics_to_extract, create_results_dict, get_bandwidth_bytes, get_proxy_request_or_start_time, get_incoming_messages, get_histogram_metrics
+def get_metrics_data(data_dir, path_length, n_clients, results, variable, index):
 
-def get_metrics_data(data_dir, path_length, results, variable, index):
+    if not simulation_ran_successfully(data_dir, variable, index):
+        print(f"Skipping run {variable} {index}, no end-to-end latency data found")
+        return False
 
     create_results_dict(results, metrics_to_extract)
 
-    for i in range(path_length*path_length + path_length * 2):
+    for i in range(path_length*(path_length - 1) + path_length + n_clients):
+
         print(f"Getting metrics data for node-{i}")
         dir = f"{data_dir}/{variable}"
         metrics_file = os.path.join(dir, f"metrics_{index}_node-{i}.txt")
@@ -20,99 +24,83 @@ def get_metrics_data(data_dir, path_length, results, variable, index):
                 content = f.read()
             
             for metric in metrics_to_extract:
-                if metric == "loopix_bandwidth_bytes":
-                    pattern = rf"{metric}\s+([0-9.e+-]+)$"
-                    match = re.search(pattern, content, re.MULTILINE)
-                    if match:
-                        results[metric].append(float(match.group(1)))
-                    else:
-                        print(f"Error for node-{i}: match {match}")
+                if metric == "loopix_bandwidth_bytes" or metric == "loopix_start_time_seconds":
+                    get_bandwidth_bytes_or_start_time(results, content, metric, i)
 
-                elif metric == "loopix_number_of_proxy_requests" or metric == "loopix_start_time_seconds":
-                    pattern = rf"{metric}\s+([0-9.e+-]+)$"
-                    match = re.search(pattern, content, re.MULTILINE)
-                    if match:
-                        results[metric].append(float(match.group(1)))
+                elif metric == "loopix_number_of_proxy_requests":
+                    get_proxy_request(results, content, metric, i)
+
                 elif metric == "loopix_incoming_messages":
-                    provider_pattern = "loopix_provider_delay_milliseconds"
-                    client_pattern = "loopix_number_of_proxy_requests"
-                    if not provider_pattern in content and not client_pattern in content:
-                        pattern = rf"{metric}\s+([0-9.e+-]+)$"
-                        match = re.search(pattern, content, re.MULTILINE)
+                    get_incoming_messages(results, content, metric, i)
 
-                        results[metric].append(float(match.group(1)))
                 else:
-                    pattern_sum = rf"^{metric}_sum\s+([0-9.e+-]+)"
-                    pattern_count = rf"^{metric}_count\s+([0-9.e+-]+)"
-                    match_sum = re.search(pattern_sum, content, re.MULTILINE)
-                    match_count = re.search(pattern_count, content, re.MULTILINE)
-                    if match_count and match_sum:
-                        results[metric][f"sum"].append(float(match_sum.group(1)))
-                        results[metric][f"count"].append(float(match_count.group(1)))
-                    elif match_count or match_sum:
-                        print(f"Error for node-{i}: match_sum {match_sum}, match_count {match_count}")
+                    get_histogram_metrics(results, content, metric, i)
 
     return True
           
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python extract_raw_data.py <data_dir> <path_length>")
+    if len(sys.argv) != 4:
+        print("Usage: python extract_raw_data.py <data_dir> <path_length> <n_clients>")
         sys.exit(1)
 
     base_path = sys.argv[1]
     data_dir = os.path.join(base_path, "raw_data")
     path_length = int(sys.argv[2])
+    n_clients = int(sys.argv[3])
 
     results = {}
     variables = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
+    print(variables)
+
+    signal_log_suffix = "_SIGNAL.log"
+    json_suffix = ".json"
 
     for variable in variables:
-
-        directory = f"{data_dir}/{variable}"
-
-        runs = os.listdir(directory)
-
-        for run in runs:
-            run_dir = os.path.join(directory, run)
-
-            nodes = os.listdir(run_dir)
-
-            for node in nodes:
-                node_dir = os.path.join(run_dir, node, "data")
-                metrics_files = os.listdir(node_dir)
-
-                for metrics_file in metrics_files:
-                    with open(os.path.join(node_dir, metrics_file), 'r') as f:
-                        content = f.read()
-
-                
+        run_dir = os.path.join(data_dir, variable)
+        runs = [f for f in os.listdir(run_dir) if not f.endswith(signal_log_suffix) and not f.endswith(json_suffix)]
 
         print(runs)
 
-        if runs > 0:
-            indices_to_remove = []
-            for index in range(runs):
-                with open(os.path.join(directory, f'{index}_config.yaml'), 'r') as f:
-                    config = yaml.safe_load(f)
+        for run in runs:
+            node_dir = os.path.join(run_dir, run)
+            nodes = os.listdir(node_dir)
+            print(nodes)
+            for node in nodes:
+                node_data_dir = os.path.join(node_dir, node, "data")
+                print(node_data_dir)
 
-                print(variable == 'control')
+                prefix = "metrics_"
 
-                if variable == 'control':
-                    run_value = index
-                else:
-                    run_value = config[variable]
+                files = os.listdir(node_data_dir)
 
-                if variable not in results.keys():
-                    results[variable] = {str(run_value): {}}
-                else:
-                    results[variable][str(run_value)] = {}
+                metrics_files = [file for file in files if file.startswith(prefix) and os.path.isfile(os.path.join(node_data_dir, file))]
 
-                print(f"Getting metrics data from run {variable} {index}")
+                print(metrics_files)
 
-                if not get_metrics_data(data_dir, path_length, results[variable][str(run_value)], variable, index):
-                    indices_to_remove.append(index)
+                for index in range(runs):
+                    with open(os.path.join(directory, f'{index}_config.yaml'), 'r') as f:
+                        config = yaml.safe_load(f)
+
+                    print(variable == 'control')
+
+                    if variable == 'control':
+                        run_value = index
+                    else:
+                        try:
+                            run_value = config[variable]
+                        except:
+                            continue
+
+                    if variable not in results.keys():
+                        results[variable] = {str(run_value): {}}
+                    else:
+                        results[variable][str(run_value)] = {}
+
+                    print(f"Getting metrics data from run {variable} {index}")
+
+                    get_metrics_data(data_dir, path_length, n_clients, results[variable][str(run_value)], variable, index)
+
                     
-
         print(results)
     with open(f'{base_path}/raw_metrics.json', 'w') as f:
         json.dump(results, f, indent=2)

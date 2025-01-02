@@ -96,14 +96,7 @@ def main():
             else:
                 results[time_pull][max_retrieve] = {}
             
-
-            indices_to_remove = []
-            if not get_metrics_data(data_dir, path_length, n_clients, results[time_pull][max_retrieve], time_index, retrieve_index):
-                indices_to_remove.append(max_retrieve)
-                
-            print(indices_to_remove)
-            for index in indices_to_remove:
-                results[time_pull][max_retrieve].pop(index, None)
+            get_metrics_data(data_dir, path_length, n_clients, results[time_pull][max_retrieve], time_index, retrieve_index)
 
         print(results[time_pull][max_retrieve].keys())
 

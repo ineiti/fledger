@@ -14,6 +14,14 @@ mkdir -p metrics/retry
 
 retry_values=(0 1 2 3 4)
 
+retry_json="{"
+for i in "${!retry_values[@]}"; do
+    retry=${retry_values[$i]}
+    retry_json+="\"$i\": $retry,"
+done
+retry_json="${retry_json%,}}"
+echo -e "$retry_json" > metrics/retry/retry.json
+
 for i in "${!retry_values[@]}"; do
     retry=${retry_values[$i]}
 
@@ -35,10 +43,8 @@ for i in "${!duplicates_values[@]}"; do
     duplicates=${duplicates_values[$i]}
     duplicates_json+="\"$i\": $duplicates,"
 done
-
 duplicates_json="${duplicates_json%,}}"
-echo -e "$duplicates_json" > metrics/duplicates/duplicates.json >&2
-
+echo -e "$duplicates_json" > metrics/duplicates/duplicates.json
 
 for i in "${!duplicates_values[@]}"; do
     duplicates=${duplicates_values[$i]}
@@ -63,14 +69,12 @@ for i in "${!duplicates_values[@]}"; do
         duplicates=${duplicates_values[$i]}
         retry=${retry_values[$j]}
         index=$((i * j + j))
-        retry_duplicates+="\"$index\": {duplicates: $duplicates, retry: $retry},"
+        retry_duplicates+="\"$index\": {\"duplicates\": $duplicates, \"retry\": $retry},"
     done
 done
-
 retry_duplicates="${retry_duplicates%,}}"
-echo -e "$retry_duplicates" > metrics/retry_duplicates/retry_duplicates.json >&2
+echo -e "$retry_duplicates" > metrics/retry_duplicates/retry_duplicates.json
 
-    
 for i in "${!duplicates_values[@]}"; do
     for j in "${!retry_values[@]}"; do
         duplicates=${duplicates_values[$i]}
@@ -100,4 +104,3 @@ for i in "${!time_pulls[@]}"; do
     ansible-playbook -i inventory.ini delete_only_metrics.yml
     wait
 done
-
