@@ -13,13 +13,14 @@ mergetb/metrics/
 metrics/plots/
 simul_data/
 
+*/plots/*
 mergetb/*/plots/*
 mergetb/*/raw_data/*
 !mergetb/*/raw_data/.gitkeep
 mergetb/rename/*
 !mergetb/rename/.gitkeep
 
-*/average_data.json
-*/raw_metrics.json
+average_data.json
+raw_metrics.json
 
 logs.txt
