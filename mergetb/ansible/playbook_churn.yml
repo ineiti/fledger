@@ -81,7 +81,7 @@
               --path-len {{ path_len }}
               {% endif %}
               -s ws://{{ signal_node }}:8765
-              --start_loopix_time 60
+              --start_loopix_time 15
               --retry {{ retry }}
               --n-clients {{ n_clients }}
               --save_new_metrics_file
@@ -100,7 +100,7 @@
 
         - name: Wait 
           pause:
-            seconds: 260
+            seconds: 320
 
 - name: Stop first mixnode
   hosts: node-10
@@ -111,7 +111,7 @@
 
     - name: Wait
       pause:
-        seconds: 240
+        seconds: 305
 
 - name: Stop second mixnode
   hosts: node-3
@@ -122,7 +122,7 @@
 
     - name: Wait
       pause:
-        seconds: 240
+        seconds: 305
 
 - name: Stop third mixnode
   hosts: node-6
@@ -133,7 +133,7 @@
 
     - name: Wait
       pause:
-        seconds: 240
+        seconds: 305
 
 - name: Stop existing fledger container if present
   hosts: FLEDGER_NODES

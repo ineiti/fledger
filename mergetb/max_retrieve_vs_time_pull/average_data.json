@@ -4,7 +4,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 773.1217651367188,
         "loopix_reliability": 0.875968992248062,
-        "loopix_reliability_std": 0.01592991352103914,
         "loopix_incoming_messages": 23.217158364283282,
         "loopix_incoming_messages_std": 0.488113557555805,
         "loopix_end_to_end_latency_seconds": 1.973665542646018,
@@ -17,7 +16,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 833.1909255981445,
         "loopix_reliability": 0.9198113207547169,
-        "loopix_reliability_std": 0.007958409148258442,
         "loopix_incoming_messages": 24.016482096070508,
         "loopix_incoming_messages_std": 0.33012944662483285,
         "loopix_end_to_end_latency_seconds": 1.8085618894615387,
@@ -30,7 +28,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 879.8133163452148,
         "loopix_reliability": 0.8366013071895425,
-        "loopix_reliability_std": 0.06009195822554705,
         "loopix_incoming_messages": 24.073966899227084,
         "loopix_incoming_messages_std": 0.19022177683128774,
         "loopix_end_to_end_latency_seconds": 1.8717205117109375,
@@ -43,7 +40,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 925.8646087646484,
         "loopix_reliability": 0.9477911646586346,
-        "loopix_reliability_std": 0.006856096952396788,
         "loopix_incoming_messages": 24.10372906224321,
         "loopix_incoming_messages_std": 0.20965864320588576,
         "loopix_end_to_end_latency_seconds": 1.6893954891694916,
@@ -56,7 +52,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 972.6842880249023,
         "loopix_reliability": 0.8917525773195877,
-        "loopix_reliability_std": 0.019838816858644772,
         "loopix_incoming_messages": 24.189122764760494,
         "loopix_incoming_messages_std": 0.2447240248257119,
         "loopix_end_to_end_latency_seconds": 1.664269324560694,
@@ -69,7 +64,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 1018.413688659668,
         "loopix_reliability": 0.9182389937106918,
-        "loopix_reliability_std": 0.20194539953102325,
         "loopix_incoming_messages": 24.19935991756442,
         "loopix_incoming_messages_std": 0.2717649293334197,
         "loopix_end_to_end_latency_seconds": 1.5861865472328764,
@@ -82,7 +76,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 1062.9905090332031,
         "loopix_reliability": 0.91,
-        "loopix_reliability_std": 0.039913981059577344,
         "loopix_incoming_messages": 24.15314880182108,
         "loopix_incoming_messages_std": 0.17289491710655677,
         "loopix_end_to_end_latency_seconds": 1.714521926412088,
@@ -95,7 +88,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 1108.9587326049805,
         "loopix_reliability": 0.9254385964912281,
-        "loopix_reliability_std": 0.010050817661395569,
         "loopix_incoming_messages": 24.156586969040802,
         "loopix_incoming_messages_std": 0.16997181432530925,
         "loopix_end_to_end_latency_seconds": 1.6688454154312795,
@@ -108,7 +100,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 1152.1441497802734,
         "loopix_reliability": 0.9032258064516129,
-        "loopix_reliability_std": 0.10498693441144104,
         "loopix_incoming_messages": 24.05077066003366,
         "loopix_incoming_messages_std": 0.10011196537774161,
         "loopix_end_to_end_latency_seconds": 1.6722287176142856,
@@ -121,7 +112,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 1192.7232818603516,
         "loopix_reliability": 0.8405797101449275,
-        "loopix_reliability_std": 0.04583303847208566,
         "loopix_incoming_messages": 23.90209954619331,
         "loopix_incoming_messages_std": 0.3386423178959229,
         "loopix_end_to_end_latency_seconds": 1.821136169275862,
@@ -134,7 +124,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 1245.035888671875,
         "loopix_reliability": 0.9237668161434978,
-        "loopix_reliability_std": 0.020936354963658112,
         "loopix_incoming_messages": 24.161303140037976,
         "loopix_incoming_messages_std": 0.22008196550928114,
         "loopix_end_to_end_latency_seconds": 1.7579342064951458,
@@ -147,7 +136,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 1289.4673385620117,
         "loopix_reliability": 0.9154929577464789,
-        "loopix_reliability_std": 0.015612482055017944,
         "loopix_incoming_messages": 24.1031405118483,
         "loopix_incoming_messages_std": 0.12005100505722593,
         "loopix_end_to_end_latency_seconds": 1.6867397447538464,
@@ -161,8 +149,7 @@
     "0.5": {
       "1": {
         "loopix_total_bandwidth_mb": 689.1599273681641,
-        "loopix_reliability": 0,
-        "loopix_reliability_std": 0,
+        "loopix_reliability": 0.7105263157894737,
         "loopix_incoming_messages": 23.271137336277846,
         "loopix_incoming_messages_std": 0.2313258176408701,
         "loopix_end_to_end_latency_seconds": 2.4757876609814815,
@@ -175,7 +162,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 710.2282638549805,
         "loopix_reliability": 0.8584905660377359,
-        "loopix_reliability_std": 0.03821997909327926,
         "loopix_incoming_messages": 23.169427490912714,
         "loopix_incoming_messages_std": 0.39324082931787746,
         "loopix_end_to_end_latency_seconds": 2.3168258337802197,
@@ -188,7 +174,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 743.621940612793,
         "loopix_reliability": 0.8813559322033898,
-        "loopix_reliability_std": 0.016997808254937255,
         "loopix_incoming_messages": 24.062212429798542,
         "loopix_incoming_messages_std": 0.25406034433482183,
         "loopix_end_to_end_latency_seconds": 2.08740793075641,
@@ -201,7 +186,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 762.8627624511719,
         "loopix_reliability": 0.9526627218934911,
-        "loopix_reliability_std": 0.026808712934755948,
         "loopix_incoming_messages": 24.11697132949738,
         "loopix_incoming_messages_std": 0.20016446837015794,
         "loopix_end_to_end_latency_seconds": 1.9620311800310561,
@@ -214,7 +198,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 778.18896484375,
         "loopix_reliability": 0.8854961832061069,
-        "loopix_reliability_std": 0.18755000476324735,
         "loopix_incoming_messages": 23.960316553339446,
         "loopix_incoming_messages_std": 0.19570870590689723,
         "loopix_end_to_end_latency_seconds": 1.8893839354224133,
@@ -227,7 +210,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 800.0360717773438,
         "loopix_reliability": 0.8858695652173914,
-        "loopix_reliability_std": 0.0356834946546658,
         "loopix_incoming_messages": 24.1357108920484,
         "loopix_incoming_messages_std": 0.19709785801824317,
         "loopix_end_to_end_latency_seconds": 1.9576203061656443,
@@ -240,7 +222,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 819.5572509765625,
         "loopix_reliability": 0.9357798165137615,
-        "loopix_reliability_std": 0.05885686663711681,
         "loopix_incoming_messages": 24.20254288149768,
         "loopix_incoming_messages_std": 0.08281873656175805,
         "loopix_end_to_end_latency_seconds": 2.0029470492499994,
@@ -253,7 +234,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 837.5001220703125,
         "loopix_reliability": 0.8742857142857143,
-        "loopix_reliability_std": 0.02864310601752995,
         "loopix_incoming_messages": 24.18424595932663,
         "loopix_incoming_messages_std": 0.3651808542839171,
         "loopix_end_to_end_latency_seconds": 1.9157146960392157,
@@ -266,7 +246,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 855.951789855957,
         "loopix_reliability": 0.9113300492610837,
-        "loopix_reliability_std": 0.059316215658706074,
         "loopix_incoming_messages": 24.19138539475268,
         "loopix_incoming_messages_std": 0.13995041111009512,
         "loopix_end_to_end_latency_seconds": 1.9682072641459467,
@@ -279,7 +258,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 868.5055694580078,
         "loopix_reliability": 0.64,
-        "loopix_reliability_std": 0.07904197644189974,
         "loopix_incoming_messages": 23.871652097468264,
         "loopix_incoming_messages_std": 0.3873827136080187,
         "loopix_end_to_end_latency_seconds": 1.8506145174687498,
@@ -292,7 +270,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 892.2113418579102,
         "loopix_reliability": 0.9351851851851852,
-        "loopix_reliability_std": 0.017841065831164394,
         "loopix_incoming_messages": 24.187935853918024,
         "loopix_incoming_messages_std": 0.19907210782021284,
         "loopix_end_to_end_latency_seconds": 2.005589735257426,
@@ -305,7 +282,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 909.9880752563477,
         "loopix_reliability": 0.9084507042253521,
-        "loopix_reliability_std": 0.011212060437483955,
         "loopix_incoming_messages": 24.167339736840155,
         "loopix_incoming_messages_std": 0.19863436983668006,
         "loopix_end_to_end_latency_seconds": 2.150577040627907,
@@ -320,7 +296,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 690.2917404174805,
         "loopix_reliability": 0.8947368421052632,
-        "loopix_reliability_std": 0.048979838086116965,
         "loopix_incoming_messages": 23.98516475882908,
         "loopix_incoming_messages_std": 0.20528935693043956,
         "loopix_end_to_end_latency_seconds": 3.3307067334705884,
@@ -333,7 +308,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 706.9885787963867,
         "loopix_reliability": 0.9171270718232044,
-        "loopix_reliability_std": 0.062460198255668,
         "loopix_incoming_messages": 24.20030556075676,
         "loopix_incoming_messages_std": 0.2402008834199394,
         "loopix_end_to_end_latency_seconds": 2.3677702702951806,
@@ -346,7 +320,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 687.7062225341797,
         "loopix_reliability": 0.7586206896551724,
-        "loopix_reliability_std": 0.13439222874739035,
         "loopix_incoming_messages": 22.407928982570255,
         "loopix_incoming_messages_std": 1.2277702555852825,
         "loopix_end_to_end_latency_seconds": 2.2502337480681818,
@@ -359,7 +332,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 732.2207412719727,
         "loopix_reliability": 0.9130434782608695,
-        "loopix_reliability_std": 0.016929331117077295,
         "loopix_incoming_messages": 24.156198783451323,
         "loopix_incoming_messages_std": 0.22533112776379102,
         "loopix_end_to_end_latency_seconds": 2.188319902015873,
@@ -372,7 +344,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 744.4422454833984,
         "loopix_reliability": 0.8901734104046243,
-        "loopix_reliability_std": 0.01671764758728992,
         "loopix_incoming_messages": 24.091528698913486,
         "loopix_incoming_messages_std": 0.1723119701521763,
         "loopix_end_to_end_latency_seconds": 2.3389547777207795,
@@ -385,7 +356,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 755.7915267944336,
         "loopix_reliability": 0.8953488372093024,
-        "loopix_reliability_std": 0.02507233174433543,
         "loopix_incoming_messages": 24.003796861604073,
         "loopix_incoming_messages_std": 0.16085497365179174,
         "loopix_end_to_end_latency_seconds": 2.3123562897662335,
@@ -398,7 +368,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 757.255615234375,
         "loopix_reliability": 0.8888888888888888,
-        "loopix_reliability_std": 0.08318917572302297,
         "loopix_incoming_messages": 23.371853695857965,
         "loopix_incoming_messages_std": 0.4943680995374852,
         "loopix_end_to_end_latency_seconds": 2.2321338245874998,
@@ -411,7 +380,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 785.841682434082,
         "loopix_reliability": 0.9541284403669725,
-        "loopix_reliability_std": 0.02230188237733391,
         "loopix_incoming_messages": 24.198595791524163,
         "loopix_incoming_messages_std": 0.30135393085193385,
         "loopix_end_to_end_latency_seconds": 2.353427739096153,
@@ -424,7 +392,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 798.2708587646484,
         "loopix_reliability": 0.921875,
-        "loopix_reliability_std": 0.04862866792701007,
         "loopix_incoming_messages": 24.17565830565053,
         "loopix_incoming_messages_std": 0.11028088378471042,
         "loopix_end_to_end_latency_seconds": 2.3484290013446323,
@@ -437,7 +404,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 811.3022842407227,
         "loopix_reliability": 0.8959537572254336,
-        "loopix_reliability_std": 0.022617557712257066,
         "loopix_incoming_messages": 24.164886272080622,
         "loopix_incoming_messages_std": 0.062378236757270014,
         "loopix_end_to_end_latency_seconds": 2.2858058805741934,
@@ -450,7 +416,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 823.4095687866211,
         "loopix_reliability": 0.864516129032258,
-        "loopix_reliability_std": 0.029501096174586832,
         "loopix_incoming_messages": 24.147628395601068,
         "loopix_incoming_messages_std": 0.09704836436471498,
         "loopix_end_to_end_latency_seconds": 2.3102862086492535,
@@ -463,7 +428,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 835.0703582763672,
         "loopix_reliability": 0.8773006134969326,
-        "loopix_reliability_std": 0.014225138686041671,
         "loopix_incoming_messages": 24.03419579992919,
         "loopix_incoming_messages_std": 0.22127848017298524,
         "loopix_end_to_end_latency_seconds": 2.336813164433566,
@@ -478,7 +442,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 688.9211044311523,
         "loopix_reliability": 0.9172413793103448,
-        "loopix_reliability_std": 0.03737877556746745,
         "loopix_incoming_messages": 24.189948061977756,
         "loopix_incoming_messages_std": 0.2080587934849428,
         "loopix_end_to_end_latency_seconds": 3.994979309819549,
@@ -491,7 +454,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 697.5291137695312,
         "loopix_reliability": 0.8461538461538461,
-        "loopix_reliability_std": 0.04317199725214444,
         "loopix_incoming_messages": 24.038432725262577,
         "loopix_incoming_messages_std": 0.21270539467656652,
         "loopix_end_to_end_latency_seconds": 2.6744154385041323,
@@ -504,7 +466,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 709.7921524047852,
         "loopix_reliability": 0.9423076923076923,
-        "loopix_reliability_std": 0.021591216698392722,
         "loopix_incoming_messages": 24.057701170102373,
         "loopix_incoming_messages_std": 0.1720339535096439,
         "loopix_end_to_end_latency_seconds": 2.2956794201700683,
@@ -517,7 +478,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 720.694938659668,
         "loopix_reliability": 0.9175257731958762,
-        "loopix_reliability_std": 0.011961010229026169,
         "loopix_incoming_messages": 24.02927969845147,
         "loopix_incoming_messages_std": 0.34940855905428897,
         "loopix_end_to_end_latency_seconds": 2.3188838571404498,
@@ -530,7 +490,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 733.4148559570312,
         "loopix_reliability": 0.9050279329608939,
-        "loopix_reliability_std": 0.02655033332388324,
         "loopix_incoming_messages": 24.09305406725444,
         "loopix_incoming_messages_std": 0.1513750623106399,
         "loopix_end_to_end_latency_seconds": 2.303158232685185,
@@ -543,7 +502,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 744.8783569335938,
         "loopix_reliability": 0.9259259259259259,
-        "loopix_reliability_std": 0.042773391582373324,
         "loopix_incoming_messages": 24.124033234051687,
         "loopix_incoming_messages_std": 0.16315514180360677,
         "loopix_end_to_end_latency_seconds": 2.6120722264857146,
@@ -556,7 +514,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 757.2140808105469,
         "loopix_reliability": 0.9109947643979057,
-        "loopix_reliability_std": 0.009751835730541078,
         "loopix_incoming_messages": 24.156517204511474,
         "loopix_incoming_messages_std": 0.2064777483717873,
         "loopix_end_to_end_latency_seconds": 2.274324981068965,
@@ -569,7 +526,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 769.4667358398438,
         "loopix_reliability": 0.9238578680203046,
-        "loopix_reliability_std": 0.03343994771705077,
         "loopix_incoming_messages": 24.18665465541681,
         "loopix_incoming_messages_std": 0.11595110630721042,
         "loopix_end_to_end_latency_seconds": 2.353281480247253,
@@ -582,7 +538,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 780.0995483398438,
         "loopix_reliability": 0.9343434343434344,
-        "loopix_reliability_std": 0.018819408680279662,
         "loopix_incoming_messages": 24.167245380643124,
         "loopix_incoming_messages_std": 0.11436274811002732,
         "loopix_end_to_end_latency_seconds": 2.3239005221891884,
@@ -595,7 +550,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 791.2619247436523,
         "loopix_reliability": 0.9463414634146341,
-        "loopix_reliability_std": 0.007394265746382272,
         "loopix_incoming_messages": 24.142332566406424,
         "loopix_incoming_messages_std": 0.0912094284163116,
         "loopix_end_to_end_latency_seconds": 2.58241639964433,
@@ -608,7 +562,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 800.9602127075195,
         "loopix_reliability": 0.90625,
-        "loopix_reliability_std": 0.012335683970723621,
         "loopix_incoming_messages": 24.060039183661495,
         "loopix_incoming_messages_std": 0.2817589508357775,
         "loopix_end_to_end_latency_seconds": 2.390541803034483,
@@ -621,7 +574,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 814.0331726074219,
         "loopix_reliability": 0.9329896907216495,
-        "loopix_reliability_std": 0.01296197415564505,
         "loopix_incoming_messages": 24.137721070197923,
         "loopix_incoming_messages_std": 0.2566346076264579,
         "loopix_end_to_end_latency_seconds": 2.35788461240884,
@@ -636,7 +588,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 683.6669998168945,
         "loopix_reliability": 0.88,
-        "loopix_reliability_std": 0.02896126852706255,
         "loopix_incoming_messages": 24.10496201192675,
         "loopix_incoming_messages_std": 0.07233742449068171,
         "loopix_end_to_end_latency_seconds": 4.279382702436363,
@@ -649,7 +600,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 695.0578155517578,
         "loopix_reliability": 0.8640776699029126,
-        "loopix_reliability_std": 0.048437270023244085,
         "loopix_incoming_messages": 24.182462366082795,
         "loopix_incoming_messages_std": 0.11130165289794605,
         "loopix_end_to_end_latency_seconds": 2.7098782196741573,
@@ -662,7 +612,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 703.769660949707,
         "loopix_reliability": 0.9285714285714286,
-        "loopix_reliability_std": 0.15094270723700168,
         "loopix_incoming_messages": 24.09036062814027,
         "loopix_incoming_messages_std": 0.29818966107857076,
         "loopix_end_to_end_latency_seconds": 2.2439110386713286,
@@ -675,7 +624,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 712.8864669799805,
         "loopix_reliability": 0.819672131147541,
-        "loopix_reliability_std": 0.14785541751926412,
         "loopix_incoming_messages": 24.025747771709934,
         "loopix_incoming_messages_std": 0.12560415077007847,
         "loopix_end_to_end_latency_seconds": 2.47027306396,
@@ -688,7 +636,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 725.2741088867188,
         "loopix_reliability": 0.9247311827956989,
-        "loopix_reliability_std": 0.09923775502425572,
         "loopix_incoming_messages": 24.153041421042154,
         "loopix_incoming_messages_std": 0.10601003827195422,
         "loopix_end_to_end_latency_seconds": 2.0725451796046515,
@@ -701,7 +648,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 736.4468688964844,
         "loopix_reliability": 0.8994413407821229,
-        "loopix_reliability_std": 0.022463404841072197,
         "loopix_incoming_messages": 24.20508946451732,
         "loopix_incoming_messages_std": 0.15586462215237515,
         "loopix_end_to_end_latency_seconds": 2.3941831580372672,
@@ -714,7 +660,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 745.5429077148438,
         "loopix_reliability": 0.8666666666666667,
-        "loopix_reliability_std": 0.025494790547777264,
         "loopix_incoming_messages": 24.16133486578522,
         "loopix_incoming_messages_std": 0.14737710097644555,
         "loopix_end_to_end_latency_seconds": 2.404258749932692,
@@ -727,7 +672,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 755.0231399536133,
         "loopix_reliability": 0.9243243243243243,
-        "loopix_reliability_std": 0.05645829900739742,
         "loopix_incoming_messages": 24.124208048860826,
         "loopix_incoming_messages_std": 0.1757662634237069,
         "loopix_end_to_end_latency_seconds": 2.5762900563274855,
@@ -740,7 +684,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 764.2022476196289,
         "loopix_reliability": 0.9130434782608695,
-        "loopix_reliability_std": 0.03734134756418237,
         "loopix_incoming_messages": 24.045471684517363,
         "loopix_incoming_messages_std": 0.18425127220344867,
         "loopix_end_to_end_latency_seconds": 2.4132208005833333,
@@ -753,7 +696,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 776.4341354370117,
         "loopix_reliability": 0.9157894736842105,
-        "loopix_reliability_std": 0.029388017194265977,
         "loopix_incoming_messages": 24.177242295168092,
         "loopix_incoming_messages_std": 0.21541336119625426,
         "loopix_end_to_end_latency_seconds": 2.2836920748160923,
@@ -766,7 +708,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 786.506233215332,
         "loopix_reliability": 0.9541284403669725,
-        "loopix_reliability_std": 0.037903554204199344,
         "loopix_incoming_messages": 24.17258357214578,
         "loopix_incoming_messages_std": 0.13807549802754418,
         "loopix_end_to_end_latency_seconds": 2.4229618627211535,
@@ -779,7 +720,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 796.4225769042969,
         "loopix_reliability": 0.9116022099447514,
-        "loopix_reliability_std": 0.01796367852265823,
         "loopix_incoming_messages": 24.149538273271844,
         "loopix_incoming_messages_std": 0.14690220001886503,
         "loopix_end_to_end_latency_seconds": 2.407971297551515,
@@ -794,7 +734,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 679.9496688842773,
         "loopix_reliability": 0.8,
-        "loopix_reliability_std": 0.15520794494109993,
         "loopix_incoming_messages": 24.07721738502039,
         "loopix_incoming_messages_std": 0.18602818774935453,
         "loopix_end_to_end_latency_seconds": 3.9146594052249997,
@@ -807,7 +746,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 628.7896423339844,
         "loopix_reliability": 0.5116279069767442,
-        "loopix_reliability_std": 0.04977486713967634,
         "loopix_incoming_messages": 20.540069510654185,
         "loopix_incoming_messages_std": 1.5126339490519976,
         "loopix_end_to_end_latency_seconds": 2.6227321252272726,
@@ -820,7 +758,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 699.3981628417969,
         "loopix_reliability": 0.9253731343283582,
-        "loopix_reliability_std": 0.012880977306800944,
         "loopix_incoming_messages": 24.13571195488567,
         "loopix_incoming_messages_std": 0.34626680236626,
         "loopix_end_to_end_latency_seconds": 2.6362206524838707,
@@ -833,7 +770,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 704.9949264526367,
         "loopix_reliability": 0.9191176470588235,
-        "loopix_reliability_std": 0.14775481083586178,
         "loopix_incoming_messages": 23.930863600740988,
         "loopix_incoming_messages_std": 0.15654091623003483,
         "loopix_end_to_end_latency_seconds": 2.567262554328,
@@ -846,7 +782,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 716.9256896972656,
         "loopix_reliability": 0.9162303664921466,
-        "loopix_reliability_std": 0.011227686584828032,
         "loopix_incoming_messages": 24.09147560047369,
         "loopix_incoming_messages_std": 0.3313693417212514,
         "loopix_end_to_end_latency_seconds": 2.378290281634286,
@@ -859,7 +794,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 726.1878662109375,
         "loopix_reliability": 0.888235294117647,
-        "loopix_reliability_std": 0.05899779081117847,
         "loopix_incoming_messages": 24.08904720370507,
         "loopix_incoming_messages_std": 0.20615437535376274,
         "loopix_end_to_end_latency_seconds": 2.366149674092715,
@@ -872,7 +806,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 732.5322494506836,
         "loopix_reliability": 0.7526881720430108,
-        "loopix_reliability_std": 0.010889859524143715,
         "loopix_incoming_messages": 24.0525404403729,
         "loopix_incoming_messages_std": 0.3799766057084264,
         "loopix_end_to_end_latency_seconds": 2.358034939171429,
@@ -885,7 +818,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 745.9271011352539,
         "loopix_reliability": 0.918918918918919,
-        "loopix_reliability_std": 0.013670864775218302,
         "loopix_incoming_messages": 24.172037550087797,
         "loopix_incoming_messages_std": 0.18146875872755625,
         "loopix_end_to_end_latency_seconds": 2.3718949332588233,
@@ -898,7 +830,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 754.4935760498047,
         "loopix_reliability": 0.8703703703703703,
-        "loopix_reliability_std": 0.03340409380077772,
         "loopix_incoming_messages": 24.142931794438912,
         "loopix_incoming_messages_std": 0.12344932173946901,
         "loopix_end_to_end_latency_seconds": 2.278230149446808,
@@ -911,7 +842,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 763.5896148681641,
         "loopix_reliability": 0.9029850746268657,
-        "loopix_reliability_std": 0.24620719746514835,
         "loopix_incoming_messages": 24.13849273020497,
         "loopix_incoming_messages_std": 0.061779172577664264,
         "loopix_end_to_end_latency_seconds": 2.379352413190083,
@@ -924,7 +854,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 730.9747085571289,
         "loopix_reliability": 0.75,
-        "loopix_reliability_std": 0.16001630998038543,
         "loopix_incoming_messages": 21.885361167078035,
         "loopix_incoming_messages_std": 1.3278014785726473,
         "loopix_end_to_end_latency_seconds": 3.2685005322916663,
@@ -937,7 +866,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 778.9054336547852,
         "loopix_reliability": 0.9157303370786517,
-        "loopix_reliability_std": 0.04051996212869928,
         "loopix_incoming_messages": 23.968413094185667,
         "loopix_incoming_messages_std": 0.08528855213350112,
         "loopix_end_to_end_latency_seconds": 2.6152381321104285,
@@ -952,7 +880,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 675.8273773193359,
         "loopix_reliability": 0.872093023255814,
-        "loopix_reliability_std": 0.2632050431721441,
         "loopix_incoming_messages": 23.985833289630033,
         "loopix_incoming_messages_std": 0.20431300863342694,
         "loopix_end_to_end_latency_seconds": 4.731904208226666,
@@ -965,7 +892,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 683.833137512207,
         "loopix_reliability": 0.8108108108108109,
-        "loopix_reliability_std": 0.09603999350204002,
         "loopix_incoming_messages": 23.87823197557046,
         "loopix_incoming_messages_std": 0.3859155112217127,
         "loopix_end_to_end_latency_seconds": 3.22760098545,
@@ -978,7 +904,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 695.7327499389648,
         "loopix_reliability": 0.8523489932885906,
-        "loopix_reliability_std": 0.017935354233824835,
         "loopix_incoming_messages": 24.145358444300136,
         "loopix_incoming_messages_std": 0.21174157132782812,
         "loopix_end_to_end_latency_seconds": 2.672994066322835,
@@ -991,7 +916,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 701.9629135131836,
         "loopix_reliability": 0.8793103448275862,
-        "loopix_reliability_std": 0.01316254687827443,
         "loopix_incoming_messages": 24.036162229811136,
         "loopix_incoming_messages_std": 0.1724460586899154,
         "loopix_end_to_end_latency_seconds": 2.6938891963039215,
@@ -1004,7 +928,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 711.8896408081055,
         "loopix_reliability": 0.893491124260355,
-        "loopix_reliability_std": 0.0433520479472221,
         "loopix_incoming_messages": 24.137609004032903,
         "loopix_incoming_messages_std": 0.13218965765265722,
         "loopix_end_to_end_latency_seconds": 2.543601111589404,
@@ -1017,7 +940,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 712.8345489501953,
         "loopix_reliability": 0.9285714285714286,
-        "loopix_reliability_std": 0.04352786576410858,
         "loopix_incoming_messages": 23.71668447966328,
         "loopix_incoming_messages_std": 0.4791879611982727,
         "loopix_end_to_end_latency_seconds": 2.6716792902153843,
@@ -1030,7 +952,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 727.9426956176758,
         "loopix_reliability": 0.9162011173184358,
-        "loopix_reliability_std": 0.03368857483039303,
         "loopix_incoming_messages": 24.0961469782195,
         "loopix_incoming_messages_std": 0.14915338044937612,
         "loopix_end_to_end_latency_seconds": 2.727485954060976,
@@ -1043,7 +964,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 732.989128112793,
         "loopix_reliability": 0.8848484848484849,
-        "loopix_reliability_std": 0.034856821127255425,
         "loopix_incoming_messages": 23.938018825577785,
         "loopix_incoming_messages_std": 0.16161657905805718,
         "loopix_end_to_end_latency_seconds": 2.468479257986301,
@@ -1056,7 +976,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 723.1662368774414,
         "loopix_reliability": 0.6805555555555556,
-        "loopix_reliability_std": 0.009418784626534567,
         "loopix_incoming_messages": 22.926278005870117,
         "loopix_incoming_messages_std": 0.6404857654857291,
         "loopix_end_to_end_latency_seconds": 2.3615149004897957,
@@ -1069,7 +988,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 754.4001235961914,
         "loopix_reliability": 0.9175824175824175,
-        "loopix_reliability_std": 0.02284216918996075,
         "loopix_incoming_messages": 24.188218682767396,
         "loopix_incoming_messages_std": 0.1949440589329436,
         "loopix_end_to_end_latency_seconds": 2.54816654036527,
@@ -1082,7 +1000,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 757.8578643798828,
         "loopix_reliability": 0.8950617283950617,
-        "loopix_reliability_std": 0.02916755565245535,
         "loopix_incoming_messages": 23.90711152119406,
         "loopix_incoming_messages_std": 0.30336777599362275,
         "loopix_end_to_end_latency_seconds": 2.7214183816758615,
@@ -1095,7 +1012,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 761.7932510375977,
         "loopix_reliability": 0.8020833333333334,
-        "loopix_reliability_std": 0.20068140255673225,
         "loopix_incoming_messages": 23.443412839598153,
         "loopix_incoming_messages_std": 1.0723243710368886,
         "loopix_end_to_end_latency_seconds": 2.7478957114805196,
@@ -1110,7 +1026,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 673.6779708862305,
         "loopix_reliability": 0.9043478260869565,
-        "loopix_reliability_std": 0.05775531030254618,
         "loopix_incoming_messages": 23.971440353197572,
         "loopix_incoming_messages_std": 0.19526353347783823,
         "loopix_end_to_end_latency_seconds": 5.511440184836538,
@@ -1123,7 +1038,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 675.1628265380859,
         "loopix_reliability": 0.8785714285714286,
-        "loopix_reliability_std": 0.03046491801030475,
         "loopix_incoming_messages": 23.61450893271401,
         "loopix_incoming_messages_std": 0.18826234956364776,
         "loopix_end_to_end_latency_seconds": 3.6274521165528455,
@@ -1136,7 +1050,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 690.6863174438477,
         "loopix_reliability": 0.8691588785046729,
-        "loopix_reliability_std": 0.013135409823872084,
         "loopix_incoming_messages": 24.07335157486358,
         "loopix_incoming_messages_std": 0.22829517701049207,
         "loopix_end_to_end_latency_seconds": 2.814070951537634,
@@ -1149,7 +1062,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 696.9372482299805,
         "loopix_reliability": 0.5205479452054794,
-        "loopix_reliability_std": 0.15776359346187308,
         "loopix_incoming_messages": 24.04776311886949,
         "loopix_incoming_messages_std": 0.1678152084735555,
         "loopix_end_to_end_latency_seconds": 2.983798653921052,
@@ -1162,7 +1074,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 706.6043853759766,
         "loopix_reliability": 0.9206349206349206,
-        "loopix_reliability_std": 0.2555808139996535,
         "loopix_incoming_messages": 24.11304857928372,
         "loopix_incoming_messages_std": 0.2954559024446807,
         "loopix_end_to_end_latency_seconds": 2.7770824767155173,
@@ -1175,7 +1086,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 702.8559036254883,
         "loopix_reliability": 0.9289617486338798,
-        "loopix_reliability_std": 0.02867941503442408,
         "loopix_incoming_messages": 23.438747237268352,
         "loopix_incoming_messages_std": 0.39616381038858073,
         "loopix_end_to_end_latency_seconds": 2.6690908392764707,
@@ -1188,7 +1098,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 712.6995620727539,
         "loopix_reliability": 0.9428571428571428,
-        "loopix_reliability_std": 0.21488961212288654,
         "loopix_incoming_messages": 23.592081006074476,
         "loopix_incoming_messages_std": 0.360578246545209,
         "loopix_end_to_end_latency_seconds": 2.632414393037879,
@@ -1201,7 +1110,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 730.1440200805664,
         "loopix_reliability": 0.9378238341968912,
-        "loopix_reliability_std": 0.026403810379012422,
         "loopix_incoming_messages": 24.144691394460253,
         "loopix_incoming_messages_std": 0.1707590816687942,
         "loopix_end_to_end_latency_seconds": 2.7114272155635364,
@@ -1214,7 +1122,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 736.4987869262695,
         "loopix_reliability": 0.8881987577639752,
-        "loopix_reliability_std": 0.04776543119345436,
         "loopix_incoming_messages": 24.076658351794755,
         "loopix_incoming_messages_std": 0.19343634286250988,
         "loopix_end_to_end_latency_seconds": 2.6072394793286717,
@@ -1227,7 +1134,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 746.2489929199219,
         "loopix_reliability": 0.9528795811518325,
-        "loopix_reliability_std": 0.028121952607822187,
         "loopix_incoming_messages": 24.177848066686803,
         "loopix_incoming_messages_std": 0.17610381937408767,
         "loopix_end_to_end_latency_seconds": 2.941507494587912,
@@ -1240,7 +1146,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 753.8809432983398,
         "loopix_reliability": 0.9297297297297298,
-        "loopix_reliability_std": 0.03042136114196569,
         "loopix_incoming_messages": 24.183826504034315,
         "loopix_incoming_messages_std": 0.28824701315729845,
         "loopix_end_to_end_latency_seconds": 2.7206624311511622,
@@ -1253,7 +1158,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 760.5576019287109,
         "loopix_reliability": 0.9395604395604396,
-        "loopix_reliability_std": 0.02059163618409562,
         "loopix_incoming_messages": 24.14700407318833,
         "loopix_incoming_messages_std": 0.21423876676035655,
         "loopix_end_to_end_latency_seconds": 2.8272058311929826,
@@ -1268,7 +1172,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 674.9032363891602,
         "loopix_reliability": 0.8888888888888888,
-        "loopix_reliability_std": 0.02782068512799456,
         "loopix_incoming_messages": 24.13854382731448,
         "loopix_incoming_messages_std": 0.18380430483042903,
         "loopix_end_to_end_latency_seconds": 6.0344647013125,
@@ -1281,7 +1184,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 587.4213562011719,
         "loopix_reliability": 0.5897435897435898,
-        "loopix_reliability_std": 0.15255859354556414,
         "loopix_incoming_messages": 20.18460736761935,
         "loopix_incoming_messages_std": 0.1936994228322521,
         "loopix_end_to_end_latency_seconds": 5.793909983130434,
@@ -1294,7 +1196,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 687.2804946899414,
         "loopix_reliability": 0.8851351351351351,
-        "loopix_reliability_std": 0.03184914277703647,
         "loopix_incoming_messages": 24.045269526967928,
         "loopix_incoming_messages_std": 0.245028195903299,
         "loopix_end_to_end_latency_seconds": 3.1626093021297708,
@@ -1307,7 +1208,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 686.8339996337891,
         "loopix_reliability": 0.873015873015873,
-        "loopix_reliability_std": 0.04751475696504193,
         "loopix_incoming_messages": 23.64983986543978,
         "loopix_incoming_messages_std": 0.3706001488622993,
         "loopix_end_to_end_latency_seconds": 2.918272019836363,
@@ -1320,7 +1220,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 703.3335494995117,
         "loopix_reliability": 0.8843537414965986,
-        "loopix_reliability_std": 0.030285536088286102,
         "loopix_incoming_messages": 24.13759773813247,
         "loopix_incoming_messages_std": 0.1760677310749006,
         "loopix_end_to_end_latency_seconds": 3.2271877695307687,
@@ -1333,7 +1232,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 711.9934768676758,
         "loopix_reliability": 0.9096385542168675,
-        "loopix_reliability_std": 0.030075955333328144,
         "loopix_incoming_messages": 24.228258855930466,
         "loopix_incoming_messages_std": 0.10359207558783605,
         "loopix_end_to_end_latency_seconds": 2.8805416092649003,
@@ -1346,7 +1244,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 718.4313125610352,
         "loopix_reliability": 0.945054945054945,
-        "loopix_reliability_std": 0.03275380701600944,
         "loopix_incoming_messages": 24.19114450228407,
         "loopix_incoming_messages_std": 0.17327284803303028,
         "loopix_end_to_end_latency_seconds": 2.9948445571511626,
@@ -1359,7 +1256,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 682.0160064697266,
         "loopix_reliability": 0.6379310344827587,
-        "loopix_reliability_std": 0.09027316278094331,
         "loopix_incoming_messages": 21.860816832842097,
         "loopix_incoming_messages_std": 1.5067354854554704,
         "loopix_end_to_end_latency_seconds": 2.873467968945946,
@@ -1372,7 +1268,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 732.2726593017578,
         "loopix_reliability": 0.9644670050761421,
-        "loopix_reliability_std": 0.02139904640159227,
         "loopix_incoming_messages": 24.18630759197422,
         "loopix_incoming_messages_std": 0.2202393008848098,
         "loopix_end_to_end_latency_seconds": 2.905816376831579,
@@ -1385,7 +1280,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 738.5235900878906,
         "loopix_reliability": 0.9252873563218391,
-        "loopix_reliability_std": 0.02185515043800209,
         "loopix_incoming_messages": 24.140059039123123,
         "loopix_incoming_messages_std": 0.1136700080648577,
         "loopix_end_to_end_latency_seconds": 2.8188904173975153,
@@ -1398,7 +1292,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 739.7384719848633,
         "loopix_reliability": 0.835820895522388,
-        "loopix_reliability_std": 0.027771100081272062,
         "loopix_incoming_messages": 23.800834340850425,
         "loopix_incoming_messages_std": 0.45391795838953214,
         "loopix_end_to_end_latency_seconds": 2.813899841392857,
@@ -1411,7 +1304,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 749.7586517333984,
         "loopix_reliability": 0.9041916167664671,
-        "loopix_reliability_std": 0.03420220241619132,
         "loopix_incoming_messages": 23.9945905392326,
         "loopix_incoming_messages_std": 0.29214371920476123,
         "loopix_end_to_end_latency_seconds": 2.9066360308278156,
@@ -1426,7 +1318,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 672.3177185058594,
         "loopix_reliability": 0.8350515463917526,
-        "loopix_reliability_std": 0.05401061881344844,
         "loopix_incoming_messages": 24.064499093649,
         "loopix_incoming_messages_std": 0.09805426051854503,
         "loopix_end_to_end_latency_seconds": 6.245174223580248,
@@ -1439,7 +1330,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 666.0252532958984,
         "loopix_reliability": 0.8651685393258427,
-        "loopix_reliability_std": 0.03342791193877841,
         "loopix_incoming_messages": 23.35329447359248,
         "loopix_incoming_messages_std": 0.4824118032479027,
         "loopix_end_to_end_latency_seconds": 4.018015248012986,
@@ -1452,7 +1342,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 678.9632263183594,
         "loopix_reliability": 0.7934782608695652,
-        "loopix_reliability_std": 0.049833239689102644,
         "loopix_incoming_messages": 23.81009562060739,
         "loopix_incoming_messages_std": 0.2906102329595663,
         "loopix_end_to_end_latency_seconds": 3.3740861801095887,
@@ -1465,7 +1354,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 693.2303009033203,
         "loopix_reliability": 0.9252873563218391,
-        "loopix_reliability_std": 0.024590791768742157,
         "loopix_incoming_messages": 24.147651113656064,
         "loopix_incoming_messages_std": 0.11253703923402361,
         "loopix_end_to_end_latency_seconds": 2.9404232869875773,
@@ -1478,7 +1366,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 699.3254776000977,
         "loopix_reliability": 0.9012345679012346,
-        "loopix_reliability_std": 0.007400052651334364,
         "loopix_incoming_messages": 24.107473113985623,
         "loopix_incoming_messages_std": 0.19900087608600367,
         "loopix_end_to_end_latency_seconds": 2.8657417956986304,
@@ -1491,7 +1378,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 704.8080215454102,
         "loopix_reliability": 0.8849557522123894,
-        "loopix_reliability_std": 0.26711352209815176,
         "loopix_incoming_messages": 24.063709107732965,
         "loopix_incoming_messages_std": 0.19486582071991418,
         "loopix_end_to_end_latency_seconds": 2.7240868694100002,
@@ -1504,7 +1390,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 712.2842178344727,
         "loopix_reliability": 0.8859060402684564,
-        "loopix_reliability_std": 0.030350125268434527,
         "loopix_incoming_messages": 24.09235239336695,
         "loopix_incoming_messages_std": 0.3143597814014561,
         "loopix_end_to_end_latency_seconds": 3.063908763598485,
@@ -1517,7 +1402,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 718.8570404052734,
         "loopix_reliability": 0.8789808917197452,
-        "loopix_reliability_std": 0.07714172816172962,
         "loopix_incoming_messages": 24.112780490742892,
         "loopix_incoming_messages_std": 0.13324829490716536,
         "loopix_end_to_end_latency_seconds": 2.734920850768116,
@@ -1530,7 +1414,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 725.2637252807617,
         "loopix_reliability": 0.9453551912568307,
-        "loopix_reliability_std": 0.030715968953758586,
         "loopix_incoming_messages": 24.093605795110488,
         "loopix_incoming_messages_std": 0.16582722699434835,
         "loopix_end_to_end_latency_seconds": 2.9747401712312143,
@@ -1543,7 +1426,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 725.1183547973633,
         "loopix_reliability": 0.901840490797546,
-        "loopix_reliability_std": 0.013099663047424734,
         "loopix_incoming_messages": 23.700870015575287,
         "loopix_incoming_messages_std": 0.3821860313573171,
         "loopix_end_to_end_latency_seconds": 2.9255852920748295,
@@ -1556,7 +1438,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 739.987678527832,
         "loopix_reliability": 0.9325842696629213,
-        "loopix_reliability_std": 0.029609193056859894,
         "loopix_incoming_messages": 24.177187269945595,
         "loopix_incoming_messages_std": 0.07243429210695786,
         "loopix_end_to_end_latency_seconds": 2.9487330157289158,
@@ -1569,7 +1450,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 744.9821929931641,
         "loopix_reliability": 0.9337016574585635,
-        "loopix_reliability_std": 0.024038539359839357,
         "loopix_incoming_messages": 24.10445948840744,
         "loopix_incoming_messages_std": 0.4152492900714902,
         "loopix_end_to_end_latency_seconds": 2.8862664776863904,
@@ -1584,7 +1464,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 671.6947021484375,
         "loopix_reliability": 0.8846153846153846,
-        "loopix_reliability_std": 0.03467216366337511,
         "loopix_incoming_messages": 24.131032042621037,
         "loopix_incoming_messages_std": 0.18791906536291486,
         "loopix_end_to_end_latency_seconds": 6.203998864202898,
@@ -1597,7 +1476,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 675.9727478027344,
         "loopix_reliability": 0.859504132231405,
-        "loopix_reliability_std": 0.0403959648761027,
         "loopix_incoming_messages": 24.01175096814519,
         "loopix_incoming_messages_std": 0.15427213189589462,
         "loopix_end_to_end_latency_seconds": 4.37285367935577,
@@ -1610,7 +1488,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 684.1134948730469,
         "loopix_reliability": 0.9294117647058824,
-        "loopix_reliability_std": 0.01843686679074824,
         "loopix_incoming_messages": 24.120074200133594,
         "loopix_incoming_messages_std": 0.30035444274979894,
         "loopix_end_to_end_latency_seconds": 3.191397694012658,
@@ -1623,7 +1500,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 674.6124954223633,
         "loopix_reliability": 0.4838709677419355,
-        "loopix_reliability_std": 0.12283683848458853,
         "loopix_incoming_messages": 23.53548772761002,
         "loopix_incoming_messages_std": 0.6713658499151856,
         "loopix_end_to_end_latency_seconds": 2.2241816304666666,
@@ -1636,7 +1512,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 692.7734222412109,
         "loopix_reliability": 0.8432835820895522,
-        "loopix_reliability_std": 0.0677405804064881,
         "loopix_incoming_messages": 23.984176085745577,
         "loopix_incoming_messages_std": 0.17502257696010445,
         "loopix_end_to_end_latency_seconds": 2.6308864835575223,
@@ -1649,7 +1524,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 703.5516052246094,
         "loopix_reliability": 0.851063829787234,
-        "loopix_reliability_std": 0.041419870673642875,
         "loopix_incoming_messages": 24.185856972415767,
         "loopix_incoming_messages_std": 0.2686323901465456,
         "loopix_end_to_end_latency_seconds": 2.8059608126499995,
@@ -1662,7 +1536,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 598.5837326049805,
         "loopix_reliability": 0.17391304347826086,
-        "loopix_reliability_std": 0.16555182695279266,
         "loopix_incoming_messages": 18.13117989894612,
         "loopix_incoming_messages_std": 3.4191330562539854,
         "loopix_end_to_end_latency_seconds": 2.82541908275,
@@ -1675,7 +1548,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 713.8625259399414,
         "loopix_reliability": 0.8679245283018868,
-        "loopix_reliability_std": 0.07754767864861097,
         "loopix_incoming_messages": 24.0875776154676,
         "loopix_incoming_messages_std": 0.13035777560140638,
         "loopix_end_to_end_latency_seconds": 2.8865304550543476,
@@ -1687,8 +1559,7 @@
       },
       "9": {
         "loopix_total_bandwidth_mb": 619.5793838500977,
-        "loopix_reliability": 0,
-        "loopix_reliability_std": 0,
+        "loopix_reliability": 0.6363636363636364,
         "loopix_incoming_messages": 20.368771317892808,
         "loopix_incoming_messages_std": 0.3437153686319975,
         "loopix_end_to_end_latency_seconds": 2.7639096604285713,
@@ -1701,7 +1572,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 724.6095581054688,
         "loopix_reliability": 0.8789808917197452,
-        "loopix_reliability_std": 0.01504143823003212,
         "loopix_incoming_messages": 23.992226360915627,
         "loopix_incoming_messages_std": 0.11834565846751399,
         "loopix_end_to_end_latency_seconds": 2.7879969497318844,
@@ -1714,7 +1584,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 734.7024230957031,
         "loopix_reliability": 0.8766233766233766,
-        "loopix_reliability_std": 0.01070441445216247,
         "loopix_incoming_messages": 24.212227618136986,
         "loopix_incoming_messages_std": 0.19922435152630902,
         "loopix_end_to_end_latency_seconds": 2.8727697675333332,
@@ -1727,7 +1596,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 698.6505432128906,
         "loopix_reliability": 0.6470588235294118,
-        "loopix_reliability_std": 0.04314155013130014,
         "loopix_incoming_messages": 21.736225162857874,
         "loopix_incoming_messages_std": 1.6463022731793242,
         "loopix_end_to_end_latency_seconds": 2.740058190333334,
@@ -1742,7 +1610,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 670.4798202514648,
         "loopix_reliability": 0.8804347826086957,
-        "loopix_reliability_std": 0.01718459697369636,
         "loopix_incoming_messages": 24.17856130841134,
         "loopix_incoming_messages_std": 0.11300150008169017,
         "loopix_end_to_end_latency_seconds": 7.1139781628888885,
@@ -1755,7 +1622,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 675.9104461669922,
         "loopix_reliability": 0.8888888888888888,
-        "loopix_reliability_std": 0.013006517430813208,
         "loopix_incoming_messages": 24.1713265540847,
         "loopix_incoming_messages_std": 0.13009905089335605,
         "loopix_end_to_end_latency_seconds": 4.6041695495,
@@ -1768,7 +1634,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 677.7171936035156,
         "loopix_reliability": 0.9017857142857143,
-        "loopix_reliability_std": 0.006349350356729947,
         "loopix_incoming_messages": 23.71495836918219,
         "loopix_incoming_messages_std": 0.6270398071954654,
         "loopix_end_to_end_latency_seconds": 3.204769856831683,
@@ -1781,7 +1646,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 686.4082717895508,
         "loopix_reliability": 0.9097744360902256,
-        "loopix_reliability_std": 0.01777854819475528,
         "loopix_incoming_messages": 24.153432946260025,
         "loopix_incoming_messages_std": 0.26849409521997736,
         "loopix_end_to_end_latency_seconds": 2.5796692491735542,
@@ -1794,7 +1658,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 689.6168060302734,
         "loopix_reliability": 0.8761061946902655,
-        "loopix_reliability_std": 0.18651153335410592,
         "loopix_incoming_messages": 24.024392648572853,
         "loopix_incoming_messages_std": 0.32497717376689544,
         "loopix_end_to_end_latency_seconds": 2.820288248787879,
@@ -1807,7 +1670,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 687.8723602294922,
         "loopix_reliability": 0.6883116883116883,
-        "loopix_reliability_std": 0.16262150351494217,
         "loopix_incoming_messages": 23.83550367195349,
         "loopix_incoming_messages_std": 0.6032014804247793,
         "loopix_end_to_end_latency_seconds": 4.272826464773585,
@@ -1820,7 +1682,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 703.5516052246094,
         "loopix_reliability": 0.9375,
-        "loopix_reliability_std": 0.01821403173142847,
         "loopix_incoming_messages": 24.19794971935948,
         "loopix_incoming_messages_std": 0.3045402937890264,
         "loopix_end_to_end_latency_seconds": 2.6758863539611113,
@@ -1833,7 +1694,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 708.2657623291016,
         "loopix_reliability": 0.8514851485148515,
-        "loopix_reliability_std": 0.03273679492982992,
         "loopix_incoming_messages": 24.170858009601822,
         "loopix_incoming_messages_std": 0.13268130346393664,
         "loopix_end_to_end_latency_seconds": 2.8891556720348834,
@@ -1846,7 +1706,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 711.4950637817383,
         "loopix_reliability": 0.9098360655737705,
-        "loopix_reliability_std": 0.27862199411564004,
         "loopix_incoming_messages": 24.04956762515417,
         "loopix_incoming_messages_std": 0.19050233510165573,
         "loopix_end_to_end_latency_seconds": 2.7340563826036033,
@@ -1859,7 +1718,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 717.382568359375,
         "loopix_reliability": 0.9101796407185628,
-        "loopix_reliability_std": 0.005832409783990494,
         "loopix_incoming_messages": 23.945450340672426,
         "loopix_incoming_messages_std": 0.34730832395815303,
         "loopix_end_to_end_latency_seconds": 2.770618505223684,
@@ -1872,7 +1730,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 724.5264892578125,
         "loopix_reliability": 0.8680555555555556,
-        "loopix_reliability_std": 0.06273542117774021,
         "loopix_incoming_messages": 24.173397158103104,
         "loopix_incoming_messages_std": 0.17807161045789283,
         "loopix_end_to_end_latency_seconds": 3.0588221031839993,
@@ -1885,7 +1742,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 626.9621276855469,
         "loopix_reliability": 0.6190476190476191,
-        "loopix_reliability_std": 0.0617784334481064,
         "loopix_incoming_messages": 20.430842792966867,
         "loopix_incoming_messages_std": 0.2549443506075812,
         "loopix_end_to_end_latency_seconds": 6.907558762615384,
@@ -1900,7 +1756,6 @@
       "1": {
         "loopix_total_bandwidth_mb": 667.4166564941406,
         "loopix_reliability": 0.891566265060241,
-        "loopix_reliability_std": 0.030494889871183206,
         "loopix_incoming_messages": 24.145171127861747,
         "loopix_incoming_messages_std": 0.2670559312310386,
         "loopix_end_to_end_latency_seconds": 8.792337318716216,
@@ -1913,7 +1768,6 @@
       "2": {
         "loopix_total_bandwidth_mb": 670.8847808837891,
         "loopix_reliability": 0.9026548672566371,
-        "loopix_reliability_std": 0.03855723677631122,
         "loopix_incoming_messages": 24.06714864173288,
         "loopix_incoming_messages_std": 0.08978232600416834,
         "loopix_end_to_end_latency_seconds": 5.760575018588236,
@@ -1926,7 +1780,6 @@
       "3": {
         "loopix_total_bandwidth_mb": 571.6175079345703,
         "loopix_reliability": 0.49019607843137253,
-        "loopix_reliability_std": 0.1889750845329615,
         "loopix_incoming_messages": 19.82898255962081,
         "loopix_incoming_messages_std": 0.2473710624875235,
         "loopix_end_to_end_latency_seconds": 3.49361317112,
@@ -1939,7 +1792,6 @@
       "4": {
         "loopix_total_bandwidth_mb": 680.7388229370117,
         "loopix_reliability": 0.8909090909090909,
-        "loopix_reliability_std": 0.12296677787153727,
         "loopix_incoming_messages": 24.10172679960958,
         "loopix_incoming_messages_std": 0.2986123843345105,
         "loopix_end_to_end_latency_seconds": 3.4047707027959193,
@@ -1952,7 +1804,6 @@
       "5": {
         "loopix_total_bandwidth_mb": 684.5288391113281,
         "loopix_reliability": 0.9488636363636364,
-        "loopix_reliability_std": 0.0004132710585543899,
         "loopix_incoming_messages": 23.927264178820018,
         "loopix_incoming_messages_std": 0.265868291289352,
         "loopix_end_to_end_latency_seconds": 3.062954758041916,
@@ -1965,7 +1816,6 @@
       "6": {
         "loopix_total_bandwidth_mb": 691.3093338012695,
         "loopix_reliability": 0.9281437125748503,
-        "loopix_reliability_std": 0.0029592248637227135,
         "loopix_incoming_messages": 24.193007870970174,
         "loopix_incoming_messages_std": 0.24195594123213093,
         "loopix_end_to_end_latency_seconds": 3.1012475949419356,
@@ -1978,7 +1828,6 @@
       "7": {
         "loopix_total_bandwidth_mb": 695.7639007568359,
         "loopix_reliability": 0.9294117647058824,
-        "loopix_reliability_std": 0.016752228497191133,
         "loopix_incoming_messages": 24.065691308116573,
         "loopix_incoming_messages_std": 0.2612945757876877,
         "loopix_end_to_end_latency_seconds": 3.136068912183545,
@@ -1991,7 +1840,6 @@
       "8": {
         "loopix_total_bandwidth_mb": 698.1417465209961,
         "loopix_reliability": 0.907563025210084,
-        "loopix_reliability_std": 0.039742619103948704,
         "loopix_incoming_messages": 24.05970610519867,
         "loopix_incoming_messages_std": 0.33884330876062974,
         "loopix_end_to_end_latency_seconds": 3.1889260392037038,
@@ -2004,7 +1852,6 @@
       "9": {
         "loopix_total_bandwidth_mb": 704.5484313964844,
         "loopix_reliability": 0.8737864077669902,
-        "loopix_reliability_std": 0.1359125535858341,
         "loopix_incoming_messages": 24.168433530323753,
         "loopix_incoming_messages_std": 0.09907789636021005,
         "loopix_end_to_end_latency_seconds": 3.3378464457333332,
@@ -2017,7 +1864,6 @@
       "10": {
         "loopix_total_bandwidth_mb": 706.5940017700195,
         "loopix_reliability": 0.8947368421052632,
-        "loopix_reliability_std": 0.025368742908767727,
         "loopix_incoming_messages": 24.031374571999578,
         "loopix_incoming_messages_std": 0.18894952583782312,
         "loopix_end_to_end_latency_seconds": 3.3276755395073527,
@@ -2030,7 +1876,6 @@
       "11": {
         "loopix_total_bandwidth_mb": 710.7059097290039,
         "loopix_reliability": 0.9226190476190477,
-        "loopix_reliability_std": 0.030007658243745124,
         "loopix_incoming_messages": 23.991060770624912,
         "loopix_incoming_messages_std": 0.1410367999401776,
         "loopix_end_to_end_latency_seconds": 3.119544508006451,
@@ -2043,7 +1888,6 @@
       "12": {
         "loopix_total_bandwidth_mb": 709.7713851928711,
         "loopix_reliability": 0.8979591836734694,
-        "loopix_reliability_std": 0.001701152617701089,
         "loopix_incoming_messages": 23.663057531195065,
         "loopix_incoming_messages_std": 0.2557284717510777,
         "loopix_end_to_end_latency_seconds": 3.1868212343787885,
@@ -2060,7 +1904,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 773.1217651367188,
         "loopix_reliability": 0.875968992248062,
-        "loopix_reliability_std": 0.01592991352103914,
         "loopix_incoming_messages": 23.217158364283282,
         "loopix_incoming_messages_std": 0.488113557555805,
         "loopix_end_to_end_latency_seconds": 1.973665542646018,
@@ -2072,8 +1915,7 @@
       },
       "0.5": {
         "loopix_total_bandwidth_mb": 689.1599273681641,
-        "loopix_reliability": 0,
-        "loopix_reliability_std": 0,
+        "loopix_reliability": 0.7105263157894737,
         "loopix_incoming_messages": 23.271137336277846,
         "loopix_incoming_messages_std": 0.2313258176408701,
         "loopix_end_to_end_latency_seconds": 2.4757876609814815,
@@ -2086,7 +1928,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 690.2917404174805,
         "loopix_reliability": 0.8947368421052632,
-        "loopix_reliability_std": 0.048979838086116965,
         "loopix_incoming_messages": 23.98516475882908,
         "loopix_incoming_messages_std": 0.20528935693043956,
         "loopix_end_to_end_latency_seconds": 3.3307067334705884,
@@ -2099,7 +1940,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 688.9211044311523,
         "loopix_reliability": 0.9172413793103448,
-        "loopix_reliability_std": 0.03737877556746745,
         "loopix_incoming_messages": 24.189948061977756,
         "loopix_incoming_messages_std": 0.2080587934849428,
         "loopix_end_to_end_latency_seconds": 3.994979309819549,
@@ -2112,7 +1952,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 683.6669998168945,
         "loopix_reliability": 0.88,
-        "loopix_reliability_std": 0.02896126852706255,
         "loopix_incoming_messages": 24.10496201192675,
         "loopix_incoming_messages_std": 0.07233742449068171,
         "loopix_end_to_end_latency_seconds": 4.279382702436363,
@@ -2125,7 +1964,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 679.9496688842773,
         "loopix_reliability": 0.8,
-        "loopix_reliability_std": 0.15520794494109993,
         "loopix_incoming_messages": 24.07721738502039,
         "loopix_incoming_messages_std": 0.18602818774935453,
         "loopix_end_to_end_latency_seconds": 3.9146594052249997,
@@ -2138,7 +1976,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 675.8273773193359,
         "loopix_reliability": 0.872093023255814,
-        "loopix_reliability_std": 0.2632050431721441,
         "loopix_incoming_messages": 23.985833289630033,
         "loopix_incoming_messages_std": 0.20431300863342694,
         "loopix_end_to_end_latency_seconds": 4.731904208226666,
@@ -2151,7 +1988,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 673.6779708862305,
         "loopix_reliability": 0.9043478260869565,
-        "loopix_reliability_std": 0.05775531030254618,
         "loopix_incoming_messages": 23.971440353197572,
         "loopix_incoming_messages_std": 0.19526353347783823,
         "loopix_end_to_end_latency_seconds": 5.511440184836538,
@@ -2164,7 +2000,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 674.9032363891602,
         "loopix_reliability": 0.8888888888888888,
-        "loopix_reliability_std": 0.02782068512799456,
         "loopix_incoming_messages": 24.13854382731448,
         "loopix_incoming_messages_std": 0.18380430483042903,
         "loopix_end_to_end_latency_seconds": 6.0344647013125,
@@ -2177,7 +2012,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 672.3177185058594,
         "loopix_reliability": 0.8350515463917526,
-        "loopix_reliability_std": 0.05401061881344844,
         "loopix_incoming_messages": 24.064499093649,
         "loopix_incoming_messages_std": 0.09805426051854503,
         "loopix_end_to_end_latency_seconds": 6.245174223580248,
@@ -2190,7 +2024,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 671.6947021484375,
         "loopix_reliability": 0.8846153846153846,
-        "loopix_reliability_std": 0.03467216366337511,
         "loopix_incoming_messages": 24.131032042621037,
         "loopix_incoming_messages_std": 0.18791906536291486,
         "loopix_end_to_end_latency_seconds": 6.203998864202898,
@@ -2203,7 +2036,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 670.4798202514648,
         "loopix_reliability": 0.8804347826086957,
-        "loopix_reliability_std": 0.01718459697369636,
         "loopix_incoming_messages": 24.17856130841134,
         "loopix_incoming_messages_std": 0.11300150008169017,
         "loopix_end_to_end_latency_seconds": 7.1139781628888885,
@@ -2216,7 +2048,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 667.4166564941406,
         "loopix_reliability": 0.891566265060241,
-        "loopix_reliability_std": 0.030494889871183206,
         "loopix_incoming_messages": 24.145171127861747,
         "loopix_incoming_messages_std": 0.2670559312310386,
         "loopix_end_to_end_latency_seconds": 8.792337318716216,
@@ -2231,7 +2062,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 833.1909255981445,
         "loopix_reliability": 0.9198113207547169,
-        "loopix_reliability_std": 0.007958409148258442,
         "loopix_incoming_messages": 24.016482096070508,
         "loopix_incoming_messages_std": 0.33012944662483285,
         "loopix_end_to_end_latency_seconds": 1.8085618894615387,
@@ -2244,7 +2074,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 710.2282638549805,
         "loopix_reliability": 0.8584905660377359,
-        "loopix_reliability_std": 0.03821997909327926,
         "loopix_incoming_messages": 23.169427490912714,
         "loopix_incoming_messages_std": 0.39324082931787746,
         "loopix_end_to_end_latency_seconds": 2.3168258337802197,
@@ -2257,7 +2086,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 706.9885787963867,
         "loopix_reliability": 0.9171270718232044,
-        "loopix_reliability_std": 0.062460198255668,
         "loopix_incoming_messages": 24.20030556075676,
         "loopix_incoming_messages_std": 0.2402008834199394,
         "loopix_end_to_end_latency_seconds": 2.3677702702951806,
@@ -2270,7 +2098,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 697.5291137695312,
         "loopix_reliability": 0.8461538461538461,
-        "loopix_reliability_std": 0.04317199725214444,
         "loopix_incoming_messages": 24.038432725262577,
         "loopix_incoming_messages_std": 0.21270539467656652,
         "loopix_end_to_end_latency_seconds": 2.6744154385041323,
@@ -2283,7 +2110,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 695.0578155517578,
         "loopix_reliability": 0.8640776699029126,
-        "loopix_reliability_std": 0.048437270023244085,
         "loopix_incoming_messages": 24.182462366082795,
         "loopix_incoming_messages_std": 0.11130165289794605,
         "loopix_end_to_end_latency_seconds": 2.7098782196741573,
@@ -2296,7 +2122,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 628.7896423339844,
         "loopix_reliability": 0.5116279069767442,
-        "loopix_reliability_std": 0.04977486713967634,
         "loopix_incoming_messages": 20.540069510654185,
         "loopix_incoming_messages_std": 1.5126339490519976,
         "loopix_end_to_end_latency_seconds": 2.6227321252272726,
@@ -2309,7 +2134,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 683.833137512207,
         "loopix_reliability": 0.8108108108108109,
-        "loopix_reliability_std": 0.09603999350204002,
         "loopix_incoming_messages": 23.87823197557046,
         "loopix_incoming_messages_std": 0.3859155112217127,
         "loopix_end_to_end_latency_seconds": 3.22760098545,
@@ -2322,7 +2146,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 675.1628265380859,
         "loopix_reliability": 0.8785714285714286,
-        "loopix_reliability_std": 0.03046491801030475,
         "loopix_incoming_messages": 23.61450893271401,
         "loopix_incoming_messages_std": 0.18826234956364776,
         "loopix_end_to_end_latency_seconds": 3.6274521165528455,
@@ -2335,7 +2158,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 587.4213562011719,
         "loopix_reliability": 0.5897435897435898,
-        "loopix_reliability_std": 0.15255859354556414,
         "loopix_incoming_messages": 20.18460736761935,
         "loopix_incoming_messages_std": 0.1936994228322521,
         "loopix_end_to_end_latency_seconds": 5.793909983130434,
@@ -2348,7 +2170,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 666.0252532958984,
         "loopix_reliability": 0.8651685393258427,
-        "loopix_reliability_std": 0.03342791193877841,
         "loopix_incoming_messages": 23.35329447359248,
         "loopix_incoming_messages_std": 0.4824118032479027,
         "loopix_end_to_end_latency_seconds": 4.018015248012986,
@@ -2361,7 +2182,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 675.9727478027344,
         "loopix_reliability": 0.859504132231405,
-        "loopix_reliability_std": 0.0403959648761027,
         "loopix_incoming_messages": 24.01175096814519,
         "loopix_incoming_messages_std": 0.15427213189589462,
         "loopix_end_to_end_latency_seconds": 4.37285367935577,
@@ -2374,7 +2194,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 675.9104461669922,
         "loopix_reliability": 0.8888888888888888,
-        "loopix_reliability_std": 0.013006517430813208,
         "loopix_incoming_messages": 24.1713265540847,
         "loopix_incoming_messages_std": 0.13009905089335605,
         "loopix_end_to_end_latency_seconds": 4.6041695495,
@@ -2387,7 +2206,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 670.8847808837891,
         "loopix_reliability": 0.9026548672566371,
-        "loopix_reliability_std": 0.03855723677631122,
         "loopix_incoming_messages": 24.06714864173288,
         "loopix_incoming_messages_std": 0.08978232600416834,
         "loopix_end_to_end_latency_seconds": 5.760575018588236,
@@ -2402,7 +2220,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 879.8133163452148,
         "loopix_reliability": 0.8366013071895425,
-        "loopix_reliability_std": 0.06009195822554705,
         "loopix_incoming_messages": 24.073966899227084,
         "loopix_incoming_messages_std": 0.19022177683128774,
         "loopix_end_to_end_latency_seconds": 1.8717205117109375,
@@ -2415,7 +2232,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 743.621940612793,
         "loopix_reliability": 0.8813559322033898,
-        "loopix_reliability_std": 0.016997808254937255,
         "loopix_incoming_messages": 24.062212429798542,
         "loopix_incoming_messages_std": 0.25406034433482183,
         "loopix_end_to_end_latency_seconds": 2.08740793075641,
@@ -2428,7 +2244,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 687.7062225341797,
         "loopix_reliability": 0.7586206896551724,
-        "loopix_reliability_std": 0.13439222874739035,
         "loopix_incoming_messages": 22.407928982570255,
         "loopix_incoming_messages_std": 1.2277702555852825,
         "loopix_end_to_end_latency_seconds": 2.2502337480681818,
@@ -2441,7 +2256,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 709.7921524047852,
         "loopix_reliability": 0.9423076923076923,
-        "loopix_reliability_std": 0.021591216698392722,
         "loopix_incoming_messages": 24.057701170102373,
         "loopix_incoming_messages_std": 0.1720339535096439,
         "loopix_end_to_end_latency_seconds": 2.2956794201700683,
@@ -2454,7 +2268,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 703.769660949707,
         "loopix_reliability": 0.9285714285714286,
-        "loopix_reliability_std": 0.15094270723700168,
         "loopix_incoming_messages": 24.09036062814027,
         "loopix_incoming_messages_std": 0.29818966107857076,
         "loopix_end_to_end_latency_seconds": 2.2439110386713286,
@@ -2467,7 +2280,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 699.3981628417969,
         "loopix_reliability": 0.9253731343283582,
-        "loopix_reliability_std": 0.012880977306800944,
         "loopix_incoming_messages": 24.13571195488567,
         "loopix_incoming_messages_std": 0.34626680236626,
         "loopix_end_to_end_latency_seconds": 2.6362206524838707,
@@ -2480,7 +2292,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 695.7327499389648,
         "loopix_reliability": 0.8523489932885906,
-        "loopix_reliability_std": 0.017935354233824835,
         "loopix_incoming_messages": 24.145358444300136,
         "loopix_incoming_messages_std": 0.21174157132782812,
         "loopix_end_to_end_latency_seconds": 2.672994066322835,
@@ -2493,7 +2304,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 690.6863174438477,
         "loopix_reliability": 0.8691588785046729,
-        "loopix_reliability_std": 0.013135409823872084,
         "loopix_incoming_messages": 24.07335157486358,
         "loopix_incoming_messages_std": 0.22829517701049207,
         "loopix_end_to_end_latency_seconds": 2.814070951537634,
@@ -2506,7 +2316,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 687.2804946899414,
         "loopix_reliability": 0.8851351351351351,
-        "loopix_reliability_std": 0.03184914277703647,
         "loopix_incoming_messages": 24.045269526967928,
         "loopix_incoming_messages_std": 0.245028195903299,
         "loopix_end_to_end_latency_seconds": 3.1626093021297708,
@@ -2519,7 +2328,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 678.9632263183594,
         "loopix_reliability": 0.7934782608695652,
-        "loopix_reliability_std": 0.049833239689102644,
         "loopix_incoming_messages": 23.81009562060739,
         "loopix_incoming_messages_std": 0.2906102329595663,
         "loopix_end_to_end_latency_seconds": 3.3740861801095887,
@@ -2532,7 +2340,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 684.1134948730469,
         "loopix_reliability": 0.9294117647058824,
-        "loopix_reliability_std": 0.01843686679074824,
         "loopix_incoming_messages": 24.120074200133594,
         "loopix_incoming_messages_std": 0.30035444274979894,
         "loopix_end_to_end_latency_seconds": 3.191397694012658,
@@ -2545,7 +2352,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 677.7171936035156,
         "loopix_reliability": 0.9017857142857143,
-        "loopix_reliability_std": 0.006349350356729947,
         "loopix_incoming_messages": 23.71495836918219,
         "loopix_incoming_messages_std": 0.6270398071954654,
         "loopix_end_to_end_latency_seconds": 3.204769856831683,
@@ -2558,7 +2364,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 571.6175079345703,
         "loopix_reliability": 0.49019607843137253,
-        "loopix_reliability_std": 0.1889750845329615,
         "loopix_incoming_messages": 19.82898255962081,
         "loopix_incoming_messages_std": 0.2473710624875235,
         "loopix_end_to_end_latency_seconds": 3.49361317112,
@@ -2573,7 +2378,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 925.8646087646484,
         "loopix_reliability": 0.9477911646586346,
-        "loopix_reliability_std": 0.006856096952396788,
         "loopix_incoming_messages": 24.10372906224321,
         "loopix_incoming_messages_std": 0.20965864320588576,
         "loopix_end_to_end_latency_seconds": 1.6893954891694916,
@@ -2586,7 +2390,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 762.8627624511719,
         "loopix_reliability": 0.9526627218934911,
-        "loopix_reliability_std": 0.026808712934755948,
         "loopix_incoming_messages": 24.11697132949738,
         "loopix_incoming_messages_std": 0.20016446837015794,
         "loopix_end_to_end_latency_seconds": 1.9620311800310561,
@@ -2599,7 +2402,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 732.2207412719727,
         "loopix_reliability": 0.9130434782608695,
-        "loopix_reliability_std": 0.016929331117077295,
         "loopix_incoming_messages": 24.156198783451323,
         "loopix_incoming_messages_std": 0.22533112776379102,
         "loopix_end_to_end_latency_seconds": 2.188319902015873,
@@ -2612,7 +2414,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 720.694938659668,
         "loopix_reliability": 0.9175257731958762,
-        "loopix_reliability_std": 0.011961010229026169,
         "loopix_incoming_messages": 24.02927969845147,
         "loopix_incoming_messages_std": 0.34940855905428897,
         "loopix_end_to_end_latency_seconds": 2.3188838571404498,
@@ -2625,7 +2426,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 712.8864669799805,
         "loopix_reliability": 0.819672131147541,
-        "loopix_reliability_std": 0.14785541751926412,
         "loopix_incoming_messages": 24.025747771709934,
         "loopix_incoming_messages_std": 0.12560415077007847,
         "loopix_end_to_end_latency_seconds": 2.47027306396,
@@ -2638,7 +2438,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 704.9949264526367,
         "loopix_reliability": 0.9191176470588235,
-        "loopix_reliability_std": 0.14775481083586178,
         "loopix_incoming_messages": 23.930863600740988,
         "loopix_incoming_messages_std": 0.15654091623003483,
         "loopix_end_to_end_latency_seconds": 2.567262554328,
@@ -2651,7 +2450,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 701.9629135131836,
         "loopix_reliability": 0.8793103448275862,
-        "loopix_reliability_std": 0.01316254687827443,
         "loopix_incoming_messages": 24.036162229811136,
         "loopix_incoming_messages_std": 0.1724460586899154,
         "loopix_end_to_end_latency_seconds": 2.6938891963039215,
@@ -2664,7 +2462,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 696.9372482299805,
         "loopix_reliability": 0.5205479452054794,
-        "loopix_reliability_std": 0.15776359346187308,
         "loopix_incoming_messages": 24.04776311886949,
         "loopix_incoming_messages_std": 0.1678152084735555,
         "loopix_end_to_end_latency_seconds": 2.983798653921052,
@@ -2677,7 +2474,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 686.8339996337891,
         "loopix_reliability": 0.873015873015873,
-        "loopix_reliability_std": 0.04751475696504193,
         "loopix_incoming_messages": 23.64983986543978,
         "loopix_incoming_messages_std": 0.3706001488622993,
         "loopix_end_to_end_latency_seconds": 2.918272019836363,
@@ -2690,7 +2486,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 693.2303009033203,
         "loopix_reliability": 0.9252873563218391,
-        "loopix_reliability_std": 0.024590791768742157,
         "loopix_incoming_messages": 24.147651113656064,
         "loopix_incoming_messages_std": 0.11253703923402361,
         "loopix_end_to_end_latency_seconds": 2.9404232869875773,
@@ -2703,7 +2498,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 674.6124954223633,
         "loopix_reliability": 0.4838709677419355,
-        "loopix_reliability_std": 0.12283683848458853,
         "loopix_incoming_messages": 23.53548772761002,
         "loopix_incoming_messages_std": 0.6713658499151856,
         "loopix_end_to_end_latency_seconds": 2.2241816304666666,
@@ -2716,7 +2510,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 686.4082717895508,
         "loopix_reliability": 0.9097744360902256,
-        "loopix_reliability_std": 0.01777854819475528,
         "loopix_incoming_messages": 24.153432946260025,
         "loopix_incoming_messages_std": 0.26849409521997736,
         "loopix_end_to_end_latency_seconds": 2.5796692491735542,
@@ -2729,7 +2522,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 680.7388229370117,
         "loopix_reliability": 0.8909090909090909,
-        "loopix_reliability_std": 0.12296677787153727,
         "loopix_incoming_messages": 24.10172679960958,
         "loopix_incoming_messages_std": 0.2986123843345105,
         "loopix_end_to_end_latency_seconds": 3.4047707027959193,
@@ -2744,7 +2536,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 972.6842880249023,
         "loopix_reliability": 0.8917525773195877,
-        "loopix_reliability_std": 0.019838816858644772,
         "loopix_incoming_messages": 24.189122764760494,
         "loopix_incoming_messages_std": 0.2447240248257119,
         "loopix_end_to_end_latency_seconds": 1.664269324560694,
@@ -2757,7 +2548,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 778.18896484375,
         "loopix_reliability": 0.8854961832061069,
-        "loopix_reliability_std": 0.18755000476324735,
         "loopix_incoming_messages": 23.960316553339446,
         "loopix_incoming_messages_std": 0.19570870590689723,
         "loopix_end_to_end_latency_seconds": 1.8893839354224133,
@@ -2770,7 +2560,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 744.4422454833984,
         "loopix_reliability": 0.8901734104046243,
-        "loopix_reliability_std": 0.01671764758728992,
         "loopix_incoming_messages": 24.091528698913486,
         "loopix_incoming_messages_std": 0.1723119701521763,
         "loopix_end_to_end_latency_seconds": 2.3389547777207795,
@@ -2783,7 +2572,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 733.4148559570312,
         "loopix_reliability": 0.9050279329608939,
-        "loopix_reliability_std": 0.02655033332388324,
         "loopix_incoming_messages": 24.09305406725444,
         "loopix_incoming_messages_std": 0.1513750623106399,
         "loopix_end_to_end_latency_seconds": 2.303158232685185,
@@ -2796,7 +2584,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 725.2741088867188,
         "loopix_reliability": 0.9247311827956989,
-        "loopix_reliability_std": 0.09923775502425572,
         "loopix_incoming_messages": 24.153041421042154,
         "loopix_incoming_messages_std": 0.10601003827195422,
         "loopix_end_to_end_latency_seconds": 2.0725451796046515,
@@ -2809,7 +2596,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 716.9256896972656,
         "loopix_reliability": 0.9162303664921466,
-        "loopix_reliability_std": 0.011227686584828032,
         "loopix_incoming_messages": 24.09147560047369,
         "loopix_incoming_messages_std": 0.3313693417212514,
         "loopix_end_to_end_latency_seconds": 2.378290281634286,
@@ -2822,7 +2608,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 711.8896408081055,
         "loopix_reliability": 0.893491124260355,
-        "loopix_reliability_std": 0.0433520479472221,
         "loopix_incoming_messages": 24.137609004032903,
         "loopix_incoming_messages_std": 0.13218965765265722,
         "loopix_end_to_end_latency_seconds": 2.543601111589404,
@@ -2835,7 +2620,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 706.6043853759766,
         "loopix_reliability": 0.9206349206349206,
-        "loopix_reliability_std": 0.2555808139996535,
         "loopix_incoming_messages": 24.11304857928372,
         "loopix_incoming_messages_std": 0.2954559024446807,
         "loopix_end_to_end_latency_seconds": 2.7770824767155173,
@@ -2848,7 +2632,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 703.3335494995117,
         "loopix_reliability": 0.8843537414965986,
-        "loopix_reliability_std": 0.030285536088286102,
         "loopix_incoming_messages": 24.13759773813247,
         "loopix_incoming_messages_std": 0.1760677310749006,
         "loopix_end_to_end_latency_seconds": 3.2271877695307687,
@@ -2861,7 +2644,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 699.3254776000977,
         "loopix_reliability": 0.9012345679012346,
-        "loopix_reliability_std": 0.007400052651334364,
         "loopix_incoming_messages": 24.107473113985623,
         "loopix_incoming_messages_std": 0.19900087608600367,
         "loopix_end_to_end_latency_seconds": 2.8657417956986304,
@@ -2874,7 +2656,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 692.7734222412109,
         "loopix_reliability": 0.8432835820895522,
-        "loopix_reliability_std": 0.0677405804064881,
         "loopix_incoming_messages": 23.984176085745577,
         "loopix_incoming_messages_std": 0.17502257696010445,
         "loopix_end_to_end_latency_seconds": 2.6308864835575223,
@@ -2887,7 +2668,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 689.6168060302734,
         "loopix_reliability": 0.8761061946902655,
-        "loopix_reliability_std": 0.18651153335410592,
         "loopix_incoming_messages": 24.024392648572853,
         "loopix_incoming_messages_std": 0.32497717376689544,
         "loopix_end_to_end_latency_seconds": 2.820288248787879,
@@ -2900,7 +2680,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 684.5288391113281,
         "loopix_reliability": 0.9488636363636364,
-        "loopix_reliability_std": 0.0004132710585543899,
         "loopix_incoming_messages": 23.927264178820018,
         "loopix_incoming_messages_std": 0.265868291289352,
         "loopix_end_to_end_latency_seconds": 3.062954758041916,
@@ -2915,7 +2694,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 1018.413688659668,
         "loopix_reliability": 0.9182389937106918,
-        "loopix_reliability_std": 0.20194539953102325,
         "loopix_incoming_messages": 24.19935991756442,
         "loopix_incoming_messages_std": 0.2717649293334197,
         "loopix_end_to_end_latency_seconds": 1.5861865472328764,
@@ -2928,7 +2706,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 800.0360717773438,
         "loopix_reliability": 0.8858695652173914,
-        "loopix_reliability_std": 0.0356834946546658,
         "loopix_incoming_messages": 24.1357108920484,
         "loopix_incoming_messages_std": 0.19709785801824317,
         "loopix_end_to_end_latency_seconds": 1.9576203061656443,
@@ -2941,7 +2718,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 755.7915267944336,
         "loopix_reliability": 0.8953488372093024,
-        "loopix_reliability_std": 0.02507233174433543,
         "loopix_incoming_messages": 24.003796861604073,
         "loopix_incoming_messages_std": 0.16085497365179174,
         "loopix_end_to_end_latency_seconds": 2.3123562897662335,
@@ -2954,7 +2730,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 744.8783569335938,
         "loopix_reliability": 0.9259259259259259,
-        "loopix_reliability_std": 0.042773391582373324,
         "loopix_incoming_messages": 24.124033234051687,
         "loopix_incoming_messages_std": 0.16315514180360677,
         "loopix_end_to_end_latency_seconds": 2.6120722264857146,
@@ -2967,7 +2742,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 736.4468688964844,
         "loopix_reliability": 0.8994413407821229,
-        "loopix_reliability_std": 0.022463404841072197,
         "loopix_incoming_messages": 24.20508946451732,
         "loopix_incoming_messages_std": 0.15586462215237515,
         "loopix_end_to_end_latency_seconds": 2.3941831580372672,
@@ -2980,7 +2754,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 726.1878662109375,
         "loopix_reliability": 0.888235294117647,
-        "loopix_reliability_std": 0.05899779081117847,
         "loopix_incoming_messages": 24.08904720370507,
         "loopix_incoming_messages_std": 0.20615437535376274,
         "loopix_end_to_end_latency_seconds": 2.366149674092715,
@@ -2993,7 +2766,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 712.8345489501953,
         "loopix_reliability": 0.9285714285714286,
-        "loopix_reliability_std": 0.04352786576410858,
         "loopix_incoming_messages": 23.71668447966328,
         "loopix_incoming_messages_std": 0.4791879611982727,
         "loopix_end_to_end_latency_seconds": 2.6716792902153843,
@@ -3006,7 +2778,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 702.8559036254883,
         "loopix_reliability": 0.9289617486338798,
-        "loopix_reliability_std": 0.02867941503442408,
         "loopix_incoming_messages": 23.438747237268352,
         "loopix_incoming_messages_std": 0.39616381038858073,
         "loopix_end_to_end_latency_seconds": 2.6690908392764707,
@@ -3019,7 +2790,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 711.9934768676758,
         "loopix_reliability": 0.9096385542168675,
-        "loopix_reliability_std": 0.030075955333328144,
         "loopix_incoming_messages": 24.228258855930466,
         "loopix_incoming_messages_std": 0.10359207558783605,
         "loopix_end_to_end_latency_seconds": 2.8805416092649003,
@@ -3032,7 +2802,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 704.8080215454102,
         "loopix_reliability": 0.8849557522123894,
-        "loopix_reliability_std": 0.26711352209815176,
         "loopix_incoming_messages": 24.063709107732965,
         "loopix_incoming_messages_std": 0.19486582071991418,
         "loopix_end_to_end_latency_seconds": 2.7240868694100002,
@@ -3045,7 +2814,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 703.5516052246094,
         "loopix_reliability": 0.851063829787234,
-        "loopix_reliability_std": 0.041419870673642875,
         "loopix_incoming_messages": 24.185856972415767,
         "loopix_incoming_messages_std": 0.2686323901465456,
         "loopix_end_to_end_latency_seconds": 2.8059608126499995,
@@ -3058,7 +2826,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 687.8723602294922,
         "loopix_reliability": 0.6883116883116883,
-        "loopix_reliability_std": 0.16262150351494217,
         "loopix_incoming_messages": 23.83550367195349,
         "loopix_incoming_messages_std": 0.6032014804247793,
         "loopix_end_to_end_latency_seconds": 4.272826464773585,
@@ -3071,7 +2838,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 691.3093338012695,
         "loopix_reliability": 0.9281437125748503,
-        "loopix_reliability_std": 0.0029592248637227135,
         "loopix_incoming_messages": 24.193007870970174,
         "loopix_incoming_messages_std": 0.24195594123213093,
         "loopix_end_to_end_latency_seconds": 3.1012475949419356,
@@ -3086,7 +2852,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 1062.9905090332031,
         "loopix_reliability": 0.91,
-        "loopix_reliability_std": 0.039913981059577344,
         "loopix_incoming_messages": 24.15314880182108,
         "loopix_incoming_messages_std": 0.17289491710655677,
         "loopix_end_to_end_latency_seconds": 1.714521926412088,
@@ -3099,7 +2864,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 819.5572509765625,
         "loopix_reliability": 0.9357798165137615,
-        "loopix_reliability_std": 0.05885686663711681,
         "loopix_incoming_messages": 24.20254288149768,
         "loopix_incoming_messages_std": 0.08281873656175805,
         "loopix_end_to_end_latency_seconds": 2.0029470492499994,
@@ -3112,7 +2876,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 757.255615234375,
         "loopix_reliability": 0.8888888888888888,
-        "loopix_reliability_std": 0.08318917572302297,
         "loopix_incoming_messages": 23.371853695857965,
         "loopix_incoming_messages_std": 0.4943680995374852,
         "loopix_end_to_end_latency_seconds": 2.2321338245874998,
@@ -3125,7 +2888,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 757.2140808105469,
         "loopix_reliability": 0.9109947643979057,
-        "loopix_reliability_std": 0.009751835730541078,
         "loopix_incoming_messages": 24.156517204511474,
         "loopix_incoming_messages_std": 0.2064777483717873,
         "loopix_end_to_end_latency_seconds": 2.274324981068965,
@@ -3138,7 +2900,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 745.5429077148438,
         "loopix_reliability": 0.8666666666666667,
-        "loopix_reliability_std": 0.025494790547777264,
         "loopix_incoming_messages": 24.16133486578522,
         "loopix_incoming_messages_std": 0.14737710097644555,
         "loopix_end_to_end_latency_seconds": 2.404258749932692,
@@ -3151,7 +2912,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 732.5322494506836,
         "loopix_reliability": 0.7526881720430108,
-        "loopix_reliability_std": 0.010889859524143715,
         "loopix_incoming_messages": 24.0525404403729,
         "loopix_incoming_messages_std": 0.3799766057084264,
         "loopix_end_to_end_latency_seconds": 2.358034939171429,
@@ -3164,7 +2924,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 727.9426956176758,
         "loopix_reliability": 0.9162011173184358,
-        "loopix_reliability_std": 0.03368857483039303,
         "loopix_incoming_messages": 24.0961469782195,
         "loopix_incoming_messages_std": 0.14915338044937612,
         "loopix_end_to_end_latency_seconds": 2.727485954060976,
@@ -3177,7 +2936,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 712.6995620727539,
         "loopix_reliability": 0.9428571428571428,
-        "loopix_reliability_std": 0.21488961212288654,
         "loopix_incoming_messages": 23.592081006074476,
         "loopix_incoming_messages_std": 0.360578246545209,
         "loopix_end_to_end_latency_seconds": 2.632414393037879,
@@ -3190,7 +2948,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 718.4313125610352,
         "loopix_reliability": 0.945054945054945,
-        "loopix_reliability_std": 0.03275380701600944,
         "loopix_incoming_messages": 24.19114450228407,
         "loopix_incoming_messages_std": 0.17327284803303028,
         "loopix_end_to_end_latency_seconds": 2.9948445571511626,
@@ -3203,7 +2960,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 712.2842178344727,
         "loopix_reliability": 0.8859060402684564,
-        "loopix_reliability_std": 0.030350125268434527,
         "loopix_incoming_messages": 24.09235239336695,
         "loopix_incoming_messages_std": 0.3143597814014561,
         "loopix_end_to_end_latency_seconds": 3.063908763598485,
@@ -3216,7 +2972,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 598.5837326049805,
         "loopix_reliability": 0.17391304347826086,
-        "loopix_reliability_std": 0.16555182695279266,
         "loopix_incoming_messages": 18.13117989894612,
         "loopix_incoming_messages_std": 3.4191330562539854,
         "loopix_end_to_end_latency_seconds": 2.82541908275,
@@ -3229,7 +2984,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 703.5516052246094,
         "loopix_reliability": 0.9375,
-        "loopix_reliability_std": 0.01821403173142847,
         "loopix_incoming_messages": 24.19794971935948,
         "loopix_incoming_messages_std": 0.3045402937890264,
         "loopix_end_to_end_latency_seconds": 2.6758863539611113,
@@ -3242,7 +2996,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 695.7639007568359,
         "loopix_reliability": 0.9294117647058824,
-        "loopix_reliability_std": 0.016752228497191133,
         "loopix_incoming_messages": 24.065691308116573,
         "loopix_incoming_messages_std": 0.2612945757876877,
         "loopix_end_to_end_latency_seconds": 3.136068912183545,
@@ -3257,7 +3010,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 1108.9587326049805,
         "loopix_reliability": 0.9254385964912281,
-        "loopix_reliability_std": 0.010050817661395569,
         "loopix_incoming_messages": 24.156586969040802,
         "loopix_incoming_messages_std": 0.16997181432530925,
         "loopix_end_to_end_latency_seconds": 1.6688454154312795,
@@ -3270,7 +3022,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 837.5001220703125,
         "loopix_reliability": 0.8742857142857143,
-        "loopix_reliability_std": 0.02864310601752995,
         "loopix_incoming_messages": 24.18424595932663,
         "loopix_incoming_messages_std": 0.3651808542839171,
         "loopix_end_to_end_latency_seconds": 1.9157146960392157,
@@ -3283,7 +3034,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 785.841682434082,
         "loopix_reliability": 0.9541284403669725,
-        "loopix_reliability_std": 0.02230188237733391,
         "loopix_incoming_messages": 24.198595791524163,
         "loopix_incoming_messages_std": 0.30135393085193385,
         "loopix_end_to_end_latency_seconds": 2.353427739096153,
@@ -3296,7 +3046,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 769.4667358398438,
         "loopix_reliability": 0.9238578680203046,
-        "loopix_reliability_std": 0.03343994771705077,
         "loopix_incoming_messages": 24.18665465541681,
         "loopix_incoming_messages_std": 0.11595110630721042,
         "loopix_end_to_end_latency_seconds": 2.353281480247253,
@@ -3309,7 +3058,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 755.0231399536133,
         "loopix_reliability": 0.9243243243243243,
-        "loopix_reliability_std": 0.05645829900739742,
         "loopix_incoming_messages": 24.124208048860826,
         "loopix_incoming_messages_std": 0.1757662634237069,
         "loopix_end_to_end_latency_seconds": 2.5762900563274855,
@@ -3322,7 +3070,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 745.9271011352539,
         "loopix_reliability": 0.918918918918919,
-        "loopix_reliability_std": 0.013670864775218302,
         "loopix_incoming_messages": 24.172037550087797,
         "loopix_incoming_messages_std": 0.18146875872755625,
         "loopix_end_to_end_latency_seconds": 2.3718949332588233,
@@ -3335,7 +3082,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 732.989128112793,
         "loopix_reliability": 0.8848484848484849,
-        "loopix_reliability_std": 0.034856821127255425,
         "loopix_incoming_messages": 23.938018825577785,
         "loopix_incoming_messages_std": 0.16161657905805718,
         "loopix_end_to_end_latency_seconds": 2.468479257986301,
@@ -3348,7 +3094,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 730.1440200805664,
         "loopix_reliability": 0.9378238341968912,
-        "loopix_reliability_std": 0.026403810379012422,
         "loopix_incoming_messages": 24.144691394460253,
         "loopix_incoming_messages_std": 0.1707590816687942,
         "loopix_end_to_end_latency_seconds": 2.7114272155635364,
@@ -3361,7 +3106,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 682.0160064697266,
         "loopix_reliability": 0.6379310344827587,
-        "loopix_reliability_std": 0.09027316278094331,
         "loopix_incoming_messages": 21.860816832842097,
         "loopix_incoming_messages_std": 1.5067354854554704,
         "loopix_end_to_end_latency_seconds": 2.873467968945946,
@@ -3374,7 +3118,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 718.8570404052734,
         "loopix_reliability": 0.8789808917197452,
-        "loopix_reliability_std": 0.07714172816172962,
         "loopix_incoming_messages": 24.112780490742892,
         "loopix_incoming_messages_std": 0.13324829490716536,
         "loopix_end_to_end_latency_seconds": 2.734920850768116,
@@ -3387,7 +3130,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 713.8625259399414,
         "loopix_reliability": 0.8679245283018868,
-        "loopix_reliability_std": 0.07754767864861097,
         "loopix_incoming_messages": 24.0875776154676,
         "loopix_incoming_messages_std": 0.13035777560140638,
         "loopix_end_to_end_latency_seconds": 2.8865304550543476,
@@ -3400,7 +3142,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 708.2657623291016,
         "loopix_reliability": 0.8514851485148515,
-        "loopix_reliability_std": 0.03273679492982992,
         "loopix_incoming_messages": 24.170858009601822,
         "loopix_incoming_messages_std": 0.13268130346393664,
         "loopix_end_to_end_latency_seconds": 2.8891556720348834,
@@ -3413,7 +3154,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 698.1417465209961,
         "loopix_reliability": 0.907563025210084,
-        "loopix_reliability_std": 0.039742619103948704,
         "loopix_incoming_messages": 24.05970610519867,
         "loopix_incoming_messages_std": 0.33884330876062974,
         "loopix_end_to_end_latency_seconds": 3.1889260392037038,
@@ -3428,7 +3168,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 1152.1441497802734,
         "loopix_reliability": 0.9032258064516129,
-        "loopix_reliability_std": 0.10498693441144104,
         "loopix_incoming_messages": 24.05077066003366,
         "loopix_incoming_messages_std": 0.10011196537774161,
         "loopix_end_to_end_latency_seconds": 1.6722287176142856,
@@ -3441,7 +3180,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 855.951789855957,
         "loopix_reliability": 0.9113300492610837,
-        "loopix_reliability_std": 0.059316215658706074,
         "loopix_incoming_messages": 24.19138539475268,
         "loopix_incoming_messages_std": 0.13995041111009512,
         "loopix_end_to_end_latency_seconds": 1.9682072641459467,
@@ -3454,7 +3192,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 798.2708587646484,
         "loopix_reliability": 0.921875,
-        "loopix_reliability_std": 0.04862866792701007,
         "loopix_incoming_messages": 24.17565830565053,
         "loopix_incoming_messages_std": 0.11028088378471042,
         "loopix_end_to_end_latency_seconds": 2.3484290013446323,
@@ -3467,7 +3204,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 780.0995483398438,
         "loopix_reliability": 0.9343434343434344,
-        "loopix_reliability_std": 0.018819408680279662,
         "loopix_incoming_messages": 24.167245380643124,
         "loopix_incoming_messages_std": 0.11436274811002732,
         "loopix_end_to_end_latency_seconds": 2.3239005221891884,
@@ -3480,7 +3216,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 764.2022476196289,
         "loopix_reliability": 0.9130434782608695,
-        "loopix_reliability_std": 0.03734134756418237,
         "loopix_incoming_messages": 24.045471684517363,
         "loopix_incoming_messages_std": 0.18425127220344867,
         "loopix_end_to_end_latency_seconds": 2.4132208005833333,
@@ -3493,7 +3228,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 754.4935760498047,
         "loopix_reliability": 0.8703703703703703,
-        "loopix_reliability_std": 0.03340409380077772,
         "loopix_incoming_messages": 24.142931794438912,
         "loopix_incoming_messages_std": 0.12344932173946901,
         "loopix_end_to_end_latency_seconds": 2.278230149446808,
@@ -3506,7 +3240,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 723.1662368774414,
         "loopix_reliability": 0.6805555555555556,
-        "loopix_reliability_std": 0.009418784626534567,
         "loopix_incoming_messages": 22.926278005870117,
         "loopix_incoming_messages_std": 0.6404857654857291,
         "loopix_end_to_end_latency_seconds": 2.3615149004897957,
@@ -3519,7 +3252,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 736.4987869262695,
         "loopix_reliability": 0.8881987577639752,
-        "loopix_reliability_std": 0.04776543119345436,
         "loopix_incoming_messages": 24.076658351794755,
         "loopix_incoming_messages_std": 0.19343634286250988,
         "loopix_end_to_end_latency_seconds": 2.6072394793286717,
@@ -3532,7 +3264,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 732.2726593017578,
         "loopix_reliability": 0.9644670050761421,
-        "loopix_reliability_std": 0.02139904640159227,
         "loopix_incoming_messages": 24.18630759197422,
         "loopix_incoming_messages_std": 0.2202393008848098,
         "loopix_end_to_end_latency_seconds": 2.905816376831579,
@@ -3545,7 +3276,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 725.2637252807617,
         "loopix_reliability": 0.9453551912568307,
-        "loopix_reliability_std": 0.030715968953758586,
         "loopix_incoming_messages": 24.093605795110488,
         "loopix_incoming_messages_std": 0.16582722699434835,
         "loopix_end_to_end_latency_seconds": 2.9747401712312143,
@@ -3557,8 +3287,7 @@
       },
       "1.5": {
         "loopix_total_bandwidth_mb": 619.5793838500977,
-        "loopix_reliability": 0,
-        "loopix_reliability_std": 0,
+        "loopix_reliability": 0.6363636363636364,
         "loopix_incoming_messages": 20.368771317892808,
         "loopix_incoming_messages_std": 0.3437153686319975,
         "loopix_end_to_end_latency_seconds": 2.7639096604285713,
@@ -3571,7 +3300,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 711.4950637817383,
         "loopix_reliability": 0.9098360655737705,
-        "loopix_reliability_std": 0.27862199411564004,
         "loopix_incoming_messages": 24.04956762515417,
         "loopix_incoming_messages_std": 0.19050233510165573,
         "loopix_end_to_end_latency_seconds": 2.7340563826036033,
@@ -3584,7 +3312,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 704.5484313964844,
         "loopix_reliability": 0.8737864077669902,
-        "loopix_reliability_std": 0.1359125535858341,
         "loopix_incoming_messages": 24.168433530323753,
         "loopix_incoming_messages_std": 0.09907789636021005,
         "loopix_end_to_end_latency_seconds": 3.3378464457333332,
@@ -3599,7 +3326,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 1192.7232818603516,
         "loopix_reliability": 0.8405797101449275,
-        "loopix_reliability_std": 0.04583303847208566,
         "loopix_incoming_messages": 23.90209954619331,
         "loopix_incoming_messages_std": 0.3386423178959229,
         "loopix_end_to_end_latency_seconds": 1.821136169275862,
@@ -3612,7 +3338,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 868.5055694580078,
         "loopix_reliability": 0.64,
-        "loopix_reliability_std": 0.07904197644189974,
         "loopix_incoming_messages": 23.871652097468264,
         "loopix_incoming_messages_std": 0.3873827136080187,
         "loopix_end_to_end_latency_seconds": 1.8506145174687498,
@@ -3625,7 +3350,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 811.3022842407227,
         "loopix_reliability": 0.8959537572254336,
-        "loopix_reliability_std": 0.022617557712257066,
         "loopix_incoming_messages": 24.164886272080622,
         "loopix_incoming_messages_std": 0.062378236757270014,
         "loopix_end_to_end_latency_seconds": 2.2858058805741934,
@@ -3638,7 +3362,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 791.2619247436523,
         "loopix_reliability": 0.9463414634146341,
-        "loopix_reliability_std": 0.007394265746382272,
         "loopix_incoming_messages": 24.142332566406424,
         "loopix_incoming_messages_std": 0.0912094284163116,
         "loopix_end_to_end_latency_seconds": 2.58241639964433,
@@ -3651,7 +3374,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 776.4341354370117,
         "loopix_reliability": 0.9157894736842105,
-        "loopix_reliability_std": 0.029388017194265977,
         "loopix_incoming_messages": 24.177242295168092,
         "loopix_incoming_messages_std": 0.21541336119625426,
         "loopix_end_to_end_latency_seconds": 2.2836920748160923,
@@ -3664,7 +3386,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 763.5896148681641,
         "loopix_reliability": 0.9029850746268657,
-        "loopix_reliability_std": 0.24620719746514835,
         "loopix_incoming_messages": 24.13849273020497,
         "loopix_incoming_messages_std": 0.061779172577664264,
         "loopix_end_to_end_latency_seconds": 2.379352413190083,
@@ -3677,7 +3398,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 754.4001235961914,
         "loopix_reliability": 0.9175824175824175,
-        "loopix_reliability_std": 0.02284216918996075,
         "loopix_incoming_messages": 24.188218682767396,
         "loopix_incoming_messages_std": 0.1949440589329436,
         "loopix_end_to_end_latency_seconds": 2.54816654036527,
@@ -3690,7 +3410,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 746.2489929199219,
         "loopix_reliability": 0.9528795811518325,
-        "loopix_reliability_std": 0.028121952607822187,
         "loopix_incoming_messages": 24.177848066686803,
         "loopix_incoming_messages_std": 0.17610381937408767,
         "loopix_end_to_end_latency_seconds": 2.941507494587912,
@@ -3703,7 +3422,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 738.5235900878906,
         "loopix_reliability": 0.9252873563218391,
-        "loopix_reliability_std": 0.02185515043800209,
         "loopix_incoming_messages": 24.140059039123123,
         "loopix_incoming_messages_std": 0.1136700080648577,
         "loopix_end_to_end_latency_seconds": 2.8188904173975153,
@@ -3716,7 +3434,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 725.1183547973633,
         "loopix_reliability": 0.901840490797546,
-        "loopix_reliability_std": 0.013099663047424734,
         "loopix_incoming_messages": 23.700870015575287,
         "loopix_incoming_messages_std": 0.3821860313573171,
         "loopix_end_to_end_latency_seconds": 2.9255852920748295,
@@ -3729,7 +3446,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 724.6095581054688,
         "loopix_reliability": 0.8789808917197452,
-        "loopix_reliability_std": 0.01504143823003212,
         "loopix_incoming_messages": 23.992226360915627,
         "loopix_incoming_messages_std": 0.11834565846751399,
         "loopix_end_to_end_latency_seconds": 2.7879969497318844,
@@ -3742,7 +3458,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 717.382568359375,
         "loopix_reliability": 0.9101796407185628,
-        "loopix_reliability_std": 0.005832409783990494,
         "loopix_incoming_messages": 23.945450340672426,
         "loopix_incoming_messages_std": 0.34730832395815303,
         "loopix_end_to_end_latency_seconds": 2.770618505223684,
@@ -3755,7 +3470,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 706.5940017700195,
         "loopix_reliability": 0.8947368421052632,
-        "loopix_reliability_std": 0.025368742908767727,
         "loopix_incoming_messages": 24.031374571999578,
         "loopix_incoming_messages_std": 0.18894952583782312,
         "loopix_end_to_end_latency_seconds": 3.3276755395073527,
@@ -3770,7 +3484,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 1245.035888671875,
         "loopix_reliability": 0.9237668161434978,
-        "loopix_reliability_std": 0.020936354963658112,
         "loopix_incoming_messages": 24.161303140037976,
         "loopix_incoming_messages_std": 0.22008196550928114,
         "loopix_end_to_end_latency_seconds": 1.7579342064951458,
@@ -3783,7 +3496,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 892.2113418579102,
         "loopix_reliability": 0.9351851851851852,
-        "loopix_reliability_std": 0.017841065831164394,
         "loopix_incoming_messages": 24.187935853918024,
         "loopix_incoming_messages_std": 0.19907210782021284,
         "loopix_end_to_end_latency_seconds": 2.005589735257426,
@@ -3796,7 +3508,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 823.4095687866211,
         "loopix_reliability": 0.864516129032258,
-        "loopix_reliability_std": 0.029501096174586832,
         "loopix_incoming_messages": 24.147628395601068,
         "loopix_incoming_messages_std": 0.09704836436471498,
         "loopix_end_to_end_latency_seconds": 2.3102862086492535,
@@ -3809,7 +3520,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 800.9602127075195,
         "loopix_reliability": 0.90625,
-        "loopix_reliability_std": 0.012335683970723621,
         "loopix_incoming_messages": 24.060039183661495,
         "loopix_incoming_messages_std": 0.2817589508357775,
         "loopix_end_to_end_latency_seconds": 2.390541803034483,
@@ -3822,7 +3532,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 786.506233215332,
         "loopix_reliability": 0.9541284403669725,
-        "loopix_reliability_std": 0.037903554204199344,
         "loopix_incoming_messages": 24.17258357214578,
         "loopix_incoming_messages_std": 0.13807549802754418,
         "loopix_end_to_end_latency_seconds": 2.4229618627211535,
@@ -3835,7 +3544,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 730.9747085571289,
         "loopix_reliability": 0.75,
-        "loopix_reliability_std": 0.16001630998038543,
         "loopix_incoming_messages": 21.885361167078035,
         "loopix_incoming_messages_std": 1.3278014785726473,
         "loopix_end_to_end_latency_seconds": 3.2685005322916663,
@@ -3848,7 +3556,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 757.8578643798828,
         "loopix_reliability": 0.8950617283950617,
-        "loopix_reliability_std": 0.02916755565245535,
         "loopix_incoming_messages": 23.90711152119406,
         "loopix_incoming_messages_std": 0.30336777599362275,
         "loopix_end_to_end_latency_seconds": 2.7214183816758615,
@@ -3861,7 +3568,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 753.8809432983398,
         "loopix_reliability": 0.9297297297297298,
-        "loopix_reliability_std": 0.03042136114196569,
         "loopix_incoming_messages": 24.183826504034315,
         "loopix_incoming_messages_std": 0.28824701315729845,
         "loopix_end_to_end_latency_seconds": 2.7206624311511622,
@@ -3874,7 +3580,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 739.7384719848633,
         "loopix_reliability": 0.835820895522388,
-        "loopix_reliability_std": 0.027771100081272062,
         "loopix_incoming_messages": 23.800834340850425,
         "loopix_incoming_messages_std": 0.45391795838953214,
         "loopix_end_to_end_latency_seconds": 2.813899841392857,
@@ -3887,7 +3592,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 739.987678527832,
         "loopix_reliability": 0.9325842696629213,
-        "loopix_reliability_std": 0.029609193056859894,
         "loopix_incoming_messages": 24.177187269945595,
         "loopix_incoming_messages_std": 0.07243429210695786,
         "loopix_end_to_end_latency_seconds": 2.9487330157289158,
@@ -3900,7 +3604,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 734.7024230957031,
         "loopix_reliability": 0.8766233766233766,
-        "loopix_reliability_std": 0.01070441445216247,
         "loopix_incoming_messages": 24.212227618136986,
         "loopix_incoming_messages_std": 0.19922435152630902,
         "loopix_end_to_end_latency_seconds": 2.8727697675333332,
@@ -3913,7 +3616,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 724.5264892578125,
         "loopix_reliability": 0.8680555555555556,
-        "loopix_reliability_std": 0.06273542117774021,
         "loopix_incoming_messages": 24.173397158103104,
         "loopix_incoming_messages_std": 0.17807161045789283,
         "loopix_end_to_end_latency_seconds": 3.0588221031839993,
@@ -3926,7 +3628,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 710.7059097290039,
         "loopix_reliability": 0.9226190476190477,
-        "loopix_reliability_std": 0.030007658243745124,
         "loopix_incoming_messages": 23.991060770624912,
         "loopix_incoming_messages_std": 0.1410367999401776,
         "loopix_end_to_end_latency_seconds": 3.119544508006451,
@@ -3941,7 +3642,6 @@
       "0.2": {
         "loopix_total_bandwidth_mb": 1289.4673385620117,
         "loopix_reliability": 0.9154929577464789,
-        "loopix_reliability_std": 0.015612482055017944,
         "loopix_incoming_messages": 24.1031405118483,
         "loopix_incoming_messages_std": 0.12005100505722593,
         "loopix_end_to_end_latency_seconds": 1.6867397447538464,
@@ -3954,7 +3654,6 @@
       "0.5": {
         "loopix_total_bandwidth_mb": 909.9880752563477,
         "loopix_reliability": 0.9084507042253521,
-        "loopix_reliability_std": 0.011212060437483955,
         "loopix_incoming_messages": 24.167339736840155,
         "loopix_incoming_messages_std": 0.19863436983668006,
         "loopix_end_to_end_latency_seconds": 2.150577040627907,
@@ -3967,7 +3666,6 @@
       "0.7": {
         "loopix_total_bandwidth_mb": 835.0703582763672,
         "loopix_reliability": 0.8773006134969326,
-        "loopix_reliability_std": 0.014225138686041671,
         "loopix_incoming_messages": 24.03419579992919,
         "loopix_incoming_messages_std": 0.22127848017298524,
         "loopix_end_to_end_latency_seconds": 2.336813164433566,
@@ -3980,7 +3678,6 @@
       "0.8": {
         "loopix_total_bandwidth_mb": 814.0331726074219,
         "loopix_reliability": 0.9329896907216495,
-        "loopix_reliability_std": 0.01296197415564505,
         "loopix_incoming_messages": 24.137721070197923,
         "loopix_incoming_messages_std": 0.2566346076264579,
         "loopix_end_to_end_latency_seconds": 2.35788461240884,
@@ -3993,7 +3690,6 @@
       "0.9": {
         "loopix_total_bandwidth_mb": 796.4225769042969,
         "loopix_reliability": 0.9116022099447514,
-        "loopix_reliability_std": 0.01796367852265823,
         "loopix_incoming_messages": 24.149538273271844,
         "loopix_incoming_messages_std": 0.14690220001886503,
         "loopix_end_to_end_latency_seconds": 2.407971297551515,
@@ -4006,7 +3702,6 @@
       "1.0": {
         "loopix_total_bandwidth_mb": 778.9054336547852,
         "loopix_reliability": 0.9157303370786517,
-        "loopix_reliability_std": 0.04051996212869928,
         "loopix_incoming_messages": 23.968413094185667,
         "loopix_incoming_messages_std": 0.08528855213350112,
         "loopix_end_to_end_latency_seconds": 2.6152381321104285,
@@ -4019,7 +3714,6 @@
       "1.1": {
         "loopix_total_bandwidth_mb": 761.7932510375977,
         "loopix_reliability": 0.8020833333333334,
-        "loopix_reliability_std": 0.20068140255673225,
         "loopix_incoming_messages": 23.443412839598153,
         "loopix_incoming_messages_std": 1.0723243710368886,
         "loopix_end_to_end_latency_seconds": 2.7478957114805196,
@@ -4032,7 +3726,6 @@
       "1.2": {
         "loopix_total_bandwidth_mb": 760.5576019287109,
         "loopix_reliability": 0.9395604395604396,
-        "loopix_reliability_std": 0.02059163618409562,
         "loopix_incoming_messages": 24.14700407318833,
         "loopix_incoming_messages_std": 0.21423876676035655,
         "loopix_end_to_end_latency_seconds": 2.8272058311929826,
@@ -4045,7 +3738,6 @@
       "1.3": {
         "loopix_total_bandwidth_mb": 749.7586517333984,
         "loopix_reliability": 0.9041916167664671,
-        "loopix_reliability_std": 0.03420220241619132,
         "loopix_incoming_messages": 23.9945905392326,
         "loopix_incoming_messages_std": 0.29214371920476123,
         "loopix_end_to_end_latency_seconds": 2.9066360308278156,
@@ -4058,7 +3750,6 @@
       "1.4": {
         "loopix_total_bandwidth_mb": 744.9821929931641,
         "loopix_reliability": 0.9337016574585635,
-        "loopix_reliability_std": 0.024038539359839357,
         "loopix_incoming_messages": 24.10445948840744,
         "loopix_incoming_messages_std": 0.4152492900714902,
         "loopix_end_to_end_latency_seconds": 2.8862664776863904,
@@ -4071,7 +3762,6 @@
       "1.5": {
         "loopix_total_bandwidth_mb": 698.6505432128906,
         "loopix_reliability": 0.6470588235294118,
-        "loopix_reliability_std": 0.04314155013130014,
         "loopix_incoming_messages": 21.736225162857874,
         "loopix_incoming_messages_std": 1.6463022731793242,
         "loopix_end_to_end_latency_seconds": 2.740058190333334,
@@ -4084,7 +3774,6 @@
       "1.7": {
         "loopix_total_bandwidth_mb": 626.9621276855469,
         "loopix_reliability": 0.6190476190476191,
-        "loopix_reliability_std": 0.0617784334481064,
         "loopix_incoming_messages": 20.430842792966867,
         "loopix_incoming_messages_std": 0.2549443506075812,
         "loopix_end_to_end_latency_seconds": 6.907558762615384,
@@ -4097,7 +3786,6 @@
       "2.0": {
         "loopix_total_bandwidth_mb": 709.7713851928711,
         "loopix_reliability": 0.8979591836734694,
-        "loopix_reliability_std": 0.001701152617701089,
         "loopix_incoming_messages": 23.663057531195065,
         "loopix_incoming_messages_std": 0.2557284717510777,
         "loopix_end_to_end_latency_seconds": 3.1868212343787885,

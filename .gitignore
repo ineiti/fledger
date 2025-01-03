@@ -19,4 +19,7 @@ mergetb/*/raw_data/*
 mergetb/rename/*
 !mergetb/rename/.gitkeep
 
+*/average_data.json
+*/raw_metrics.json
+
 logs.txt

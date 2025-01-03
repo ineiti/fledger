@@ -24,8 +24,6 @@ use prometheus::{gather, Encoder, TextEncoder};
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey, StaticSecret};
 
-const TIMEOUT: u64 = 5;
-
 /// Fledger node CLI binary
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -107,7 +105,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         SIGNAL_VERSION,
         VERSION_STRING
     );
-    log::info!("timeout is {:?}", Duration::from_secs(TIMEOUT));
     log::info!("start loopix time is {}", args.start_loopix_time);
     log::info!("retry is {}", retry);
     log::info!("duplicates is {}", duplicates);
@@ -204,7 +201,7 @@ async fn save_metrics_loop(
             .expect("Unable to write data");
     }
     let sleep_time = if save_new_metrics_file {
-        20
+        30
     } else {
         5
     };
@@ -334,7 +331,11 @@ impl LSRoot {
                 return Ok(LSRoot::SendProxyRequest(i + 10).into());
             }
             LSRoot::SendProxyRequest(_start) => {
-                log::info!("Sending request through WebProxy at {} seconds since start with timeout {:?}", start_time.elapsed().as_secs_f64(), Duration::from_secs(TIMEOUT));
+                let timeout = if save_new_metrics_file {
+                    6
+                } else {
+                    20
+                };
                 let start = now();
                 let start_time = Instant::now();
                 NUMBER_OF_PROXY_REQUESTS.inc();
@@ -343,7 +344,7 @@ impl LSRoot {
                     .as_mut()
                     .unwrap()
                     // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                    .get_with_retry_and_timeout_with_duplicates(&format!("https://ipinfo.io?token={}", token), retry, duplicates, Duration::from_secs(TIMEOUT))
+                    .get_with_retry_and_timeout_with_duplicates(&format!("https://ipinfo.io?token={}", token), retry, duplicates, Duration::from_secs(timeout))
                     // .get_with_timeout("https://ipinfo.io", Duration::from_secs_f64(TIMEOUT))
                     // .get(&format!("https://ipinfo.io?token={}", token))
                     .await
@@ -405,16 +406,22 @@ impl LSChild {
             } 
 
             LSChild::ProxyRequesting(_start) => {
-                log::info!("Sending request through WebProxy at {} seconds since start with timeout {:?}", start_time.elapsed().as_secs_f64(), Duration::from_secs(TIMEOUT));
-                let start = now();
+                let timeout = if save_new_metrics_file {
+                    6
+                } else {
+                    20
+                };
+                log::info!("Sending request through WebProxy at {} seconds since start with timeout {:?}", start_time.elapsed().as_secs_f64(), Duration::from_secs(timeout));
+                let _start = now();
                 let start_time = Instant::now();
                 NUMBER_OF_PROXY_REQUESTS.inc();
+                let start = now();
                 match node
                     .webproxy
                     .as_mut()
                     .unwrap()
                     // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                    .get_with_retry_and_timeout_with_duplicates(&format!("https://ipinfo.io?token={}", token), retry, duplicates, Duration::from_secs(TIMEOUT))
+                    .get_with_retry_and_timeout_with_duplicates(&format!("https://ipinfo.io?token={}", token), retry, duplicates, Duration::from_secs(timeout))
                     // .get(&format!("https://ipinfo.io?token={}", token))
                     // .get_with_timeout("https://ipinfo.io", )
                     .await

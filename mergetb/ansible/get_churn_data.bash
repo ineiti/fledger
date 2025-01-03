@@ -9,6 +9,16 @@ token=$1
 
 initial_path_length=3
 
+mkdir -p metrics/control
+for i in {0..10}; do
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 token=$token variable=control index=$i"
+    wait
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
+    wait
+done
+
 # Try retry values
 mkdir -p metrics/retry
 
@@ -88,19 +98,4 @@ for i in "${!duplicates_values[@]}"; do
         ansible-playbook -i inventory.ini delete_only_metrics.yml
         wait
     done
-done
-
-# Control run
-time_pulls=(0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7 0.7)
-mkdir -p metrics/control
-
-for i in "${!time_pulls[@]}"; do
-    time_pull=${time_pulls[$i]}
-
-    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "retry=1 path_len=$initial_path_length n_clients=3 duplicates=2 token=$token variable=control index=$i"
-    wait
-    ansible-playbook -i inventory.ini stop_containers.yml 
-    wait
-    ansible-playbook -i inventory.ini delete_only_metrics.yml
-    wait
 done

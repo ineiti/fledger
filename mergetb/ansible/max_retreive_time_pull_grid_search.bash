@@ -10,7 +10,7 @@ token=$1
 # Define initial values
 lambda_loop=1.65
 lambda_drop=1.65
-lambda_payload=6.1
+lambda_payload=6.25
 path_length=3
 mean_delay=80
 lambda_loop_mix=1.65
@@ -30,8 +30,8 @@ initial_max_retrieve=$max_retrieve
 initial_pad_length=$pad_length
 
 # Try different time_pull and max_retrieve values
-time_pulls=(0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.2 1.4 1.5 1.7 2.0)
-max_retrieves=(1 2 3 4 5 6 7 8 9 10 11 12)
+time_pulls=(0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.2 1.4 1.6 1.8 2.0)
+max_retrieves=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
 
 # time_pulls=(0.2 0.5)
 # max_retrieves=(1)

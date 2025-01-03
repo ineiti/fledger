@@ -26,17 +26,20 @@ def calculate_average_data(data, duration):
             if metric == "loopix_total_bandwidth_mb":
                 results["loopix_total_bandwidth_mb"] = np.sum(data["loopix_bandwidth_bytes"]) / (1024 * 1024)
             elif metric == "loopix_reliability":
-                latency_data = np.array(data["loopix_end_to_end_latency_seconds"]["count"])
                 total_requests = np.array(data["loopix_number_of_proxy_requests"])
+                latency_data = np.array(data["loopix_end_to_end_latency_seconds"]["count"])
+                latency_data = np.pad(latency_data, (0, len(total_requests) - len(latency_data)), 'constant')
                 print(f"latency_data: {latency_data}, total_requests: {total_requests}")
-                print(f"latency_data / total_requests: {latency_data / total_requests}")
-                results[metric] = np.sum(latency_data) / np.sum(total_requests)
-                results[f"{metric}_std"] = np.std(latency_data / total_requests)
+                if np.sum(total_requests) == 0:
+                    results[metric] = 0
+                else:
+                    results[metric] = np.sum(latency_data) / np.sum(total_requests)       
+                print(f"results[metric]: {results[metric]}")         
             elif metric == "loopix_incoming_messages":
                 results[metric] = np.mean(data[metric]) / (duration - np.mean(data["loopix_start_time_seconds"]))
                 results[f"{metric}_std"] = np.std(data[metric]) / (duration - np.mean(data["loopix_start_time_seconds"]))
             else:
-                if len(data[metric]["count"]) == 0:
+                if np.sum(data[metric]["count"]) == 0:
                     results[metric] = 0
                 else:
                     results[metric] = np.sum(data[metric]["sum"]) / np.sum(data[metric]["count"])

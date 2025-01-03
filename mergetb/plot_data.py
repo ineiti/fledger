@@ -20,7 +20,10 @@ def save_plot_directory(directory):
 def plot_latency_components(directory, path_length, variable, run):
     plt.rcParams.update({'font.size': 16})
     indices = list(run.keys())
+    print(f"Indices: {indices}")
+    # print(f"Run: {run}")
     n_runs = len(indices)
+    print(run[indices[0]])
 
     n_mixnode_delay = (path_length + 1) * 2
     n_decryption_delay = (path_length + 3) * 2
@@ -57,8 +60,8 @@ def plot_latency_components(directory, path_length, variable, run):
     plt.legend()
     plt.tight_layout()
 
-    save_plot_directory(f"{directory}/plots/{variable}")
-    plt.savefig(f"{directory}/plots/{variable}/latency_components.png")
+    save_plot_directory(directory)
+    plt.savefig(os.path.join(directory, "latency_components.png"))
     plt.clf()
     plt.close()
 
@@ -80,8 +83,8 @@ def plot_reliability(directory, variable, run):
 
     plt.tight_layout()
 
-    save_plot_directory(f"{directory}/plots/{variable}")
-    plt.savefig(f"{directory}/plots/{variable}/reliability.png")
+    save_plot_directory(directory)
+    plt.savefig(os.path.join(directory, "reliability.png"))
     plt.clf()
     plt.close()
 
@@ -104,8 +107,8 @@ def plot_latency(directory, variable, run):
 
     plt.tight_layout()
 
-    save_plot_directory(f"{directory}/plots/{variable}")
-    plt.savefig(f"{directory}/plots/{variable}/latency.png")
+    save_plot_directory(directory)
+    plt.savefig(os.path.join(directory, "latency.png"))
     plt.clf()
     plt.close()
 
@@ -146,8 +149,8 @@ def plot_latency_and_bandwidth(directory, variable, run):
     ax2.set_ylim(0, max(bandwidth) * 1.1)
 
     plt.tight_layout()
-    save_plot_directory(f"{directory}/plots/{variable}")
-    plt.savefig(f"{directory}/plots/{variable}/latency_and_bandwidth.png")
+    save_plot_directory(directory)
+    plt.savefig(os.path.join(directory, "latency_and_bandwidth.png"))
     plt.clf()
     plt.close()
 
@@ -188,8 +191,8 @@ def plot_reliability_latency(directory, variable, run):
     ax2.set_ylim(0, max(latency) * 1.1)
 
     plt.tight_layout()
-    save_plot_directory(f"{directory}/plots/{variable}")
-    plt.savefig(f"{directory}/plots/{variable}/reliability_latency.png")
+    save_plot_directory(directory)
+    plt.savefig(os.path.join(directory, "reliability_latency.png"))
     plt.clf()
     plt.close()
 
@@ -230,8 +233,8 @@ def plot_reliability_incoming_latency(directory, variable, run):
 
     plt.subplots_adjust(left=0.1)
 
-    save_plot_directory(f"{directory}/plots/{variable}")
-    plt.savefig(f"{directory}/plots/{variable}/reliability_incoming_latency.png")
+    save_plot_directory(directory)
+    plt.savefig(os.path.join(directory, "reliability_incoming_latency.png"))
     plt.clf()
     plt.close()
 
@@ -240,11 +243,9 @@ def plot_incoming_messages(directory, variable, run):
     plt.rcParams.update({'font.size': 16})
     indices = list(run.keys())
     incoming_messages = [run[i]["loopix_incoming_messages"] for i in indices]
-    incoming_messages_std = [run[i]["loopix_incoming_messages_std"] for i in indices]
     plt.figure(figsize=(20, 6))
     
     plt.plot(indices, incoming_messages, marker='o', linestyle='-', color='blue', label='Incoming Messages')
-    plt.errorbar(indices, incoming_messages, yerr=incoming_messages_std, fmt='o', color='blue')
     if variable in x_axis_name:
         plt.xlabel(x_axis_name[variable])
     else:
@@ -256,8 +257,8 @@ def plot_incoming_messages(directory, variable, run):
 
     plt.tight_layout()
 
-    save_plot_directory(f"{directory}/plots/{variable}")
-    plt.savefig(f"{directory}/plots/{variable}/incoming_messages.png")
+    save_plot_directory(directory)
+    plt.savefig(os.path.join(directory, "incoming_messages.png"))
     plt.clf()
     plt.close()
 
@@ -267,16 +268,9 @@ def plot_bandwidth(directory, duration, variable, run):
     indices = [float(i) for i in keys]
     bandwidth = [run[i]["loopix_total_bandwidth_mb"] for i in keys]
 
-    coefficients = np.polyfit(indices, bandwidth, 1)
-    fitted_line = np.poly1d(coefficients)
     plt.figure(figsize=(20, 6))
 
     plt.plot(indices, bandwidth, marker='o', linestyle='-', color='green', label='Bandwidth')
-    plt.plot(indices, fitted_line(indices), linestyle='--', color='blue', label='Fit Line')
-
-    equation_text = f"y = {coefficients[0]:.2f}x + {coefficients[1]:.2f}"
-    plt.text(0.05, 0.95, equation_text, transform=plt.gca().transAxes, fontsize=10,
-             verticalalignment='top', bbox=dict(boxstyle="round", facecolor="white", alpha=0.5))
 
     if variable in x_axis_name:
         plt.xlabel(x_axis_name[variable])
@@ -288,8 +282,8 @@ def plot_bandwidth(directory, duration, variable, run):
     plt.legend()
     plt.tight_layout()
 
-    save_plot_directory(f"{directory}/plots/{variable}")
-    plt.savefig(f"{directory}/plots/{variable}/bandwidth.png")
+    save_plot_directory(directory)
+    plt.savefig(os.path.join(directory, "bandwidth.png"))
     plt.clf()
     plt.close()
 
@@ -307,11 +301,12 @@ if __name__ == "__main__":
     data = get_data(directory)
 
     for variable, run in data.items():
-        plot_latency_components(directory, path_length, variable, run)
-        plot_reliability(directory, variable, run)
-        plot_incoming_messages(directory, variable, run)
-        plot_latency(directory, variable, run)
-        plot_bandwidth(directory, duration, variable, run)
-        plot_latency_and_bandwidth(directory, variable, run)
+        plot_dir = os.path.join(directory, "plots", variable)
+        plot_latency_components(plot_dir, path_length, variable, run)
+        plot_reliability(plot_dir, variable, run)
+        plot_incoming_messages(plot_dir, variable, run)
+        plot_latency(plot_dir, variable, run)
+        plot_bandwidth(plot_dir, duration, variable, run)
+        plot_latency_and_bandwidth(plot_dir, variable, run)
         # plot_reliability_incoming_latency(directory, variable, run)
         plot_reliability_latency(directory, variable, run)

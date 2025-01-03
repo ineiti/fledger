@@ -18,11 +18,10 @@ metrics_to_extract = [
 ]
 
 def simulation_ran_successfully(data_dir, variable, index):
-    dir = f"{data_dir}/{variable}"
-    metrics_file = os.path.join(dir, f"metrics_{index}_node-1.txt")
-    metrics_file_2 = os.path.join(dir, f"metrics_{index}.txt")
-
-    if not os.path.exists(metrics_file) and not os.path.exists(metrics_file_2):
+    metrics_dir = os.path.join(data_dir, variable)
+    metrics_file = os.path.join(metrics_dir, f"metrics_{index}_node-1.txt")
+    
+    if not os.path.exists(metrics_file):
         return False
 
     with open(metrics_file, 'r') as f:
@@ -87,16 +86,11 @@ def get_metrics_data(data_dir, path_length, n_clients, results, variable, index)
     for i in range(path_length*(path_length - 1) + path_length + n_clients):
 
         print(f"Getting metrics data for node-{i}")
-        dir = f"{data_dir}/{variable}"
-        metrics_file = os.path.join(dir, f"metrics_{index}_node-{i}.txt")
-        metrics_file_2 = os.path.join(dir, f"metrics_{index}.txt")
+        directory = os.path.join(data_dir, variable)
+        metrics_file = os.path.join(directory, f"metrics_{index}_node-{i}.txt")
 
         if os.path.exists(metrics_file):
             with open(metrics_file, 'r') as f:
-                content = f.read()
-
-        elif os.path.exists(metrics_file_2):
-            with open(metrics_file_2, 'r') as f:
                 content = f.read()
         else:
             print(f"Metrics file not found")
@@ -145,18 +139,14 @@ def main():
         if runs > 0:
             indices_to_remove = []
             for index in range(runs):
+                print(f"index: {index}")
                 with open(os.path.join(directory, f'{index}_config.yaml'), 'r') as f:
                     config = yaml.safe_load(f)
 
-                print(variable == 'control')
-
-                if variable == 'control':
+                try:
+                    run_value = config[variable]
+                except:
                     run_value = index
-                else:
-                    try:
-                        run_value = config[variable]
-                    except:
-                        continue
 
                 if variable not in results.keys():
                     results[variable] = {str(run_value): {}}

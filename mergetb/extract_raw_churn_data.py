@@ -3,38 +3,32 @@ import re
 import json
 import sys
 import yaml
-from extract_raw_data import get_bandwidth_bytes_or_start_time, get_proxy_request, get_incoming_messages, get_histogram_metrics, 
+from extract_raw_data import get_bandwidth_bytes_or_start_time, metrics_to_extract, create_results_dict, simulation_ran_successfully, get_proxy_request, get_incoming_messages, get_histogram_metrics 
 
 def get_metrics_data(data_dir, path_length, n_clients, results, variable, index):
+    if metrics_to_extract[0] not in results:
+        create_results_dict(results, metrics_to_extract)
 
-    if not simulation_ran_successfully(data_dir, variable, index):
-        print(f"Skipping run {variable} {index}, no end-to-end latency data found")
-        return False
-
-    create_results_dict(results, metrics_to_extract)
-
-    for i in range(path_length*(path_length - 1) + path_length + n_clients):
-
-        print(f"Getting metrics data for node-{i}")
-        dir = f"{data_dir}/{variable}"
-        metrics_file = os.path.join(dir, f"metrics_{index}_node-{i}.txt")
+    directory = os.path.join(data_dir, variable)
+    metrics_file = os.path.join(directory, f"metrics_{index}.txt")
+    
+    print(f"Getting metrics data from {metrics_file}")
+    if os.path.exists(metrics_file):
+        with open(metrics_file, 'r') as f:
+            content = f.read()
         
-        if os.path.exists(metrics_file):
-            with open(metrics_file, 'r') as f:
-                content = f.read()
-            
-            for metric in metrics_to_extract:
-                if metric == "loopix_bandwidth_bytes" or metric == "loopix_start_time_seconds":
-                    get_bandwidth_bytes_or_start_time(results, content, metric, i)
+        for metric in metrics_to_extract:
+            if metric == "loopix_bandwidth_bytes" or metric == "loopix_start_time_seconds":
+                get_bandwidth_bytes_or_start_time(results, content, metric, index)
 
-                elif metric == "loopix_number_of_proxy_requests":
-                    get_proxy_request(results, content, metric, i)
+            elif metric == "loopix_number_of_proxy_requests":
+                get_proxy_request(results, content, metric, index)
 
-                elif metric == "loopix_incoming_messages":
-                    get_incoming_messages(results, content, metric, i)
+            elif metric == "loopix_incoming_messages":
+                get_incoming_messages(results, content, metric, index)
 
-                else:
-                    get_histogram_metrics(results, content, metric, i)
+            else:
+                get_histogram_metrics(results, content, metric, index)
 
     return True
           
@@ -56,16 +50,28 @@ def main():
     json_suffix = ".json"
 
     for variable in variables:
+        results[variable] = {}
         run_dir = os.path.join(data_dir, variable)
         runs = [f for f in os.listdir(run_dir) if not f.endswith(signal_log_suffix) and not f.endswith(json_suffix)]
 
         print(runs)
 
+        with open(os.path.join(run_dir, f'{variable}.json'), 'r') as f:
+            run_keys = json.load(f)
+
         for run in runs:
+            if variable == "retry_duplicates":
+                run_key = run
+            else:
+                run_key = run_keys[run]
+
+            results[variable][run_key] = {}
             node_dir = os.path.join(run_dir, run)
             nodes = os.listdir(node_dir)
             print(nodes)
-            for node in nodes:
+
+            for enum_node, node in enumerate(nodes):
+                print(node)
                 node_data_dir = os.path.join(node_dir, node, "data")
                 print(node_data_dir)
 
@@ -77,28 +83,15 @@ def main():
 
                 print(metrics_files)
 
-                for index in range(runs):
-                    with open(os.path.join(directory, f'{index}_config.yaml'), 'r') as f:
-                        config = yaml.safe_load(f)
+                for time_index, metrics_file in enumerate(metrics_files):
+                    if time_index*20 not in results[variable][run_key]:
+                        results[variable][run_key][time_index*20] = {}  
 
-                    print(variable == 'control')
+                    print(f"time index: {time_index}")             
 
-                    if variable == 'control':
-                        run_value = index
-                    else:
-                        try:
-                            run_value = config[variable]
-                        except:
-                            continue
+                    print(f"Getting metrics data from run {variable} {time_index*20} for node {enum_node}")
 
-                    if variable not in results.keys():
-                        results[variable] = {str(run_value): {}}
-                    else:
-                        results[variable][str(run_value)] = {}
-
-                    print(f"Getting metrics data from run {variable} {index}")
-
-                    get_metrics_data(data_dir, path_length, n_clients, results[variable][str(run_value)], variable, index)
+                    get_metrics_data(node_data_dir, path_length, n_clients, results[variable][run_key][time_index*20], "", time_index)
 
                     
         print(results)
