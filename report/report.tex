@@ -25,7 +25,11 @@
 \makeacks
 
 \begin{abstract}
-Fledger is a peer-to-peer network which works on browsers, it is very modular an can easily be extended with additional services. One of it's services is web proxy which lets peers act as proxies for other nodes. This service can let users their traffic patterns from their ISP, however it does nothing to protect from traffic analysis by an adversary with limited view of the network nor does it hide traffic patterns from the proxy node. In this project, we do literature review to choose a suitable anonymous communication system for this specific use case of web proxy. We create a proof of concept implementation and fine tune and evaluate it in the setting of Fledger. \textbf{Given Fledger is a peer to peer network and churn is inevitable, we then add simple mechanisms to improve the reliability of message delivery in the presence of churn. We achieve few seconds latency with }\textbf{x percent reliability with these mechanisms}
+Fledger is a peer-to-peer network which works on browsers, it is very modular an can easily be extended with additional services. One of it's services is web proxy which lets peers act as proxies for other nodes. This service can let users their traffic patterns from their ISP, however it does nothing to protect from traffic analysis by an adversary with limited view of the network nor does it hide traffic patterns from the proxy node. In this project, we do literature review to choose a suitable anonymous communication system for this specific use case of web proxy. We create a proof of concept implementation and fine tune and evaluate it in the setting of Fledger. 
+
+
+\textbf{Given Fledger is a peer to peer network and churn is inevitable, we then add simple mechanisms to improve the reliability of message delivery in the presence of churn.} 
+\textbf{Add the results here}
 \end{abstract}
 
 \maketoc
@@ -44,7 +48,7 @@ Fledger is a peer-to-peer network which works on browsers, it is very modular an
 % The eights paragraph discusses your core contribution.
 
 % This section is usually 3-5 pages.
-\textbf{Insert something that leads onto fledger without chatgpt speak (something about web proxies maybe)}
+\textbf{Insert something that leads onto fledger without chatgpt speak ( or something about web proxies maybe)}
 
 Fledger\textbf{cite} is a peer-to-peer network designed to work directly in the browser, without the need for proxies. It enables connecting browsers to communicate between nodes. It is under development and will let users share resources like disk space, CPU, and network bandwidth in the future. Fledger's initial use cases are a decentralized chat application and web proxy. Although with the current version of Fledger, one can use the web proxy, there are some privacy concerns with it. \textbf{insert stuff of isp and traffic analysis} Also, the remote node acting as the web proxy can see all the traffic patterns from the user. 
 
@@ -97,6 +101,7 @@ In \autoref{fig:webrtc}, Peer 1 sends \textit{Signaling} message to the Signalin
 
 %-------------------
 \subsection{Modules}
+\label{sec:fledger_modules}
 
 For each functionality in Fledger, there is a separate module. This section will introduce the relevant Fledger modules to this project.
 
@@ -147,7 +152,7 @@ The typical route of a message from the client goes \textbf{provider -> mixnode 
     \item \textbf{Drop Message} \\
     If the client payload message queue is empty, the client sends a drop message instead. These message are sent to a random random provider and they are dropped at the destination. All nodes, clients, providers, and mix nodes, periodically send drop messages.
     \item \textbf{Loop Message} \\
-    Loop messages are the \textbf{namesake of the loopix anoymity system}. They are a part of the cover traffic along with the drop messages. Loop messages are mmessages that a node sends to themselves, routed through a random provider. They mimick getting a reply for a message, and provide important \textbf{security/privacy} properties which will be detailed in the next section.
+    Loop messages are the \textbf{namesake of the loopix anonymity system}. They are a part of the cover traffic along with the drop messages. Loop messages are mmessages that a node sends to themselves, routed through a random provider. They mimick getting a reply for a message, and provide important \textbf{security/privacy} properties which will be detailed in the next section.
     \item \textbf{Pull Message} \\
     When a client is online, it periodically asks provider whether the provider is storing any many messages for it. Pull message serves this purpose. When the provider receives a pull message, it will send a predetermined number of messages back to the client. These message messages can be real messages destined to the client, or messages created by the provider to fill up the predetermined number.
     \item \textbf{Dummy Message} \\
@@ -155,35 +160,53 @@ The typical route of a message from the client goes \textbf{provider -> mixnode 
 \end{itemize}
 
 %-------------------
-\subsection{Thread Model}
+\subsection{Threat Model}
+\label{sec:loopix_assumptions}
+An adversary can observe all traffic. The mix network prevents sender - receiver linkage. Even with misbehaving providers and all but one mix node misbehaving, loopix provides protections against an adversary observing whether a sender and a receiver are communicating.  \textbf{is this really corrupt provider????}
+
+Particularly at a single mix node, loopix provides strong protection against trickling attacks, where the adversary drops all but one packet and tries to correlate the destination of that packet. Thanks to the presence of drop and loop messages that are sent periodically at each mix node, the adversary cannot know exactly which packet is the one they let into the mix node. \textbf{we will talk about in more detail in the autoref section}. This being said adversary can delay, drop, inject packets into the network with the purpose of learning information about the communications of the honest clients.
+
+\textbf{finish this part}
+Message in distinguishability
+client-provider unobservability
 
 
+passive traffic analysis
+n01 attack
+end to end correlation
+sender receiver third party unlinkability: if two parties are commyunicating, GPA (section 4.3), 
+sneder online unobservability: adversary doesn't know if A is communicating with B or not, corrupt provider
+receiver unobservability: is there communication to B from any sender (4.1.2) honest ptovifrt
+
+\textbf{talk about what is malicioius here}
+\begin{itemize}
+    \item honest but curious providers
+    \item a fractions of mixnodes can be malicous
+    \item a fraction of clients can be malicioius
+\end{itemize}
 %-------------------
 \subsection{Parameters}
-There are many parameters to the Loopix Anonymity System. Which let's us finetune the system to our needs.
-
-\textbf{Talk about how these provide anonymity etc}
 \begin{itemize}
-\item \textbf{Path Length} \\
-How many hops a message goes through the mix network.
+\item \textbf{Path length} \\
+This is the number of hops a packet goes through in the mix node. Although chosen by the clients, the authors of the Loopix paper recommend a path length of 3 or more. Each hop of the packet would be in layer of the mix network topology.
 \item \textbf{Mean Delay} \\
-Mean delay for a messaeg to wait a mixnode.
-\item \textbf{Lambda payload} \\
-The rate at which the clients sends messages from it's "real" message queue. If it's queue is empty, it will send a dummy\textbf{fact check this} message.
-\item \textbf{Lambda loop} \\ 
-Rate at which each node sends loop messages \textbf{need to explain loop messages somewhere}. Although the paper separates between the loop rates of mix nodes and clients, for simplicity we use the same thing for all nodes in this project.
-\item \textbf{Lambda drop} \\
-Rate at which all nodes send drop messages. \textbf{again need to explain drop messages somewhere}
-\item \textbf{Time Pull} \\
-Rate at which clients asks its provider to send its stored messages. The client always sends this message.
-\item \textbf{Max retrieve} \\
-The number of messages the provider sends each time it receives a pull request. It always sends this number of messages. If there aren't enough messages for the client, it will send dummy messages to send exactly "max retreieve" number of messages.
+This is the average amount of time a packet stops at a mix node. This value is used to draw from the exponential distribution while the a node is creating a packet that will go through the network. For each hop, one value is drawn from this distribution.
+\item \textbf{Payload Message Rate (\(\lambda_p\))} \\
+The rate at which the clients sends messages from it's "real" message queue. In this project we will use all \(\lambda\) values as \(x\) per second, however \(\lambda\) values can be rates with any time unit.
+\item \textbf{Loop Message Rate (\(\lambda_L\))} \\ 
+The rate at which each node sends loop messages. Although the Loopix paper distinguishes between the loop message rate of mix nodes (\(\lambda_M\))and clients (\(\lambda_L\)), in this project, for simplicity we will use the same values for both and refer to it as \(\lambda_L\).
+\item \textbf{Drop Message Rate  (\(\lambda_D\))} \\
+The rate at which all nodes send drop messages. 
+\item \textbf{Time-to-Pull} (\(t_{pull}\))\\
+This is the amount of time that a client waits between each pull message to its provider. Although not explicitly defined in the loopix paper, it can be found in the reference implementation \textbf{cite} by the authors. In this project we will use seconds to define this value.
+\item \textbf{Number of messages retrieved (\(N_R\))} \\
+The number of messages the provider sends each time it receives a pull request. It always sends this number of messages to ensure that an adversary cannot tell whether a client is receiving messages or not. If there aren't enough messages for the client, it will also send dummy messages to make sure exactly \(N_R\) messages are in its response. Again this parameter is not explicitly defined in the Loopix paper, but can be found in the reference implementation.
 \end{itemize}
 
-%-------------------
-\subsection{Mean number of messages in the mix}
-One important security parameter here is lambda/mu. It is essentially number of messages that are at a mixnode being "mixed" at a time. This is an estimate where lambda is the number of incoming messages every second. And mu is the inverse of the mean delay. One can thing of it as the number of messages that are "leaving" the mixnode on average per second. It is important to note that this estimate assumes that there are no loop messages \textbf{and drop?} being send by the mixnode. The Loopix paper recommends lambda/mu of 2. 
-
+\subsubsection{Mean number of messages in a mix node}
+\label{sec:lambda_over_mu}
+An important security parameter is the mean number of messages in a mix node at a given time. This is essentially number of messages that are being "mixed" at the mix node at a time. An adversary can observe some messages coming into the mix node, it waits a certain amount of time and observes some messages leaving the mix node. It is  \textbf{TODO complete this}
+It is an estimate where lambda is the number of incoming messages every second. And mu is the inverse of the mean delay. One can thing of it as the number of messages that are "leaving" the mixnode on average per second. It is important to note that this estimate assumes that there are no loop messages \textbf{and drop?} being send by the mixnode. The Loopix paper recommends lambda/mu of 2. 
 
 %%%%%%%%%%%%%%%%
 \chapter{Design}
@@ -195,11 +218,10 @@ One important security parameter here is lambda/mu. It is essentially number of 
 
 % This section is usually 5-10 pages.
 %-------------------
-\section{Mix Network Literature Review}
+\section{Choosing an Anonymous Communication System}
+\label{sec:mixers}
 %-------------------
-First step in this project was to find a suitable mixer or an anonymous communcation system that can be used in the context of web proxying.
-
-We looked at a multitude of different systems. Here is some of the more relevant ones:
+Having identified our initial goal, namely making Fledger web proxy more privacy preserving, the first step was to find a suitable mix network or more broadly an anonymous communication system that can be used in the context of browsing the web through a web proxy. For this purpose, we identified potential anonymous communication systems to look into. This section will detail the process of choosing Loopix to integrate into Fledger, and the reasoning behind this choice.
 
 \subsection{Atom}
 Development of a scalable anonymous messaging system that defends against traffic analysis attacks. The system is very scalable and techinically over a million users are supports with \textbf{talk about privacy qurantees}, they only achieve 28 minute latency. THis latency might be acceptable for an aync messaging application however, for accessing web pages, this is not usable.
@@ -220,7 +242,7 @@ As we have talked about Loopix we will not go into further detail here. We chose
 \section{Loopix Integration into Fledger}
 %-------------------
 \subsection{Loopix as a fledger module}
-We we talked about in the background section, fledger contains many modules to communicate between nodes and is very extensible. For this reason we wanted make a loopix module that can fit between any fledger module and the network. Although primary focus of this projec thas been web proxy module, we took care to make sure this module is extensible.
+\autoref{sec:fledger_modules} goes into detail how Fledger contains many modules and is very extensible. Keeping this in mind, we set out to create a Loopix module that can fit between any Fledger module and the network. Although primary focus of this project has been, using the Loopix module as an intermediary between the web proxy module and the network, Fledger Looopix module described in this section has been designed to work with other modules.
 
 Here is how it works. When a node wants to use web proxy through loopix module, it will create the web proxy module with loopix overlay. Loopix overlay translate the message into a a format that loopix module can understand, note that it could be any fledger module that can send a message to loopix overlay to be translated. Note that only Loopix Clients can send web proxy requests. When loopix module receives a message from overlay it will create a route that goes through its own provider, the mixnetwork, the destion clients provider and finally the client that will be the web proxy. Once the route is created it will create delays for each mixnode. And then encrypt using the public keys of each node. Kind of like onion routing.
 
@@ -245,12 +267,8 @@ The web proxy module receives the request, gets the url requested and sends all 
 
 %-------------------
 \subsection{Assumptions}
-Adversary can observe all traffic
-Mixers prevent sender - receiver linkage
-There can be misbehaving mix nodes
-At least one has to follow the protocol
-Adversary can inject, delay, drop messages
-Cover traffic prevents it from learning a lot of information
+
+For the most part
 Web proxy => web page access patterns
 Every time a node goes online, a specific website is accessed
 Enough users to provide an anonymity set
@@ -264,10 +282,17 @@ They are “trusted”
 - even unique message ID
 Fledger Signaling Server (WebRTC)
 Tells nodes which other nodes are online (!)
+\textbf{talk about how we can get rid of providers}
 
-\section{Reliable Message Delivery Literature Review}
 
-\section{Adaptations for Reliable Message Delivery and Future Work}
+\section{Potential Approaches to More Reliable Message Delivery}
+\label{sec:reliable_message_delivery}
+\textbf{Talk about the simple approach, retrying and duplicate messages}
+\textbf{Talk about }
+
+\section{Further Adaptation to Fledger}
+
+\section{Future Work}
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Implementation}
@@ -278,18 +303,16 @@ Tells nodes which other nodes are online (!)
 % you wrote but covers the implementation aspects of the projects.l
 
 % This section is usually 3-5 pages.
+\section{Communication between Modules}
+\textbf{Talk about messages and how they wrapped between modules}
 
-Some basic details about implementation, no need to talk too much here
+\section{Performance Improvements}
+\textbf{Two big performance improvements: parallel message processing, stop adding each message to storage :)}
 
-talk about parallel message processing
+\section{Miscellaneous}
+\textbf{Talk using rust sphinx for messages and the one line adaptation needed (maybe I need to talk about it in the background)}
 
-removing storage
-
-using rust sphinx
-
-duplicate messages :)
-
-and there was something else but we'll see
+\textbf{Talk about one caveat with duplicate messages: web proxy cannot avoid reprocessing (duplicate) responses, it doesn't know how many packets it will receive}
 
 %%%%%%%%%%%%%%%%%%%%
 \chapter{Evaluation}
@@ -301,11 +324,10 @@ and there was something else but we'll see
 
 % This section is usually 5-10 pages.
 
-\textbf{PRETTIFY THE GRAPHS AND ADD STD LINES}
+\textbf{I will rerun some weird points}
 %-------------------
 \section{Experiental Setup}
 %-------------------
-\subsection{}
 Talk about setup etc and how I wasn't able to setup a massive experiment
 
 number of nodes,
@@ -331,10 +353,11 @@ Each node runs Ubuntu 20.04 LTS with 4 GB RAM and 4 cores on Sphere Testbed \tex
 \section{Fine tuning Loopix Parameters for Web Proxy}
 \label{sec:finetune}
 %-------------------
-In section this section, each measurement is taken within a simulation of 5 minutes. The nodes are allowed get started for 15 seconds, after which Fledger Loopix module is started. Here the web proxy timeout mentioned in \textbf{autoref} is set to 20 seconds. This ensures that each request takes as long as they need, and any proxy request that is not successful means dropped packets or \textbf{something along those lines.}
+In section this section, each measurement is taken within a simulation of 5 minutes. The nodes are allowed get started for 15 seconds, after which Fledger Loopix module is started. Here the web proxy timeout mentioned in \textbf{autoref} is set to 20 seconds. This ensures that each request takes as long as it needs, and any proxy request that is not successful means dropped packets or \textbf{something along those lines.}
 %-------------------
 \subsection{Mean number of messages in the mix}
-As mentioned in section \textbf{cite section}, one important security parameters for loopix system is the mean number of message in the mix. One issue with the Loopix paper is that in their experiments, they used providers and mixnodes with essentially unlimited resources. \textbf{Quote from the paper here}. Which makes it easy to reach their recommendation of lambda over mu. \\
+As mentioned in \autoref{sec:lambda_over_mu}, one important security parameters for loopix system is the mean number of message in the mix. One issue with the Loopix paper is that in their experiments, they used providers and mixnodes with essentially unlimited resources. \textbf{Quote from the paper here}. Which makes it easy to reach their recommendation of lambda over mu.
+
 However, Fledger is designed as a lightweight program, user that want to participate in as mixnode should not need to have \textbf{X amount of RAM and Y cores}. And so keeping in mind that the lambda over mu estimate does not take into account loop messages and the fact that using loopix as already gives up some privacy properties of the original system, we first look into choosing a suitable value for the incoming that a \textbf{low specced machine} can handle.
 
 In this section we keep all parameters of the loopix system stable expect the \textbf{lambda loop drop} etc. This is used to adjust the incoming messages per second while keeping the latency the same, which in turn changes the value of the mean number of message in the mix the mix.
@@ -393,7 +416,7 @@ It is also important to note one caviat with these measurements. For mixnode and
 \subsection{Lambda Payload and Mean Delay}
 As the most binding limitation in our setup is the end to end latency (a user should be able to surf the internet without waiting too long). In this we section try to find mean delay and lambda payload values that reduces the end to end latency without comprimising too much bandwidth\textbf{(!}.
 
-\textbf{Here is how we calculate the lambda over mu values: emprical lol}
+\textbf{Talk about how incoming messages per second is calculated}
 
 \textbf{Talk about the timeout!}
 
@@ -477,7 +500,7 @@ Next we change mean delay values to see how they change the latency bandwidth et
     \caption{Data Visualization for different mean delays}
 \end{figure}
 
-Since latency decreases and relibility increases, and bandwidth is not affected \textbf{technically shouldn't affected anyway, but I need to rerun a few with less chaff traffic}, we choose 60 as the mean delay going forward. \textbf{link to figures}
+Since latency decreases and reliability increases, and bandwidth is not affected \textbf{technically shouldn't affected anyway, but I need to rerun a few with less chaff traffic}, we choose 60 as the mean delay going forward. \textbf{link to figures}
 
 %-------------------
 \subsection{Choosing Max Retrieve and Time pull}
@@ -504,9 +527,9 @@ In figure \textbf{autoref} there are two heatmaps, one that shows how max retrei
 \end{figure}
 
 
-In \textbf{autref}, max retreive value over 9 and below 3 increases the latency. We believe below three it is not enough to send the full web page information from the web proxy, and over 9, there is an added overhead for the provider and client to process all the dummy messages which increases latency. As mentioned in \textbf{autoref}, these experiments were run with \textbf{url} proxy requests, and rnuning this experiment with a wider variety of websites would be beneficial. However to accomodate larger websites with multiple body messages from the web proxy, we choose the max retreieve \textbf{X} going forward.
+In \textbf{autoref}, max retreive value over 9 and below 3 increases the latency. We believe below three it is not enough to send the full web page information from the web proxy, and over 9, there is an added overhead for the provider and client to process all the dummy messages which increases latency. As mentioned in \textbf{autoref}, these experiments were run with \textbf{url} proxy requests, and rnuning this experiment with a wider variety of websites would be beneficial. However to accomodate larger websites with multiple body messages from the web proxy, we choose the max retreieve \textbf{X} going forward.
 
-For time pull it is no surprise that lwoer time pull decreases latency and increases bandwidth.
+For time pull it is no surprise that lower time pull decreases latency and increases bandwidth.
 essentially, we believe that as we are tuning our system to browse the internet, we do not need to have a very big max retrieve value but the time pull should be low.
 
 
@@ -516,7 +539,7 @@ essentially, we believe that as we are tuning our system to browse the internet,
 In \textbf{autoref} section, it is mentioned that providers do not serve their main purpose of providing sender receiver online unobservibility. If loopix integration into fledger is only to be used for web proxy module, it might be beneficial to replace providers with simple entry nodes that will not store message but directory send the traffic to the client. \textbf{The client needs to know the network anyway, so they're kinda useless here} Mixnodes in the first and final layers of mix network could be used for this purpose, and would significantly reduce end-to-end latency while not affecting privacy properties. However, if fledger loopix module would be used for other purposes such as private messaging, providers could still provide better privacy than not. We leave this extension/study of fledger loopix module to future work.
 
 %-------------------
-\subsection{? Why this should work with more nodes}
+\subsection{Scalability}
 Although we were not able to set up a experiments with larger number of nodes, in this section we try to demonstrate that this integration of Loopix Anonymity System into Fledger is scalable to many more nodes in the network. The same way we changed the cover traffic volume to accomodate the change in payload values and mean delay to keep the \textbf{mean number of messages at a mixnode} the same, we can adjust cover traffic to accomodate changing number of mixnodes and clients.
 
 \textbf{insert graphs}
@@ -531,14 +554,16 @@ In section this section, each measurement is taken within a simulation of 980 se
 
 Here the web proxy timeout is set to 6 seconds, approximately 2-3 times the average latency with this configuration. The timeout is set to this value to be able to study the effectiveness of the mechanisms in this section.
 %-------------------
-\subsubsection{Retry}
+\subsection{Retrying}
 
 %-------------------
-\subsubsection{Duplicate}
+\subsection{Duplicate Messages}
 
 %-------------------
-\subsubsection{Combination of Retry and Duplicate}
+\subsection{Combination of Retrying and Duplicate Messages}
 
+\subsection{Raptor Code}
+\textbf{I don't think I'll have time to implement this}
 
 %%%%%%%%%%%%%%%%%%%%%%
 \chapter{Related Work}
@@ -553,15 +578,15 @@ Here the web proxy timeout is set to 6 seconds, approximately 2-3 times the aver
 
 % This section is usually 3-5 pages.
 
-Not sure if this section is necessary after all the literature review sections but let's see.
+\textbf{I will probably skip this because of sections \autoref{sec:mixers} and \autoref{sec:reliable_message_delivery}}
 
 %%%%%%%%%%%%%%%%%%%%
 \chapter{Conclusion}
 %%%%%%%%%%%%%%%%%%%%
 
-In the conclusion you repeat the main result and finalize the discussion of
-your project. Mention the core results and why as well as how your system
-advances the status quo.
+% In the conclusion you repeat the main result and finalize the discussion of
+% your project. Mention the core results and why as well as how your system
+% advances the status quo.
 
 \cleardoublepage
 \phantomsection
