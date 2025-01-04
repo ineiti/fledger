@@ -103,7 +103,7 @@
             seconds: 320
 
 - name: Stop first mixnode
-  hosts: node-10
+  hosts: node-6
   tasks:
     - name: Stop first mixnode
       shell: |
@@ -114,7 +114,7 @@
         seconds: 305
 
 - name: Stop second mixnode
-  hosts: node-3
+  hosts: node-4
   tasks:
     - name: Stop second mixnode
       shell: |
@@ -125,7 +125,7 @@
         seconds: 305
 
 - name: Stop third mixnode
-  hosts: node-6
+  hosts: node-7
   tasks:
     - name: Stop third mixnode
       shell: |

@@ -62,7 +62,7 @@ def main():
     base_path = sys.argv[1]
     path_length = int(sys.argv[2])
     n_clients = int(sys.argv[3])
-    data_dir = os.path.join(base_path, "raw_data")
+    data_dir = os.path.join(base_path, "raw_data", "grid_search")
 
     print(data_dir)
 

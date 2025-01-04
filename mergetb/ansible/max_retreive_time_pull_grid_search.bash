@@ -10,7 +10,7 @@ token=$1
 # Define initial values
 lambda_loop=1.65
 lambda_drop=1.65
-lambda_payload=6.25
+lambda_payload=6.1
 path_length=3
 mean_delay=80
 lambda_loop_mix=1.65

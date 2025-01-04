@@ -9,15 +9,28 @@ token=$1
 
 initial_path_length=3
 
-mkdir -p metrics/control
-for i in {0..10}; do
-    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 token=$token variable=control index=$i"
-    wait
-    ansible-playbook -i inventory.ini stop_containers.yml 
-    wait
-    ansible-playbook -i inventory.ini delete_only_metrics.yml
-    wait
-done
+lambda_loop=1.65 
+lambda_drop=1.65
+lambda_payload=6.1
+path_length=3
+mean_delay=80
+lambda_loop_mix=1.65
+time_pull=0.8
+max_retrieve=5
+pad_length=150
+
+    cat <<EOL > loopix_core_config.yaml
+---
+lambda_loop: $lambda_loop
+lambda_drop: $lambda_drop
+lambda_payload: $lambda_payload
+path_length: $initial_path_length
+mean_delay: $mean_delay
+lambda_loop_mix: $lambda_loop_mix
+time_pull: $time_pull
+max_retrieve: $max_retrieve
+pad_length: $pad_length
+EOL
 
 # Try retry values
 mkdir -p metrics/retry
@@ -98,4 +111,15 @@ for i in "${!duplicates_values[@]}"; do
         ansible-playbook -i inventory.ini delete_only_metrics.yml
         wait
     done
+done
+
+# control
+mkdir -p metrics/control
+for i in {0..6}; do
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=1 token=$token variable=control index=$i"
+    wait
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
+    wait
 done

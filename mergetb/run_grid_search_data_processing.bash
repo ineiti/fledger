@@ -1,4 +1,4 @@
-#bin/bash
+#!/bin/bash
 
 DATA_DIR=$1
 PATH_LENGTH=$2

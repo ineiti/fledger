@@ -6,10 +6,11 @@ import os
 
 from plot_data import *
 
+y_labels = range(1, 16)
+
 def plot_heatmap_bandwidth(directory, data):
 
     x_labels = data.keys()
-    y_labels = range(1, 13)
     Z = np.zeros((len(y_labels), len(x_labels)))
     
     for i, x in enumerate(x_labels):
@@ -36,7 +37,6 @@ def plot_heatmap_bandwidth(directory, data):
 def plot_heatmap_latency(directory, data):
 
     x_labels = data.keys()
-    y_labels = range(1, 13)
 
     Z = np.zeros((len(y_labels), len(x_labels)))
     
@@ -68,7 +68,6 @@ def plot_average_reliability(directory, data):
 
     plt.figure(figsize=(20, 6))
     x_labels = data.keys()
-    y_labels = range(1, 13)
     Z = np.zeros((len(y_labels), len(x_labels)))
 
     average_reliability = []
