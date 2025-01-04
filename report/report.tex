@@ -25,7 +25,7 @@
 \makeacks
 
 \begin{abstract}
-Fledger is a peer-to-peer network which works on browsers, it is very modular an can easily be extended with additional services. One of the current services is web proxy module which let's peers act as proxies for other nodes. This service can let \textbf{hide} their traffic patterns from their ISP, however does nothing to protect from traffic analysis by an adversary with limited view of the network nor does it hide traffic patterns from the proxy node. In this project, we do literature review to choose a suitable anonymous communication system for this specific use case of web proxy. We can make crate a proof of concept implementation and tune/evaluate it in the setting of fledger. Given Fledger is a peer to peer network and churn is inevitable, we then add simple mechanisms to improve the reliability of message delivery in the presence of churn. We achieve few seconds latency with \textbf{x percent reliability with these mechanisms}
+Fledger is a peer-to-peer network which works on browsers, it is very modular an can easily be extended with additional services. One of it's services is web proxy which lets peers act as proxies for other nodes. This service can let users their traffic patterns from their ISP, however it does nothing to protect from traffic analysis by an adversary with limited view of the network nor does it hide traffic patterns from the proxy node. In this project, we do literature review to choose a suitable anonymous communication system for this specific use case of web proxy. We create a proof of concept implementation and fine tune and evaluate it in the setting of Fledger. \textbf{Given Fledger is a peer to peer network and churn is inevitable, we then add simple mechanisms to improve the reliability of message delivery in the presence of churn. We achieve few seconds latency with }\textbf{x percent reliability with these mechanisms}
 \end{abstract}
 
 \maketoc
@@ -108,17 +108,23 @@ For each functionality in Fledger, there is a separate module. This section will
     \item \textbf{Web Proxy} \\
     Web proxy module handles web proxy requests, it can be used to create and respond to request to get web pages. It creates a unique ID for a request and sends the message. When a node responds to a request, it sends multiple messages with the same unique ID as the request, which enables the web proxy client to collect the messages into the requested page. If the client does not receive the complete response within a set period of time, the request will timeout.
     \item \textbf{Overlay} \\
-    This module acts as a translator/wrapper for fledger modules. While sending a message through gossip or web proxy this module will wrap the message and then send it to the specific module. For example if node A wants to send a web proxy message to node B, node A will create web proxy message, which will be sent to Overlay module, still within node A, and Overlay module will translate for the corresponding module, for example random connections, and send the translated message to this module, which will finally send the message to the network module, and the message will be sent to node B through the WebRTC connection. Linus Gasser has kindly created this module to help integrate Loopix module into Fledger.
+    This module acts as a translator/wrapper for Fledger modules. While sending a message through gossip or web proxy this module will wrap the message and then send it to the specific module. For example if node A wants to send a web proxy message to node B, node A will create web proxy message, which will be sent to Overlay module, still within node A, and Overlay module will translate for the corresponding module, for example random connections, and send the translated message to this module, which will finally send the message to the network module, and the message will be sent to node B through the WebRTC connection. Linus Gasser has kindly created this module to help integrate Loopix module into Fledger.
     \item \textbf{Loopix} \\
     In this project we have created a Loopix module that can be used as a middle man between any module and the network module. The main purpose is to be used with web proxy but it can be used to send other kinds of messages from Fledger modules as long as they are sent through an Overlay. See the next section \textbf{autoref} for more detailed information about the Loopix Anonymity System. 
 \end{itemize}
 
 %-------------------
-\section{Loopix Anonymity System}
+\section{The Loopix Anonymity System}
 %-------------------
-Loopix is an anonymous communication system that ... It is called a continuous time mixnet as the messages are not delayed between rounds.
+Loopix is a continuous time mix network. Unlike the traditional mix networks introduced by \textbf{cite chaum here}, in continuous time mix networks, which operate in rounds. Packets are stopped for a time at the mix node and then sent on their ways. This delay is usually drawn from an exponential dsitribution \textbf{cite}.
 
-\textbf{explain the general idea here}
+Loopix combines this stop-and-go \textbf{maybe i need to cite the paper that called it that?} mixing with cover traffic to further hide traffic patterns and avoid \textbf{find attacks (n-1?) , which were possible with  networks.}
+
+Quite like the Tor network, the route of the message is chosen by the client in advance and the messages are encapsulated in layers of encryption with public keys each of the nodes in the route. However, unlike the Tor network, each message goes through a separate route, with a different delay at each hop of the route. \textbf{talk about how this makes it harder to do traffic analysis}.
+
+There are three different roles in the Loopix network. Nodes which use the mix network are called \textit{clients}. Clients have \textit{providers}, providers act as entry nodes to the network for the clients. A client sends all their traffic through their provider. In turn, the provider forwards the clients messages to the mix network and stores message, in which the final destination is the client. If the client is online, it will ask the provider for the messages it is storing.
+
+Finally, there are mix nodes. Mix nodes are arranged in a stratified topology \textbf{cite}, and their main purpose is to \textit{unwrap} messages that they receive, wait for the delay specified in the header of the unwrapped packet, and then send the message to the next hop. The mix node only knows about the delay, and previous and next nodes.
 
 \begin{figure}[H]
     \centering
@@ -128,23 +134,29 @@ Loopix is an anonymous communication system that ... It is called a continuous t
     \small\textit{Figure 1 from The Loopix Anonymity System paper}
 \end{figure}
 
+The typical route of a message from the client goes \textbf{provider -> mixnode layer 1 -> mixnode layer 2 to n -> provider of the destination -> destination client}. Of course, this requires the source client to know mixnodes at each layer as well as the destination node and the provider of the destination node.
 \textbf{TODO get rid of the text at the top of the figure}
-%-------------------
-\subsection{Client}
-The users in Loopix are called "clients" these are the nodes that are trying to communicate between each other without being observed.
-
-To achieve this has a send queue. and constantly sends cover traffic.
-%-------------------
-\subsection{Provider}
-
-Providers in loopix are the entry nodes for the client. Each client has one chosen provider and needs to "subscribe" to this provider. A client will send any message that will go through the mixnet through its provider. If a client receives a message, the provider will store this message and send it to the client only when the client sends a message to retreieve its messages.
-\textbf{Talk aboout subscribe messages.}
 
 %-------------------
-\subsection{Mixnodes}
+\subsection{Types of Messages}
+\begin{itemize}
+    \item \textbf{Subscribe Message} \\
+    When a client joins the network client sends a subscribe message to a provider of its own choosing. When a provider receives a subscribe message, it simply adds the client to its list of subscribed clients and stores any messages that arrive for this client.
+    \item \textbf{Payload Message} \\
+    If a client want to send a real message to another client, it creates a payload message. These payload messages are then put into a queue and the client pops messages from this queue at a constant rate.
+    \item \textbf{Drop Message} \\
+    If the client payload message queue is empty, the client sends a drop message instead. These message are sent to a random random provider and they are dropped at the destination. All nodes, clients, providers, and mix nodes, periodically send drop messages.
+    \item \textbf{Loop Message} \\
+    Loop messages are the \textbf{namesake of the loopix anoymity system}. They are a part of the cover traffic along with the drop messages. Loop messages are mmessages that a node sends to themselves, routed through a random provider. They mimick getting a reply for a message, and provide important \textbf{security/privacy} properties which will be detailed in the next section.
+    \item \textbf{Pull Message} \\
+    When a client is online, it periodically asks provider whether the provider is storing any many messages for it. Pull message serves this purpose. When the provider receives a pull message, it will send a predetermined number of messages back to the client. These message messages can be real messages destined to the client, or messages created by the provider to fill up the predetermined number.
+    \item \textbf{Dummy Message} \\
+    Dummy messages are messages sent to a client by the provider as a response to pull messages, if the provider does not store enough messages. For example, if the provider is storing 3 messages and needs to send 5, it will create 2 dummy messages to \textit{pad} its response.
+\end{itemize}
 
 %-------------------
-\subsection{Thread Model???}
+\subsection{Thread Model}
+
 
 %-------------------
 \subsection{Parameters}
@@ -231,8 +243,6 @@ The web proxy module receives the request, gets the url requested and sends all 
     \label{fig:implementation}
 \end{figure}
 
-\textbf{TODO fix the font in the figure}
-
 %-------------------
 \subsection{Assumptions}
 Adversary can observe all traffic
@@ -310,7 +320,12 @@ Each node runs Ubuntu 20.04 LTS with 4 GB RAM and 4 cores on Sphere Testbed \tex
 
 
 \textbf{Talk aboout the setup and what the nodes are doing during the experiment for how long, how many proxy requests over the 5 mins.}
-
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{plots/experimental_setup.png}
+    \caption{}
+    \label{fig:setup}
+\end{figure}
 
 %-------------------
 \section{Fine tuning Loopix Parameters for Web Proxy}
