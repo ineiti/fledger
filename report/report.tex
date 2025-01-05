@@ -25,11 +25,8 @@
 \makeacks
 
 \begin{abstract}
-Fledger is a peer-to-peer network which works on browsers, it is very modular an can easily be extended with additional services. One of it's services is web proxy which lets peers act as proxies for other nodes. This service can let users their traffic patterns from their ISP, however it does nothing to protect from traffic analysis by an adversary with limited view of the network nor does it hide traffic patterns from the proxy node. In this project, we do literature review to choose a suitable anonymous communication system for this specific use case of web proxy. We create a proof of concept implementation and fine tune and evaluate it in the setting of Fledger. 
-
-
-\textbf{Given Fledger is a peer to peer network and churn is inevitable, we then add simple mechanisms to improve the reliability of message delivery in the presence of churn.} 
-\textbf{Add the results here}
+Fledger is a peer-to-peer network that runs on browsers, it is very modular an can easily be extended with additional services. One of it's services, web proxy, enables peers to act as proxies for other nodes. This service can provide some additional privacy for the users, and depending on the rules enforced by the proxy, additional security. However it does not to protect from traffic analysis by an adversary observing the network nor does it hide traffic patterns from the proxy node. In this project, review existing anonymous communication systems that can be used for this specific case of a web proxy. We create a proof of concept implementation and fine tune and evaluate it in the setting of Fledger. In addition, we try to improve the reliability of the web proxy requests with this implementation in the inevitable presence of churn by the use of simple mechanism such as retrying and sending duplicate messages.
+\textbf{Add a teaser for the results here}
 \end{abstract}
 
 \maketoc
@@ -48,20 +45,23 @@ Fledger is a peer-to-peer network which works on browsers, it is very modular an
 % The eights paragraph discusses your core contribution.
 
 % This section is usually 3-5 pages.
-\textbf{Insert something that leads onto fledger without chatgpt speak ( or something about web proxies maybe)}
+\textbf{Insert something that leads onto fledger or something about web proxies}
 
-Fledger\textbf{cite} is a peer-to-peer network designed to work directly in the browser, without the need for proxies. It enables connecting browsers to communicate between nodes. It is under development and will let users share resources like disk space, CPU, and network bandwidth in the future. Fledger's initial use cases are a decentralized chat application and web proxy. Although with the current version of Fledger, one can use the web proxy, there are some privacy concerns with it. \textbf{insert stuff of isp and traffic analysis} Also, the remote node acting as the web proxy can see all the traffic patterns from the user. 
+Fledger\textbf{cite} is a peer-to-peer network designed to work directly in the browser, without the need for proxies. It enables connecting browsers to communicate between nodes. It is under development and will let users share resources like disk space, CPU, and network bandwidth in the future. Fledger's initial use cases are a decentralized chat application and web proxy. Although with the current version of Fledger, one can use the web proxy, there are some privacy concerns with it. Although using a web proxy can reveal less information about internet use of the user to their ISP, this time the proxy node can learn about the traffic patterns of the user. Since the proxy request does not hide the address of the user and multiple proxy requests from the same node will reveal information about the web traffic pattern of the user. The web proxy service also doesn't provide any privacy protections against an observer of the peer-to-peer network.
 
-To remedy this issue we first look into different anonymous communications systems. The first anonymous communication system that comes to mind, Tor\textbf{cite}, is vulrable to traffic analysis [cite stuff].
-% To our knowledge there isn't much research into using mixnets for web surfing as for a long time mixnetwork have been limited by their high latency.
-% Can probably get some inpiration from one of the mixnet papers
-Other communications systems such as .... although solves the problem of Tor, they usually have very high latencies unsuitable for an "instantanous" application such as a web proxy.
+\textbf{Talk about what the project was about}
+% To remedy this issue, this project looks into different anonymous communications systems. 
 
-We choose Loopix Anonymity System \textbf{cite} for it's low latency, apparent scalability (and tunability) and availability of reference implementations.
+% The first anonymous communication system that comes to mind, Tor\textbf{cite}, is vulrable to traffic analysis [cite stuff].
+% % To our knowledge there isn't much research into using mixnets for web surfing as for a long time mixnetwork have been limited by their high latency.
+% % Can probably get some inpiration from one of the mixnet papers
+% Other communications systems such as .... although solves the problem of Tor, they usually have very high latencies unsuitable for an "instantanous" application such as a web proxy.
 
-We integrate Loopix into Fledger, and adapt it for use for the specific purpose of web browsing through a web proxy. We then choose configuration parameters through extensive experimentation. Although the Loopix paper looks extensively into the privacy aspects of the system, they leave reliable message delivery to future work. \textbf{transition} We explore potential ways to improve the reliability of our implementation. Finally we add simple mechanisms to have more reliable message delivery in the presence of churn.
+% We choose Loopix Anonymity System \textbf{cite} for it's low latency, apparent scalability (and tunability) and availability of reference implementations.
 
-In conclusion:
+% We integrate Loopix into Fledger, and adapt it for use for the specific purpose of web browsing through a web proxy. We then choose configuration parameters through extensive experimentation. Although the Loopix paper looks extensively into the privacy aspects of the system, they leave reliable message delivery to future work. \textbf{transition} We explore potential ways to improve the reliability of our implementation. Finally we add simple mechanisms to have more reliable message delivery in the presence of churn.
+
+% In conclusion:
 
 % Conclusion: integrated loopix anonymity system into fledger and adapted it for the specific purpose of web proxying with low latency and high reliability. 
 
@@ -78,8 +78,7 @@ In conclusion:
 %-------------------
 \section{Fledger}
 %-------------------
-Fledger is a P2P network run entirely using browsers, it's goal is to enable user to share resources such as CPU, bandwidth, disk space etc. It uses WebRTC to commnunicate and uses a Signaling Server to enable nodes to discover each other.
-\textbf{talk about how it can be run through the browser but as a node as well}
+Fledger is a P2P network that can be run entirely using browsers, it's goal is to enable user to share resources such as CPU, bandwidth, disk space etc. It runs the WebRTC protocol to communicate and uses a Signaling Server to enable nodes to discover each other and establish connections. Although it can be run entrirely using browsers, Fledger nodes can also be run as standalone nodes. This project is a fork of Fledger \textbf{cite github repository}
 %-------------------
 \subsection{Communication between nodes}
 
@@ -89,7 +88,7 @@ After the node starts up and creates its routing information, it announces itsel
 
 When the node wants to communicate with another node, it will send a message to the signaling server. The signaling server will act as a mediator for the two nodes to negotiate a connection. Once the connection is established between the nodes, they can communicate through their browsers.
 
-In \autoref{fig:webrtc}, Peer 1 sends \textit{Signaling} message to the Signaling server to start establishing a connection with Peer 2, they communicate through the signaling server to negotiate the connection. Once the connection is established, they can directly communicate without the need for the Signaling server. 
+In \autoref{fig:webrtc}, Peer 1 sends a message to the Signaling server to start establishing a connection with Peer 2, they communicate through the signaling server to negotiate the connection. Once the connection is established, they can directly communicate without the need for the Signaling server. 
 
 \begin{figure}[H]
     \centering
@@ -106,30 +105,30 @@ In \autoref{fig:webrtc}, Peer 1 sends \textit{Signaling} message to the Signalin
 For each functionality in Fledger, there is a separate module. This section will introduce the relevant Fledger modules to this project.
 
 \begin{itemize}
-    \item \textbf{Network} \\
+    \item \textbf{Network}\\
     Network module uses the WebRTC protocol and enables other modules send messages through its messages. It can be used for both browsers and for Fledger nodes. In this project we use Fledger as 
     \item \textbf{Gossip and Random Connections Modules} \\
     Gossiping module enables messages to be propagated through the Fledger network, and it uses Random Connections module. Random Connections module is designed to establish random connections between the nodes, and it uses the network module to send messages to the selected nodes. These two module are used for the bootstrapping of the Loopix Module for the purpose of experimentation. See \textbf{autoref} for further details about the bootstrapping.
-    \item \textbf{Web Proxy} \\
+    \item \textbf{Web Proxy}\\
     Web proxy module handles web proxy requests, it can be used to create and respond to request to get web pages. It creates a unique ID for a request and sends the message. When a node responds to a request, it sends multiple messages with the same unique ID as the request, which enables the web proxy client to collect the messages into the requested page. If the client does not receive the complete response within a set period of time, the request will timeout.
-    \item \textbf{Overlay} \\
+    \item \textbf{Overlay}\\
     This module acts as a translator/wrapper for Fledger modules. While sending a message through gossip or web proxy this module will wrap the message and then send it to the specific module. For example if node A wants to send a web proxy message to node B, node A will create web proxy message, which will be sent to Overlay module, still within node A, and Overlay module will translate for the corresponding module, for example random connections, and send the translated message to this module, which will finally send the message to the network module, and the message will be sent to node B through the WebRTC connection. Linus Gasser has kindly created this module to help integrate Loopix module into Fledger.
-    \item \textbf{Loopix} \\
+    \item \textbf{Loopix}\\
     In this project we have created a Loopix module that can be used as a middle man between any module and the network module. The main purpose is to be used with web proxy but it can be used to send other kinds of messages from Fledger modules as long as they are sent through an Overlay. See the next section \textbf{autoref} for more detailed information about the Loopix Anonymity System. 
 \end{itemize}
 
 %-------------------
 \section{The Loopix Anonymity System}
 %-------------------
-Loopix is a continuous time mix network. Unlike the traditional mix networks introduced by \textbf{cite chaum here}, in continuous time mix networks, which operate in rounds. Packets are stopped for a time at the mix node and then sent on their ways. This delay is usually drawn from an exponential dsitribution \textbf{cite}.
+This section will give a summary of the Loopix Anonymity System introduced in \textbf{cite}. Loopix is a continuous time mix network. Unlike the traditional mix networks introduced by \textbf{cite chaum}, in continuous time mix networks, which operate in rounds. Packets are stopped for a specified delay at the mix node and then sent on their ways. This delay is usually drawn from an exponential dsitribution \textbf{cite}.
 
-Loopix combines this stop-and-go \textbf{maybe i need to cite the paper that called it that?} mixing with cover traffic to further hide traffic patterns and avoid \textbf{find attacks (n-1?) , which were possible with  networks.}
+Loopix combines this stop-and-go mixing with cover traffic to further hide traffic patterns and avoid flooding attacks (n-1)\textbf{cite}, which were possible with round based mix networks.
 
-Quite like the Tor network, the route of the message is chosen by the client in advance and the messages are encapsulated in layers of encryption with public keys each of the nodes in the route. However, unlike the Tor network, each message goes through a separate route, with a different delay at each hop of the route. \textbf{talk about how this makes it harder to do traffic analysis}.
+Quite like the Tor network, the route of the message is chosen by the user in advance and the messages are encapsulated in layers of encryption with public keys each of node in the route. However, unlike the Tor network, each message goes through a separate route, with a different delay at each node in the route. These delays combined with separate routes, make it harder to perform traffic analysis by observing entry and exit nodes, which is quite trivial with Tor \textbf{cite}.
 
-There are three different roles in the Loopix network. Nodes which use the mix network are called \textit{clients}. Clients have \textit{providers}, providers act as entry nodes to the network for the clients. A client sends all their traffic through their provider. In turn, the provider forwards the clients messages to the mix network and stores message, in which the final destination is the client. If the client is online, it will ask the provider for the messages it is storing.
+The Loopix network consists of three different roles. Nodes that use the mix network are referred to as clients. Each client chooses a provider, which serves as the entry point to the network for that client. A client routes all of its traffic through its provider, which, in turn, forwards the client’s messages to the mix network. Additionally, the provider stores any messages destined for its client. When the client is online, it retrieves these stored messages from its provider.
 
-Finally, there are mix nodes. Mix nodes are arranged in a stratified topology \textbf{cite}, and their main purpose is to \textit{unwrap} messages that they receive, wait for the delay specified in the header of the unwrapped packet, and then send the message to the next hop. The mix node only knows about the delay, and previous and next nodes.
+Finally, there are mix nodes. Mix nodes are arranged in a stratified topology \textbf{cite}, and their main purpose is to remove a layer of encryption from the messages that they receive, wait for a delay which is specified in the header of the unencrypted packet, and then send the message to the next node in its route. The mix node only knows about the delay, and previous and next nodes.
 
 \begin{figure}[H]
     \centering
@@ -139,8 +138,9 @@ Finally, there are mix nodes. Mix nodes are arranged in a stratified topology \t
     \small\textit{Figure 1 from The Loopix Anonymity System paper}
 \end{figure}
 
-The typical route of a message from the client goes \textbf{provider -> mixnode layer 1 -> mixnode layer 2 to n -> provider of the destination -> destination client}. Of course, this requires the source client to know mixnodes at each layer as well as the destination node and the provider of the destination node.
 \textbf{TODO get rid of the text at the top of the figure}
+
+The typical route of a message from a client goes to their provider, who forwards it to the mix node at the first layer of the stratified topology. Each mix node at each layer of the mix network, receives and forwards this message, until it arrives at the provider of the destination client. The destination provider stores the message, until the client retrieves it. Of course, creating this route requires the source client to know the addresses of mix nodes at each layer as well as the destination client and the provider of the destination.
 
 %-------------------
 \subsection{Types of Messages}
@@ -152,38 +152,13 @@ The typical route of a message from the client goes \textbf{provider -> mixnode 
     \item \textbf{Drop Message} \\
     If the client payload message queue is empty, the client sends a drop message instead. These message are sent to a random random provider and they are dropped at the destination. All nodes, clients, providers, and mix nodes, periodically send drop messages.
     \item \textbf{Loop Message} \\
-    Loop messages are the \textbf{namesake of the loopix anonymity system}. They are a part of the cover traffic along with the drop messages. Loop messages are mmessages that a node sends to themselves, routed through a random provider. They mimick getting a reply for a message, and provide important \textbf{security/privacy} properties which will be detailed in the next section.
+    Loop messages give the Loopix anonymity system its name. They are part of the cover traffic along with the drop messages. Loop messages are sent by a node to itself, routed through a random provider. They simulate receiving a reply to a message, and provide important some privacy properties which will be detailed in the next section.
     \item \textbf{Pull Message} \\
     When a client is online, it periodically asks provider whether the provider is storing any many messages for it. Pull message serves this purpose. When the provider receives a pull message, it will send a predetermined number of messages back to the client. These message messages can be real messages destined to the client, or messages created by the provider to fill up the predetermined number.
     \item \textbf{Dummy Message} \\
-    Dummy messages are messages sent to a client by the provider as a response to pull messages, if the provider does not store enough messages. For example, if the provider is storing 3 messages and needs to send 5, it will create 2 dummy messages to \textit{pad} its response.
+    Dummy messages are messages sent to a client by the provider as a response to pull messages, if the provider does not store enough messages. For example, if the provider is storing 3 messages and needs to send 5, it will create 2 dummy messages to pad its response.
 \end{itemize}
 
-%-------------------
-\subsection{Threat Model}
-\label{sec:loopix_assumptions}
-An adversary can observe all traffic. The mix network prevents sender - receiver linkage. Even with misbehaving providers and all but one mix node misbehaving, loopix provides protections against an adversary observing whether a sender and a receiver are communicating.  \textbf{is this really corrupt provider????}
-
-Particularly at a single mix node, loopix provides strong protection against trickling attacks, where the adversary drops all but one packet and tries to correlate the destination of that packet. Thanks to the presence of drop and loop messages that are sent periodically at each mix node, the adversary cannot know exactly which packet is the one they let into the mix node. \textbf{we will talk about in more detail in the autoref section}. This being said adversary can delay, drop, inject packets into the network with the purpose of learning information about the communications of the honest clients.
-
-\textbf{finish this part}
-Message in distinguishability
-client-provider unobservability
-
-
-passive traffic analysis
-n01 attack
-end to end correlation
-sender receiver third party unlinkability: if two parties are commyunicating, GPA (section 4.3), 
-sneder online unobservability: adversary doesn't know if A is communicating with B or not, corrupt provider
-receiver unobservability: is there communication to B from any sender (4.1.2) honest ptovifrt
-
-\textbf{talk about what is malicioius here}
-\begin{itemize}
-    \item honest but curious providers
-    \item a fractions of mixnodes can be malicous
-    \item a fraction of clients can be malicioius
-\end{itemize}
 %-------------------
 \subsection{Parameters}
 \begin{itemize}
@@ -201,12 +176,27 @@ The rate at which all nodes send drop messages.
 This is the amount of time that a client waits between each pull message to its provider. Although not explicitly defined in the loopix paper, it can be found in the reference implementation \textbf{cite} by the authors. In this project we will use seconds to define this value.
 \item \textbf{Number of messages retrieved (\(N_R\))} \\
 The number of messages the provider sends each time it receives a pull request. It always sends this number of messages to ensure that an adversary cannot tell whether a client is receiving messages or not. If there aren't enough messages for the client, it will also send dummy messages to make sure exactly \(N_R\) messages are in its response. Again this parameter is not explicitly defined in the Loopix paper, but can be found in the reference implementation.
-\end{itemize}
 
-\subsubsection{Mean number of messages in a mix node}
-\label{sec:lambda_over_mu}
+\item \textbf{Mean number of messages in a mix node} \\
+\label{item:lambda_over_mu}
 An important security parameter is the mean number of messages in a mix node at a given time. This is essentially number of messages that are being "mixed" at the mix node at a time. An adversary can observe some messages coming into the mix node, it waits a certain amount of time and observes some messages leaving the mix node. It is  \textbf{TODO complete this}
 It is an estimate where lambda is the number of incoming messages every second. And mu is the inverse of the mean delay. One can thing of it as the number of messages that are "leaving" the mixnode on average per second. It is important to note that this estimate assumes that there are no loop messages \textbf{and drop?} being send by the mixnode. The Loopix paper recommends lambda/mu of 2. 
+\end{itemize}
+
+%-------------------
+\subsection{Security Goal and Assumptions}
+\label{sec:loopix_assumptions}
+In the threat model of Loopix, it is assumed that an adversary is capable of observing all traffic in the network. The Loopix mix network is designed to protect against sender-receiver linkage. Even in scenarios where all but one mix node in the message route are compromised, and there are corrupt providers, Loopix offers strong protection against an adversary's attempts to determine whether a sender and receiver are communicating. It is important to note that in these assumptions, a corrupt provider is considered honest-but-curious—seeking to learn as much as possible while still following the protocol without misbehavior.
+
+Particularly at a single mix node, Loopix provides strong protection against trickling attacks \textbf{cite}, where the adversary blocks all but one packet from entering the mix node and the mix node and attempts to correlate the outgoing packet with its destination. Thanks to the presence of drop and loop messages that are sent periodically at each mix node, adversary cannot reliably identify which packet they allowed into the mix node. This being said adversary can delay, drop, inject packets into the network with the purpose of learning information about the communications of the honest clients.
+
+In addition, Loopix protects against an adversary attempting to determine whether a sender is communicating with any receiver. Since, each client periodically sends cover traffic, even in the presence of corrupt providers, an observer cannot tell the difference between a real and cover traffic. All messages in the system are indistinguishable.
+
+Here's a refined version of your paragraph for improved clarity and flow:
+
+Under the assumption of only honest providers, an adversary cannot determine whether a client is receiving actual messages, as the provider always sends a fixed amount of traffic for each pull request from the client. Additionally, clients do not need to be online to receive messages, as the provider stores them until the client retrieves them.  Even when the client is offline, an observer cannot distinguish between cover traffic and real messages sent to the provider. However, this protection relies on the honesty of the provider, as it inherently knows how many messages the client receives.
+
+Overall, Loopix provides robust protection against passive traffic analysis and adversaries that control a fraction of the mix nodes and can inject, delay, or drop messages. However, the model assumes that the adversary’s goal is to learn information about the clients rather than disrupt message delivery.
 
 %%%%%%%%%%%%%%%%
 \chapter{Design}
@@ -345,7 +335,7 @@ Each node runs Ubuntu 20.04 LTS with 4 GB RAM and 4 cores on Sphere Testbed \tex
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{plots/experimental_setup.png}
-    \caption{}
+    \caption{Experimental Setup}
     \label{fig:setup}
 \end{figure}
 
@@ -563,7 +553,7 @@ Here the web proxy timeout is set to 6 seconds, approximately 2-3 times the aver
 \subsection{Combination of Retrying and Duplicate Messages}
 
 \subsection{Raptor Code}
-\textbf{I don't think I'll have time to implement this}
+\textbf{Sadly I don't think I'll have time to implement this}
 
 %%%%%%%%%%%%%%%%%%%%%%
 \chapter{Related Work}
