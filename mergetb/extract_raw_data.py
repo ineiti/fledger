@@ -61,8 +61,8 @@ def get_incoming_messages(results, content, metric, i):
     if not provider_pattern in content and not client_pattern in content:
         pattern = rf"{metric}\s+([0-9.e+-]+)$"
         match = re.search(pattern, content, re.MULTILINE)
-
-        results[metric].append(float(match.group(1)))
+        if match:
+            results[metric].append(float(match.group(1)))
 
 def get_histogram_metrics(results, content, metric, i):
     pattern_sum = rf"^{metric}_sum\s+([0-9.e+-]+)"
