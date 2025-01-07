@@ -196,6 +196,48 @@ def plot_reliability_latency(directory, variable, run):
     plt.clf()
     plt.close()
 
+def plot_reliability_incoming_messages(directory, variable, run):
+    plt.rcParams.update({'font.size': 16})
+    keys = list(run.keys()) 
+    x_values = np.array([float(k) for k in keys])  
+    
+    incoming_messages = [run[k]["loopix_incoming_messages"] for k in keys]
+    
+    reliability = [run[k]["loopix_reliability"] * 100 for k in keys]
+
+    plt.figure(figsize=(20, 6))
+
+    fig, ax1 = plt.subplots(figsize=(20, 6))
+
+    ax1.plot(x_values, reliability, marker='o', linestyle='-', color='green', label='Reliability (%)')
+    if variable in x_axis_name:
+        ax1.set_xlabel(x_axis_name[variable])
+    else:
+        ax1.set_xlabel(variable)
+    ax1.set_ylabel("Percentage of Successful Proxy Requests (%)", color='green')
+    ax1.tick_params(axis='y', labelcolor='green')
+
+    ax1.set_xticks(x_values)
+
+    ax2 = ax1.twinx()
+    ax2.plot(x_values, incoming_messages, marker='o', linestyle='--', color='blue', label='Incoming Messages')
+    ax2.set_ylabel("Incoming Messages", color='blue')
+    ax2.tick_params(axis='y', labelcolor='blue')
+
+
+    fig.suptitle(f"Reliability and Incoming Messages")
+    ax1.legend(loc='upper left')
+    ax2.legend(loc='upper right')
+
+    ax1.set_ylim(0, max(reliability) * 1.1)
+    ax2.set_ylim(0, max(incoming_messages) * 1.1)
+
+    plt.tight_layout()
+    save_plot_directory(directory)
+    plt.savefig(os.path.join(directory, "reliability_incoming_messages.png"))
+    plt.clf()
+    plt.close()
+
 def plot_reliability_incoming_latency(directory, variable, run):
     plt.rcParams.update({'font.size': 16})
     keys = list(run.keys())  
@@ -302,11 +344,11 @@ if __name__ == "__main__":
 
     for variable, run in data.items():
         plot_dir = os.path.join(directory, "plots", variable)
+        plot_reliability_latency(plot_dir, variable, run)
         plot_latency_components(plot_dir, path_length, variable, run)
         plot_reliability(plot_dir, variable, run)
         plot_incoming_messages(plot_dir, variable, run)
         plot_latency(plot_dir, variable, run)
         plot_bandwidth(plot_dir, duration, variable, run)
         plot_latency_and_bandwidth(plot_dir, variable, run)
-        # plot_reliability_incoming_latency(directory, variable, run)
-        plot_reliability_latency(directory, variable, run)
+        plot_reliability_incoming_messages(plot_dir, variable, run)
