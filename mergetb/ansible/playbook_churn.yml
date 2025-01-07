@@ -135,6 +135,31 @@
       pause:
         seconds: 305
 
+- name: Fetch Docker logs from the container
+  hosts: node-1
+  become: yes
+  tasks:
+    - name: Get the container ID using the container name
+      shell: docker inspect --format='{% raw %}{{.Id}}{% endraw %}' fledger_node-1
+      register: container_id
+
+    - name: Debug container ID
+      debug:
+        msg: "Container ID: {{ container_id.stdout.strip() }}"
+
+    - name: Run a shell command
+      become: yes
+      shell: |
+        cp /var/lib/docker/containers/{{ container_id.stdout.strip() }}/{{ container_id.stdout.strip() }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
+        chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
+
+    - name: Fetch log from node-1
+      when: inventory_hostname == 'node-1'
+      fetch:
+        src: /home/dcog/data/{{ inventory_hostname }}.log
+        dest: /home/dcog/metrics/{{ variable }}/{{ index }}/{{ inventory_hostname }}.log
+        flat: yes
+
 - name: Stop existing fledger container if present
   hosts: FLEDGER_NODES
   become: yes

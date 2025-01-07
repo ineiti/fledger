@@ -6,7 +6,9 @@ import os
 
 from plot_data import *
 
-y_labels = range(1, 16)
+y_labels = range(1, 13)
+xlabel = "Time-to-Pull"
+ylabel = "Number of messages retrieved"
 
 def plot_heatmap_bandwidth(directory, data):
 
@@ -27,8 +29,8 @@ def plot_heatmap_bandwidth(directory, data):
 
     plt.xticks(ticks=np.arange(len(x_labels)), labels=x_labels)
     plt.yticks(ticks=np.arange(len(y_labels)), labels=y_labels)
-    plt.xlabel('Time Pull')
-    plt.ylabel('Max Retrieve')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
 
     plt.title('Heatmap of Total Bandwidth')
     plt.savefig(f"{directory}/heatmap_bandwidth.png")
@@ -57,8 +59,8 @@ def plot_heatmap_latency(directory, data):
 
     plt.xticks(ticks=np.arange(len(x_labels)), labels=x_labels)
     plt.yticks(ticks=np.arange(len(y_labels)), labels=y_labels)
-    plt.xlabel('Time Pull')
-    plt.ylabel('Max Retrieve')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
 
     plt.title('Heatmap of End-to-End Latency')
     plt.savefig(f"{directory}/heatmap_latency.png")
@@ -83,10 +85,10 @@ def plot_average_reliability(directory, data):
         average_reliability.append(np.mean(reliability_per_time_pull))
 
     plt.plot(x_labels, average_reliability, marker='o', linestyle='-', color='blue', label='Reliability')
-    plt.xlabel("Time Pull")
+    plt.xlabel(xlabel)
     plt.ylabel("Reliability (%)")
     plt.ylim(0, 100)
-    plt.title("Average Reliability")
+    plt.title("Percentage of Successful Web Proxy Requests")
     plt.legend()
     plt.tight_layout()
     plt.savefig(f"{directory}/average_reliability.png")
@@ -114,7 +116,7 @@ def plot_average_latency_max_retrieve(directory, data):
         average_bandwidth.append(np.mean(bandwidth_per_max_retrieve))
 
     ax1.plot(x_labels, average_latency, marker='o', linestyle='-', color='blue', label='Latency')
-    ax1.set_xlabel("Max Retrieve")
+    ax1.set_xlabel(ylabel)
     ax1.set_ylabel("Latency (milliseconds)", color='blue')
     ax1.tick_params(axis='y', labelcolor='blue')
 
@@ -152,7 +154,7 @@ def plot_average_latency_time_pull(directory, data):
         average_bandwidth.append(np.mean(bandwidth_per_time_pull))
 
     ax1.plot(x_labels, average_latency, marker='o', linestyle='-', color='blue', label='Latency')
-    ax1.set_xlabel("Time Pull")
+    ax1.set_xlabel(xlabel)
     ax1.set_ylabel("Latency (milliseconds)", color='blue')
     ax1.tick_params(axis='y', labelcolor='blue')
 

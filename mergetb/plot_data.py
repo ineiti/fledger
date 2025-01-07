@@ -23,7 +23,6 @@ def plot_latency_components(directory, path_length, variable, run):
     print(f"Indices: {indices}")
     # print(f"Run: {run}")
     n_runs = len(indices)
-    print(run[indices[0]])
 
     n_mixnode_delay = (path_length + 1) * 2
     n_decryption_delay = (path_length + 3) * 2
@@ -159,6 +158,8 @@ def plot_reliability_latency(directory, variable, run):
     keys = list(run.keys()) 
     x_values = np.array([float(k) for k in keys])  
     
+    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaa")
+    print(f"run: {run} ")
     latency = [convert_to_milliseconds(run[k]["loopix_end_to_end_latency_seconds"]) for k in keys]
     
     reliability = [run[k]["loopix_reliability"] * 100 for k in keys]
