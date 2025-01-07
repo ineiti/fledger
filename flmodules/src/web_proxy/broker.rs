@@ -8,7 +8,7 @@ use flarch::{
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
 
-use crate::overlay::messages::{NetworkWrapper, OverlayIn, OverlayMessage, OverlayOut};
+use crate::{loopix::{PROXY_MESSAGE_BANDWIDTH, PROXY_MESSAGE_COUNT, RETRY_COUNT}, overlay::messages::{NetworkWrapper, OverlayIn, OverlayMessage, OverlayOut}};
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},
@@ -168,6 +168,10 @@ impl WebProxy {
     pub async fn get_with_retry_and_timeout_with_duplicates(&mut self, url: &str, retry: u8, duplicates: u8, timeout_duration: Duration) -> Result<Response, WebProxyError> {
         log::info!("Getting {url} with retry: {}, duplicates: {} and timeout: {:?}", retry, duplicates, timeout_duration);
         for i in 0..retry + 1 { // try at leasy once
+            if i != 0 {
+                RETRY_COUNT.inc();
+            }
+
             match self.get_with_timeout(url, timeout_duration, duplicates).await {
                 Ok(resp) => {
                     return Ok(resp);
@@ -197,7 +201,8 @@ impl WebProxy {
         log::info!("Getting {url} with id: {} and timeout: {:?} and duplicates: {}", our_rnd, timeout_duration, duplicates);
         let (tx, rx) = channel(128);
         self.web_proxy
-            .emit_msg(WebProxyIn::RequestWithDuplicates(our_rnd, url.to_string(), tx, duplicates).into())?;
+            .emit_msg(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx).into())?;
+        
         let (mut tap, id) = self.web_proxy.get_tap().await?;
         timeout(timeout_duration, async move {
             while let Some(msg) = tap.recv().await {
@@ -277,10 +282,13 @@ impl Translate {
     fn link_proxy_overlay(msg: WebProxyMessage) -> Option<OverlayMessage> {
         log::trace!("WebProxy: Sending message to overlay: {:?}", msg);
         if let WebProxyMessage::Output(WebProxyOut::ToNetwork(id, msg_node)) = msg {
+            let wrapper = NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap();
+            PROXY_MESSAGE_BANDWIDTH.inc_by(wrapper.msg.len() as f64);
+            PROXY_MESSAGE_COUNT.inc();
             Some(
                 OverlayIn::NetworkWrapperToNetwork(
                     id,
-                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
+                    wrapper,
                 )
                 .into(),
             )

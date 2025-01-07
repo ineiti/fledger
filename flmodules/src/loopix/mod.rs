@@ -179,6 +179,62 @@ lazy_static::lazy_static! {
             Gauge::new("loopix_start_time_seconds", "Start time of the loopix service.").unwrap()
         }
     };
+
+    pub static ref PROXY_MESSAGE_COUNT: Counter = match register_counter!(
+        "loopix_proxy_message_count",
+        "Number of messages sent to the proxy."
+    ) {
+        Ok(counter) => {
+            log::info!("PROXY_MESSAGE_COUNT counter registered successfully.");
+            counter
+        },
+        Err(e) => {
+            log::error!("Failed to register PROXY_MESSAGE_COUNT counter: {:?}", e);
+            Counter::new("loopix_proxy_message_count", "Number of messages sent to the proxy").unwrap()
+        }
+    };
+
+    pub static ref PROXY_MESSAGE_BANDWIDTH: Counter = match register_counter!(
+        "loopix_proxy_message_bandwidth",
+        "Bandwidth usage in bytes for messages sent to the proxy."
+    ) {
+        Ok(counter) => {
+            log::info!("PROXY_MESSAGE_BANDWIDTH counter registered successfully.");
+            counter
+        },
+        Err(e) => {
+            log::error!("Failed to register PROXY_MESSAGE_BANDWIDTH counter: {:?}", e);
+            Counter::new("loopix_proxy_message_bandwidth", "Bandwidth usage in bytes for messages sent to the proxy").unwrap()
+        }
+    };
+
+    pub static ref RETRY_COUNT: Counter = match register_counter!(
+        "loopix_retry_count",
+        "Number of retries."
+    ) {
+        Ok(counter) => {
+            log::info!("RETRY_COUNT counter registered successfully.");
+            counter
+        },
+        Err(e) => {
+            log::error!("Failed to register RETRY_COUNT counter: {:?}", e);
+            Counter::new("loopix_retry_count", "Number of retries").unwrap()
+        }
+    };
+
+    pub static ref PROXY_REQUEST_RECEIVED: Counter = match register_counter!(
+        "loopix_proxy_request_received",
+        "Number of proxy requests received."
+    ) {
+        Ok(counter) => {
+            log::info!("PROXY_REQUEST_RECEIVED counter registered successfully.");
+            counter
+        },  
+        Err(e) => {
+            log::error!("Failed to register PROXY_REQUEST_RECEIVED counter: {:?}", e);
+            Counter::new("loopix_proxy_request_received", "Number of proxy requests received").unwrap()
+        }
+    };
 }
 
 #[cfg(feature = "testing")]
