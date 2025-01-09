@@ -47,6 +47,8 @@ Fledger is a peer-to-peer network that runs on browsers, it is very modular an c
 % This section is usually 3-5 pages.
 \textbf{Insert something that leads onto fledger or something about web proxies}
 
+\textbf{TODO: useful bandwidth}
+
 Fledger\textbf{cite} is a peer-to-peer network designed to work directly in the browser, without the need for proxies. It enables connecting browsers to communicate between nodes. It is under development and will let users share resources like disk space, CPU, and network bandwidth in the future. Fledger's initial use cases are a decentralized chat application and web proxy. Although with the current version of Fledger, one can use the web proxy, there are some privacy concerns with it. Although using a web proxy can reveal less information about internet use of the user to their ISP, this time the proxy node can learn about the traffic patterns of the user. Since the proxy request does not hide the address of the user and multiple proxy requests from the same node will reveal information about the web traffic pattern of the user. The web proxy service also doesn't provide any privacy protections against an observer of the peer-to-peer network.
 
 \textbf{Talk about what the project was about}
@@ -124,7 +126,7 @@ For each functionality in Fledger, there is a separate module. This section will
 %-------------------
 This section will give a summary of the Loopix Anonymity System introduced in \textbf{cite}. Loopix is a continuous time mix network. Unlike the traditional mix networks introduced by \textbf{cite chaum}, in continuous time mix networks, which operate in rounds. Packets are stopped for a specified delay at the mix node and then sent on their ways. This delay is usually drawn from an exponential dsitribution \textbf{cite}.
 
-Loopix combines this stop-and-go mixing with cover traffic to further hide traffic patterns and avoid flooding attacks (n-1)\textbf{cite}, which were possible with round based mix networks.
+Loopix combines this stop-and-go \textbf{cite Stop-And-Go-MIXes Providing Probabilistic Anonymity in an Op en System} mixing with cover traffic to further hide traffic patterns and avoid flooding attacks (n-1)\textbf{cite}, which were possible with round based mix networks.
 
 Quite like the Tor network, the route of the message is chosen by the user in advance and the messages are encapsulated in layers of encryption with public keys each of node in the route. However, unlike the Tor network, each message goes through a separate route, with a different delay at each node in the route. These delays combined with separate routes, make it harder to perform traffic analysis by observing entry and exit nodes, which is quite trivial with Tor \textbf{cite}.
 
@@ -210,26 +212,6 @@ Overall, Loopix provides robust protection against passive traffic analysis and 
 
 % This section is usually 5-10 pages.
 %-------------------
-\section{Choosing an Anonymous Communication System}
-\label{sec:mixers}
-%-------------------
-Having identified our initial goal, namely making Fledger web proxy more privacy preserving, the first step was to find a suitable mix network or more broadly an anonymous communication system that can be used in the context of browsing the web through a web proxy. For this purpose, we identified potential anonymous communication systems to look into. This section will detail the process of choosing Loopix to integrate into Fledger, and the reasoning behind this choice.
-
-\textbf{Talk about Atom, Riffle, Vuvuzela, Prifi, Groove, Larmix, and why they were not chosen}
-% \subsection{Atom}
-% Development of a scalable anonymous messaging system that defends against traffic analysis attacks. The system is very scalable and techinically over a million users are supports with \textbf{talk about privacy qurantees}, they only achieve 28 minute latency. THis latency might be acceptable for an aync messaging application however, for accessing web pages, this is not usable.
-
-% \subsection{Riffle}
-% Development a bandwidth- and computation-efficient anonymous communication system resistant to traffic analysis. \textbf{talk a bit more about the papers here?} Less than 10 second latency with 100000 users with 100KB/s per user in file sharing applications.  Although 10 seconds is much better than 28 minutes, we are still looking for something that can be more usable for a web proxy. And for the future file sharing applications of fledger 10KB per second would not be enough for a real system.
-% \subsection{Vuvuzela}
-% Develop a scalable and flexible metadata-private messaging system that allows asynchronous communication across multiple devices. 37 second latency still not what we are looking for. 
-% \subsection{Grove}
-% latency of 32-80 seconds , not enough. Also the focus of the paper was having a an async communicatoin across multiple devices not really latency
-% \subsection{Prifi}
-% Low latency DC net with 100ms latency, but only supports up to 100 clients. 
-
-% \subsection{Loopix}
-% As we have talked about Loopix we will not go into further detail here. We chose loopix for it's low latency, scalability, availablility of reference implementations and the tunability of the system. There are also many works that have built on top of loopix which attests to it's extensibility, such as larmix which uses latency aware routing to reduce the network latency between nodes. \textbf{make this a better paraphraph}.
 
 %-------------------
 \section{Loopix Integration into Fledger}
@@ -272,23 +254,21 @@ A related issue arises because the web pages accessed by proxy nodes are observa
 Although this assumption implies that the Fledger Loopix module for web proxy requests offers weaker privacy compared to applications like messaging, hiding web page access from an observer is beyond the scope of this project.
 
 %-------------------
-\section{Potential Approaches to More Reliable Message Delivery}
-\label{sec:reliable_message_delivery}
-\textbf{Talk about the simple approach, retrying and duplicate messages, erasure coding and mix groups}
-\textbf{Talk about one issue with duplicate messages: web proxy cannot avoid reprocessing (duplicate) responses, it doesn't know how many packets it will receive}
 
-\section{Further Adaptation to Fledger}
-\textbf{Briefly describe how retry and duplicate mechanisms work}
+\section{Adaptations for more reliable message delivery}
+\label{sec:design_reliability}
 
-\section{Future Work}
-\textbf{\begin{itemize}
-    \item get rid of providers
-    \item bootstrapping and node discovery
-    \item faster provider message processing
-    \item designing for rid of providers all together
-    \item raptor codes (erasure coding)
-    \item mix regions
-\end{itemize}}
+Fledger operates as a peer-to-peer network, where churn is unavoidable. Since in the mix network, each hop along a message’s route is encrypted with the public key of a specific node, if any node on the route goes offline or fails, the message will not reach its destination. To address this issue, we have integrated two simple mechanisms to improve the success rate of web proxy requests through the Fledger Loopix module. For further enhancements to reliability, we refer the reader to \autoref{sec:future_work}.
+
+\subsection{Retry Mechanism}
+As the name suggests, this mechanism retries a web proxy request if it times out. Each retry uses a route that is chosen randomly and independently of the previous route. This functionality was implemented directly in the web proxy's get request because it requires maintaining the state of the request, whereas the current Loopix implementation does not support state management. With this mechanism, we expect an increase in end-to-end latency, as more retries are expected to result in a higher success rate of requests.
+
+\subsection{Duplicate Messages}
+In this mechanism, when the web proxy sends a request and the Loopix module receives it from the overlay module, the Loopix module creates multiple encrypted copies of the request, each with separate routes and delays. This approach increases the likelihood of successful delivery, as some routes may still succeed even if others fail due to churn. While this might appear to increase the system's bandwidth usage, it does not. Duplicate messages are placed in the client queue like any other message, and since the system sends a message regardless of whether the queue is empty, the overall bandwidth usage remains unchanged. However, in scenarios with very high real traffic rates, the queue could become congested more easily due to these duplicate requests.
+
+Since the client node sends multiple copies of the same request, the proxy node may receive duplicate requests. To prevent responding multiple times to the same request, the proxy node keeps track of requests it has already processed. Web proxy requests already include unique IDs, so the proxy node simply records the IDs of requests it has replied to. When the proxy node generates a response messages and sends them to the Loopix module, they each of these responses are duplicated.
+
+Unlike the proxy node, the client node does not know how many responses it will receive for a single proxy request. Therefore, it must process all duplicate replies. This may increase the computational load on the client in scenarios with low churn or high request success rates.
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Implementation}
@@ -300,49 +280,74 @@ Although this assumption implies that the Fledger Loopix module for web proxy re
 % you wrote but covers the implementation aspects of the projects.l
 
 % This section is usually 3-5 pages.
-This chapter goes over some implementation details that might be relevant to understanding the design and evaluations of the Fledger Loopix module.
+This chapter delves into implementation details relevant to understanding the design and evaluation of the Fledger Loopix module.
 
+%-------------------
 \section{Communication between Modules}
-\textbf{Talk about messages and how they wrapped between modules}
-When the web proxy module is sending a message to overlay, it creates a message with two fields, a serialized version of it's own message (for example the get request) and module name "web proxy", this we call network wrapper message, when it sends the information to overlay, overlay just change the message type while keeping these fields to a Loopix message.
+%-------------------
+Fledger uses messages broadcasted via message brokers to facilitate communication between modules. Each module has its own set of messages, and brokers ensure these messages are directed to the appropriate modules. While we do not explore the low-level details, understanding how a message travels between modules can provide helpful context for the design of the Fledger Loopix module.
 
-When Loopix is sending a message to the network, similarly it will create a network wrapper with Loopix message as the module name and the serialized encrypted message.
+When the web proxy module sends a message to the overlay, it creates a data structure with two fields: a serialized version of its own message (e.g., the get request) and the \texttt{Module Name}, "web proxy." This structure is referred to as a \texttt{NetworkWrapper}. The web proxy module sends this \texttt{NetworkWrapper} to the overlay, which modifies the message type to a Loopix message while keeping the rest of the data structure intact.
 
-\textbf{insert a figures}
+When Loopix module receives this message from the overlay, it creates an encryption of the message as described in \autoref{sec:loopix}. It then creates its own \texttt{NetworkWrapper}, including its module name, and sends this wrapper to the network module. \autoref{fig:network_wrapper} provides a visualization of this process up to this point.
 
-When the network module receives one of these message, it broadcasts the network wrapper to all modules, since it says loopix as the module name, loopix module knows that the message contains encrypted information.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{plots/network_wrapper.png}
+    \caption{}
+    \label{fig:network_wrapper}
+\end{figure}
 
-When loopix module receives a message from the network where it is the final destination, it recovers an overlay message as the plaintext and sends it to overlay, where overlay checks the encapsulated network wrapper in the overlay message to send it to the originator module.
+Upon receiving a message from the network, the network module broadcasts the message containing the \texttt{NetworkWrapper}. The Loopix module determines whether to process the message based on the \texttt{Module Name} field in the \texttt{NetworkWrapper}.
 
-\textbf{I don't remember whos idea was this}
+When the Loopix module receives a message from the network where it is the final destination, it decrypts the message to recover the plaintext Overlay message. This message is then forwarded to the overlay, which examines the encapsulated \texttt{NetworkWrapper} and sends the data structure to the module corresponding to the \texttt{Module Name} field, which, in this case, is the web proxy module.
 
+%-------------------
 \section{Sphinx Packets}
+\label{sec:sphinx}
+%-------------------
+This implementation uses the Rust Sphinx packet implementation found in \textbf{[cite Git repository]} for mix network packet encryption. There are two reasons why this is noteworthy.
 
-This the implementation uses rust sphinx package \textbf{cite git repo}. There are two reasons why we need to mention this, this library uses a different key format than was already used for fledger. Since we have to use the format used in the rust sphinx package for fledger loopix module, fledger loopix module has different key pairs than fledger nodes, and this complicates the discovery of the fledger loopix keys as there isn't already a mechanism implemented for this. Since node discovery is out of the scope of this project, we refer the reader to the bootstrapping section.
+First, this library uses a key format that differs from the one employed in Fledger for WebRTC, as described in \autoref{sec:fledger}. To use the Sphinx packet format, the Fledger Loopix module must conform to the key format required by the Sphinx implementation. Consequently, each Fledger node participating in the mix network maintains a separate set of keys specifically for this purpose.
 
-The otehr reason is that the implementation requires a small change in the sphinx library and so it is not the one available on \textbf{crates.io?}, the \textbf{constant X had to be changed}
+However, Fledger currently lacks a mechanism for nodes to discover the Loopix public keys of other nodes, which are essential for encrypting packets in the mix network. As node discovery is beyond the scope of this project, the simulations described in \autoref{sec:eval} rely on bootstrapping  to allow nodes to learn the topology of the mix network (see \autoref{sec:impl_bootstrapping} for details).
 
+Second, the implementation requires a small modification to the Sphinx library. The version used here is not the one available on \textbf{crates.io}; a constant (\textbf{constant X}) in \textbf{file Y} had to be changed to ensure compatibility with the Fledger Loopix module. This is the only change that was made to the package.
+
+%-------------------
 \section{Bootstrapping}
-\label{sec:design_bootstrapping}
+%-------------------
+\label{sec:impl_bootstrapping}
 
-This section discusses the limitations of the implementation of Fledger Loopix module that was made for this project. To make the implementation viable with the available resources, some concessions (!) had to be made with bootstrapping of the module.
+This section outlines the limitations of the Fledger Loopix module implementation created for this project. To make the implementation viable for simulation purposes, certain aspects were included that would not be suitable for a real-world deployment. These include:
 
-\begin{itemize}
-    \item \textbf{Node Discovery}\\
-    Discussed in \autoref{sec:fledger}, Fledger currently uses a signaling server to enable nodes to discover each other. This a centralized aspect of the system, which is intended to be replaced with other mechanisms. However, currently Fledger nodes use the signaling server to discover each other. This means that a malicious signaling server could potentially point the nodes towards mix nodes that are controlled by an adversary, and the whole mix network becomes pointless. Here we assume that the signaling server is trusted.
-    \item \textbf{Public key discovery}\\
-    The Rust Sphinx library \textbf{cite?}, requires the use of different type of keys are that used in Fledger, loopix module uses  
-    \item nodeID in message (can be fixed with single use reply blocks(!))
-    \item unique message ID
-\end{itemize}
+%-------------------
+\subsection{Signaling Server}
+As discussed in \autoref{sec:fledger}, Fledger currently relies on a centralized signaling server to enable nodes to discover one another. While this approach works for simulation purposes, it introduces a single point of trust that would need to be replaced with a decentralized mechanism in real-world deployments (see \autoref{sec:future_work} for details).
 
+The reliance on a signaling server poses a significant risk: a malicious signaling server could direct nodes to adversary-controlled mix nodes. If an adversary gains control of all mix nodes in a route, they could de-anonymize the sender and receiver, undermining the core functionality of the mix network. We assume that the signaling server behaves honestly.
+    
+\subsection{Public key discovery}
+As mentioned in \autoref{sec:sphinx}, there is no mechanism for nodes to discover public keys for encrypting sphinx packets. For testing, we have a "root" node that tells each node what their loopix private (!) and public keys are. This is then propagated through the Gossip module via gossip events. Essentially these gossip events carry a information about all of the nodes and their nodes. This approach obviously cannot be used in a real setup, and there would have to be some mechanism for node discovery, this we leave to future work because this project focuses on viability of loopix for web proxy for fledger.
+
+\subsection{ nodeID in message (can be fixed with single use reply blocks(!))}
+Again because of lack of time we didn't fix this, current implementation does not fix the issue of proxy node knowing the id of the originator of the web proxy request. Loopix messages contain the id of originator of the web proxy request, although they could easily be replaced with single use reply blocks (although the usability for the response would need further investigation). To be able to reply to messages without the node id, would require loopix to keep states of messages, since the message is sent to the web proxy and then back to loopix and loopix currently doesn't have any state with regards to module messages. (\textbf{maybe in future work loopix could keep a state thorugh ids}
+
+\subsection{ unique message ID}
+For debugging the path of a message we have unecrypted uniqueID for each message, this is terrible and would have to be removed from a real deployment, however for ease of development of future work and development we have left this section intact as there is no other way to know the path of a message through the network for debugging purposes.
+
+%-------------------
 \section{Performance Improvements}
-After the first implementation, we identified a performance bottleneck due to sequential processing of messages. A worker pool for message processing was added enable handling of more messages at the same time. While this worker pool is set to \textbf{X} threads in the current implementation, it is possible that this value can be tuned further for each machine that fledger is run on depending on the core counts of the machine and the amount of computational that the user wants to contribute to the network.
+%-------------------
+\subsection{Worker Pool}
+After the initial implementation, we identified a performance bottleneck caused by the sequential processing of messages. To address this, a worker pool was added to enable parallel processing of messages. In the current implementation, this worker pool is configured to use \textbf{find the X} threads. However, this value can potentially be optimized for each machine running Fledger, depending on the core count and the computational resources the user is willing to contribute to the network.
 
-Another part of debugging the implementation, we were keeping all incoming and outgoing messages in a threadsafe datastructure. However, given taht there are many many messages incoming and outgoing each second, this was identified as a performance bottlebeck and removed. Currently only messages stored are those by the provider for their clients. 
+\subsection{Loopix Message Storage}
+During debugging, we initially stored all incoming and outgoing messages in a thread-safe data structure accessible through a read-write mutex. However, since many messages are sent and received every second, the constant locking and unlocking of the data structure significantly slowed down message processing. To resolve this issue,  we stopped storing all sent and received messages. Currently, only messages stored by providers for their clients are retained.
 
 %%%%%%%%%%%%%%%%%%%%
 \chapter{Evaluation}
+\label{sec:eval}
 %%%%%%%%%%%%%%%%%%%%
 
 % In the evaluation you convince the reader that your design works as intended.
@@ -354,18 +359,13 @@ This chapter evaluates the Fledger Loopix module, beginning with an analysis in 
 
 %-------------------
 \section{Experimental Setup}
+\label{sec:setup}
 %-------------------
 All simulations were conducted using the Sphere Research Infrastructure \textbf{[cite]}. Each simulation involved 3 clients, 6 mix nodes configured with a path length of 3 (i.e., 2 mix nodes in each layer of the stratified topology), 3 providers, and one signaling server (\autoref{fig:setup}).
 
 The network was emulated with a 50 Mbps link between each node (in a fully connected network) and a network latency of 15 ms. While an ideal setup would involve each node connecting to a single router via individual links, the following sections will demonstrate that network link speed does not present a bottleneck in this context. Additionally, we aim to convince the reader that the Fledger Loopix implementation is scalable to accommodate a significantly larger number of clients.
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\textwidth]{plots/experimental_setup.png}
-    \caption{Experimental Setup}
-    \label{fig:setup}
-\end{figure}
-
+ 
 
 Each Fledger node in the simulation runs Ubuntu 20.04 LTS with 4 GB RAM and 4 cores on Sphere Testbed Virtual Machines \textbf{link to documentation}. The signaling server node, exceptionally, has 32 GB of RAM and 32 cores to ensure it does not become a bottleneck.
 
@@ -382,6 +382,8 @@ For each experiment, measurements were collected over a 5-minute simulation peri
 
 %-------------------
 \subsection{Latency Components}
+
+\textbf{one stacked bar with std}
 Before getting into fine tuning the end-to-end latency, it is important to talk about what contributes to the time a proxy request takes. we conducted 12 simulations with identical parameters to show various components of the end-to-end latency. While the average end-to-end latencies are quite stable, it can be noted that there is a variation of 200-400ms between the different simulations.
 
 In \autoref{fig:control_lambdas}, each stacked bar represents the average end-to-end latency for a single simulation round. The dotted red line denotes the actual average end-to-end latency, which is slightly higher than the combined values of all listed components. This discrepancy arises from additional factors, such as the time taken by the proxy node to retrieve the requested website, the preparation of WebRTC messages, and the time required for nodes to set up connections. These elements lie in the gap between the stacked bars and the dotted red line.
@@ -451,7 +453,10 @@ In \autoref{fig:lambdas_latency}, it is possible to see that as payload rate inc
 
 In \autoref{fig:lambdas_bandwidth}, we see that increasing the payload rate increases the bandwidth marginally, this is because the incoming message rate also increases \autoref{fig:lambdas_messages}, which indicates that lower cover traffics should have been used in these scenarios.
 
+\textbf{since latency doesn't realy change after 6-6.25, we use a value in this internval for the section 5.2.4}
+
 \textbf{TODO: figure placements}
+\textbf{TODO: useful traffic}
 
 \begin{figure}[htbp]
     \centering
@@ -490,79 +495,93 @@ In \autoref{fig:lambdas_bandwidth}, we see that increasing the payload rate incr
 \subsubsection{Mean Delay}
 Another significant component of end-to-end latency is the mix node delay, which is directly related to the mean delay \(\mu\). This section examines how changes in the \(\mu\) value affect both latency and bandwidth. When \(\mu\) decreases, the rate of messages leaving the mix node increases. To maintain a stable \(\frac{\lambda}{\mu}\) ratio, the rate of incoming messages must also increase. However, to isolate the effect of mean delay on latency and bandwidth, the following simulations adjust only the cover traffic rates. The payload message rate and all other parameters remain consistent across all runs.
 
-% Next we change mean delay values to see how they change the latency bandwidth etc. Unlike, increasing the payload rate, decreasing the mean delay surprisingly increases reliability. We believe this is due to the worker pool mentioned in \textbf{autoref}, for each forwarded packet a thread is spawned, and this thread is part of the worker pool, therefore less time for the delay means less time for the worker to be released.
+\textbf{TODO: figure placement}
 
-% \begin{figure}[htbp]
-%     \centering
-%     \begin{subfigure}{\textwidth}
-%         \centering
-%         \includegraphics[width=\textwidth]{plots/delays_latency_components.png}
-%         \caption{}
-%         \label{fig:lambdas_latency}
-%     \end{subfigure}
-%     \hfill
-%     \centering
-%     \begin{subfigure}{\textwidth}
-%         \centering
-%         \includegraphics[width=\textwidth]{plots/delays_reliability_latency.png}
-%         \caption{}
-%         \label{fig:lambdas_realibility}
-%     \end{subfigure}
-%     \hfill
-%     \begin{subfigure}{\textwidth}
-%         \centering
-%         \includegraphics[width=\textwidth]{plots/delays_bandwidth.png}
-%         \caption{}
-%         \label{fig:lambdas_bandwidth}
-%     \end{subfigure}
-%     \hfill
-%     \begin{subfigure}{\textwidth}
-%         \centering
-%         \includegraphics[width=\textwidth]{plots/delays_incoming_messages.png}
-%         \caption{}
-%         \label{fig:lambdas_messages}
-%     \end{subfigure}
-%     \caption{Data Visualization for different mean delays}
-% \end{figure}
+\textbf{TODO: X axis label!}
 
-% Since latency decreases and reliability increases, and bandwidth is not affected \textbf{technically shouldn't affected anyway, but I need to rerun a few with less chaff traffic}, we choose 60 as the mean delay going forward. \textbf{link to figures}
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/mean_delay_latency_components.png}
+        \caption{}
+        \label{fig:delays_latency}
+    \end{subfigure}
+    \hfill
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/mean_delay_incoming_messages.png}
+        \caption{}
+        \label{fig:delays_incoming}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/mean_delay_reliability.png}
+        \caption{}
+        \label{fig:delays_reliability}
+    \end{subfigure}
+    \hfill
+\end{figure}
+
+In \autoref{fig:delays_latency}, as mean delay is increased, the mix node delay increases as well. \autoref{fig:delays_incoming} shows that incoming messages has been adjusted accordingly.
+
+Surprisignly, \autoref{fig:delays_reliability} is the highest with low mean delays, we believe this is due to the worker pool mentioned in \textbf{autoref}. The threads are freed faster with low mean delay, less issues with delivery.
+
+\textbf{The big dip in 130 in incoming and 100 in reliability comes from issues with our testing framework, should have been rerun}
+
+As the results show in \textbf{mean number of messages at a mix node}, after 30 incoming messages the thing becomes unstable, and so in our next sections we will use 80 ms for our mean delay parameter.
 
 %-------------------
 \subsection{Number of messages retrieved and time-to-pull }
 
 The final major component of the end-to-end latency influenced by Loopix parameters is the provider delay. This delay is determined by two parameters \(t_{pull}\) and \(N_R\). This section conducts a grid search over various combinations of these parameters to analyze their impact on both end-to-end latency and bandwidth usage.
 
-\textbf{insert the heatmaps and discuss what they show}
-% In figure \textbf{autoref} there are two heatmaps, one that shows how \(N_R\) and time pull affects total bandwidth and one that shows how these two variables effects end to end latency.
-% \begin{figure}[htbp]
-%     \centering
-%     \begin{subfigure}{\textwidth}
-%         \centering
-%         \includegraphics[width=\textwidth]{plots/delays_latency_components.png}
-%         \caption{}
-%         \label{fig:lambdas_latency}
-%     \end{subfigure}
-%     \hfill
-%     \centering
-%     \begin{subfigure}{\textwidth}
-%         \centering
-%         \includegraphics[width=\textwidth]{plots/delays_reliability_latency.png}
-%         \caption{}
-%         \label{fig:heatmap_bandwidth.png}
-%     \end{subfigure}
-% \end{figure}
+\autoref{fig:heatmap_bandwidth} one that shows how \(N_R\) and \(t_{pull}\) affects total bandwidth and \autoref{fig:heatmap_latency} shows how these two variables affect end-to-end latency.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/heatmap_bandwidth.png}
+        \caption{}
+        \label{fig:heatmap_bandwidth}
+    \end{subfigure}
+    \hfill
+    \centering
+    \begin{subfigure}{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/heatmap_latency.png}
+        \caption{}
+        \label{fig:heatmap_latency}
+    \end{subfigure}
+\end{figure}
 
 
-% In \textbf{autoref}, max retreive value over 9 and below 3 increases the latency. We believe below three it is not enough to send the full web page information from the web proxy, and over 9, there is an added overhead for the provider and client to process all the dummy messages which increases latency. As mentioned in \textbf{autoref}, these experiments were run with \textbf{url} proxy requests, and running this experiment with a wider variety of websites would be beneficial. However to accomodate larger websites with multiple body messages from the web proxy, we choose the max retreieve \textbf{X} going forward.
-
-% For time pull it is no surprise that lower time pull decreases latency and increases bandwidth.
-% essentially, we believe that as we are tuning our system to browse the internet, we do not need to have a very big max retrieve value but the time pull should be low.
+In \autoref{fig:heatmap_latency}, max retreive value over 9 and below 3 increases the latency. We believe below three it is not enough to send the full web page information from the web proxy, and over 9, there is an added overhead for the provider and client to process all the dummy messages which increases latency. \textbf{talk about bandwidth}
 
 
-% \textbf{TODO: add plot that shows max retreive average latency over time pulls}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{plots/nr_average_latency_max_retrieve.png}
+    \caption{}
+    \label{fig:nr_latency}
+\end{figure}
 
-% \textbf{Talk about how we believe removing/replacing the providers would be beneficial and not retract from the anonymity}
-% In \textbf{autoref} section, it is mentioned that providers do not serve their main purpose of providing sender receiver online unobservibility. If loopix integration into fledger is only to be used for web proxy module, it might be beneficial to replace providers with simple entry nodes that will not store message but directory send the traffic to the client. \textbf{The client needs to know the network anyway, so they're kinda useless here} Mixnodes in the first and final layers of mix network could be used for this purpose, and would significantly reduce end-to-end latency while not affecting privacy properties. However, if fledger loopix module would be used for other purposes such as private messaging, providers could still provide better privacy than not. We leave this extension/study of fledger loopix module to future work.
+\textbf{talk more about the figure \autoref{fig:nr_latency}}
+As mentioned in \autoref{sec:setup}, these experiments were run with \textbf{url} proxy requests, and running this experiment with a wider variety of websites would be beneficial. However to accomodate larger websites with multiple body messages from the web proxy, we choose the max retreieve 5 going forward. 
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{plots/nr_latency_and_bandwidth.png}
+    \caption{}
+    \label{fig:nr_tp}
+\end{figure}
+
+\textbf{talk more about the figure \autoref{fig:nr_tp} and fix the plot (maybe rerun :D)}
+
 
 %-------------------
 \subsection{Scalability}
@@ -584,12 +603,10 @@ The final major component of the end-to-end latency influenced by Loopix paramet
 %-------------------
 \subsection{Duplicate Messages}
 
-%-------------------
-\subsection{Combination of Retrying and Duplicate Messages}
 
-%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%
 \chapter{Related Work}
-%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%
 
 % The related work section covers closely related work. Here you can highlight
 % the related work, how it solved the problem, and why it solved a different
@@ -600,7 +617,108 @@ The final major component of the end-to-end latency influenced by Loopix paramet
 
 % This section is usually 3-5 pages.
 
-\textbf{I will probably skip this because of sections \autoref{sec:mixers} and \autoref{sec:reliable_message_delivery}}
+This section will have two parts, one about papers introducing anonymous communication systems, it will discuss the anonymous commnyuications systems that we considdered to integrate into fledger and why we chose to use Loopix. The other will contain related about reliable message delivery.
+%-------------------
+\section{Anonymous Communication Systems with Low Latency}
+\label{sec:mixers}
+%-------------------
+Having identified our initial goal, namely making Fledger web proxy more privacy preserving, the first step was to find a suitable mix network or more broadly an anonymous communication system that can be used in the context of browsing the web through a web proxy. For this purpose, we identified potential anonymous communication systems to look into.
+
+\textbf{Talk about Atom, Riffle, Vuvuzela, Prifi, Groove, Larmix, and why they were not chosen}
+% \subsection{Atom}
+% Development of a scalable anonymous messaging system that defends against traffic analysis attacks. The system is very scalable and techinically over a million users are supports with \textbf{talk about privacy qurantees}, they only achieve 28 minute latency. THis latency might be acceptable for an aync messaging application however, for accessing web pages, this is not usable.
+
+% \subsection{Riffle}
+% Development a bandwidth- and computation-efficient anonymous communication system resistant to traffic analysis. \textbf{talk a bit more about the papers here?} Less than 10 second latency with 100000 users with 100KB/s per user in file sharing applications.  Although 10 seconds is much better than 28 minutes, we are still looking for something that can be more usable for a web proxy. And for the future file sharing applications of fledger 10KB per second would not be enough for a real system.
+% \subsection{Vuvuzela}
+% Develop a scalable and flexible metadata-private messaging system that allows asynchronous communication across multiple devices. 37 second latency still not what we are looking for. 
+% \subsection{Grove}
+% latency of 32-80 seconds , not enough. Also the focus of the paper was having a an async communicatoin across multiple devices not really latency
+% \subsection{Prifi}
+% Low latency DC net with 100ms latency, but only supports up to 100 clients. 
+
+% \subsection{Loopix}
+% As we have talked about Loopix we will not go into further detail here. We chose loopix for it's low latency, scalability, availablility of reference implementations and the tunability of the system. There are also many works that have built on top of loopix which attests to it's extensibility, such as larmix which uses latency aware routing to reduce the network latency between nodes. \textbf{make this a better paraphraph}.
+
+
+%-------------------
+\section{Approaches to Reliable Message Delivery}
+\label{sec:reliable_message_delivery}
+%-------------------
+In \autoref{sec:design_reliability}, the motivation for reliability mechanisms in Loopix was discussed. The path of a message is determined at the source and encrypted with the public key of each mix node in the route. This introduces single points of failure at each mix node, which becomes especially apparent in high-churn environments. \textbf{In search of ways to improve the the Fledger Loopix module,  we looked at two routes, sysmtes that change routing etc of mixnetworks, other reliability stuff}
+
+\subsection{More on mix networks}
+
+ There are many studies that look into more reliable message delivery in mix networks.
+
+Cashmere \textbf{cite} introduces the concept of relay groups instead of single-node mixes to enhance reliability Each relay group consists of multiple nodes that share a public/private key pair, allowing any member of the group to act as the mix. When a message reaches a relay group, it can be processed by any member of the group and forwarded next hop along the route. Even if some nodes within a relay group fail or go offline, the message can still progress as long as at least one member of each relay group is available.
+
+In CAT \textbf{cite}, messages are routed through relay groups as well. Instead of pre-selecting fixed relay nodes, CAT uses probing to identify multiple valid paths within these relay groups. If a node fails during the transmission of a message, the route is switched to a backup one, which is possible thanks to commutative encryption keys.
+
+Hybrid Routing \textbf{cite} takes a similar approach by combining relay groups and determining part of the path dynamically, and the Nym Mixnet \textbf{cite}, also based on Loopix, introduces acks with retransmissions using the single use reply blocks from sphinx \textbf{sphinx}.
+
+While these are just some examples of research that explore more reliable message delivery, it would not be possible to evaluate these approaches without understanding and simulating churn in p2p networks. \textbf{cite} is a \textbf{big study} of churn in multiple deployed p2p networks, and provides many insights. Where Dcentralized reliability estimation \textbf{cite} introduces a \textbf{framework?} for evaluating the realibility.
+
+This project serves as a \textbf{something}, and a tool to try/deploy more realibility mechanisms.
+
+\subsection{Erasure Codes}
+Erasure codes represent another potential approach to improve reliability. By encoding messages into multiple fragments and allowing the reconstruction of the original message from a subset, this method ensures delivery even if some fragments are lost during transit. While erasure codes are not explicitly implemented in current mixnet designs, their potential integration could address reliability in highly dynamic environments.
+
+Another approach to reliable message delivery is that we ensure that even if a message is not delivered we can recover the message. Here we look into erasure codes to see if there is any suitable in this application:
+reed solomon, etc and how they are compared using the overview paper
+
+
+%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Future Work}
+\label{sec:future_work}
+%%%%%%%%%%%%%%%%%%%%%%
+\section{Bootstrapping and Node Discovery}
+Mentioned in bootstrapping section, fledger uses singaling server as temporary bootstrapping, proper bootstrapping and node discovery would be done through ....
+
+In case a node wants to participate in the Fledger Loopix, the keys would be included in the information along with the normal keypairs. 
+
+\section{Stateful Fledger Loopix module}
+The reliability mechanisms described in section design are implemented most within web poryx module since it already keeps state of web poryx requests, however, to avoid reimplementing these mechanisms across differnet modules, it would be beneficial to move the implementation to looipx module. Here is how it would work:
+
+The unique ID mentioned in bootstrapping section would go into the plaintext that is encrypted. When the loopix module recovers a plaintext (is the final destination of a message), it would get this unique ID from the plaintext, and store it for a predetermined durations of time (this information could also be included in the plaintext for example) and share it with the module it is relaying the message. If module is replying to the message, for example in the case of a web proxy resposne, it would use the same ID, where loopix module would use the context of ID to send the message, this in the case mentioend in bootstapping could be using the single use reply block contained in the sphinx packets.
+
+\section{Stateful Fledger Loopix Module}
+
+The reliability mechanisms described in the design section are currently implemented primarily within the web proxy module, as it already maintains the state of web proxy requests. However, to avoid re-implementing these mechanisms across different modules, it would be beneficial to move this functionality to the Loopix module. Here is how the stateful implementation could work:
+
+The unique ID mentioned in \autoref{sec:impl_bootstrapping} would be encrypted along with the web proxy request. When the Fledger Loopix module receives the message, it would extract this unique ID and store it for a predetermined duration. The duration could be specified in the message metadata. The Loopix module would then relay the unique ID along with the web proxy request to the appropriate module handling the message.
+
+If the web proxy module sends a response to this request, it would reuse the same unique ID. The Loopix module could then use the ID to retrieve the single-use reply block from the original Sphinx packet and send the response back to the originator of the request. This approach eliminates the need to include the originator node's ID in the Loopix message, addressing privacy concerns mentioned in \autoref{sec:impl_bootstrapping}.
+
+\section{Erasure Codes}
+Discussed in section related work, using erasure coding would be a possible way to increase the chance of a successfull web proxy request. This would also require the statefulness of loopix module.
+
+In the case the web proxy is sending a request, (there is a single message), loopix module would create some drop messages (which would have been sent in the case of the queue being empty anyway). It would create \textbf{ereasure coding packets} with the real message as well as the drop message, and then add that to the queue. All of these messages would contain for example an ID and some metadata about how many messages are required to recoever the original message, encrypted of course, that would let the loopix module at the final destination to match the messages and recover the original message.
+
+For the web proxy responses, as there would be multiple responses anyway, loopix module would simply contstruct the packets with the encryptions of these messages. recoevered in teh same way at the originator of the request.
+
+We leave the studt etc etc
+
+\section{Mix regions}
+As mentioned \textbf{autoref}, \textbf{cite chasmeere} and \textbf{the otehr paper} the in the mixnetork each node has it's own public key, this surfaces as a single point of failure in the route of a messsage. In the case of a web proxy there are so many of these points with at least 3 messages in the case of a failure and at least 4 messages in the case of a successfull get request. Integrating some of the ideas in the context of Fledger Loopix module would look like this:
+
+each mix layer is a mix region, when the message leaves the client/provider to arrive at the mix network, the message is broadcasted using gossip events or a similar mechanism or the client/provider sends the message to a random fraction of the nodes. When a node in the mix layer receives one of these message it forwards it to the next layer in a similar manner while broadcasting within the mix regionn that it has done so, so that other mix nodes don't resend it. In such a scenario it is possible that multiple nodes send the message at the same time, however as we send to a random fraction of the nodes this would simply increase the chance that the message actually ends up at an alive mixnode.
+
+We leave the implementation and the reliability/additional latency/bandwidth evaluation such a scheme to future work. The threat model with regards to the mix regions would have to be re-evaulated since many nodes knowing the input and output of the message could increase the attack surface and make it easier for collaboration to trace the path of a message. A potential migitation would be to have smaller mix regions, but again we leave the evaluation of privacy properties of such a scheme to future work.
+
+
+\section{Discussion of Providers}
+
+
+
+\subsection{Better Processing Mechanism / Optimization of Worker Pool}
+
+When the provider receives a pull request the worker pool mentioned in \textbf{autoref} is also being used. Seen in \textbf{max retreieve time pull grid serach}, the providers get overwhelmed with more messages, this could be migitated with a separate worker pool for pull requests. Also the the dummy packets are created one by one (they  need to be different) sequentially, this could easily be a parallel task especially since the the amount of workers and the interval at which they are needed are very well known. 
+
+\subsection{Removal of Providers}
+
+\textbf{Talk about how we believe removing/replacing the providers would be beneficial and not retract from the anonymity}
+In \textbf{autoref} section, it is mentioned that providers do not serve their main purpose of providing sender receiver online unobservibility. If loopix integration into fledger is only to be used for web proxy module, it might be beneficial to replace providers with simple entry nodes that will not store message but directory send the traffic to the client. \textbf{The client needs to know the network anyway, so they're kinda useless here} Mixnodes in the first and final layers of mix network could be used for this purpose, and would significantly reduce end-to-end latency while not affecting privacy properties. However, if fledger loopix module would be used for other purposes such as private messaging, providers could still provide better privacy than not. We leave this extension/study of fledger loopix module to future work.
 
 %%%%%%%%%%%%%%%%%%%%
 \chapter{Conclusion}
