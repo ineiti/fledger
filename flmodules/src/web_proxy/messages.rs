@@ -8,6 +8,7 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
+use crate::loopix::PROXY_REQUEST_RECEIVED;
 use crate::nodeconfig::NodeInfo;
 use crate::Modules;
 
@@ -125,6 +126,7 @@ impl WebProxyMessages {
     }
 
     fn start_request(&mut self, src: NodeID, nonce: U256, request: String) -> Vec<WebProxyOut> {
+        PROXY_REQUEST_RECEIVED.inc();
         let mut broker = self.broker.clone();
         spawn_local(async move {
             match reqwest::get(request).await {

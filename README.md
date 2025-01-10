@@ -1,5 +1,42 @@
 # Fledger - the fast, fun, easy ledger
 
+## Student Project 24
+- The loopix module implemented for this project and be found in ./flmodules/src/loopix, see readme on [here](https://github.com/fledg-re/flmodules/src/loopix/README.md).
+- The scripts that were used to run experiments as well as data processing can be found in ./mergetb: [here](https://github.com/fledg-re/mergetb/README.md).
+- The latex for the report can be found and compiled in [here](https://github.com/fledg-re/mergetb/blob/main/report/).
+
+### Runnning the code
+Rust  binary can be built with the following command:
+```bash
+cd cli/fledger && cargo build -r
+```
+
+Note that the main is configured to run a simulation with multiples node and will not work as a single node. A single node can be run with the following command:
+```bash
+  ./target-common/release/fledger --config <directory to save configs> \
+    --name <name of the node> \
+    --n-clients <number of loopix clients> \
+    --duplicates <number of duplicates> \
+    --path-len <path length> \
+    --retry <number of retries> \
+    --start_loopix_time <start time> \
+    --save_new_metrics_file <save new metrics file> \
+    --token <token> 
+```
+where token is api key for ipinfo.io.
+
+To run multiples nodes, you can use the the script:
+```bash
+./start_simul.sh
+```
+
+### Changes to Fledger
+Aside from the loopix module, and the cli/src/main.rs minor changes have been made to the code.
+
+Notably there are some changes int the web proxy module and docker files.
+
+
+## Fledger
 Fledger's main goal is to create a web3 experience in the browser without the
 need for proxies.
 Once the code starts in your browser, it will connect to other browsers,

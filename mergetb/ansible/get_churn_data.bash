@@ -9,13 +9,13 @@ token=$1
 
 initial_path_length=3
 
-lambda_loop=1.65 
-lambda_drop=1.65
-lambda_payload=6.1
+lambda_loop=1.35 
+lambda_drop=1.35
+lambda_payload=5
 path_length=3
-mean_delay=80
-lambda_loop_mix=1.65
-time_pull=0.8
+mean_delay=100
+lambda_loop_mix=1.35
+time_pull=1
 max_retrieve=5
 pad_length=150
 

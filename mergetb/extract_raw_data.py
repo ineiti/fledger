@@ -113,7 +113,6 @@ def get_metrics_data(data_dir, path_length, n_clients, results, variable, index)
             if metric == "loopix_bandwidth_bytes" or metric == "loopix_start_time_seconds":
                 get_bandwidth_bytes_or_start_time(results, content, metric, i)
 
-
             elif metric == "loopix_number_of_proxy_requests":
                 get_proxy_request(results, content, metric, i)
 

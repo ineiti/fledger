@@ -8,7 +8,7 @@ use flarch::{
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
 
-use crate::overlay::messages::{NetworkWrapper, OverlayIn, OverlayMessage, OverlayOut};
+use crate::{loopix::{PROXY_MESSAGE_BANDWIDTH, PROXY_MESSAGE_COUNT, RETRY_COUNT}, overlay::messages::{NetworkWrapper, OverlayIn, OverlayMessage, OverlayOut}};
 use flarch::{
     broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
     nodeids::{NodeID, U256},
@@ -102,6 +102,9 @@ impl WebProxy {
 
     pub async fn get_with_retry_and_timeout(&mut self, url: &str, retry: u8, time: Duration) -> Result<Response, WebProxyError> {
         for i in 0..(retry + 1) { // +1 because it should retry at least once
+            if i != 0 {
+                RETRY_COUNT.inc();
+            }
             log::debug!("Getting {url} with retry {i}");
             match self.get_with_timeout(url, time).await {
                 Ok(resp) => return Ok(resp),
@@ -180,10 +183,13 @@ impl Translate {
 
     fn link_proxy_overlay(msg: WebProxyMessage) -> Option<OverlayMessage> {
         if let WebProxyMessage::Output(WebProxyOut::ToNetwork(id, msg_node)) = msg {
+            let wrapper = NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap();
+            PROXY_MESSAGE_BANDWIDTH.inc_by(wrapper.msg.len() as f64);
+            PROXY_MESSAGE_COUNT.inc();
             Some(
                 OverlayIn::NetworkWrapperToNetwork(
                     id,
-                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
+                    wrapper,
                 )
                 .into(),
             )

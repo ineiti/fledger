@@ -10,7 +10,7 @@ token=$1
 # Define initial values
 lambda_loop=1.15 
 lambda_drop=1.15
-lambda_payload=6
+lambda_payload=6.1
 path_length=3
 mean_delay=100
 lambda_loop_mix=1.15
@@ -68,24 +68,15 @@ done
 
 # Try different mean_delay values
 mean_delays=(50 60 70 80 90 100 110 120 130 140 150 160 170 180 190 200)
-payload_values=(6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6)
-chaff_values=(3.5 3.03 2.56 2.09 1.62 1.15 1.06 0.97 0.88 0.8 0.71 0.62 0.53 0.44 0.35 0.26)
-
-
-# mean_delays=(50 60 70 80 90 100 110 120 130 140 150 160 170 180 190 200)
-# chaff_values=(4 3.3 2.79 2.45 2.2 2 1.79 1.62 1.48 1.37 1.27 1.18 1.11 1.05 0.99 0.95)
-# payload_values=(8 7.2 6.4 5.6 4.8 4 3.83333333 3.66666667 3.5 3.33333333 3.16666667 3 2.83333333 2.66666667 2.5)
-
-# mean_delays=(50 60)
-# chaff_values=(4 3.3)
-# payload_values=(8 7.2)
-
-# mu value = 20 16.67 14.29 12.5 11.11 10 9.09 8.33 7.69 7.14 6.67 6.25 5.88 5.56 5.26 5
-# required number of messages per second = 48 24
+payload_values=(6.1 6.1 6.1 6.1 6.1 6.1 6.1 6.1 6.1 6.1 6.1 6.1 6.1 6.1 6.1 6.1)
+chaff_values=(3.65 3.15 2.65 2.15 1.65 1.15 1.06 0.97 0.88 0.8 0.71 0.62 0.53 0.44 0.35 0.26)
 
 mkdir -p metrics/mean_delay
 
-for i in "${!mean_delays[@]}"; do
+start_index=0
+end_index=16
+
+for ((i=start_index; i < end_index; i++)); do
     mean_delay=${mean_delays[$i]}
     lambda_drop=${chaff_values[$i]}
     lambda_loop=${chaff_values[$i]}

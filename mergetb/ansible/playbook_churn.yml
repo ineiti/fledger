@@ -84,7 +84,6 @@
               --start_loopix_time 15
               --retry {{ retry }}
               --n-clients {{ n_clients }}
-              --save_new_metrics_file
               --duplicates {{ duplicates }}
               --token {{ token }}
               -v

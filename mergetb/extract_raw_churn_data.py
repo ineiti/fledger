@@ -3,14 +3,14 @@ import re
 import json
 import sys
 import yaml
-from extract_raw_data import get_bandwidth_bytes_or_start_time, metrics_to_extract, create_results_dict, simulation_ran_successfully, get_proxy_request, get_incoming_messages, get_histogram_metrics 
+from extract_raw_data import get_bandwidth_bytes_or_start_time, counter_metrics_to_extract, metrics_to_extract, create_results_dict, simulation_ran_successfully, get_proxy_request, get_incoming_messages, get_histogram_metrics 
 
 def get_metrics_data(data_dir, path_length, n_clients, results, variable, index):
     if metrics_to_extract[0] not in results:
         create_results_dict(results, metrics_to_extract)
 
     directory = os.path.join(data_dir, variable)
-    metrics_file = os.path.join(directory, f"metrics_{index}.txt")
+    metrics_file = os.path.join(directory, f"metrics_4.txt")
     
     print(f"Getting metrics data from {metrics_file}")
     if os.path.exists(metrics_file):
@@ -21,14 +21,27 @@ def get_metrics_data(data_dir, path_length, n_clients, results, variable, index)
             if metric == "loopix_bandwidth_bytes" or metric == "loopix_start_time_seconds":
                 get_bandwidth_bytes_or_start_time(results, content, metric, index)
 
+
+            elif metric == "loopix_number_of_proxy_requests":
+                get_proxy_request(results, content, metric, index)
+
+            
             elif metric == "loopix_number_of_proxy_requests":
                 get_proxy_request(results, content, metric, index)
 
             elif metric == "loopix_incoming_messages":
                 get_incoming_messages(results, content, metric, index)
 
+            elif metric in counter_metrics_to_extract:
+                pattern = rf"{metric}\s+([0-9.e+-]+)$"
+                match = re.search(pattern, content, re.MULTILINE)
+                if match:
+                    results[metric].append(float(match.group(1)))
+
             else:
                 get_histogram_metrics(results, content, metric, index)
+
+            
 
     return True
           
@@ -52,46 +65,49 @@ def main():
     for variable in variables:
         results[variable] = {}
         run_dir = os.path.join(data_dir, variable)
-        runs = [f for f in os.listdir(run_dir) if not f.endswith(signal_log_suffix) and not f.endswith(json_suffix)]
+        # runs = [f for f in os.listdir(run_dir) if not f.endswith(signal_log_suffix) and not f.endswith(json_suffix)]
 
-        print(runs)
+        # print(runs)
 
-        with open(os.path.join(run_dir, f'{variable}.json'), 'r') as f:
-            run_keys = json.load(f)
+        try:
+            with open(os.path.join(run_dir, f'{variable}.json'), 'r') as f:
+                run_keys = json.load(f)
+        except FileNotFoundError:
+            print(f"File not found: {os.path.join(run_dir, f'{variable}.json')}")
+            continue
 
-        for run in runs:
-            if variable == "retry_duplicates":
-                run_key = run
-            else:
-                run_key = run_keys[run]
+        index = 0
+        option = 0
+        for dir_name in [f for f in os.listdir(run_dir) if os.path.isdir(os.path.join(run_dir, f))]:
+            if "_" in dir_name:
+                i, j = map(int, dir_name.split("_"))
+                index = max(index, i)
+                option = max(option, j)
+                print(f"Processing directory for i={index}, j={option}")
 
+
+        for i in range(index + 1):
+            run_key = run_keys[str(i)]
             results[variable][run_key] = {}
-            node_dir = os.path.join(run_dir, run)
-            nodes = os.listdir(node_dir)
-            print(nodes)
 
-            for enum_node, node in enumerate(nodes):
-                print(node)
-                node_data_dir = os.path.join(node_dir, node, "data")
-                print(node_data_dir)
+            for j in range(option + 1):
 
-                prefix = "metrics_"
+                results[variable][run_key][j] = {}
 
-                files = os.listdir(node_data_dir)
+                node_dir = os.path.join(run_dir, f"{i}_{j}")
+                print(node_dir)
+                
+                metrics_file_name = f"metrics_{4}.txt"
 
-                metrics_files = [file for file in files if file.startswith(prefix) and os.path.isfile(os.path.join(node_data_dir, file))]
 
-                print(metrics_files)
+                nodes = os.listdir(node_dir)
+                for enum_node, node in enumerate(nodes):
+                    print(node)
 
-                for time_index, metrics_file in enumerate(metrics_files):
-                    if time_index*20 not in results[variable][run_key]:
-                        results[variable][run_key][time_index*20] = {}  
+                    node_data_dir = os.path.join(node_dir, node, "data")
+                    print(node_data_dir)
 
-                    print(f"time index: {time_index}")             
-
-                    print(f"Getting metrics data from run {variable} {time_index*20} for node {enum_node}")
-
-                    get_metrics_data(node_data_dir, path_length, n_clients, results[variable][run_key][time_index*20], "", time_index)
+                    get_metrics_data(node_data_dir, path_length, n_clients, results[variable][run_key][j], "", 0)
 
                     
         print(results)
