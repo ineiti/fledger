@@ -53,7 +53,7 @@ Once the data is collected, download this data into ./mean_delay_lambdas/raw_dat
 
 The data processing can be run with the following command:
 ```bash
-./run_data_processing.bash <path_length> <n_clients> <duration>
+./run_data_processing.bash mean_delay_lambdas <path_length> <n_clients> <duration>
 ```
 In our case path_length = 3, n_clients = 3 and duration = 300.
 
