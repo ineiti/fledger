@@ -4,7 +4,7 @@ This folder contains the scripts used to run experiments and process data.
 
 The ansible folder contains the scripts used to run the simulations with the MergeTB XDC. To set up experiments as well as the XDC please refer to the Sphere Research Infrastructure documentation.
 
-Firstly with MergeTB, an experiment needs to be reserved and activated. The configuration for the experiment can be found in ansible/experiment.py
+Firstly with MergeTB, an experiment needs to be reserved and activated. The configuration for the experiment can be found in experiment.py
 
 Once the experiment is activated, and ansible is isntalled on the XDC, the following playbooks can be used to run the simulations:
 
