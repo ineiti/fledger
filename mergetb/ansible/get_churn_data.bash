@@ -48,10 +48,43 @@ echo -e "$retry_json" > metrics/retry/retry.json
 for i in "${!retry_values[@]}"; do
     retry=${retry_values[$i]}
 
-    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "retry=$retry path_len=$initial_path_length n_clients=3 duplicates=1 token=$token variable=retry index=$i"
+    # no churn
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "retry=$retry path_len=$initial_path_length n_clients=3 duplicates=1 token=$token variable=retry index=${i}_0"
     wait
+
     ansible-playbook -i inventory.ini stop_containers.yml 
     wait
+
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
+    wait
+
+    # kill first mixnode
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "stop_first_mixnode=true retry=$retry path_len=$initial_path_length n_clients=3 duplicates=1 token=$token variable=retry index=${i}_1"
+    wait
+
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
+
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
+    wait
+
+    # kill two mixnodes
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "stop_first_mixnode=true stop_second_mixnode=true retry=$retry path_len=$initial_path_length n_clients=3 duplicates=1 token=$token variable=retry index=${i}_2"
+    wait
+
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
+
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
+    wait
+
+    # kill three mixnodes
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "stop_first_mixnode=true stop_second_mixnode=true stop_third_mixnode=true retry=$retry path_len=$initial_path_length n_clients=3 duplicates=1 token=$token variable=retry index=${i}_3"
+    wait
+
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
+
     ansible-playbook -i inventory.ini delete_only_metrics.yml
     wait
 done
@@ -72,10 +105,44 @@ echo -e "$duplicates_json" > metrics/duplicates/duplicates.json
 for i in "${!duplicates_values[@]}"; do
     duplicates=${duplicates_values[$i]}
 
-    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=$duplicates token=$token variable=duplicates index=$i"
+    # no churn
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "retry=0 path_len=$initial_path_length n_clients=3 duplicates=$duplicates token=$token variable=duplicates index=${i}_0"
     wait
+
     ansible-playbook -i inventory.ini stop_containers.yml 
     wait
+
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
+    wait
+
+    # kill first mixnode
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "stop_first_mixnode=true retry=0 path_len=$initial_path_length n_clients=3 duplicates=$duplicates token=$token variable=duplicates index=${i}_1"
+    wait
+
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
+
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
+    wait
+
+    # kill two mixnodes
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "stop_first_mixnode=true stop_second_mixnode=true retry=0 path_len=$initial_path_length n_clients=3 duplicates=$duplicates token=$token variable=duplicates index=${i}_2"
+    wait
+
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
+
+    ansible-playbook -i inventory.ini delete_only_metrics.yml
+    wait
+
+    # kill three mixnodes
+    ansible-playbook -i inventory.ini playbook_churn.yml --extra-vars "stop_first_mixnode=true stop_second_mixnode=true stop_third_mixnode=true retry=0 path_len=$initial_path_length n_clients=3 duplicates=$duplicates token=$token variable=duplicates index=${i}_3"
+    wait
+
+    ansible-playbook -i inventory.ini stop_containers.yml 
+    wait
+
     ansible-playbook -i inventory.ini delete_only_metrics.yml
     wait
 done
+

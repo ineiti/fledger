@@ -98,20 +98,13 @@
               RUST_BACKTRACE: "full"
           register: fledger_container
 
-        - name: Wait 
-          pause:
-            seconds: 320
-
 - name: Stop first mixnode
   hosts: node-6
   tasks:
     - name: Stop first mixnode
       shell: |
         docker stop $(docker ps -q)
-
-    - name: Wait
-      pause:
-        seconds: 305
+      when: stop_first_mixnode | default(false)
 
 - name: Stop second mixnode
   hosts: node-4
@@ -119,10 +112,7 @@
     - name: Stop second mixnode
       shell: |
         docker stop $(docker ps -q)
-
-    - name: Wait
-      pause:
-        seconds: 305
+      when: stop_second_mixnode | default(false)
 
 - name: Stop third mixnode
   hosts: node-7
@@ -130,17 +120,18 @@
     - name: Stop third mixnode
       shell: |
         docker stop $(docker ps -q)
-
-    - name: Wait
-      pause:
-        seconds: 305
+      when: stop_third_mixnode | default(false)
 
 - name: Fetch Docker logs from the container
-  hosts: node-1
+  hosts: FLEDGER_NODES
   become: yes
   tasks:
+    - name: Wait 
+      pause:
+        seconds: 320
+
     - name: Get the container ID using the container name
-      shell: docker inspect --format='{% raw %}{{.Id}}{% endraw %}' fledger_node-1
+      shell: docker inspect --format='{% raw %}{{.Id}}{% endraw %}' fledger_{{ inventory_hostname }}
       register: container_id
 
     - name: Debug container ID
@@ -152,13 +143,6 @@
       shell: |
         cp /var/lib/docker/containers/{{ container_id.stdout.strip() }}/{{ container_id.stdout.strip() }}-json.log /home/dcog/data/{{ inventory_hostname }}.log
         chmod 666 /home/dcog/data/{{ inventory_hostname }}.log
-
-    - name: Fetch log from node-1
-      when: inventory_hostname == 'node-1'
-      fetch:
-        src: /home/dcog/data/{{ inventory_hostname }}.log
-        dest: /home/dcog/metrics/{{ variable }}/{{ index }}/{{ inventory_hostname }}.log
-        flat: yes
 
 - name: Stop existing fledger container if present
   hosts: FLEDGER_NODES
