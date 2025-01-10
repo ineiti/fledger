@@ -55,7 +55,7 @@ def plot_latency_components(directory, path_length, variable, run):
     else:
         plt.xlabel(variable)
     plt.ylabel("Latency (milliseconds)")
-    plt.title(f"End-to-End Latency with different components")
+    plt.title(f"End-to-End Latency with Components")
     plt.legend()
     plt.tight_layout()
 
