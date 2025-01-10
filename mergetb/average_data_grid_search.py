@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
 
     average_data_time_pull = {}
-    average_data_max_retrieve = {str(i): {} for i in range(1, 16)}
+    average_data_max_retrieve = {str(i): {} for i in range(1, 13)}
 
     print(f"time_pulls: {data.keys()}")
 
