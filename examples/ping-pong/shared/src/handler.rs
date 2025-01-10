@@ -6,7 +6,7 @@ use flmodules::{
     nodeconfig::NodeInfo,
     timer::{TimerBroker, TimerMessage},
 };
-use flmodules::network::network::{NetCall, NetworkMessage};
+use flmodules::network::messages::{NetworkIn, NetworkMessage, NetworkOut};
 
 use crate::common::{PPMessage, PPMessageNode};
 
@@ -60,19 +60,19 @@ impl PingPong {
     }
 
     // Translates incoming messages from the network to messages that can be understood by PingPong.
-    // The only two messages that need to be interpreted are RcvNodeMessage and RcvWSUpdateList.
-    // For RcvNodeMessage, the enclosed message is interpreted as a PPMessageNode and sent to this
+    // The only two messages that need to be interpreted are MessageFromNode and NodeListFromWS.
+    // For MessageFromNode, the enclosed message is interpreted as a PPMessageNode and sent to this
     // broker.
     // All other messages coming from Network are ignored.
     fn net_to_pp(msg: NetworkMessage) -> Option<PPMessage> {
-        if let NetworkMessage::Reply(rep) = msg {
+        if let NetworkMessage::Output(rep) = msg {
             match rep {
-                flmodules::network::network::NetReply::RcvNodeMessage(from, node_msg) => {
+                NetworkOut::MessageFromNode(from, node_msg) => {
                     serde_json::from_str::<PPMessageNode>(&node_msg)
                         .ok()
                         .map(|ppm| PPMessage::FromNetwork(from, ppm))
                 }
-                flmodules::network::network::NetReply::RcvWSUpdateList(nodes) => Some(PPMessage::List(nodes)),
+                NetworkOut::NodeListFromWS(nodes) => Some(PPMessage::List(nodes)),
                 _ => None,
             }
         } else {
@@ -80,10 +80,10 @@ impl PingPong {
         }
     }
 
-    // Sends a generic NetCall type message to the network-broker.
-    async fn send_net(&mut self, msg: NetCall) {
+    // Sends a generic NetworkIn type message to the network-broker.
+    async fn send_net(&mut self, msg: NetworkIn) {
         self.net
-            .emit_msg(NetworkMessage::Call(msg.clone()))
+            .emit_msg(NetworkMessage::Input(msg.clone()))
             .err()
             .map(|e| log::error!("While sending {:?} to net: {:?}", msg, e));
     }
@@ -91,7 +91,7 @@ impl PingPong {
     // Wraps a PPMessageNode into a json and sends it over the network to the
     // dst address.
     async fn send_net_ppm(&mut self, dst: U256, msg: &PPMessageNode) {
-        self.send_net(NetCall::SendNodeMessage(
+        self.send_net(NetworkIn::MessageToNode(
             dst,
             serde_json::to_string(msg).unwrap(),
         ))
@@ -115,7 +115,7 @@ impl SubsystemHandler<PPMessage> for PingPong {
                 }
                 PPMessage::FromNetwork(from, PPMessageNode::Ping) => {
                     self.send_net_ppm(from, &PPMessageNode::Pong).await;
-                    self.send_net(NetCall::SendWSUpdateListRequest).await;
+                    self.send_net(NetworkIn::WSUpdateListRequest).await;
                 }
                 PPMessage::List(list) => self.nodes = list,
                 PPMessage::Tick => {
@@ -144,7 +144,7 @@ mod test {
 
     use flarch::{broker::Destination, start_logging};
     use flmodules::nodeconfig::NodeConfig;
-    use flmodules::network::{network::NetReply, NetworkSetupError};
+    use flmodules::network::{messages::NetworkOut, NetworkSetupError};
 
     use super::*;
 
@@ -185,7 +185,7 @@ mod test {
         // Receive a ping message through the network
         net.emit_msg_dest(
             Destination::NoTap,
-            NetworkMessage::Reply(NetReply::RcvNodeMessage(
+            NetworkMessage::Output(NetworkOut::MessageFromNode(
                 dst_id.clone(),
                 serde_json::to_string(&PPMessageNode::Ping).unwrap(),
             )),
@@ -199,7 +199,7 @@ mod test {
             net_tap.recv().unwrap()
         );
         assert_eq!(
-            NetworkMessage::Call(NetCall::SendWSUpdateListRequest),
+            NetworkMessage::Input(NetworkIn::WSUpdateListRequest),
             net_tap.recv().unwrap()
         );
 
@@ -207,7 +207,7 @@ mod test {
     }
 
     fn node_msg(dst: &U256, msg: &PPMessageNode) -> NetworkMessage {
-        NetworkMessage::Call(NetCall::SendNodeMessage(
+        NetworkMessage::Input(NetworkIn::MessageToNode(
             dst.clone(),
             serde_json::to_string(msg).unwrap(),
         ))

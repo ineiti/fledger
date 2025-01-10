@@ -2,8 +2,8 @@ use std::error::Error;
 
 use flarch::{nodeids::NodeID, start_logging};
 use flmodules::gossip_events::{
-    events::{Category, EventsStorage},
-    messages::{Config, GossipEvents, GossipIn, GossipOut, MessageNode},
+    core::{Category, EventsStorage},
+    messages::{Config, GossipEvents, GossipIn, GossipOut, ModuleMessage},
 };
 
 #[tokio::test]
@@ -26,7 +26,7 @@ async fn test_gossip() -> Result<(), Box<dyn Error>> {
     let msg12 = es1.process_messages(msg_out(msg21))?;
     let msg21 = es2.process_messages(msg_out(msg12))?;
     assert_eq!(1, msg21.len());
-    if let GossipOut::Node(_, MessageNode::Events(events)) = &msg21[0] {
+    if let GossipOut::ToNetwork(_, ModuleMessage::Events(events)) = &msg21[0] {
         assert_eq!(
             2,
             events
@@ -44,7 +44,7 @@ async fn test_gossip() -> Result<(), Box<dyn Error>> {
 fn msg_out(mut msgs: Vec<GossipOut>) -> Vec<GossipIn> {
     msgs.drain(..)
         .filter_map(|msg| match msg {
-            GossipOut::Node(id, msg_node) => Some(GossipIn::Node(id, msg_node)),
+            GossipOut::ToNetwork(id, msg_node) => Some(GossipIn::FromNetwork(id, msg_node)),
             _ => None,
         })
         .collect()

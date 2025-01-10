@@ -1,16 +1,23 @@
 Following https://keepachangelog.com/en/1.1.0/ and using
-- Added for new features.
-- Changed for changes in existing functionality.
-- Deprecated for soon-to-be removed features.
-- Removed for now removed features.
-- Fixed for any bug fixes.
-- Security in case of vulnerabilities.
+- `Added` for new features.
+- `Changed` for changes in existing functionality.
+- `Deprecated` for soon-to-be removed features.
+- `Removed` for now removed features.
+- `Fixed` for any bug fixes.
+- `Security` in case of vulnerabilities.
 
 ## [Unreleased]
 
 ### Fixed
 - reconnections should work better now, both for libc and wasm
 - fixed signalling server to correctly close and remove timed-out connections
+- removed mdns calls, so it doesn't flood my home network
+
+### Changed
+- re-arranged file names in the flmodules section, to better fit with the `template` module
+- changed the names of the networking messages
+- added an `Overlay` module to abstract the network handling
+- more changes in names of the messages to remove ambiguities
 
 ## [0.8.0] - 2024-09-09
 

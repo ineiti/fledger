@@ -6,13 +6,14 @@ use flarch::{
 };
 
 use crate::{
-    random_connections::messages::{ModuleMessage, RandomIn, RandomMessage, RandomOut},
+    overlay::messages::NetworkWrapper,
+    random_connections::messages::{RandomIn, RandomMessage, RandomOut},
     timer::TimerMessage,
 };
 
 use super::{
-    messages::{MessageNode, Ping, PingConfig, PingIn, PingMessage, PingOut},
-    storage::PingStorage,
+    core::PingStorage,
+    messages::{Ping, PingConfig, PingIn, PingMessage, PingOut},
 };
 
 const MODULE_NAME: &str = "Ping";
@@ -89,16 +90,10 @@ impl Translate {
         if let RandomMessage::Output(msg_out) = msg {
             match msg_out {
                 RandomOut::DisconnectNode(id) => Some(PingIn::DisconnectNode(id).into()),
-                RandomOut::ListUpdate(list) => Some(PingIn::NodeList(list.into()).into()),
-                RandomOut::NodeMessageFromNetwork(id, msg) => {
-                    if msg.module == MODULE_NAME {
-                        serde_yaml::from_str::<MessageNode>(&msg.msg)
-                            .ok()
-                            .map(|msg_node| PingIn::Message(id, msg_node).into())
-                    } else {
-                        None
-                    }
-                }
+                RandomOut::NodeIDsConnected(list) => Some(PingIn::NodeList(list.into()).into()),
+                RandomOut::NetworkWrapperFromNetwork(id, msg) => msg
+                    .unwrap_yaml(MODULE_NAME)
+                    .map(|msg| PingIn::FromNetwork(id, msg).into()),
                 _ => None,
             }
         } else {
@@ -109,13 +104,10 @@ impl Translate {
     fn link_ping_rnd(msg: PingMessage) -> Option<RandomMessage> {
         if let PingMessage::Output(msg_out) = msg {
             match msg_out {
-                PingOut::Message(id, msg_node) => Some(
-                    RandomIn::NodeMessageToNetwork(
+                PingOut::ToNetwork(id, msg_node) => Some(
+                    RandomIn::NetworkMapperToNetwork(
                         id,
-                        ModuleMessage {
-                            module: MODULE_NAME.into(),
-                            msg: serde_yaml::to_string(&msg_node).unwrap(),
-                        },
+                        NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
                     )
                     .into(),
                 ),

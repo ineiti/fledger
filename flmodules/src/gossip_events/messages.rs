@@ -1,10 +1,10 @@
 use flarch::nodeids::{NodeID, NodeIDs, U256};
 use serde::{Deserialize, Serialize};
 
-use super::events::*;
+use super::core::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum MessageNode {
+pub enum ModuleMessage {
     KnownEventIDs(Vec<U256>),
     Events(Vec<Event>),
     RequestEventIDs,
@@ -20,7 +20,7 @@ pub enum GossipMessage {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum GossipIn {
     Tick,
-    Node(NodeID, MessageNode),
+    FromNetwork(NodeID, ModuleMessage),
     SetStorage(EventsStorage),
     GetStorage,
     AddEvent(Event),
@@ -29,7 +29,7 @@ pub enum GossipIn {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum GossipOut {
-    Node(NodeID, MessageNode),
+    ToNetwork(NodeID, ModuleMessage),
     Storage(EventsStorage),
     Updated,
 }
@@ -69,7 +69,10 @@ impl GossipEvents {
     }
 
     /// Processes many messages at a time.
-    pub fn process_messages(&mut self, msgs: Vec<GossipIn>) -> Result<Vec<GossipOut>, serde_yaml::Error>{
+    pub fn process_messages(
+        &mut self,
+        msgs: Vec<GossipIn>,
+    ) -> Result<Vec<GossipOut>, serde_yaml::Error> {
         let mut out = vec![];
         for msg in msgs {
             out.extend(self.process_message(msg)?);
@@ -79,14 +82,11 @@ impl GossipEvents {
 
     /// Processes one generic message and returns either an error
     /// or a Vec<MessageOut>.
-    pub fn process_message(
-        &mut self,
-        msg: GossipIn,
-    ) -> Result<Vec<GossipOut>, serde_yaml::Error> {
+    pub fn process_message(&mut self, msg: GossipIn) -> Result<Vec<GossipOut>, serde_yaml::Error> {
         log::trace!("{} got message {:?}", self.cfg.our_id, msg);
         Ok(match msg {
             GossipIn::Tick => self.tick(),
-            GossipIn::Node(src, node_msg) => self.process_node_message(src, node_msg),
+            GossipIn::FromNetwork(src, node_msg) => self.process_node_message(src, node_msg),
             GossipIn::AddEvent(ev) => self.add_event(ev),
             GossipIn::NodeList(ids) => self.node_list(ids),
             GossipIn::GetStorage => vec![GossipOut::Storage(self.storage.clone())],
@@ -99,12 +99,12 @@ impl GossipEvents {
 
     /// Processes a node to node message and returns zero or more
     /// MessageOut.
-    pub fn process_node_message(&mut self, src: NodeID, msg: MessageNode) -> Vec<GossipOut> {
+    pub fn process_node_message(&mut self, src: NodeID, msg: ModuleMessage) -> Vec<GossipOut> {
         match msg {
-            MessageNode::KnownEventIDs(ids) => self.node_known_event_ids(src, ids),
-            MessageNode::Events(events) => self.node_events(src, events),
-            MessageNode::RequestEvents(ids) => self.node_request_events(src, ids),
-            MessageNode::RequestEventIDs => self.node_request_event_list(src),
+            ModuleMessage::KnownEventIDs(ids) => self.node_known_event_ids(src, ids),
+            ModuleMessage::Events(events) => self.node_events(src, events),
+            ModuleMessage::RequestEvents(ids) => self.node_request_events(src, ids),
+            ModuleMessage::RequestEventIDs => self.node_request_event_list(src),
         }
     }
 
@@ -114,10 +114,7 @@ impl GossipEvents {
         if self.storage.add_event(event.clone()) {
             return itertools::concat([
                 self.send_events(self.cfg.our_id, &[event]),
-                vec![
-                    GossipOut::Updated,
-                    GossipOut::Storage(self.storage.clone()),
-                ],
+                vec![GossipOut::Updated, GossipOut::Storage(self.storage.clone())],
             ]);
         }
         vec![]
@@ -139,9 +136,9 @@ impl GossipEvents {
             .iter()
             .filter(|&&node_id| node_id != src && node_id != self.cfg.our_id)
             .map(|node_id| {
-                GossipOut::Node(
+                GossipOut::ToNetwork(
                     *node_id,
-                    MessageNode::KnownEventIDs(
+                    ModuleMessage::KnownEventIDs(
                         events
                             .iter()
                             .filter_map(|e| {
@@ -165,7 +162,7 @@ impl GossipEvents {
             .0
             .iter()
             .filter(|&id| !self.nodes.0.contains(id) && id != &self.cfg.our_id)
-            .map(|&id| GossipOut::Node(id, MessageNode::RequestEventIDs))
+            .map(|&id| GossipOut::ToNetwork(id, ModuleMessage::RequestEventIDs))
             .collect();
         self.nodes = ids;
         reply
@@ -178,9 +175,9 @@ impl GossipEvents {
         let unknown_ids = self.filter_known_events(ids);
         if !unknown_ids.is_empty() {
             self.outstanding.extend(unknown_ids.clone());
-            return vec![GossipOut::Node(
+            return vec![GossipOut::ToNetwork(
                 src,
-                MessageNode::RequestEvents(unknown_ids),
+                ModuleMessage::RequestEvents(unknown_ids),
             )];
         }
         vec![]
@@ -207,7 +204,7 @@ impl GossipEvents {
     pub fn node_request_events(&mut self, src: NodeID, ids: Vec<U256>) -> Vec<GossipOut> {
         let events: Vec<Event> = self.storage.get_events_by_ids(ids);
         if !events.is_empty() {
-            vec![GossipOut::Node(src, MessageNode::Events(events))]
+            vec![GossipOut::ToNetwork(src, ModuleMessage::Events(events))]
         } else {
             vec![]
         }
@@ -215,9 +212,9 @@ impl GossipEvents {
 
     /// Returns the list of known events.
     pub fn node_request_event_list(&mut self, src: NodeID) -> Vec<GossipOut> {
-        vec![GossipOut::Node(
+        vec![GossipOut::ToNetwork(
             src,
-            MessageNode::KnownEventIDs(self.storage.event_ids()),
+            ModuleMessage::KnownEventIDs(self.storage.event_ids()),
         )]
     }
 
@@ -240,7 +237,7 @@ impl GossipEvents {
         self.nodes
             .0
             .iter()
-            .map(|id| GossipOut::Node(*id, MessageNode::RequestEventIDs))
+            .map(|id| GossipOut::ToNetwork(*id, ModuleMessage::RequestEventIDs))
             .collect()
     }
 }

@@ -3,9 +3,15 @@ use serde::{Deserialize, Serialize};
 
 use flarch::nodeids::{NodeID, NodeIDs, U256};
 
-use crate::nodeconfig::NodeInfo;
+use crate::{nodeconfig::NodeInfo, overlay::messages::NetworkWrapper};
 
-use super::storage::RandomStorage;
+use super::core::RandomStorage;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ModuleMessage {
+    Module(NetworkWrapper),
+    DropConnection,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RandomMessage {
@@ -14,25 +20,13 @@ pub enum RandomMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum NodeMessage {
-    Module(ModuleMessage),
-    DropConnection,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ModuleMessage {
-    pub module: String,
-    pub msg: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RandomIn {
     NodeList(Vec<NodeInfo>),
     NodeFailure(NodeID),
     NodeConnected(NodeID),
     NodeDisconnected(NodeID),
-    NodeMessageFromNetwork(NodeID, NodeMessage),
-    NodeMessageToNetwork(NodeID, ModuleMessage),
+    NodeCommFromNetwork(NodeID, ModuleMessage),
+    NetworkMapperToNetwork(NodeID, NetworkWrapper),
     Tick,
 }
 
@@ -40,10 +34,10 @@ pub enum RandomIn {
 pub enum RandomOut {
     ConnectNode(NodeID),
     DisconnectNode(NodeID),
-    ListUpdate(NodeIDs),
-    NodeInfoConnected(Vec<NodeInfo>),
-    NodeMessageToNetwork(NodeID, NodeMessage),
-    NodeMessageFromNetwork(NodeID, ModuleMessage),
+    NodeIDsConnected(NodeIDs),
+    NodeInfosConnected(Vec<NodeInfo>),
+    NodeCommToNetwork(NodeID, ModuleMessage),
+    NetworkWrapperFromNetwork(NodeID, NetworkWrapper),
     Storage(RandomStorage),
 }
 
@@ -100,12 +94,12 @@ impl RandomConnections {
                     self.update(),
                 ])
             }
-            RandomIn::NodeMessageFromNetwork(id, node_msg) => self.network_msg(id, node_msg),
-            RandomIn::NodeMessageToNetwork(dst, msg) => {
+            RandomIn::NodeCommFromNetwork(id, node_msg) => self.network_msg(id, node_msg),
+            RandomIn::NetworkMapperToNetwork(dst, msg) => {
                 if self.storage.connected.contains(&dst) {
-                    vec![RandomOut::NodeMessageToNetwork(
+                    vec![RandomOut::NodeCommToNetwork(
                         dst,
-                        NodeMessage::Module(msg),
+                        ModuleMessage::Module(msg),
                     )]
                 } else {
                     log::warn!(
@@ -113,7 +107,7 @@ impl RandomConnections {
                     );
                     vec![
                         RandomOut::DisconnectNode(dst),
-                        RandomOut::ListUpdate(self.storage.connected.get_nodes()),
+                        RandomOut::NodeIDsConnected(self.storage.connected.get_nodes()),
                     ]
                 }
             }
@@ -122,10 +116,10 @@ impl RandomConnections {
     }
 
     /// Processes one message from the network.
-    pub fn network_msg(&mut self, id: U256, msg: NodeMessage) -> Vec<RandomOut> {
+    pub fn network_msg(&mut self, id: U256, msg: ModuleMessage) -> Vec<RandomOut> {
         match msg {
-            NodeMessage::Module(msg_mod) => vec![RandomOut::NodeMessageFromNetwork(id, msg_mod)],
-            NodeMessage::DropConnection => {
+            ModuleMessage::Module(msg_mod) => vec![RandomOut::NetworkWrapperFromNetwork(id, msg_mod)],
+            ModuleMessage::DropConnection => {
                 self.storage.disconnect((&vec![id]).into());
                 concat([vec![RandomOut::DisconnectNode(id)], self.new_connection()])
             }
@@ -157,7 +151,7 @@ impl RandomConnections {
             .into_iter()
             .flat_map(|n| {
                 vec![
-                    RandomOut::NodeMessageToNetwork(n, NodeMessage::DropConnection),
+                    RandomOut::NodeCommToNetwork(n, ModuleMessage::DropConnection),
                     RandomOut::DisconnectNode(n),
                 ]
             })
@@ -200,8 +194,8 @@ impl RandomConnections {
 
     fn update(&self) -> Vec<RandomOut> {
         vec![
-            RandomOut::ListUpdate(self.storage.connected.get_nodes()),
-            RandomOut::NodeInfoConnected(self.storage.get_connected_info()),
+            RandomOut::NodeIDsConnected(self.storage.connected.get_nodes()),
+            RandomOut::NodeInfosConnected(self.storage.get_connected_info()),
             RandomOut::Storage(self.storage.clone()),
         ]
     }

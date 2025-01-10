@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 use flarch::{broker::{Destination, BrokerError}, tasks::wait_ms, web_rtc::connection::ConnectionConfig};
 use flmodules::nodeconfig::{NodeConfig, NodeInfo};
 use flmodules::network::{
-    network::{NetCall, NetReply, NetworkError, NetworkMessage},
+    messages::{NetworkIn, NetworkOut, NetworkError, NetworkMessage},
     network_broker_start, NetworkSetupError,
 };
 
@@ -38,14 +38,14 @@ async fn run_app() -> Result<(), StartError> {
             log::info!("Waiting - {}", i / 10);
         }
         while let Ok(msg) = rx.try_recv() {
-            if let NetworkMessage::Reply(reply) = msg {
+            if let NetworkMessage::Output(reply) = msg {
                 match reply {
-                    NetReply::RcvNodeMessage(id, msg_net) => {
+                    NetworkOut::MessageFromNode(id, msg_net) => {
                         log::info!("Got node message: {} / {:?}", id, msg_net);
                         net.remove_subsystem(tap_indx).await?;
                         return Ok(());
                     }
-                    NetReply::RcvWSUpdateList(list) => {
+                    NetworkOut::NodeListFromWS(list) => {
                         let other: Vec<NodeInfo> = list
                             .iter()
                             .filter(|n| n.get_id() != nc.info.get_id())
@@ -55,7 +55,7 @@ async fn run_app() -> Result<(), StartError> {
                         if other.len() > 0 {
                             net.emit_msg_dest(
                                 Destination::NoTap,
-                                NetCall::SendNodeMessage(
+                                NetworkIn::MessageToNode(
                                     other.get(0).unwrap().get_id(),
                                     "Hello from Rust wasm".to_string(),
                                 )
@@ -67,7 +67,7 @@ async fn run_app() -> Result<(), StartError> {
                 }
             }
         }
-        net.emit_msg(NetworkMessage::Call(NetCall::SendWSUpdateListRequest))?;
+        net.emit_msg(NetworkMessage::Input(NetworkIn::WSUpdateListRequest))?;
         wait_ms(1000).await;
     }
 }

@@ -20,3 +20,4 @@ pub mod timer;
 pub mod ping;
 pub mod web_proxy;
 pub mod network;
+pub mod overlay;

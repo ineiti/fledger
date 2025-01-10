@@ -1,0 +1,28 @@
+FROM rust:latest AS build
+
+RUN apt update && apt install -y patchelf ca-certificates
+
+WORKDIR /home
+COPY flarch ./flarch
+COPY flarch_macro ./flarch_macro
+COPY flmodules ./flmodules
+COPY flnode ./flnode
+COPY cli ./cli
+COPY .cargo ./.cargo
+WORKDIR /home/cli
+RUN cargo build -p flsignal -r
+RUN cargo build -p fledger -r
+
+FROM debian:bookworm-slim AS flsignal
+WORKDIR /fledger
+COPY --from=build /home/target-common/release/flsignal .
+COPY --from=build /etc/ssl /etc/ssl
+
+ENTRYPOINT ["/fledger/flsignal", "-vv"]
+
+FROM debian:bookworm-slim AS fledger
+WORKDIR /fledger
+COPY --from=build /home/target-common/release/fledger .
+COPY --from=build /etc/ssl /etc/ssl
+
+ENTRYPOINT ["/fledger/fledger", "-vv"]

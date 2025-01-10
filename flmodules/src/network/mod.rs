@@ -88,7 +88,7 @@
 //!     log::info!("Server id is {server_id:?}");
 //!     // This sends the message by setting up a connection using the signalling server.
 //!     // The client must already be running and be registered with the signalling server.
-//!     // Using `SendNodeMessage` will set up a connection using the signalling server, but
+//!     // Using `MessageToNode` will set up a connection using the signalling server, but
 //!     // in the best case, the signalling server will not be used anymore afterwards.
 //!     net.send_msg(server_id, "ping".into())?;
 //!
@@ -164,7 +164,7 @@
 
 use thiserror::Error;
 
-pub mod network;
+pub mod messages;
 pub mod signal;
 
 use flarch::{
@@ -176,7 +176,7 @@ use flarch::{
     },
 };
 
-use crate::network::network::NetworkMessage;
+use crate::network::messages::NetworkMessage;
 use crate::nodeconfig::NodeConfig;
 
 #[derive(Error, Debug)]
@@ -190,7 +190,7 @@ pub enum NetworkSetupError {
     WebSocketClient(#[from] WSClientError),
     /// Generic network error
     #[error(transparent)]
-    Network(#[from] network::NetworkError),
+    Network(#[from] messages::NetworkError),
     #[cfg(target_family = "unix")]
     /// Problem in the websocket server
     #[error(transparent)]
@@ -216,7 +216,7 @@ pub async fn network_broker_start(
     node: NodeConfig,
     connection: ConnectionConfig,
 ) -> Result<Broker<NetworkMessage>, NetworkSetupError> {
-    use crate::network::network::NetworkBroker;
+    use crate::network::messages::NetworkBroker;
 
     let ws = WebSocketClient::connect(&connection.signal()).await?;
     let webrtc = WebRTCConn::new(web_rtc_spawner(connection)).await?;
@@ -232,7 +232,7 @@ pub async fn network_broker_start(
 pub async fn network_start(
     node: NodeConfig,
     connection: ConnectionConfig,
-) -> Result<network::Network, NetworkSetupError> {
+) -> Result<messages::Network, NetworkSetupError> {
     let net_broker = network_broker_start(node, connection).await?;
-    Ok(network::Network::start(net_broker).await?)
+    Ok(messages::Network::start(net_broker).await?)
 }
