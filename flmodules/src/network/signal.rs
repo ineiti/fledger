@@ -47,7 +47,7 @@
 //! You can find an example of how the signalling server is used in
 //! <https://github.com/ineiti/fledger/tree/0.7.0/cli/flsignal/src/main.rs>
 
-use bimap::BiMap;
+use bimap::{BiMap, Overwritten};
 use serde::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
 use std::{
@@ -55,15 +55,18 @@ use std::{
     fmt::{Error, Formatter},
 };
 
-use flarch::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler}, nodeids::{NodeID, U256}, platform_async_trait, web_rtc::{
-        messages::PeerInfo,
-        websocket::{WSServerInput, WSServerMessage, WSServerOutput},
-    }
-};
 use crate::{
     nodeconfig::NodeInfo,
     timer::{TimerBroker, TimerMessage},
+};
+use flarch::{
+    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
+    nodeids::{NodeID, U256},
+    platform_async_trait,
+    web_rtc::{
+        messages::PeerInfo,
+        websocket::{WSServerInput, WSServerMessage, WSServerOutput},
+    },
 };
 
 #[derive(Clone, Debug)]
@@ -104,6 +107,7 @@ pub enum SignalOutput {
 /// PeerInfo messages between nodes.
 /// It also handles statistics by forwarding NodeStats to a listener.
 pub struct SignalServer {
+    challenge_ids: BiMap<U256, usize>,
     connection_ids: BiMap<U256, usize>,
     info: HashMap<U256, NodeInfo>,
     ttl: HashMap<usize, u64>,
@@ -124,6 +128,7 @@ impl SignalServer {
         let mut broker = Broker::new();
         broker
             .add_subsystem(Subsystem::Handler(Box::new(SignalServer {
+                challenge_ids: BiMap::new(),
                 connection_ids: BiMap::new(),
                 info: HashMap::new(),
                 ttl: HashMap::new(),
@@ -216,7 +221,7 @@ impl SignalServer {
     fn msg_ws_connect(&mut self, index: usize) -> Vec<SignalMessage> {
         log::debug!("Sending challenge to new connection");
         let challenge = U256::rnd();
-        self.connection_ids.insert(challenge, index);
+        self.challenge_ids.insert(challenge, index);
         self.ttl.insert(index, self.ttl_minutes);
         let challenge_msg =
             serde_json::to_string(&WSSignalMessageToNode::Challenge(SIGNAL_VERSION, challenge))
@@ -225,7 +230,7 @@ impl SignalServer {
     }
 
     fn ws_announce(&mut self, index: usize, msg: MessageAnnounce) -> Vec<SignalMessage> {
-        let challenge = match self.connection_ids.get_by_right(&index) {
+        let challenge = match self.challenge_ids.get_by_right(&index) {
             Some(id) => id,
             None => {
                 log::warn!("Got an announcement message without challenge.");
@@ -237,15 +242,25 @@ impl SignalServer {
             return vec![];
         }
         let id = msg.node_info.get_id();
-        self.connection_ids.insert(id, index);
+
+        let mut out = vec![SignalOutput::NewNode(id).into()];
+        for (id, _) in &self.connection_ids {
+            log::warn!("Have ID: {id}");
+        }
+        if let Overwritten::Left(_, old) = self.connection_ids.insert(id, index) {
+            log::warn!("Sending close for {old}");
+            out.push(SignalMessage::WSServer(WSServerMessage::Input(
+                WSServerInput::Close(old),
+            )));
+        }
 
         log::info!("Registration of node-id {}: {}", id, msg.node_info.name);
         self.info.insert(id, msg.node_info);
-        vec![SignalOutput::NewNode(id).into()]
+        out
     }
 
     fn ws_list_ids(&mut self, id: usize) -> Vec<SignalMessage> {
-        log::info!("Current list is: {:?}", self.info.values());
+        // log::info!("Current list is: {:?}", self.info.values());
         self.send_msg_node(
             id,
             WSSignalMessageToNode::ListIDsReply(self.info.values().cloned().collect()),
@@ -278,6 +293,8 @@ impl SignalServer {
     }
 
     fn remove_node(&mut self, index: usize) {
+        log::warn!("Removing node {index}");
+        self.challenge_ids.remove_by_right(&index);
         if let Some((id, _)) = self.connection_ids.remove_by_right(&index) {
             self.info.remove(&id);
         }

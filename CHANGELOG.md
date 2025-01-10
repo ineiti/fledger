@@ -10,6 +10,7 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 ### Fixed
 - reconnections should work better now, both for libc and wasm
+- fixed signalling server to correctly close and remove timed-out connections
 - removed mdns calls, so it doesn't flood my home network
 
 ### Changed
