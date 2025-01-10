@@ -8,7 +8,6 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
-use crate::loopix::PROXY_REQUEST_RECEIVED;
 use crate::nodeconfig::NodeInfo;
 use crate::Modules;
 
@@ -90,7 +89,16 @@ impl WebProxyMessages {
     /// MessageOut.
     pub fn process_node_message(&mut self, src: NodeID, msg: ModuleMessage) -> Vec<WebProxyOut> {
         let mut out = match msg {
-            ModuleMessage::Request(nonce, request) => self.start_request(src, nonce, request),
+            ModuleMessage::Request(nonce, request) => {
+                if self.core.has_responded(nonce) {
+                    log::debug!("Already responded to nonce {}", nonce);
+                    return vec![];
+                } else {
+                    let res = self.start_request(src, nonce, request);
+                    self.core.mark_as_responded(nonce);
+                    res
+                }
+            }
             ModuleMessage::Response(nonce, response) => self.handle_response(src, nonce, response),
         };
         out.push(WebProxyOut::UpdateStorage(self.core.storage.clone()));
@@ -107,7 +115,6 @@ impl WebProxyMessages {
                 .collect::<Vec<NodeID>>()
                 .into(),
         );
-        log::trace!("WebProxy: Node list updated: {:?}", nodes);
         vec![]
     }
 
@@ -118,59 +125,55 @@ impl WebProxyMessages {
     }
 
     fn start_request(&mut self, src: NodeID, nonce: U256, request: String) -> Vec<WebProxyOut> {
-        if self.core.has_responded(nonce) {
-            log::info!("Request already responded for nonce: {}", nonce);
-            return vec![];
-        }
-        PROXY_REQUEST_RECEIVED.inc();
-
-        let mut broker_clone = self.broker.clone(); // Clone the broker for each duplicate
-        let src_clone = src; // Clone the source node ID
-        let request_clone = request.clone(); // Clone the request string
-        let nonce_clone = nonce; // Clone the nonce
-
+        let mut broker = self.broker.clone();
         spawn_local(async move {
-            match reqwest::get(request_clone).await {
+            match reqwest::get(request).await {
                 Ok(resp) => {
-                    broker_clone
+                    broker
                         .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
-                            src_clone,
-                            ModuleMessage::Response(nonce_clone, ResponseMessage::Header((&resp).into())),
+                            src,
+                            ModuleMessage::Response(nonce, ResponseMessage::Header((&resp).into())),
                         )))
                         .expect("sending header");
                     let mut stream = resp.bytes_stream().chunks(1024);
                     while let Some(chunks) = stream.next().await {
                         for chunk in chunks {
-                            broker_clone
+                            broker
                                 .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
-                                    src_clone,
+                                    src,
                                     ModuleMessage::Response(
-                                        nonce_clone,
+                                        nonce,
                                         ResponseMessage::Body(chunk.expect("getting chunk")),
                                     ),
                                 )))
                                 .expect("sending body");
                         }
                     }
-                    broker_clone
+                    broker
                         .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
-                            src_clone,
-                            ModuleMessage::Response(nonce_clone, ResponseMessage::Done),
+                            src,
+                            ModuleMessage::Response(nonce, ResponseMessage::Done),
                         )))
                         .expect("sending done");
                 }
                 Err(e) => {
-                    broker_clone
+                    broker
                         .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
-                            src_clone,
-                            ModuleMessage::Response(nonce_clone, ResponseMessage::Error(e.to_string())),
+                            src,
+                            ModuleMessage::Response(nonce, ResponseMessage::Error(e.to_string())),
                         )))
-                        .expect("Sending error message");
+                        .expect("Sending done message for");
+                    return;
                 }
             }
+            broker
+                .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
+                    src,
+                    ModuleMessage::Response(nonce, ResponseMessage::Done),
+                )))
+                .expect("Sending done message for");
         });
 
-        self.core.mark_as_responded(nonce);
         vec![]
     }
 
@@ -186,7 +189,6 @@ impl WebProxyMessages {
                 vec![WebProxyOut::ResponseGet(src, nonce, header)]
             })
     }
-
 }
 
 /// Convenience method to reduce long lines.

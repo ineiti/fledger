@@ -151,6 +151,7 @@ impl LoopixMessages {
     }
 
     async fn process_overlay_message(&self, node_id: NodeID, message: NetworkWrapper) {
+        log::debug!("Processing overlay message to send {} duplicates", self.n_duplicates);
         for _ in 0..self.n_duplicates {
             let (next_node, sphinx) = self.role.process_overlay_message(node_id, message.clone()).await;
 

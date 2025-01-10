@@ -177,6 +177,7 @@ async fn save_metrics_loop(
     storage: Arc<LoopixStorage>,
     dir_path: String,
     save_new_metrics_file: bool,
+    start_time: Instant,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::info!("Starting save metrics thread!");
     let path = PathBuf::from(dir_path);
@@ -201,7 +202,7 @@ async fn save_metrics_loop(
             .expect("Unable to write data");
     }
     let sleep_time = if save_new_metrics_file {
-        30
+        60
     } else {
         5
     };
@@ -212,10 +213,10 @@ async fn save_metrics_loop(
 
         let mut metrics_path = metrics_base_path.clone();
         if save_new_metrics_file {
-            log::info!("Saving metrics to new file {}", i);
+            log::info!("Saving metrics to new file {} at {} seconds since start", i, start_time.elapsed().as_secs_f64());
             metrics_path.push(format!("metrics_{}.txt", i));
         } else {
-            log::info!("Saving metrics to existing file for the {}th time", i);
+            log::info!("Saving metrics to existing file for the {}th time at {} seconds since start", i, start_time.elapsed().as_secs_f64());
             metrics_path.push("metrics.txt");
         }
 
@@ -327,6 +328,7 @@ impl LSRoot {
                     Arc::clone(&loopix_storage),
                     save_path.clone(),
                     save_new_metrics_file,
+                    start_time,
                 ));
                 return Ok(LSRoot::SendProxyRequest(i + 10).into());
             }
@@ -339,17 +341,15 @@ impl LSRoot {
                 let start = now();
                 let start_time = Instant::now();
                 NUMBER_OF_PROXY_REQUESTS.inc();
-                match node
+                let timeout_duration = Duration::from_secs(timeout + 3);
+                match tokio::time::timeout(timeout_duration, node
                     .webproxy
                     .as_mut()
                     .unwrap()
-                    // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                    .get_with_retry_and_timeout_with_duplicates(&format!("https://ipinfo.io?token={}", token), retry, duplicates, Duration::from_secs(timeout))
-                    // .get_with_timeout("https://ipinfo.io", Duration::from_secs_f64(TIMEOUT))
-                    // .get(&format!("https://ipinfo.io?token={}", token))
-                    .await
-                {
-                    Ok(mut res) => match res.text().await {
+                    .get_with_retry_and_timeout(&format!("https://ipinfo.io?token={}", token), retry, Duration::from_secs(timeout))
+                    // .get_with_retry_and_timeout_with_duplicates(&format!("https://ipinfo.io?token={}", token), retry, duplicates, Duration::from_secs(timeout))
+                ).await {
+                    Ok(Ok(mut res)) => match res.text().await {
                         Ok(body) => {
                             let end_to_end_time = start_time.elapsed().as_secs_f64();
                             END_TO_END_LATENCY.observe(end_to_end_time);
@@ -361,7 +361,8 @@ impl LSRoot {
                         }
                         Err(e) => log::info!("---------------- Couldn't get body: {e:?}"),
                     },
-                    Err(e) => log::info!("---------------- Webproxy returned error: {e:?}"),
+                    Ok(Err(e)) => log::info!("---------------- Webproxy returned error: {e:?}"),
+                    Err(_) => log::info!("---------------- Request timed out"),
                 }
                 log::info!("---------------- Webproxy returned!");
             }
@@ -396,6 +397,7 @@ impl LSChild {
                         Arc::clone(&loopix_storage),
                         save_path.clone(),
                         save_new_metrics_file,
+                        start_time,
                     ));
                     if setup.role == LoopixRole::Client {
                         return Ok(LSChild::ProxyRequesting(i + 10).into());
@@ -416,17 +418,15 @@ impl LSChild {
                 let start_time = Instant::now();
                 NUMBER_OF_PROXY_REQUESTS.inc();
                 let start = now();
-                match node
+                let timeout_duration = Duration::from_secs(timeout);
+                match tokio::time::timeout(timeout_duration, node
                     .webproxy
                     .as_mut()
                     .unwrap()
-                    // .get_with_timeout("https://ipinfo.io", Duration::from_secs(60), true)
-                    .get_with_retry_and_timeout_with_duplicates(&format!("https://ipinfo.io?token={}", token), retry, duplicates, Duration::from_secs(timeout))
-                    // .get(&format!("https://ipinfo.io?token={}", token))
-                    // .get_with_timeout("https://ipinfo.io", )
-                    .await
-                {
-                    Ok(mut res) => match res.text().await {
+                    .get_with_retry_and_timeout(&format!("https://ipinfo.io?token={}", token), retry, Duration::from_secs(timeout))
+                    // .get_with_retry_and_timeout_with_duplicates(&format!("https://ipinfo.io?token={}", token), retry, duplicates, Duration::from_secs(timeout))
+                ).await {
+                    Ok(Ok(mut res)) => match res.text().await {
                         Ok(body) => {
                             let end_to_end_time = start_time.elapsed().as_secs_f64();
                             END_TO_END_LATENCY.observe(end_to_end_time);
@@ -438,8 +438,11 @@ impl LSChild {
                         }
                         Err(e) => log::info!("---------------- Couldn't get body: {e:?}"),
                     },
-                    Err(e) => log::info!("---------------- Webproxy returned error: {e:?}"),
+                    Ok(Err(e)) => log::info!("---------------- Webproxy returned error: {e:?}"),
+                    Err(_) => log::info!("---------------- Request timed out"),
                 }
+                log::info!("---------------- Webproxy returning!");
+                return Ok(LSChild::ProxyRequesting(i + 10).into());
             }
             LSChild::ProxyReady => {
                 log::info!("Child is proxy ready");
