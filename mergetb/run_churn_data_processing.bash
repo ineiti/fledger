@@ -16,6 +16,6 @@ source ../venv/bin/activate
 
 python3 extract_raw_churn_data.py "$DATA_DIR" "$PATH_LENGTH" "$N_CLIENTS"
 
-python3 average_churn_data.py "$DATA_DIR" "$DURATION"
+# python3 average_churn_data.py "$DATA_DIR" "$DURATION"
 
-python3 plot_data_churn.py "$DATA_DIR" "$PATH_LENGTH" "$DURATION"
+# python3 plot_data_churn.py "$DATA_DIR" "$PATH_LENGTH" "$DURATION"

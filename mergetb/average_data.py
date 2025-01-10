@@ -50,7 +50,7 @@ def calculate_average_data(data, duration):
     return results
 
 if __name__ == "__main__":
-    if len(sys.argv) < 1:
+    if len(sys.argv) < 3:
         print("Usage: python average_data.py <directory> <duration>")
         sys.exit(1)
 

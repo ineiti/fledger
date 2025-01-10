@@ -10,7 +10,7 @@ def get_metrics_data(data_dir, path_length, n_clients, results, variable, index)
         create_results_dict(results, metrics_to_extract)
 
     directory = os.path.join(data_dir, variable)
-    metrics_file = os.path.join(directory, f"metrics_4.txt")
+    metrics_file = os.path.join(directory, f"metrics.txt")
     
     print(f"Getting metrics data from {metrics_file}")
     if os.path.exists(metrics_file):
@@ -96,9 +96,7 @@ def main():
 
                 node_dir = os.path.join(run_dir, f"{i}_{j}")
                 print(node_dir)
-                
-                metrics_file_name = f"metrics_{4}.txt"
-
+        
 
                 nodes = os.listdir(node_dir)
                 for enum_node, node in enumerate(nodes):
