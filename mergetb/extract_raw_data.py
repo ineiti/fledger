@@ -15,6 +15,21 @@ metrics_to_extract = [
     "loopix_decryption_latency_milliseconds",
     "loopix_mixnode_delay_milliseconds",
     "loopix_provider_delay_milliseconds",
+    "loopix_proxy_message_count",
+    "loopix_proxy_message_bandwidth",
+    "loopix_retry_count",
+    "loopix_proxy_request_received"
+]
+
+counter_metrics_to_extract = [
+    "loopix_bandwidth_bytes",
+    "loopix_proxy_message_count",
+    "loopix_proxy_message_bandwidth",
+    "loopix_number_of_proxy_requests",
+    "loopix_start_time_seconds",
+    "loopix_incoming_messages",
+    "loopix_retry_count",
+    "loopix_proxy_request_received"
 ]
 
 def simulation_ran_successfully(data_dir, variable, index):
@@ -34,7 +49,7 @@ def simulation_ran_successfully(data_dir, variable, index):
 
 def create_results_dict(results, metrics_to_extract):
     for metric in metrics_to_extract:
-        if metric == "loopix_bandwidth_bytes" or metric == "loopix_number_of_proxy_requests" or metric == "loopix_start_time_seconds" or metric == "loopix_incoming_messages":
+        if metric in counter_metrics_to_extract:
             results[metric] = []
         else:
             results[metric] = {"sum": [], "count": []}
@@ -52,8 +67,6 @@ def get_proxy_request(results, content, metric, i):
     match = re.search(pattern, content, re.MULTILINE)
     if match:
         results[metric].append(float(match.group(1)))
-    # else:
-    #     print(f"Error for node-{i}: match {match}")
 
 def get_incoming_messages(results, content, metric, i):
     provider_pattern = "loopix_provider_delay_milliseconds"
@@ -100,11 +113,19 @@ def get_metrics_data(data_dir, path_length, n_clients, results, variable, index)
             if metric == "loopix_bandwidth_bytes" or metric == "loopix_start_time_seconds":
                 get_bandwidth_bytes_or_start_time(results, content, metric, i)
 
+
+            elif metric == "loopix_number_of_proxy_requests":
+                get_proxy_request(results, content, metric, i)
+
+            
             elif metric == "loopix_number_of_proxy_requests":
                 get_proxy_request(results, content, metric, i)
 
             elif metric == "loopix_incoming_messages":
                 get_incoming_messages(results, content, metric, i)
+
+            elif metric in counter_metrics_to_extract:
+                get_proxy_request(results, content, metric, i)
 
             else:
                 get_histogram_metrics(results, content, metric, i)
