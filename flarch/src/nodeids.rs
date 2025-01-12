@@ -54,6 +54,10 @@ impl U256 {
     pub fn to_bytes(self) -> [u8; 32] {
         self.0
     }
+
+    pub fn zero() -> U256 {
+        U256{ 0: [0; 32] }
+    }
 }
 
 impl FromStr for U256 {

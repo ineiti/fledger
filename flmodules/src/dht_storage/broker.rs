@@ -139,19 +139,19 @@ mod tests {
         let ace = new_ace()?;
         let df = new_dht_flo_blob(ace.clone(), "1234".into());
         ds.store_dhtflo(df.clone())?;
-        ds.broker.settle(vec![]).await?;
+        // ds.broker.settle(vec![]).await?;
 
         let (mut dht_out, _) = dht_routing.get_tap_in().await?;
 
         let stored = ds.read_dhtflo_local(&df.id()).await;
         assert!(stored.is_some());
         assert_eq!(df, stored.unwrap());
-        ds.broker.settle(vec![]).await?;
+        // ds.broker.settle(vec![]).await?;
         assert!(dht_out.try_recv().is_err());
 
         let stored = ds.read_dhtflo_local(&U256::rnd()).await;
         assert!(stored.is_none());
-        ds.broker.settle(vec![]).await?;
+        // ds.broker.settle(vec![]).await?;
         assert!(dht_out.try_recv().is_ok());
 
         Ok(())
