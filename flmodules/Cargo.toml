@@ -15,6 +15,7 @@ testing = []
 
 [dependencies]
 flarch = { path = "../flarch", version = "0.8" }
+flarch_macro = { path = "../flarch_macro", version = "0.8" }
 
 bimap = "0.6"
 getrandom = { version = "0.2" }

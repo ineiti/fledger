@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::crypto::{entity::EntityID, signer::Signature};
+use crate::crypto::{access::TesseraID, signer::Signature};
 
 #[derive(Debug, Error)]
 pub enum FloError {
@@ -236,5 +236,5 @@ impl Action {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Condition {
-    Signature(EntityID),
+    Signature(TesseraID),
 }

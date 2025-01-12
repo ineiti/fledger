@@ -910,6 +910,7 @@ dependencies = [
  "ed25519-compact",
  "ed25519-dalek",
  "flarch",
+ "flarch_macro",
  "futures",
  "getrandom",
  "itertools",

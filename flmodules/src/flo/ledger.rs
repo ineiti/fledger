@@ -18,7 +18,7 @@ pub struct LedgerConfigData {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LedgerNode {
     pub id: NodeID,
-    pub verifier: Verifier,
+    pub verifier: Box<dyn Verifier>,
 }
 
 impl LedgerConfig {

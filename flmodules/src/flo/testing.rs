@@ -3,13 +3,7 @@ use std::error::Error;
 use flarch::nodeids::{NodeID, U256};
 
 use crate::{
-    crypto::{
-        entity::{Entity, EntityError},
-        signer::{SignatureType, Signer},
-    },
-    dht_routing::{broker::DHTRoutingOut, kademlia::KNode},
-    dht_storage::messages::MessageNodeClosest,
-    overlay::messages::NetworkWrapper,
+    crypto::{access::{self, Tessera}, signer::SignerError, signer_ed25519::SignerEd25519}, dht_routing::{broker::DHTRoutingOut, kademlia::KNode}, dht_storage::messages::MessageNodeClosest, overlay::messages::NetworkWrapper
 };
 
 use super::{
@@ -17,13 +11,14 @@ use super::{
     flo::{Action, Condition, Content, Flo, Rule, ACE},
 };
 
-pub fn new_ace() -> Result<ACE, EntityError> {
-    let signer = Signer::new(SignatureType::Ed25519);
-    let entity = Entity::new(&[signer.verifier().into()], 1)?;
+pub fn new_ace() -> Result<ACE, SignerError> {
+    let signer = SignerEd25519::new();
+    let cond = access::Condition::Verifier(signer.verifier().get_id());
+    let tessera = Tessera::new(cond.clone(), cond).unwrap();
     Ok(ACE {
         rules: vec![Rule {
             action: Action::UpdateACE,
-            condition: Condition::Signature(entity.get_id()),
+            condition: Condition::Signature(tessera.get_id()),
         }],
     })
 }

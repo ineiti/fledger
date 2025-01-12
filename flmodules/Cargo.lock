@@ -870,6 +870,7 @@ dependencies = [
  "ed25519-dalek",
  "env_logger",
  "flarch",
+ "flarch_macro",
  "flmodules",
  "futures",
  "getrandom",

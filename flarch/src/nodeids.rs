@@ -2,6 +2,7 @@ use rand::random;
 use serde::{Deserialize, Serialize};
 use serde_with::{hex::Hex, serde_as};
 use sha2::digest::{consts::U32, generic_array::GenericArray};
+use sha2::{Digest, Sha256};
 use std::num::ParseIntError;
 use std::{fmt, str::FromStr};
 use thiserror::Error;
@@ -17,7 +18,7 @@ pub enum ParseError {
 /// Nicely formatted 256 bit structure
 #[serde_as]
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-pub struct U256(#[serde_as(as = "Hex")][u8; 32]);
+pub struct U256(#[serde_as(as = "Hex")] [u8; 32]);
 
 impl fmt::Display for U256 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -46,9 +47,34 @@ impl fmt::Debug for U256 {
     }
 }
 
+fn to_varint(i: usize) -> Vec<u8> {
+    if i < 0x80 {
+        return vec![i as u8];
+    }
+    let mut out = i.to_be_bytes().to_vec();
+    out = out.into_iter().skip_while(|&x| x == 0).collect();
+    let len = out.len();
+    let mut result = vec![len as u8 | 0x80];
+    result.extend(out);
+    result
+}
+
 impl U256 {
     pub fn rnd() -> U256 {
         U256 { 0: random() }
+    }
+
+    pub fn from_hash(domain: &str, parts: &[&[u8]]) -> Self {
+        let mut hasher = Sha256::new();
+        hasher.update(to_varint(domain.len()));
+        hasher.update(domain);
+        hasher.update(to_varint(parts.len()));
+        for part in parts {
+            hasher.update(to_varint(part.len()));
+            hasher.update(part);
+        }
+
+        Self(hasher.finalize().into())
     }
 
     pub fn to_bytes(self) -> [u8; 32] {
@@ -56,7 +82,7 @@ impl U256 {
     }
 
     pub fn zero() -> U256 {
-        U256{ 0: [0; 32] }
+        U256 { 0: [0; 32] }
     }
 }
 

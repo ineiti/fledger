@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::crypto::signer::{Signature, SignerError};
 
-use super::{access::ID, signer::{Signer, Verifier}};
+use super::signer::{Signer, SignerID, Verifier, VerifierID};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SignerEd25519 {
     keypair: ed25519_dalek::SigningKey,
 }
@@ -32,7 +32,7 @@ impl Signer for SignerEd25519 {
         })
     }
 
-    fn get_id(&self) -> ID {
+    fn get_id(&self) -> SignerID {
         todo!()
     }
 
@@ -43,7 +43,7 @@ impl Signer for SignerEd25519 {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct VerifierEd25519 {
     verifier: ed25519_dalek::VerifyingKey,
 }
@@ -59,7 +59,7 @@ impl Verifier for VerifierEd25519 {
         }
     }
 
-    fn get_id(&self) -> ID {
+    fn get_id(&self) -> VerifierID {
         todo!()
     }
 

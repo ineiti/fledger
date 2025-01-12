@@ -6,6 +6,12 @@
 
 ## Current concrete goal
 
+### Crypto
+
+Updated the structures to have `ActionRules`, `Identities` (`Tessera`), and `Condition`s.
+Need to make sure that flmodules::flo::flo follows the new structures.
+And need to finish implementation...
+
 ### DHT_routing
 
 -- seems to be more or less OK, at least if it's usable by DHT_storage --
