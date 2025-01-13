@@ -5,26 +5,26 @@ This crypto wrapper defines the following main structures:
 - `Signer` - a generic structure to sign messages
 - `Verifier` - a generic structure to verify signed messages
 - `Condition` - an AND/OR/NofT combination of verifiers
-- `Tessera` - an updatable pair of `sign` and `update` Conditions,
+- `Identity` - an updatable pair of `sign` and `update` Conditions,
   representing identities or cryptographic anchors
-- `AccessRules` - a set of rules defined verifiable by `Tessera`s,
-  can be updated, can delegate to other `AccessRules`.
+- `ACE` - a set of rules defined verifiable by `Identity`s,
+  can be updated, can delegate to other `ACE`.
 
 An example use-case is the following:
 
-- When a node starts, it creates a `Signer`, and a `Tessera` with a `Condition`
+- When a node starts, it creates a `Signer`, and a `Identity` with a `Condition`
  pointing to that `Signer`. This allows the node to do key rotation by updating
- its `Tessera`
+ its `Identity`
 - A user wants to create a website with many objects, so they create:
-  - one or more nodes with the corresponding `Tessera`s. 
+  - one or more nodes with the corresponding `Identity`s. 
     A CLI tool to update the page also acts as a node.
-  - a `WebPageT: Tessera` with an OR of all nodes and CLIs `Tessera`s
-  - a `WebPageAR: AccessRules` with rules like `update_object`, `add_object`, `rm_object`,
+  - a `WebPageT: Identity` with an OR of all nodes and CLIs `Identity`s
+  - a `WebPageAR: ACE` with rules like `update_object`, `add_object`, `rm_object`,
    pointing to the `WebPageT`
 - Now the user can create objects and point them to the `WebPageAR`, allowing them to:
   - control all objects from any node
   - update the `WebPageT` if nodes join or go away
-  - update the `WebPageAR` if part of the rules should apply to other `Tessera`s. An example
+  - update the `WebPageAR` if part of the rules should apply to other `Identity`s. An example
     could be a rule to update the `TTL` of an object, which could be allowed by more nodes
     than the rule to modify an object
 
@@ -80,7 +80,7 @@ or
 or
 4. `Expression.update_finalize(EU)` -> `Expression`
 
-## AccessRules
+## ACE
 
 In an `AccessRule`, the rules only point to `ExpressionID`.
 As such, whatever you want to do with an `AccessRule` needs to have

@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     dht_routing::broker::{DHTRoutingIn, DHTRoutingOut},
-    flo::dht::{DHTFlo, DHTStorageConfig},
+    flo::{
+        dht::{DHTFlo, DHTStorageConfig},
+        flo::FloID,
+    },
     overlay::messages::NetworkWrapper,
 };
 
@@ -47,7 +50,7 @@ pub enum MessageNodeDirect {
     // Returns the result of the requested flo.
     ValueFlo(DHTFlo),
     // Indicates this flo is not in the closest node.
-    UnknownFlo(U256),
+    UnknownFlo(FloID),
 
     // Request a list of all Flos. This is sent to a specific node.
     // TODO: add some filters here like the domain this node accepts
@@ -55,7 +58,7 @@ pub enum MessageNodeDirect {
     // Sends out the metadata of available Flos on this node.
     UpdateAvailable(Vec<FloMeta>),
     // Request a list of Flos.
-    UpdateRequest(Vec<U256>),
+    UpdateRequest(Vec<FloID>),
     // The requested Flos.
     UpdateFlos(Vec<DHTFlo>),
 }
@@ -96,11 +99,11 @@ impl DHTStorageMessages {
             DHTStorageIn::StoreValue(flo) => {
                 self.core.store_kv(flo.clone());
                 out.push(DHTStorageOut::UpdateStorage(self.core.storage_clone()).into());
-                MessageNodeClosest::StoreFlo(flo.clone()).to_intern_out(flo.id())
+                MessageNodeClosest::StoreFlo(flo.clone()).to_intern_out(flo.id().into())
             }
             DHTStorageIn::ReadValue(id) => match self.core.get_flo(&id) {
                 Some(df) => Some(DHTStorageOut::Value(df.clone()).into()),
-                None => MessageNodeClosest::ReadFlo.to_intern_out(id),
+                None => MessageNodeClosest::ReadFlo.to_intern_out(*id),
             },
         } {
             out.push(msg);
@@ -120,7 +123,7 @@ impl DHTStorageMessages {
                 self.core.store_kv(dhtflo);
             }
             MessageNodeClosest::ReadFlo => {
-                if let Some(df) = self.core.get_flo(&key) {
+                if let Some(df) = self.core.get_flo(&(key.into())) {
                     if closest {
                         return MessageNodeDirect::ValueFlo(df.clone())
                             .to_intern_out(origin)
@@ -213,7 +216,7 @@ mod tests {
 
     use super::*;
 
-    use crate::flo::testing::{new_ace, new_msg_closest};
+    use crate::{crypto::access::Version, flo::testing::{new_ace, new_msg_closest}};
 
     #[test]
     fn test_choice() -> Result<(), Box<dyn Error>> {
@@ -229,7 +232,13 @@ mod tests {
 
         let ace = new_ace()?;
         for len in [1, 2, 2] {
-            let (_, dout) = new_msg_closest(MODULE_NAME, origin, last, &ace, "0".repeat(400))?;
+            let (_, dout) = new_msg_closest(
+                MODULE_NAME,
+                origin,
+                last,
+                Version::Minimal(ace.get_id(), 0),
+                "0".repeat(400),
+            )?;
             msgs.routing(dout);
             assert_eq!(len, msgs.core.flo_meta().len());
         }

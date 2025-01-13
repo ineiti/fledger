@@ -1,12 +1,12 @@
-use flarch::nodeids::U256;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
-use super::flo::{Content, Flo, FloError, ACE};
+use crate::crypto::access::{AceId, Version};
+
+use super::flo::{Content, Flo, FloError, FloID, ToFromBytes};
 
 pub struct Mana {
     flo: Flo,
-    pub data: ManaData,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -15,28 +15,28 @@ pub struct ManaData {
 }
 
 impl Mana {
-    pub fn new(ace: ACE, data: ManaData) -> Result<Self, FloError> {
-        let flo = Flo::new_now(
-            Content::Mana,
-            serde_json::to_string(&data).map_err(|e| FloError::Serialization(e.to_string()))?,
-            ace,
-        );
-        Ok(Self { flo, data })
+    pub fn new(ace: Version<AceId>, data: ManaData) -> Result<Self, FloError> {
+        let flo = Flo::new_now(Content::Mana, data.to_bytes(), ace);
+        Ok(Self { flo })
     }
 
     pub fn to_string(&self) -> Result<String, FloError> {
-        match serde_json::to_string(&self.data) {
+        match serde_json::to_string(&self.data()?) {
             Ok(str) => Ok(str),
             Err(e) => Err(FloError::Serialization(e.to_string())),
         }
     }
 
-    pub fn id(&self) -> U256 {
-        self.flo.id
+    pub fn data(&self) -> Result<ManaData, FloError> {
+        ManaData::from_bytes("ManaData", &self.flo.data)
     }
 
-    pub fn ace(&self) -> ACE {
-        self.flo.ace()
+    pub fn id(&self) -> FloID {
+        self.flo.id.clone()
+    }
+
+    pub fn ace(&self) -> AceId {
+        self.flo.ace.get_id()
     }
 }
 
@@ -48,9 +48,8 @@ impl TryFrom<Flo> for Mana {
             return Err(FloError::WrongContent(Content::Mana, flo.content));
         }
 
-        match serde_json::from_str::<ManaData>(&flo.data()) {
-            Ok(data) => Ok(Mana { flo, data }),
-            Err(e) => Err(FloError::Deserialization("Mana".into(), e.to_string())),
-        }
+        let m = Mana { flo };
+        m.data()?;
+        Ok(m)
     }
 }

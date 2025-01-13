@@ -1,13 +1,13 @@
 use bytes::Bytes;
-use flarch::nodeids::U256;
 use serde::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
 
-use super::flo::{Content, Flo, FloError, ACE};
+use crate::crypto::access::{AceId, Version};
+
+use super::flo::{Content, Flo, FloError, FloID};
 
 pub struct Blob {
     flo: Flo,
-    pub data: BlobData,
 }
 
 #[serde_as]
@@ -19,28 +19,28 @@ pub struct BlobData {
 }
 
 impl Blob {
-    pub fn new(ace: ACE, data: BlobData) -> Result<Self, FloError> {
-        let flo = Flo::new_now(
-            Content::Blob,
-            serde_json::to_string(&data).map_err(|e| FloError::Serialization(e.to_string()))?,
-            ace,
-        );
-        Ok(Self { flo, data })
+    pub fn new(ace: Version<AceId>, data: BlobData) -> Result<Self, FloError> {
+        let flo = Flo::new_now(Content::Blob, data.to_bytes(), ace);
+        Ok(Self { flo })
     }
 
     pub fn to_string(&self) -> Result<String, FloError> {
-        match serde_json::to_string(&self.data) {
+        match serde_json::to_string(&self.data()) {
             Ok(str) => Ok(str),
             Err(e) => Err(FloError::Serialization(e.to_string())),
         }
     }
 
-    pub fn id(&self) -> U256 {
-        self.flo.id
+    pub fn data(&self) -> BlobData {
+        (&self.flo.data).try_into().unwrap()
     }
 
-    pub fn ace(&self) -> ACE {
-        self.flo.ace()
+    pub fn id(&self) -> FloID {
+        self.flo.id.clone()
+    }
+
+    pub fn ace(&self) -> AceId {
+        self.flo.ace.get_id()
     }
 }
 
@@ -52,9 +52,21 @@ impl TryFrom<Flo> for Blob {
             return Err(FloError::WrongContent(Content::Blob, flo.content));
         }
 
-        match serde_json::from_str::<BlobData>(&flo.data()) {
-            Ok(data) => Ok(Blob { flo, data }),
-            Err(e) => Err(FloError::Deserialization("Blob".into(), e.to_string())),
-        }
+        Ok(Blob { flo })
+    }
+}
+
+impl BlobData {
+    pub fn to_bytes(&self) -> Bytes {
+        rmp_serde::to_vec(self).unwrap().into()
+    }
+}
+
+impl TryFrom<&Bytes> for BlobData {
+    type Error = FloError;
+
+    fn try_from(value: &Bytes) -> Result<Self, Self::Error> {
+        rmp_serde::from_slice(&value)
+            .map_err(|e| FloError::Deserialization("BlobData".into(), e.to_string()))
     }
 }

@@ -1,13 +1,15 @@
-use flarch::nodeids::{NodeID, U256};
+use flarch::nodeids::NodeID;
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::signer::Verifier;
+use crate::crypto::{
+    access::{AceId, Version},
+    signer::Verifier,
+};
 
-use super::flo::{Content, Flo, FloError, ACE};
+use super::flo::{Content, Flo, FloError, ToFromBytes};
 
 pub struct LedgerConfig {
     flo: Flo,
-    pub data: LedgerConfigData,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -22,28 +24,28 @@ pub struct LedgerNode {
 }
 
 impl LedgerConfig {
-    pub fn new(ace: ACE, data: LedgerConfigData) -> Result<Self, FloError> {
-        let flo = Flo::new_now(
-            Content::LedgerConfig,
-            serde_json::to_string(&data).map_err(|e| FloError::Serialization(e.to_string()))?,
-            ace,
-        );
-        Ok(Self { flo, data })
+    pub fn new(ace: Version<AceId>, data: LedgerConfigData) -> Result<Self, FloError> {
+        let flo = Flo::new_now(Content::LedgerConfig, data.to_bytes(), ace);
+        Ok(Self { flo })
     }
 
     pub fn to_string(&self) -> Result<String, FloError> {
-        match serde_json::to_string(&self.data) {
+        match serde_json::to_string(&self.data()?) {
             Ok(str) => Ok(str),
             Err(e) => Err(FloError::Serialization(e.to_string())),
         }
     }
 
-    pub fn id(&self) -> U256 {
-        self.flo.id
+    pub fn data(&self) -> Result<LedgerConfigData, FloError> {
+        LedgerConfigData::from_bytes("LedgerConfigData", &self.flo.data)
     }
 
-    pub fn ace(&self) -> ACE {
-        self.flo.ace()
+    pub fn id(&self) -> super::flo::FloID {
+        self.flo.id.clone()
+    }
+
+    pub fn ace(&self) -> AceId {
+        self.flo.ace.get_id()
     }
 }
 
@@ -55,12 +57,8 @@ impl TryFrom<Flo> for LedgerConfig {
             return Err(FloError::WrongContent(Content::LedgerConfig, flo.content));
         }
 
-        match serde_json::from_str::<LedgerConfigData>(&flo.data()) {
-            Ok(data) => Ok(LedgerConfig { flo, data }),
-            Err(e) => Err(FloError::Deserialization(
-                "LedgerConfig".into(),
-                e.to_string(),
-            )),
-        }
+        let l = LedgerConfig { flo };
+        l.data()?;
+        Ok(l)
     }
 }

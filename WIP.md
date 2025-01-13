@@ -8,7 +8,7 @@
 
 ### Crypto
 
-Updated the structures to have `ActionRules`, `Identities` (`Tessera`), and `Condition`s.
+Updated the structures to have `ACE`, `Identities` (`Identity`), and `Condition`s.
 Need to make sure that flmodules::flo::flo follows the new structures.
 And need to finish implementation...
 

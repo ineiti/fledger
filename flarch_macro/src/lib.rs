@@ -42,12 +42,24 @@ pub fn as_u256_derive(input: TokenStream) -> TokenStream {
                 Self(U256::zero())
             }
 
-            pub fn from_hash(domain: &str, parts: &[&[u8]]) -> Self {
-                Self(U256::from_hash(domain, parts))
+            pub fn hash_into(domain: &str, parts: &[&[u8]]) -> Self {
+                Self(U256::hash_into(domain, parts))
+            }
+
+            pub fn from_hashmap<K: Serialize, V: Serialize>(domain: &str, hm: &std::collections::HashMap<K, V>) -> Self {
+                Self(U256::from_hashmap(domain, hm))
+            }
+
+            pub fn from_vec<V: Serialize>(domain: &str, v: &Vec<V>) -> Self {
+                Self(U256::from_vec(domain, v))
             }
 
             pub fn to_bytes(&self) -> [u8; 32] {
                 self.0.to_bytes()
+            }
+
+            pub fn len(&self) -> usize {
+                32
             }
         }
 
@@ -102,10 +114,22 @@ pub fn as_u256_derive(input: TokenStream) -> TokenStream {
             }
         }
 
+        impl From<U256> for #name {
+            fn from(u: U256) -> Self {
+                Self(u)
+            }
+        }
+
         impl std::fmt::LowerHex for #name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_fmt(format_args!("{:x}", self.0))?;
                 Ok(())
+            }
+        }
+
+        impl Into<U256> for #name {
+            fn into(self) -> U256 {
+                self.0.clone()
             }
         }
     };

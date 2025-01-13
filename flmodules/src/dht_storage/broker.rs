@@ -1,7 +1,6 @@
 use flarch::{
     broker_io::{BrokerError, BrokerIO},
     data_storage::DataStorage,
-    nodeids::U256,
     tasks::spawn_local,
 };
 use serde::{Deserialize, Serialize};
@@ -10,7 +9,7 @@ use tokio::sync::watch;
 
 use crate::{
     dht_routing::broker::{DHTRoutingIn, DHTRoutingOut},
-    flo::dht::{DHTFlo, DHTStorageConfig},
+    flo::{dht::{DHTFlo, DHTStorageConfig}, flo::FloID},
 };
 use flarch::nodeids::NodeID;
 
@@ -24,13 +23,13 @@ pub(super) const MODULE_NAME: &str = "DHTStorage";
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTStorageIn {
     StoreValue(DHTFlo),
-    ReadValue(U256),
+    ReadValue(FloID),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTStorageOut {
     Value(DHTFlo),
-    ValueMissing(U256),
+    ValueMissing(FloID),
     UpdateStorage(DHTStorageBucket),
     UpdateStats(DHTStorageStats),
 }
@@ -108,19 +107,19 @@ impl DHTStorage {
         self.broker.emit_msg_in(DHTStorageIn::StoreValue(df))
     }
 
-    pub async fn read_dhtflo_local(&mut self, id: &U256) -> Option<DHTFlo> {
+    pub async fn read_dhtflo_local(&mut self, id: &FloID) -> Option<DHTFlo> {
         self.storage.borrow().get(id)
     }
 
-    pub async fn request_dhtflo_global(&mut self, id: &U256) -> Result<(), BrokerError> {
-        self.broker.emit_msg_in(DHTStorageIn::ReadValue(*id))
+    pub async fn request_dhtflo_global(&mut self, id: &FloID) -> Result<(), BrokerError> {
+        self.broker.emit_msg_in(DHTStorageIn::ReadValue(id.clone()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::flo::testing::{new_ace, new_dht_flo_blob};
+    use crate::{crypto::access::Version, flo::testing::{new_ace, new_dht_flo_blob}};
     use flarch::{data_storage::DataStorageTemp, start_logging_filter_level};
 
     #[tokio::test]
@@ -137,7 +136,8 @@ mod tests {
         .await?;
 
         let ace = new_ace()?;
-        let df = new_dht_flo_blob(ace.clone(), "1234".into());
+        let ace_version = Version::Minimal(ace.get_id(), 0);
+        let df = new_dht_flo_blob(ace_version.clone(), "1234".into());
         ds.store_dhtflo(df.clone())?;
         // ds.broker.settle(vec![]).await?;
 
@@ -149,7 +149,7 @@ mod tests {
         // ds.broker.settle(vec![]).await?;
         assert!(dht_out.try_recv().is_err());
 
-        let stored = ds.read_dhtflo_local(&U256::rnd()).await;
+        let stored = ds.read_dhtflo_local(&FloID::rnd()).await;
         assert!(stored.is_none());
         // ds.broker.settle(vec![]).await?;
         assert!(dht_out.try_recv().is_ok());

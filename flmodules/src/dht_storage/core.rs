@@ -6,12 +6,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     dht_routing::kademlia::KNode,
-    flo::dht::{DHTFlo, DHTStorageConfig},
+    flo::{
+        dht::{DHTFlo, DHTStorageConfig},
+        flo::FloID,
+    },
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct FloMeta {
-    pub id: U256,
+    pub id: FloID,
     pub version: usize,
 }
 
@@ -39,11 +42,11 @@ impl DHTStorageCore {
     }
 
     /// TODO: decide which IDs need to be stored.
-    pub fn update_available(&self, available: Vec<FloMeta>) -> Vec<U256> {
-        available.iter().map(|fm| fm.id).collect()
+    pub fn update_available(&self, available: Vec<FloMeta>) -> Vec<FloID> {
+        available.iter().map(|fm| fm.id.clone()).collect()
     }
 
-    pub fn update_request(&self, keys: Vec<U256>) -> Vec<DHTFlo> {
+    pub fn update_request(&self, keys: Vec<FloID>) -> Vec<DHTFlo> {
         keys.iter()
             .filter_map(|k| self.storage.flos.get(k))
             .cloned()
@@ -54,7 +57,7 @@ impl DHTStorageCore {
         for flo in flos {
             if let Some(old) = self.storage.flos.get(&flo.id()) {
                 if old.flo.version() < flo.flo.version() {
-                    self.storage.flos.insert(old.flo.id, flo);
+                    self.storage.flos.insert(old.flo.id.clone(), flo);
                 }
             }
         }
@@ -79,7 +82,7 @@ impl DHTStorageCore {
             .collect()
     }
 
-    pub fn get_flo(&self, key: &U256) -> Option<&DHTFlo> {
+    pub fn get_flo(&self, key: &FloID) -> Option<&DHTFlo> {
         self.storage.flos.get(key)
     }
 
@@ -112,8 +115,8 @@ impl DHTStorageStorageSave {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DHTStorageBucket {
     root: U256,
-    flos: HashMap<U256, DHTFlo>,
-    distances: HashMap<usize, Vec<U256>>,
+    flos: HashMap<FloID, DHTFlo>,
+    distances: HashMap<usize, Vec<FloID>>,
     size: usize,
 }
 
@@ -138,16 +141,16 @@ impl DHTStorageBucket {
     pub fn put(&mut self, df: DHTFlo) {
         let id = df.id();
         self.remove_entry(&id);
-        let depth = KNode::get_depth(&self.root, id);
+        let depth = KNode::get_depth(&self.root, *id);
         self.distances
             .entry(depth)
             .or_insert_with(Vec::new)
-            .push(id);
+            .push(id.clone());
         self.size += df.size();
         self.flos.insert(id, df);
     }
 
-    pub fn get(&self, id: &U256) -> Option<DHTFlo> {
+    pub fn get(&self, id: &FloID) -> Option<DHTFlo> {
         self.flos.get(id).cloned()
     }
 
@@ -157,16 +160,16 @@ impl DHTStorageBucket {
                 .distances
                 .get(furthest)
                 .and_then(|ids| ids.first())
-                .map(|id| *id)
+                .cloned()
             {
                 self.remove_entry(&id);
             }
         }
     }
 
-    pub fn remove_entry(&mut self, id: &U256) {
+    pub fn remove_entry(&mut self, id: &FloID) {
         if let Some(df) = self.flos.remove(id) {
-            let distance = KNode::get_depth(&self.root, *id);
+            let distance = KNode::get_depth(&self.root, **id);
             self.distances
                 .entry(distance)
                 .and_modify(|v| v.retain(|i| i != id));
@@ -183,14 +186,15 @@ mod tests {
 
     use super::*;
 
-    use crate::flo::testing::{new_ace, new_dht_flo_depth};
+    use crate::{crypto::access::Version, flo::testing::{new_ace, new_dht_flo_depth}};
 
     #[test]
     fn test_furthest() -> Result<(), Box<dyn Error>> {
         let root = U256::from_str("00").unwrap();
         let ace = new_ace()?;
+        let ace_version = Version::Minimal(ace.get_id(), 0);
         let flos1: Vec<DHTFlo> = (1..=3)
-            .map(|i| new_dht_flo_depth(ace.clone(), &root, i))
+            .map(|i| new_dht_flo_depth(ace_version.clone(), &root, i))
             .collect();
         let mut storage = DHTStorageBucket::new(root);
         for df in flos1 {
@@ -202,7 +206,7 @@ mod tests {
         let size = storage.size;
 
         let flos2: Vec<DHTFlo> = (1..=3)
-            .map(|i| new_dht_flo_depth(ace.clone(), &root, i))
+            .map(|i| new_dht_flo_depth(ace_version.clone(), &root, i))
             .collect();
         for df in flos2 {
             storage.put(df);

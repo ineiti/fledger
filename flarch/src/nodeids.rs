@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{hex::Hex, serde_as};
 use sha2::digest::{consts::U32, generic_array::GenericArray};
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::num::ParseIntError;
 use std::{fmt, str::FromStr};
 use thiserror::Error;
@@ -64,7 +65,7 @@ impl U256 {
         U256 { 0: random() }
     }
 
-    pub fn from_hash(domain: &str, parts: &[&[u8]]) -> Self {
+    pub fn hash_into(domain: &str, parts: &[&[u8]]) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(to_varint(domain.len()));
         hasher.update(domain);
@@ -75,6 +76,25 @@ impl U256 {
         }
 
         Self(hasher.finalize().into())
+    }
+
+    pub fn from_hashmap<K: Serialize, V: Serialize>(domain: &str, hm: &HashMap<K, V>) -> Self {
+        let mut parts = vec![];
+        for (k, v) in hm {
+            parts.push(rmp_serde::to_vec(k).unwrap());
+            parts.push(rmp_serde::to_vec(v).unwrap());
+        }
+        let slices: Vec<&[u8]> = parts.iter().map(|e| e.as_slice()).collect();
+        Self::hash_into(domain, &slices)
+    }
+
+    pub fn from_vec<V: Serialize>(domain: &str, vec: &Vec<V>) -> Self {
+        let mut parts = vec![];
+        for v in vec {
+            parts.push(rmp_serde::to_vec(v).unwrap());
+        }
+        let slices: Vec<&[u8]> = parts.iter().map(|e| e.as_slice()).collect();
+        Self::hash_into(domain, &slices)
     }
 
     pub fn to_bytes(self) -> [u8; 32] {

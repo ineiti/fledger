@@ -1,10 +1,10 @@
 use bytes::Bytes;
 use flarch::{nodeids::U256, tasks::now};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use flarch_macro::AsU256;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::crypto::{access::TesseraID, signer::Signature};
+use crate::crypto::access::{AceId, Proof, Version};
 
 #[derive(Debug, Error)]
 pub enum FloError {
@@ -24,101 +24,84 @@ pub enum FloError {
     UpdatesMissing,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+#[derive(AsU256, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
+pub struct FloID(U256);
+
+/// Flo defines the following actions:
+/// - ican.re.fledg.flo.flo
+///   - .update_data - change the data of the Flo
+///   - .update_ace -
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Flo {
-    pub id: U256,
+    pub id: FloID,
     pub content: Content,
-    pub updates: Vec<Update>,
+    pub data: Bytes,
+    pub ace: Version<AceId>,
+    pub proof: Proof<Change>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Default, Clone)]
+pub enum Content {
+    #[default]
+    Domain,
+    DHTConfig,
+    FloEntity,
+    LedgerConfig,
+    Mana,
+    Blob,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum Change {
+    Data(u64, Bytes),
+    ACE(u64, AceId),
 }
 
 impl Flo {
-    pub fn new_now(content: Content, data: String, ace: ACE) -> Self {
+    pub fn new_now(content: Content, data: Bytes, ace: Version<AceId>) -> Self {
         Self::new(now() as u64, content, data, ace)
     }
 
-    pub fn new(now: u64, content: Content, data: String, ace: ACE) -> Self {
-        let updates = vec![
-            Update {
-                time: now,
-                change: Change::ACE(ace),
-                proof: Proof::Initial,
-            },
-            Update {
-                time: now,
-                change: Change::Data(data),
-                proof: Proof::Initial,
-            },
-        ];
-        let mut hasher = Sha256::new();
-        hasher.update(now.to_le_bytes());
-        hasher.update(content.to_bytes());
-        for update in &updates {
-            hasher.update(update.to_bytes());
-        }
+    pub fn new(now: u64, content: Content, data: Bytes, ace: Version<AceId>) -> Self {
         Self {
-            id: hasher.finalize().into(),
+            id: FloID::hash_into(
+                "ican.re.fledg.flo.Flo",
+                &[
+                    &now.to_be_bytes(),
+                    &content.to_bytes(),
+                    &data,
+                    &ace.to_bytes(),
+                ],
+            ),
             content,
-            updates,
+            data,
+            ace,
+            proof: Proof::Single(vec![]),
         }
     }
 
-    pub fn data(&self) -> String {
-        self.updates
-            .iter()
-            .rev()
-            .find(|u| matches!(u.change, Change::Data(_)))
-            .unwrap()
-            .change
-            .data()
-            .unwrap()
+    pub fn data(&self) -> Bytes {
+        self.data.clone()
     }
 
-    pub fn ace(&self) -> ACE {
-        self.updates
-            .iter()
-            .rev()
-            .find(|u| matches!(u.change, Change::ACE(_)))
-            .unwrap()
-            .change
-            .ace()
-            .unwrap()
+    pub fn ace_id(&self) -> AceId {
+        self.ace.get_id()
     }
 
     pub fn is_valid(&self) -> Result<(), FloError> {
-        if self.updates.len() < 2 {
-            return Err(FloError::UpdatesMissing);
-        }
-
-        if self
-            .updates
-            .iter()
-            .rev()
-            .find(|u| matches!(u.change, Change::ACE(_)))
-            .is_none()
-        {
-            return Err(FloError::Deserialization(
-                "Flo".into(),
-                "Missing ACE".into(),
-            ));
-        }
-
-        if self
-            .updates
-            .iter()
-            .rev()
-            .find(|u| matches!(u.change, Change::Data(_)))
-            .is_none()
-        {
-            return Err(FloError::Deserialization(
-                "Flo".into(),
-                "Missing Data".into(),
-            ));
-        }
-        Ok(())
+        todo!()
     }
 
     pub fn version(&self) -> usize {
-        self.updates.len()
+        self.proof.version()
+    }
+
+    pub fn size(&self) -> usize {
+        self.id.0.to_bytes().len() +
+        self.content.to_bytes().len() +
+        self.data.len() +
+        self.ace.to_bytes().len() +
+        self.proof.size()
     }
 }
 
@@ -135,106 +118,44 @@ impl TryFrom<String> for Flo {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Default, Clone)]
-pub enum Content {
-    #[default]
-    Domain,
-    DHTConfig,
-    FloEntity,
-    LedgerConfig,
-    Mana,
-    Blob,
-}
-
 impl Content {
     pub fn to_bytes(&self) -> Bytes {
         format!("{:?}", self).into()
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Update {
-    pub time: u64,
-    pub change: Change,
-    pub proof: Proof,
-}
-
-impl Update {
-    pub fn to_bytes(&self) -> Bytes {
-        format!("{}::{:?}::{:?}", self.time, self.change, self.proof).into()
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum Change {
-    Data(String),
-    ACE(ACE),
-}
-
 impl Change {
-    pub fn data(&self) -> Result<String, FloError> {
+    pub fn data(&self) -> Result<Bytes, FloError> {
         match self {
-            Change::Data(str) => Ok(str.clone()),
-            Change::ACE(_) => Err(FloError::UpdateNoData),
+            Change::Data(_, b) => Ok(b.clone()),
+            Change::ACE(_, _) => Err(FloError::UpdateNoData),
         }
     }
 
-    pub fn ace(&self) -> Result<ACE, FloError> {
+    pub fn ace(&self) -> Result<AceId, FloError> {
         match self {
-            Change::ACE(ace) => Ok(ace.clone()),
-            Change::Data(_) => Err(FloError::UpdateNoACE),
+            Change::ACE(_, ace) => Ok(ace.clone()),
+            Change::Data(_, _) => Err(FloError::UpdateNoACE),
         }
     }
 
     pub fn size(&self) -> usize {
         match self {
-            Change::Data(str) => str.len(),
-            Change::ACE(ace) => ace.rules.iter().map(|r| r.action.size()).sum(),
+            Change::Data(_, b) => b.len(),
+            Change::ACE(_, ace) => ace.to_bytes().len(),
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum Proof {
-    Initial,
-    Signature(Signature),
-}
+pub trait ToFromBytes: Serialize + DeserializeOwned {
+    fn to_bytes(&self) -> Bytes {
+        rmp_serde::to_vec(self).unwrap().into()
+    }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
-pub struct ACE {
-    pub rules: Vec<Rule>,
-}
-
-impl ACE {
-    pub fn new(rules: Vec<Rule>) -> Self {
-        Self { rules }
+    fn from_bytes(name: &str, bytes: &Bytes) -> Result<Self, FloError> {
+        rmp_serde::from_slice(bytes)
+            .map_err(|e| FloError::Deserialization(name.into(), e.to_string()))
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Rule {
-    pub action: Action,
-    pub condition: Condition,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum Action {
-    UpdateACE,
-    UpdateData,
-    Flo(String),
-}
-
-impl Action {
-    pub fn size(&self) -> usize {
-        match self {
-            Action::UpdateACE => 0,
-            Action::UpdateData => 0,
-            Action::Flo(str) => str.len(),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum Condition {
-    Signature(TesseraID),
-}
+impl<T: Serialize + DeserializeOwned> ToFromBytes for T {}

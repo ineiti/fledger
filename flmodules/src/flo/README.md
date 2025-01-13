@@ -1,31 +1,23 @@
 # Fledger Object (Flo)
 
 A Fledger Object (Flo) is the basic data structure in Fledger.
-It consists of data and an Access Control Element (ACE).
-A Flo can be updated over time, either its data part or the ACE part.
+It consists of data and a pointer to a `flmodules::crypto::ACE`.
+A Flo can be updated over time, either its data part or the `ACE` part.
 
-It looks something like this:
+It looks like this:
 
 ```
 - Fledger Object (Flo)
   - ID = Hash(Type | Updates_0 | Updates_1 )
-  - Type: (Domain, DHT, Ledger, Mana, Blob)
-  - 2..n Updates: [0] is the Data, [1] is the ACE
+  - Content: (Domain, DHT, Ledger, Mana, Blob)
+  - Data: Bytes
+  - ACE: Version<AceID>
+  - Proof<Change>
 ```
 
-The first two updates define the data and the ACE and are included in
-the calculation of the ID of a Flo.
-Each update has the following structure and updates either the ACE or
-the data.
-The first two updates have an empty `Proof`.
-
-```
-- Flo - Updates
-  - Time
-  - Data | ACE: replaces previous Data or ACE
-  - Proof of condition: will probably need to include all the parents
-    ACEs, or at least a proof from the Ledger that all is OK
-```
+The `Proof` is defined in `flmodules::crypto` and can be either a list of all past values,
+together with a signature on the new value, or a proof that a trusted `Identity` signed
+the latest value and the version.
 
 ## Access Control Element (ACE)
 
