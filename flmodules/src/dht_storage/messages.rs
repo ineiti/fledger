@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     dht_routing::broker::{DHTRoutingIn, DHTRoutingOut},
     flo::{
-        dht::{DHTFlo, DHTStorageConfig},
+        dht::{DHTFlo, DHTConfigData},
         flo::FloID,
     },
     overlay::messages::NetworkWrapper,
@@ -71,7 +71,7 @@ pub struct DHTStorageMessages {
 
 impl DHTStorageMessages {
     /// Returns a new chat module.
-    pub fn new(storage: DHTStorageBucket, cfg: DHTStorageConfig) -> Self {
+    pub fn new(storage: DHTStorageBucket, cfg: DHTConfigData) -> Self {
         Self {
             core: DHTStorageCore::new(storage, cfg),
         }
@@ -224,7 +224,7 @@ mod tests {
 
         let mut msgs = DHTStorageMessages::new(
             DHTStorageBucket::new(origin),
-            DHTStorageConfig {
+            DHTConfigData {
                 over_provide: 1.,
                 max_space: 1000,
             },

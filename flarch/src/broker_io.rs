@@ -44,7 +44,7 @@ use std::{
 use futures::{future::BoxFuture, lock::Mutex};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-use crate::{broker, tasks::spawn_local};
+use crate::{broker::{self, asy::*}, tasks::spawn_local};
 use flarch_macro::platform_async_trait;
 
 pub type BrokerError = broker::BrokerError;
@@ -79,18 +79,6 @@ impl<I, O> fmt::Debug for SubsystemAction<I, O> {
         }
     }
 }
-
-#[cfg(target_family = "wasm")]
-mod asy {
-    pub trait Async {}
-    impl<T> Async for T {}
-}
-#[cfg(target_family = "unix")]
-mod asy {
-    pub trait Async: Sync + Send {}
-    impl<I: Sync + Send> Async for I {}
-}
-use asy::*;
 
 pub trait Message: Async + Clone + fmt::Debug {}
 impl<M: Async + Clone + fmt::Debug> Message for M {}
@@ -151,20 +139,6 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
             )))
             .map_err(|_| BrokerError::SendQueue("add_subsystem".into()))?;
         Ok(subsystem)
-    }
-
-    pub async fn add_handler(
-        &mut self,
-        handler: Box<dyn SubsystemHandler<I, O> + Send>,
-    ) -> Result<usize, BrokerError> {
-        self.add_subsystem(Subsystem::Handler(handler)).await
-    }
-
-    pub async fn add_translator(
-        &mut self,
-        translate: Box<dyn SubsystemTranslator<I, O> + Send>,
-    ) -> Result<usize, BrokerError> {
-        self.add_subsystem(Subsystem::Translator(translate)).await
     }
 
     pub async fn add_translator_link<TI: Message + 'static, TO: Message + 'static>(
@@ -379,7 +353,7 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
 
     // Links with a "Broker": any message received by self::Input will be forwarded to the
     // Broker, and any Broker::Output message will be forwarded to self::Output.
-    pub async fn link_broker<IO: broker::asy::Async + Clone + fmt::Debug + 'static>(
+    pub async fn link_broker<IO: Async + Clone + fmt::Debug + 'static>(
         &mut self,
         mut broker: broker::Broker<IO>,
     ) -> Result<(), BrokerError>
@@ -392,7 +366,7 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
             broker: broker.clone(),
         };
         broker.add_handler(Box::new(link.clone())).await?;
-        self.add_translator(Box::new(link)).await?; 
+        self.add_translator(Box::new(link)).await?;
         Ok(())
     }
 
@@ -409,6 +383,40 @@ impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
         Ok(())
     }
 }
+
+#[cfg(target_family = "wasm")]
+impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
+    pub async fn add_handler(
+        &mut self,
+        handler: Box<dyn SubsystemHandler<I, O>>,
+    ) -> Result<usize, BrokerError> {
+        self.add_subsystem(Subsystem::Handler(handler)).await
+    }
+
+    pub async fn add_translator(
+        &mut self,
+        translate: Box<dyn SubsystemTranslator<I, O>>,
+    ) -> Result<usize, BrokerError> {
+        self.add_subsystem(Subsystem::Translator(translate)).await
+    }
+}
+#[cfg(target_family = "unix")]
+impl<I: 'static + Message, O: 'static + Message> BrokerIO<I, O> {
+    pub async fn add_handler(
+        &mut self,
+        handler: Box<dyn SubsystemHandler<I, O> + Send>,
+    ) -> Result<usize, BrokerError> {
+        self.add_subsystem(Subsystem::Handler(handler)).await
+    }
+
+    pub async fn add_translator(
+        &mut self,
+        translate: Box<dyn SubsystemTranslator<I, O> + Send>,
+    ) -> Result<usize, BrokerError> {
+        self.add_subsystem(Subsystem::Translator(translate)).await
+    }
+}
+
 
 enum InternMessage<I: Message, O: Message> {
     Subsystem(SubsystemAction<I, O>),
@@ -730,7 +738,7 @@ pub enum Subsystem<I, O> {
     TapSyncIn(Sender<I>),
     TapSyncOut(Sender<O>),
     Handler(Box<dyn SubsystemHandler<I, O>>),
-    Translator(Box<dyn SubsystemTranslator<O>>),
+    Translator(Box<dyn SubsystemTranslator<I, O>>),
     Callback(SubsystemCallback<I, O>),
     TranslatorCallback(SubsystemTranslatorCallback<O>),
 }
@@ -955,7 +963,7 @@ pub trait TranslateDirect<I: Message, O: Message, TI: Message, TO: Message> {
 }
 
 #[derive(Clone)]
-struct BrokerLink<I: Message, O: Message, IO: broker::asy::Async + Clone + fmt::Debug> {
+struct BrokerLink<I: Message, O: Message, IO: Async + Clone + fmt::Debug> {
     broker: broker::Broker<IO>,
     brokerio: BrokerIO<I, O>,
 }
@@ -964,7 +972,7 @@ struct BrokerLink<I: Message, O: Message, IO: broker::asy::Async + Clone + fmt::
 impl<
         I: Message + TranslateFrom<IO> + 'static,
         O: Message + 'static,
-        IO: broker::asy::Async + Clone + fmt::Debug,
+        IO: Async + Clone + fmt::Debug,
     > broker::SubsystemHandler<IO> for BrokerLink<I, O, IO>
 {
     async fn messages(&mut self, from_broker: Vec<IO>) -> Vec<IO> {
@@ -983,7 +991,7 @@ impl<
 impl<
         I: Message + 'static,
         O: Message + TranslateInto<IO> + 'static,
-        IO: broker::asy::Async + Clone + fmt::Debug + 'static,
+        IO: Async + Clone + fmt::Debug + 'static,
     > SubsystemTranslator<I, O> for BrokerLink<I, O, IO>
 {
     async fn translate_input(&mut self, _: Vec<BrokerID>, _: I) {}
@@ -1211,7 +1219,7 @@ mod tests {
     impl TranslateFrom<MessageAIO> for MessageAI {
         fn translate(value: MessageAIO) -> Option<MessageAI> {
             if let MessageAIO::Output(out) = value {
-                Some(match out { 
+                Some(match out {
                     MessageAO::Un => MessageAI::One,
                     MessageAO::Deux => MessageAI::_Two,
                     MessageAO::Trois => MessageAI::_Three,

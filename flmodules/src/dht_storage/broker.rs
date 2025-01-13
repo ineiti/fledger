@@ -9,7 +9,7 @@ use tokio::sync::watch;
 
 use crate::{
     dht_routing::broker::{DHTRoutingIn, DHTRoutingOut},
-    flo::{dht::{DHTFlo, DHTStorageConfig}, flo::FloID},
+    flo::{dht::{DHTConfigData, DHTFlo}, flo::FloID},
 };
 use flarch::nodeids::NodeID;
 
@@ -52,7 +52,7 @@ impl DHTStorage {
         mut ds: Box<dyn DataStorage + Send>,
         our_id: NodeID,
         dht_routing: BrokerIO<DHTRoutingIn, DHTRoutingOut>,
-        config: DHTStorageConfig,
+        config: DHTConfigData,
     ) -> Result<Self, Box<dyn Error>> {
         let str = ds.get(MODULE_NAME).unwrap_or("".into());
         let storage =
@@ -119,7 +119,10 @@ impl DHTStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{crypto::access::Version, flo::testing::{new_ace, new_dht_flo_blob}};
+    use crate::{
+        crypto::access::Version,
+        flo::testing::{new_ace, new_dht_flo_blob},
+    };
     use flarch::{data_storage::DataStorageTemp, start_logging_filter_level};
 
     #[tokio::test]
@@ -131,7 +134,7 @@ mod tests {
             Box::new(DataStorageTemp::new()),
             NodeID::rnd(),
             dht_routing.clone(),
-            DHTStorageConfig::default(),
+            DHTConfigData::default(),
         )
         .await?;
 

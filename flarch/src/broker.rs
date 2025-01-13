@@ -91,7 +91,7 @@ impl<T> fmt::Debug for SubsystemAction<T> {
 }
 
 #[cfg(target_family = "wasm")]
-mod asy {
+pub mod asy {
     pub trait Async {}
     impl<T> Async for T {}
 }

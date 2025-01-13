@@ -30,17 +30,17 @@ pub fn new_ace() -> Result<ACE, SignerError> {
 }
 
 pub fn new_dht_flo_blob(va: Version<AceId>, data: String) -> DHTFlo {
-    let flo = Flo::new_now(Content::Blob, data.into(), va);
-    DHTFlo::new(flo, 1)
+    let flo = Flo::new(Content::Blob, data.into(), va);
+    DHTFlo{flo, spread: 1}
 }
 
 pub fn new_dht_flo_depth(va: Version<AceId>, root: &U256, depth: usize) -> DHTFlo {
     loop {
         let data = format!("{:02x}", U256::rnd());
-        let flo = Flo::new_now(Content::Blob, data.into(), va.clone());
+        let flo = Flo::new(Content::Blob, data.into(), va.clone());
         let nd = KNode::get_depth(root, *flo.id);
         if nd == depth {
-            return DHTFlo::new(flo, 1);
+            return DHTFlo{flo, spread: 1};
         }
     }
 }
@@ -68,6 +68,6 @@ pub fn new_msg_closest(
     let (dht_flo, nm) = new_wrapper_closest(mod_name, va, data)?;
     Ok((
         dht_flo.clone(),
-        DHTRoutingOut::MessageClosest(origin, last, *dht_flo.id(), nm),
+        DHTRoutingOut::MessageClosest(origin, last, *dht_flo.flo.id, nm),
     ))
 }

@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     dht_routing::kademlia::KNode,
     flo::{
-        dht::{DHTFlo, DHTStorageConfig},
-        flo::FloID,
+        dht::{DHTConfigData, DHTFlo},
+        flo::{FloID, ToFromBytes},
     },
 };
 
@@ -18,7 +18,7 @@ pub struct FloMeta {
     pub version: usize,
 }
 
-impl Default for DHTStorageConfig {
+impl Default for DHTConfigData {
     fn default() -> Self {
         Self {
             over_provide: 1.,
@@ -32,12 +32,12 @@ impl Default for DHTStorageConfig {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DHTStorageCore {
     storage: DHTStorageBucket,
-    config: DHTStorageConfig,
+    config: DHTConfigData,
 }
 
 impl DHTStorageCore {
     /// Initializes a new DHTStorageCore.
-    pub fn new(storage: DHTStorageBucket, config: DHTStorageConfig) -> Self {
+    pub fn new(storage: DHTStorageBucket, config: DHTConfigData) -> Self {
         Self { storage, config }
     }
 

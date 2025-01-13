@@ -228,19 +228,6 @@ impl<T: Serialize> Proof<T> {
             Proof::Delegated(len, _) => *len,
         }
     }
-
-    pub fn size(&self) -> usize {
-        match self {
-            Proof::Single(vec) => vec
-                .iter()
-                .map(|(t, sig)| rmp_serde::to_vec(t).unwrap().len() + sig.len())
-                .sum(),
-            Proof::Delegated(ver, vec) => {
-                ver.to_be_bytes().len()
-                    + vec.iter().map(|(id, b)| id.len() + b.len()).sum::<usize>()
-            }
-        }
-    }
 }
 
 impl ACEData {

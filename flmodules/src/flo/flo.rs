@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use flarch::{nodeids::U256, tasks::now};
+use flarch::nodeids::U256;
 use flarch_macro::AsU256;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
@@ -28,18 +28,24 @@ pub enum FloError {
 pub struct FloID(U256);
 
 /// Flo defines the following actions:
-/// - ican.re.fledg.flo.flo
-///   - .update_data - change the data of the Flo
-///   - .update_ace -
+/// - ican.re.fledg.flmodules.flo.flo
+///   - .update_data - update the data
+///   - .update_ace - update the Version<AceId>
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Flo {
     pub id: FloID,
     pub content: Content,
-    pub data: Bytes,
-    pub ace: Version<AceId>,
-    pub proof: Proof<Change>,
+    pub current: FloData,
+    pub proof: Proof<FloData>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct FloWrapper<T> {
+    flo: Flo,
+    cache: T,
+}
+
+/// Type of content stored in a Flo.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Default, Clone)]
 pub enum Content {
     #[default]
@@ -51,41 +57,32 @@ pub enum Content {
     Blob,
 }
 
+/// Modifications applied to a Flo.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum Change {
-    Data(u64, Bytes),
-    ACE(u64, AceId),
+pub struct FloData {
+    pub data: Bytes,
+    pub ace: Version<AceId>,
 }
 
 impl Flo {
-    pub fn new_now(content: Content, data: Bytes, ace: Version<AceId>) -> Self {
-        Self::new(now() as u64, content, data, ace)
-    }
-
-    pub fn new(now: u64, content: Content, data: Bytes, ace: Version<AceId>) -> Self {
+    pub fn new(content: Content, data: Bytes, ace: Version<AceId>) -> Self {
         Self {
             id: FloID::hash_into(
-                "ican.re.fledg.flo.Flo",
-                &[
-                    &now.to_be_bytes(),
-                    &content.to_bytes(),
-                    &data,
-                    &ace.to_bytes(),
-                ],
+                "ican.re.fledg.flmodules.flo.Flo",
+                &[&content.to_bytes(), &data, &ace.to_bytes()],
             ),
             content,
-            data,
-            ace,
+            current: FloData { data, ace },
             proof: Proof::Single(vec![]),
         }
     }
 
     pub fn data(&self) -> Bytes {
-        self.data.clone()
+        self.current.data.clone()
     }
 
     pub fn ace_id(&self) -> AceId {
-        self.ace.get_id()
+        self.current.ace.get_id()
     }
 
     pub fn is_valid(&self) -> Result<(), FloError> {
@@ -94,14 +91,6 @@ impl Flo {
 
     pub fn version(&self) -> usize {
         self.proof.version()
-    }
-
-    pub fn size(&self) -> usize {
-        self.id.0.to_bytes().len() +
-        self.content.to_bytes().len() +
-        self.data.len() +
-        self.ace.to_bytes().len() +
-        self.proof.size()
     }
 }
 
@@ -118,35 +107,6 @@ impl TryFrom<String> for Flo {
     }
 }
 
-impl Content {
-    pub fn to_bytes(&self) -> Bytes {
-        format!("{:?}", self).into()
-    }
-}
-
-impl Change {
-    pub fn data(&self) -> Result<Bytes, FloError> {
-        match self {
-            Change::Data(_, b) => Ok(b.clone()),
-            Change::ACE(_, _) => Err(FloError::UpdateNoData),
-        }
-    }
-
-    pub fn ace(&self) -> Result<AceId, FloError> {
-        match self {
-            Change::ACE(_, ace) => Ok(ace.clone()),
-            Change::Data(_, _) => Err(FloError::UpdateNoACE),
-        }
-    }
-
-    pub fn size(&self) -> usize {
-        match self {
-            Change::Data(_, b) => b.len(),
-            Change::ACE(_, ace) => ace.to_bytes().len(),
-        }
-    }
-}
-
 pub trait ToFromBytes: Serialize + DeserializeOwned {
     fn to_bytes(&self) -> Bytes {
         rmp_serde::to_vec(self).unwrap().into()
@@ -156,6 +116,50 @@ pub trait ToFromBytes: Serialize + DeserializeOwned {
         rmp_serde::from_slice(bytes)
             .map_err(|e| FloError::Deserialization(name.into(), e.to_string()))
     }
+
+    fn size(&self) -> usize {
+        self.to_bytes().len()
+    }
 }
 
 impl<T: Serialize + DeserializeOwned> ToFromBytes for T {}
+
+impl<T: Serialize + DeserializeOwned + Clone> FloWrapper<T> {
+    pub fn new(ace: Version<AceId>, cache: T) -> Result<Self, FloError> {
+        let flo = Flo::new(Content::Blob, cache.to_bytes(), ace);
+        Ok(Self { flo, cache })
+    }
+
+    pub fn to_string(&self) -> Result<String, FloError> {
+        match serde_json::to_string(&self.cache) {
+            Ok(str) => Ok(str),
+            Err(e) => Err(FloError::Serialization(e.to_string())),
+        }
+    }
+
+    pub fn cache(&self) -> T {
+        self.cache.clone()
+    }
+
+    pub fn id(&self) -> FloID {
+        self.flo.id.clone()
+    }
+
+    pub fn ace(&self) -> AceId {
+        self.flo.current.ace.get_id()
+    }
+}
+
+impl<T: Serialize + DeserializeOwned> TryFrom<Flo> for FloWrapper<T> {
+    type Error = FloError;
+
+    fn try_from(flo: Flo) -> Result<Self, Self::Error> {
+        if !matches!(flo.content, Content::Blob) {
+            return Err(FloError::WrongContent(Content::Blob, flo.content));
+        }
+
+        let cache = T::from_bytes("name", &flo.current.data)?;
+
+        Ok(Self { flo, cache })
+    }
+}
