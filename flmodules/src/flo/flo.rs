@@ -1,10 +1,12 @@
+use std::any::type_name;
+
 use bytes::Bytes;
 use flarch::nodeids::U256;
 use flarch_macro::AsU256;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::crypto::access::{AceId, Proof, Version};
+use crate::crypto::access::{AceId, History, Version};
 
 #[derive(Debug, Error)]
 pub enum FloError {
@@ -13,9 +15,9 @@ pub enum FloError {
     #[error("Couldn't serialize: {0}")]
     Serialization(String),
     #[error("Expected content to be '{0:?}', but was '{1:?}")]
-    WrongContent(Content, Content),
+    WrongContent(String, String),
     #[error("While converting flo to {0:?}: {1}")]
-    Conversion(Content, String),
+    Conversion(String, String),
     #[error("This update has no Data")]
     UpdateNoData,
     #[error("This update has no ACE")]
@@ -34,27 +36,15 @@ pub struct FloID(U256);
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Flo {
     pub id: FloID,
-    pub content: Content,
+    pub content: String,
     pub current: FloData,
-    pub proof: Proof<FloData>,
+    pub history: History<FloData>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct FloWrapper<T> {
     flo: Flo,
     cache: T,
-}
-
-/// Type of content stored in a Flo.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Default, Clone)]
-pub enum Content {
-    #[default]
-    Domain,
-    DHTConfig,
-    FloEntity,
-    LedgerConfig,
-    Mana,
-    Blob,
 }
 
 /// Modifications applied to a Flo.
@@ -65,7 +55,7 @@ pub struct FloData {
 }
 
 impl Flo {
-    pub fn new(content: Content, data: Bytes, ace: Version<AceId>) -> Self {
+    pub fn new(content: String, data: Bytes, ace: Version<AceId>) -> Self {
         Self {
             id: FloID::hash_into(
                 "ican.re.fledg.flmodules.flo.Flo",
@@ -73,7 +63,7 @@ impl Flo {
             ),
             content,
             current: FloData { data, ace },
-            proof: Proof::Single(vec![]),
+            history: History::Single(vec![]),
         }
     }
 
@@ -90,7 +80,7 @@ impl Flo {
     }
 
     pub fn version(&self) -> usize {
-        self.proof.version()
+        self.history.version()
     }
 }
 
@@ -126,7 +116,7 @@ impl<T: Serialize + DeserializeOwned> ToFromBytes for T {}
 
 impl<T: Serialize + DeserializeOwned + Clone> FloWrapper<T> {
     pub fn new(ace: Version<AceId>, cache: T) -> Result<Self, FloError> {
-        let flo = Flo::new(Content::Blob, cache.to_bytes(), ace);
+        let flo = Flo::new(type_name::<T>().into(), cache.to_bytes(), ace);
         Ok(Self { flo, cache })
     }
 
@@ -139,6 +129,10 @@ impl<T: Serialize + DeserializeOwned + Clone> FloWrapper<T> {
 
     pub fn cache(&self) -> T {
         self.cache.clone()
+    }
+
+    pub fn flo(&self) -> Flo {
+        self.flo.clone()
     }
 
     pub fn id(&self) -> FloID {
@@ -154,8 +148,9 @@ impl<T: Serialize + DeserializeOwned> TryFrom<Flo> for FloWrapper<T> {
     type Error = FloError;
 
     fn try_from(flo: Flo) -> Result<Self, Self::Error> {
-        if !matches!(flo.content, Content::Blob) {
-            return Err(FloError::WrongContent(Content::Blob, flo.content));
+        let content = type_name::<T>().to_string();
+        if flo.content != content {
+            return Err(FloError::WrongContent(content, flo.content));
         }
 
         let cache = T::from_bytes("name", &flo.current.data)?;

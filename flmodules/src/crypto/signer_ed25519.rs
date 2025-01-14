@@ -43,7 +43,7 @@ impl Signer for SignerEd25519 {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifierEd25519 {
     verifier: ed25519_dalek::VerifyingKey,
 }
@@ -63,7 +63,7 @@ impl Verifier for VerifierEd25519 {
         todo!()
     }
 
-    fn clone(&self) -> Box<dyn Verifier> {
+    fn clone_self(&self) -> Box<dyn Verifier> {
         Box::new(VerifierEd25519 {
             verifier: self.verifier.clone(),
         })

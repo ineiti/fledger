@@ -30,11 +30,11 @@ pub enum ErrorIdentity {}
 /// - delegate some or all of the rules to another ACE
 /// The goal is to have a flexible definition of rules for various
 /// sets of objects.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ACE {
     id: AceId,
     current: ACEData,
-    proof: Proof<ACEData>,
+    history: History<ACEData>,
     #[serde(skip)]
     ev_cache: Option<watch::Receiver<EVCache>>,
 }
@@ -49,7 +49,7 @@ pub struct ACE {
 pub struct Identity {
     id: IdentityID,
     current: IdentityData,
-    proof: Proof<IdentityData>,
+    history: History<IdentityData>,
     #[serde(skip)]
     ev_cache: Option<watch::Receiver<EVCache>>,
 }
@@ -80,11 +80,11 @@ pub enum Version<T: Serialize + Clone> {
     Maximal(T, usize),
 }
 
-/// A Proof is either a list of all past values, each one followed by a signature
+/// A History is either a list of all past values, each one followed by a signature
 /// to prove the new value is valid.
 /// Or it is a signature of a trusted Identity over the ID, the latest values, and the version.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum Proof<T: Serialize> {
+pub enum History<T: Serialize> {
     Single(Vec<(T, Signature)>),
     Delegated(usize, Vec<(IdentityID, Signature)>),
 }
@@ -145,7 +145,7 @@ impl ACE {
         Self {
             id: current.calc_id(),
             current,
-            proof: Proof::Single(vec![]),
+            history: History::Single(vec![]),
             ev_cache: None,
         }
     }
@@ -163,7 +163,7 @@ impl Identity {
         Ok(Self {
             id: hasher.finalize().into(),
             current: IdentityData { sign, update },
-            proof: Proof::Single(vec![]),
+            history: History::Single(vec![]),
             ev_cache: None,
         })
     }
@@ -173,7 +173,7 @@ impl Identity {
     }
 
     pub fn get_version(&self) -> usize {
-        self.proof.version()
+        self.history.version()
     }
 
     pub fn start_signature(&self, msg: Bytes) -> Identitiesignature {
@@ -221,11 +221,11 @@ impl<T: Serialize + Clone> Version<T> {
     }
 }
 
-impl<T: Serialize> Proof<T> {
+impl<T: Serialize> History<T> {
     pub fn version(&self) -> usize {
         match self {
-            Proof::Single(vec) => vec.len(),
-            Proof::Delegated(len, _) => *len,
+            History::Single(vec) => vec.len(),
+            History::Delegated(len, _) => *len,
         }
     }
 }

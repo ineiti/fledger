@@ -1,7 +1,7 @@
 use flarch::nodeids::NodeID;
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::signer::Verifier;
+use crate::crypto::signer::VerifierID;
 
 use super::flo::FloWrapper;
 
@@ -15,7 +15,7 @@ pub struct LedgerConfigData {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LedgerNode {
     pub id: NodeID,
-    pub verifier: Box<dyn Verifier>,
+    pub verifier: VerifierID,
 }
 
 impl LedgerConfig {}

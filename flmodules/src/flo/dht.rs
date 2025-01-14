@@ -1,6 +1,8 @@
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use super::flo::{Flo, FloID, FloWrapper};
+use crate::crypto::access::History;
+
+use super::flo::{Flo, FloData, FloError, FloID, FloWrapper};
 
 pub type DHTConfig = FloWrapper<DHTConfigData>;
 
@@ -18,13 +20,51 @@ impl DHTConfig {}
 /// Flo in it.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DHTFlo {
-    pub flo: Flo,
-    pub spread: u32,
+    flo: Flo,
+    spread: u32,
     // TODO: Add the domain of this flo here.
 }
 
 impl DHTFlo {
+    pub fn from_wrapper<T: DeserializeOwned + Serialize + Clone>(
+        wrapper: FloWrapper<T>,
+        spread: u32,
+    ) -> Self {
+        Self {
+            flo: wrapper.flo(),
+            spread,
+        }
+    }
+
     pub fn id(&self) -> FloID {
         self.flo.id.clone()
+    }
+
+    pub fn content(&self) -> String {
+        self.flo.content.clone()
+    }
+
+    pub fn current(&self) -> FloData {
+        self.flo.current.clone()
+    }
+
+    pub fn history(&self) -> History<FloData> {
+        self.flo.history.clone()
+    }
+
+    pub fn version(&self) -> usize {
+        self.flo.version()
+    }
+
+    pub fn spread(&self) -> u32 {
+        self.spread
+    }
+}
+
+impl<T: Serialize + DeserializeOwned + Clone> TryFrom<DHTFlo> for FloWrapper<T> {
+    type Error = FloError;
+
+    fn try_from(value: DHTFlo) -> Result<Self, Self::Error> {
+        value.flo.try_into()
     }
 }

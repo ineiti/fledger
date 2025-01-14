@@ -1,10 +1,11 @@
 use std::{collections::HashMap, error::Error};
 
+use bytes::Bytes;
 use flarch::nodeids::{NodeID, U256};
 
 use crate::{
     crypto::{
-        access::{AceId, Condition, Identity, Version, ACEData, ACE},
+        access::{ACEData, AceId, Condition, Identity, Version, ACE},
         signer::SignerError,
         signer_ed25519::SignerEd25519,
     },
@@ -14,8 +15,8 @@ use crate::{
 };
 
 use super::{
+    blob::{Blob, BlobData},
     dht::DHTFlo,
-    flo::{Content, Flo},
 };
 
 pub fn new_ace() -> Result<ACE, SignerError> {
@@ -29,18 +30,30 @@ pub fn new_ace() -> Result<ACE, SignerError> {
     }))
 }
 
-pub fn new_dht_flo_blob(va: Version<AceId>, data: String) -> DHTFlo {
-    let flo = Flo::new(Content::Blob, data.into(), va);
-    DHTFlo{flo, spread: 1}
+pub fn new_dht_flo_blob(va: Version<AceId>, data: Bytes) -> DHTFlo {
+    DHTFlo::from_wrapper(
+        Blob::new(
+            va,
+            BlobData {
+                data,
+                content: "test/data".into(),
+            },
+        )
+        .unwrap(),
+        1,
+    )
 }
 
 pub fn new_dht_flo_depth(va: Version<AceId>, root: &U256, depth: usize) -> DHTFlo {
     loop {
-        let data = format!("{:02x}", U256::rnd());
-        let flo = Flo::new(Content::Blob, data.into(), va.clone());
-        let nd = KNode::get_depth(root, *flo.id);
+        let cache = BlobData {
+            data: format!("{:02x}", U256::rnd()).into(),
+            content: "test/data".into(),
+        };
+        let blob = Blob::new(va.clone(), cache).unwrap();
+        let nd = KNode::get_depth(root, *blob.id());
         if nd == depth {
-            return DHTFlo{flo, spread: 1};
+            return DHTFlo::from_wrapper(blob, 1);
         }
     }
 }
@@ -50,7 +63,7 @@ pub fn new_wrapper_closest(
     va: Version<AceId>,
     data: String,
 ) -> Result<(DHTFlo, NetworkWrapper), Box<dyn Error>> {
-    let dht_flo = new_dht_flo_blob(va, data);
+    let dht_flo = new_dht_flo_blob(va, data.into());
     let msg_store = MessageNodeClosest::StoreFlo(dht_flo.clone());
     Ok((
         dht_flo,
@@ -68,6 +81,6 @@ pub fn new_msg_closest(
     let (dht_flo, nm) = new_wrapper_closest(mod_name, va, data)?;
     Ok((
         dht_flo.clone(),
-        DHTRoutingOut::MessageClosest(origin, last, *dht_flo.flo.id, nm),
+        DHTRoutingOut::MessageClosest(origin, last, *dht_flo.id(), nm),
     ))
 }

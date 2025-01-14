@@ -56,8 +56,8 @@ impl DHTStorageCore {
     pub fn update_flos(&mut self, flos: Vec<DHTFlo>) {
         for flo in flos {
             if let Some(old) = self.storage.flos.get(&flo.id()) {
-                if old.flo.version() < flo.flo.version() {
-                    self.storage.flos.insert(old.flo.id.clone(), flo);
+                if old.version() < flo.version() {
+                    self.storage.flos.insert(old.id(), flo);
                 }
             }
         }
@@ -77,7 +77,7 @@ impl DHTStorageCore {
             .values()
             .map(|df| FloMeta {
                 id: df.id(),
-                version: df.flo.version(),
+                version: df.version(),
             })
             .collect()
     }

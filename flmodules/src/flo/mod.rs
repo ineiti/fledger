@@ -1,4 +1,4 @@
-pub mod flo_entity;
+pub mod crypto;
 pub mod blob;
 pub mod dht;
 pub mod domain;

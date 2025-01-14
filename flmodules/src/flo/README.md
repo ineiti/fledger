@@ -6,42 +6,47 @@ A Flo can be updated over time, either its data part or the `ACE` part.
 
 It looks like this:
 
-```
 - Fledger Object (Flo)
-  - ID = Hash(Type | Updates_0 | Updates_1 )
-  - Content: (Domain, DHT, Ledger, Mana, Blob)
+  - ID = Hash( Content | Data | ACE )
+  - Content: String
   - Data: Bytes
   - ACE: Version<AceID>
-  - Proof<Change>
-```
+  - History<Change>
 
 The `Version<AceID>` is defined in `flmodules::crypto` and indicates which ACE and which
 of its versions are trusted by this Flo.
 
-The `Proof` is defined in `flmodules::crypto` and can be either a list of all past values,
+The `History` is defined in `flmodules::crypto` and can be either a list of all past values,
 together with a signature on the new value, or a proof that a trusted `Identity` signed
 the latest value and the version.
 
+The different contents of a `Flo` is created using a `FloWrapper<Type>`.
+For the current implementation of a simple page-sharing system, the following contents are
+implemented:
+
+- `FloACE`, `FloIdentity`, `FloVerifier` for the cryptographic objects used
+- `Domain` for the naming system
+- `DHT` to store the blobs in a DHT
+- `Blob` to store binary data
+
 ## Domain
 
-```
 - Domain
   - Has
     - Ledger?
     - DHT?
     - 0..n sub-Domains
-```
 
-## Original WIP.md
+## DHT
 
-- Data Storage (DS)
-  - Has
-    - 0..n Blobs
+- DHT
+  - Uses Mana and Domains to prioritize storage
+  - Will only accept a restricted list of Flo-IDs as root parents and refuse
+    to store Flos with other or missing root parents.
 
-- Blob
-  - Has
-    - Data
-    - Parents
+## Blob
+
+# Future Flo-types
 
 - Node
   - Has
@@ -53,12 +58,12 @@ the latest value and the version.
   - Has
     - List of nodes who participate
   - Creates
-    - Proofs for pointing to data
+    - Historys for pointing to data
     - Global State
   - Uses DHT to store Mana for nodes
   - Uses DHT to store global state of Ledger
 
-- Ledger - Proof
+- Ledger - History
   - Has
     - Flo
     - Signature of nodes
@@ -69,7 +74,3 @@ the latest value and the version.
   - Has
     - Type
 
-- DHT
-  - Uses Mana and Domains to prioritize storage
-  - Will only accept a restricted list of Flo-IDs as root parents and refuse
-    to store Flos with other or missing root parents.

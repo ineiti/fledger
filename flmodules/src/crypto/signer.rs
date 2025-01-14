@@ -35,5 +35,11 @@ pub trait Verifier: std::fmt::Debug {
 
     fn get_id(&self) -> VerifierID;
 
-    fn clone(&self) -> Box<dyn Verifier>;
+    fn clone_self(&self) -> Box<dyn Verifier>;
+}
+
+impl Clone for Box<dyn Verifier> {
+    fn clone(&self) -> Self {
+        self.clone_self()
+    }
 }
