@@ -1,7 +1,13 @@
-use std::error::Error;
-
-use flarch::nodeids::{NodeID, NodeIDs};
+use flarch::{
+    broker::SubsystemHandler,
+    data_storage::DataStorage,
+    nodeids::{NodeID, NodeIDs},
+    platform_async_trait,
+};
 use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
+
+use crate::gossip_events::broker::MODULE_NAME;
 
 use super::core::*;
 
@@ -11,14 +17,6 @@ use super::core::*;
 pub enum ModuleMessage {
     Increase(u32),
     Counter(u32),
-}
-
-/// First wrap all messages coming into this module and all messages going out in
-/// a single message time.
-#[derive(Clone, Debug)]
-pub enum TemplateMessage {
-    Input(TemplateIn),
-    Output(TemplateOut),
 }
 
 /// The messages here represent all possible interactions with this module.
@@ -31,29 +29,38 @@ pub enum TemplateIn {
 #[derive(Debug, Clone)]
 pub enum TemplateOut {
     ToNetwork(NodeID, ModuleMessage),
-    UpdateStorage(TemplateStorage),
 }
 
 /// The message handling part, but only for template messages.
 #[derive(Debug)]
-pub struct TemplateMessages {
-    pub core: TemplateCore,
+pub struct Messages {
+    core: TemplateCore,
+    storage: Box<dyn DataStorage + Send>,
     nodes: NodeIDs,
     our_id: NodeID,
+    ts_tx: Option<watch::Sender<TemplateStorage>>,
 }
 
-impl TemplateMessages {
+impl Messages {
     /// Returns a new chat module.
     pub fn new(
-        storage: TemplateStorage,
+        storage: Box<dyn DataStorage + Send>,
         cfg: TemplateConfig,
         our_id: NodeID,
-    ) -> Result<Self, Box<dyn Error>> {
-        Ok(Self {
-            core: TemplateCore::new(storage, cfg),
-            nodes: NodeIDs::empty(),
-            our_id,
-        })
+    ) -> (Self, watch::Receiver<TemplateStorage>) {
+        let str = storage.get(MODULE_NAME).unwrap_or("".into());
+        let ts = TemplateStorageSave::from_str(&str).unwrap_or_default();
+        let (ts_tx, ts_rx) = watch::channel(ts.clone());
+        (
+            Self {
+                storage,
+                core: TemplateCore::new(ts, cfg),
+                nodes: NodeIDs::empty(),
+                our_id,
+                ts_tx: Some(ts_tx),
+            },
+            ts_rx,
+        )
     }
 
     /// Processes one generic message and returns either an error
@@ -78,6 +85,7 @@ impl TemplateMessages {
                 // When increasing the counter, send 'self' counter to all other nodes.
                 // Also send a StorageUpdate message.
                 self.core.increase(c);
+                self.store();
                 return self
                     .nodes
                     .0
@@ -88,7 +96,6 @@ impl TemplateMessages {
                             ModuleMessage::Counter(self.core.storage.counter),
                         )
                     })
-                    .chain(vec![TemplateOut::UpdateStorage(self.core.storage.clone())])
                     .collect();
             }
             ModuleMessage::Counter(c) => log::info!("Got counter from {}: {}", _src, c),
@@ -101,45 +108,55 @@ impl TemplateMessages {
         self.nodes = ids.remove_missing(&vec![self.our_id].into());
         vec![]
     }
-}
 
-/// Convenience method to reduce long lines.
-impl From<TemplateIn> for TemplateMessage {
-    fn from(msg: TemplateIn) -> Self {
-        TemplateMessage::Input(msg)
+    fn store(&mut self) {
+        self.ts_tx.clone().map(|tx| {
+            tx.send(self.core.storage.clone())
+                .is_err()
+                .then(|| self.ts_tx = None)
+        });
+        if let Ok(val) = self.core.storage.to_yaml() {
+            self.storage
+                .set(MODULE_NAME, &val)
+                .err()
+                .map(|e| log::warn!("Error while updating storage: {e:?}"));
+        }
     }
 }
 
-/// Convenience method to reduce long lines.
-impl From<TemplateOut> for TemplateMessage {
-    fn from(msg: TemplateOut) -> Self {
-        TemplateMessage::Output(msg)
+#[platform_async_trait()]
+impl SubsystemHandler<TemplateIn, TemplateOut> for Messages {
+    async fn messages(&mut self, msgs: Vec<TemplateIn>) -> Vec<TemplateOut> {
+        self.process_messages(msgs)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
+    use flarch::data_storage::DataStorageTemp;
+
     use super::*;
 
     #[test]
-    fn test_something() -> Result<(), Box<dyn Error>> {
+    fn test_messages() -> Result<(), Box<dyn Error>> {
         let ids = NodeIDs::new(2);
         let id0 = *ids.0.get(0).unwrap();
         let id1 = *ids.0.get(1).unwrap();
-        let storage = TemplateStorage::default();
-        let mut msg = TemplateMessages::new(storage, TemplateConfig::default(), id0)?;
-        msg.process_messages(vec![TemplateIn::UpdateNodeList(ids).into()]);
-        let ret =
-            msg.process_messages(vec![TemplateIn::FromNetwork(id1, ModuleMessage::Increase(2)).into()]);
-        assert_eq!(2, ret.len());
+        let (mut msg, rx) =
+            Messages::new(DataStorageTemp::new_box(), TemplateConfig::default(), id0);
+        msg.process_messages(vec![TemplateIn::UpdateNodeList(ids)]);
+        let ret = msg.process_messages(vec![TemplateIn::FromNetwork(
+            id1,
+            ModuleMessage::Increase(2),
+        )]);
+        assert_eq!(1, ret.len());
         assert!(matches!(
             ret[0],
             TemplateOut::ToNetwork(_, ModuleMessage::Counter(2))
         ));
-        assert!(matches!(
-            ret[1],
-            TemplateOut::UpdateStorage(TemplateStorage { counter: 2 })
-        ));
+        assert_eq!(2, rx.borrow().counter);
         Ok(())
     }
 }

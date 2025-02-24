@@ -10,13 +10,12 @@
 //!
 //! _If you come here, I hope you're not trying to debug something that doesn't work.
 //! This code is quite obscure, and should be rewritten for the 5th time or so._
-use crate::broker::{Broker, BrokerError, Subsystem, SubsystemHandler};
-use flarch_macro::platform_async_trait;
+use crate::broker::{BrokerError, Broker, SubsystemHandler};
+use flmacro::platform_async_trait;
 use thiserror::Error;
 
 use crate::web_rtc::messages::{
-    ConnectionStateMap, DataChannelState, PeerMessage, WebRTCInput, WebRTCMessage, WebRTCOutput,
-    WebRTCSpawner,
+    ConnectionStateMap, DataChannelState, PeerMessage, WebRTCInput, WebRTCOutput, WebRTCSpawner,
 };
 
 #[derive(Error, Debug)]
@@ -34,16 +33,21 @@ pub enum NCError {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-/// Messages for the [`NodeConnection`] broker.
-pub enum NCMessage {
-    /// Messages to the [`crate::web_rtc::WebRTCConn`] broker
-    Output(NCOutput),
-    /// Messages from the [`crate::web_rtc::WebRTCConn`] broker
-    Input(NCInput),
-    /// Messages to/from the incoming connection
-    Incoming(WebRTCMessage),
-    /// Messages to/from the outgoing connection
-    Outgoing(WebRTCMessage),
+/// Messages from the [`crate::web_rtc::WebRTCConn`]
+pub enum NCInput {
+    /// Text to be sent over the first available connection
+    Text(String),
+    /// Disconnect all connections
+    Disconnect,
+    /// Return all states
+    GetStates,
+    /// Treat the [`PeerMessage`] to setup a new connection with the
+    /// given direction
+    Setup(Direction, PeerMessage),
+    /// Messages to the incoming connection
+    Incoming(WebRTCOutput),
+    /// Messages to the outgoing connection
+    Outgoing(WebRTCOutput),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,20 +63,10 @@ pub enum NCOutput {
     State(Direction, ConnectionStateMap),
     /// Setup message for the connection in the given direction
     Setup(Direction, PeerMessage),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-/// Messages from the [`crate::web_rtc::WebRTCConn`]
-pub enum NCInput {
-    /// Text to be sent over the first available connection
-    Text(String),
-    /// Disconnect all connections
-    Disconnect,
-    /// Return all states
-    GetStates,
-    /// Treat the [`PeerMessage`] to setup a new connection with the
-    /// given direction
-    Setup(Direction, PeerMessage),
+    /// Messages from the incoming connection
+    Incoming(WebRTCInput),
+    /// Messages from the outgoing connection
+    Outgoing(WebRTCInput),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -96,66 +90,52 @@ pub struct NodeConnection {
 impl NodeConnection {
     /// Create a new [`NodeConnection`] that will wait for a first message before
     /// setting up an outgoing connection.
-    pub async fn new(spawner: &WebRTCSpawner) -> Result<Broker<NCMessage>, NCError> {
+    pub async fn new(spawner: &WebRTCSpawner) -> Result<Broker<NCInput, NCOutput>, NCError> {
         let mut broker = Broker::new();
         broker
-            .link_bi(
+            .add_translator_link(
                 spawner().await?,
-                Box::new(Self::to_incoming),
-                Box::new(Self::from_incoming),
+                Box::new(|msg| match msg {
+                    NCOutput::Incoming(msg_webrtc) => Some(msg_webrtc),
+                    _ => None,
+                }),
+                Box::new(|msg_webrtc| Some(NCInput::Incoming(msg_webrtc))),
             )
             .await?;
+
         broker
-            .link_bi(
+            .add_translator_link(
                 spawner().await?,
-                Box::new(Self::to_outgoing),
-                Box::new(Self::from_outgoing),
+                Box::new(|msg| match msg {
+                    NCOutput::Outgoing(msg_webrtc) => Some(msg_webrtc),
+                    _ => None,
+                }),
+                Box::new(|msg_webrtc| Some(NCInput::Outgoing(msg_webrtc))),
             )
             .await?;
+
         let nc = NodeConnection {
             msg_queue: vec![],
             state_incoming: None,
             state_outgoing: None,
         };
         broker
-            .add_subsystem(Subsystem::Handler(Box::new(nc)))
+            .add_handler(Box::new(nc))
             .await?;
         Ok(broker)
     }
 
-    fn to_incoming(msg: WebRTCMessage) -> Option<NCMessage> {
-        matches!(msg, WebRTCMessage::Output(_)).then(|| (NCMessage::Incoming(msg)))
-    }
-
-    fn from_incoming(msg: NCMessage) -> Option<WebRTCMessage> {
-        match msg {
-            NCMessage::Incoming(msg) => matches!(msg, WebRTCMessage::Input(_)).then(|| (msg)),
-            _ => None,
-        }
-    }
-
-    fn to_outgoing(msg: WebRTCMessage) -> Option<NCMessage> {
-        matches!(msg, WebRTCMessage::Output(_)).then(|| (NCMessage::Outgoing(msg)))
-    }
-
-    fn from_outgoing(msg: NCMessage) -> Option<WebRTCMessage> {
-        match msg {
-            NCMessage::Outgoing(msg) => matches!(msg, WebRTCMessage::Input(_)).then(|| (msg)),
-            _ => None,
-        }
-    }
-
-    fn send(&mut self, dir: Direction, state: Option<ConnectionStateMap>) -> Vec<NCMessage> {
+    fn send(&mut self, dir: Direction, state: Option<ConnectionStateMap>) -> Vec<NCOutput> {
         if let Some(csm) = state {
             if let Some(dc) = csm.data_connection {
                 if dc == DataChannelState::Open {
                     return self
                         .msg_queue
                         .drain(..)
-                        .map(|msg| WebRTCMessage::Input(WebRTCInput::Text(msg)))
+                        .map(|msg| WebRTCInput::Text(msg))
                         .map(|msg| match dir {
-                            Direction::Incoming => NCMessage::Incoming(msg),
-                            Direction::Outgoing => NCMessage::Outgoing(msg),
+                            Direction::Incoming => NCOutput::Incoming(msg),
+                            Direction::Outgoing => NCOutput::Outgoing(msg),
                         })
                         .collect();
                 }
@@ -165,7 +145,7 @@ impl NodeConnection {
     }
 
     // First try to send through outgoing queue, if that fails, try incoming queue.
-    fn send_queue(&mut self) -> Vec<NCMessage> {
+    fn send_queue(&mut self) -> Vec<NCOutput> {
         let mut out = vec![];
         if self.msg_queue.len() > 0 {
             out.extend(self.send(Direction::Outgoing, self.state_outgoing));
@@ -176,110 +156,93 @@ impl NodeConnection {
         out
     }
 
-    fn msg_in(&mut self, msg: NCInput) -> Vec<NCMessage> {
+    fn msg_in(&mut self, msg: NCInput) -> Vec<NCOutput> {
         match msg {
             NCInput::Text(msg_str) => {
                 self.msg_queue.push(msg_str);
                 let mut out = vec![];
                 out.extend(self.send_queue());
                 if self.state_outgoing.is_none() {
-                    out.push(NCMessage::Outgoing(WebRTCMessage::Input(
-                        WebRTCInput::Setup(PeerMessage::Init),
-                    )));
+                    out.push(NCOutput::Outgoing(WebRTCInput::Setup(PeerMessage::Init)));
                     self.state_outgoing = Some(ConnectionStateMap::default());
                 }
                 out
             }
             NCInput::Disconnect => vec![
-                NCMessage::Incoming(WebRTCMessage::Input(WebRTCInput::Disconnect)),
-                NCMessage::Outgoing(WebRTCMessage::Input(WebRTCInput::Disconnect)),
+                NCOutput::Incoming(WebRTCInput::Disconnect),
+                NCOutput::Outgoing(WebRTCInput::Disconnect),
             ],
 
             NCInput::GetStates => {
                 let mut out = vec![];
                 if let Some(state) = self.state_incoming {
-                    out.push(NCMessage::Output(NCOutput::State(
-                        Direction::Incoming,
-                        state.clone(),
-                    )));
+                    out.push(NCOutput::State(Direction::Incoming, state.clone()));
                 }
                 if let Some(state) = self.state_outgoing {
-                    out.push(NCMessage::Output(NCOutput::State(
-                        Direction::Outgoing,
-                        state.clone(),
-                    )));
+                    out.push(NCOutput::State(Direction::Outgoing, state.clone()));
                 }
                 out
             }
-            NCInput::Setup(dir, pm) => {
-                match dir {
-                    Direction::Incoming => vec![NCMessage::Incoming(WebRTCMessage::Input(
-                        WebRTCInput::Setup(pm),
-                    ))],
-                    Direction::Outgoing => vec![NCMessage::Outgoing(WebRTCMessage::Input(
-                        WebRTCInput::Setup(pm),
-                    ))],
-                }
-            }
+            NCInput::Setup(dir, pm) => match dir {
+                Direction::Incoming => vec![NCOutput::Incoming(WebRTCInput::Setup(pm))],
+                Direction::Outgoing => vec![NCOutput::Outgoing(WebRTCInput::Setup(pm))],
+            },
+            _ => vec![],
         }
     }
 
-    fn msg_conn(&mut self, dir: Direction, msg: WebRTCMessage) -> Vec<NCMessage> {
+    fn msg_conn(&mut self, dir: Direction, msg: WebRTCOutput) -> Vec<NCOutput> {
         match msg {
-            WebRTCMessage::Output(msg_out) => match msg_out {
-                WebRTCOutput::Connected => {
-                    let state = Some(ConnectionStateMap {
-                        data_connection: Some(DataChannelState::Open),
-                        ..Default::default()
-                    });
-                    match dir {
-                        Direction::Incoming => self.state_incoming = state,
-                        Direction::Outgoing => self.state_outgoing = state,
+            WebRTCOutput::Connected => {
+                let state = Some(ConnectionStateMap {
+                    data_connection: Some(DataChannelState::Open),
+                    ..Default::default()
+                });
+                match dir {
+                    Direction::Incoming => self.state_incoming = state,
+                    Direction::Outgoing => self.state_outgoing = state,
+                }
+                let mut out = vec![NCOutput::Connected(dir)];
+                out.extend(self.send_queue());
+                out
+            }
+            WebRTCOutput::Setup(pm) => vec![NCOutput::Setup(dir, pm)],
+            WebRTCOutput::Text(msg_str) => {
+                vec![NCOutput::Text(msg_str)]
+            }
+            WebRTCOutput::State(state) => {
+                match dir {
+                    Direction::Incoming => self.state_incoming = Some(state),
+                    Direction::Outgoing => self.state_outgoing = Some(state),
+                }
+                vec![NCOutput::State(dir, state)]
+            }
+            WebRTCOutput::Disconnected | WebRTCOutput::Error(_) => {
+                let msg = match dir {
+                    Direction::Incoming => {
+                        self.state_incoming = None;
+                        NCOutput::Incoming(WebRTCInput::Reset)
                     }
-                    let mut out = vec![NCMessage::Output(NCOutput::Connected(dir))];
-                    out.extend(self.send_queue());
-                    out
-                }
-                WebRTCOutput::Setup(pm) => vec![NCMessage::Output(NCOutput::Setup(dir, pm))],
-                WebRTCOutput::Text(msg_str) => {
-                    vec![NCMessage::Output(NCOutput::Text(msg_str))]
-                }
-                WebRTCOutput::State(state) => {
-                    match dir {
-                        Direction::Incoming => self.state_incoming = Some(state),
-                        Direction::Outgoing => self.state_outgoing = Some(state),
+                    Direction::Outgoing => {
+                        self.state_outgoing = None;
+                        NCOutput::Outgoing(WebRTCInput::Reset)
                     }
-                    vec![NCMessage::Output(NCOutput::State(dir, state))]
-                }
-                WebRTCOutput::Disconnected | WebRTCOutput::Error(_) => {
-                    let msg = match dir {
-                        Direction::Incoming => {
-                            self.state_incoming = None;
-                            NCMessage::Incoming(WebRTCMessage::Input(WebRTCInput::Reset))
-                        }
-                        Direction::Outgoing => {
-                            self.state_outgoing = None;
-                            NCMessage::Outgoing(WebRTCMessage::Input(WebRTCInput::Reset))
-                        }
-                    };
-                    vec![msg, NCMessage::Output(NCOutput::Disconnected(dir))]
-                }
-            },
-            _ => vec![],
+                };
+                vec![msg, NCOutput::Disconnected(dir)]
+            }
         }
     }
 }
 
 #[platform_async_trait()]
-impl SubsystemHandler<NCMessage> for NodeConnection {
-    async fn messages(&mut self, msgs: Vec<NCMessage>) -> Vec<NCMessage> {
+impl SubsystemHandler<NCInput, NCOutput> for NodeConnection {
+    async fn messages(&mut self, msgs: Vec<NCInput>) -> Vec<NCOutput> {
         let mut out = vec![];
         for msg in msgs {
             out.extend(match msg {
-                NCMessage::Input(msg_in) => self.msg_in(msg_in),
-                NCMessage::Incoming(msg_conn) => self.msg_conn(Direction::Incoming, msg_conn),
-                NCMessage::Outgoing(msg_conn) => self.msg_conn(Direction::Outgoing, msg_conn),
-                _ => vec![],
+                NCInput::Incoming(msg_conn) => self.msg_conn(Direction::Incoming, msg_conn),
+                NCInput::Outgoing(msg_conn) => self.msg_conn(Direction::Outgoing, msg_conn),
+                _ => self.msg_in(msg),
             });
         }
 
@@ -287,14 +250,29 @@ impl SubsystemHandler<NCMessage> for NodeConnection {
     }
 }
 
-impl From<NCInput> for NCMessage {
-    fn from(msg: NCInput) -> NCMessage {
-        NCMessage::Input(msg)
+/*
+ fn to_incoming(msg: WebRTCMessage) -> Option<NCMessage> {
+    matches!(msg, WebRTCMessage::Output(_)).then(|| (NCMessage::Incoming(msg)))
+}
+
+fn from_incoming(msg: NCMessage) -> Option<WebRTCMessage> {
+    match msg {
+        NCMessage::Incoming(msg) => matches!(msg, WebRTCMessage::Input(_)).then(|| (msg)),
+        _ => None,
     }
 }
 
-impl From<NCOutput> for NCMessage {
-    fn from(msg: NCOutput) -> NCMessage {
-        NCMessage::Output(msg)
+fn to_outgoing(msg: WebRTCMessage) -> Option<NCMessage> {
+    matches!(msg, WebRTCMessage::Output(_)).then(|| (NCMessage::Outgoing(msg)))
+}
+
+fn from_outgoing(msg: NCMessage) -> Option<WebRTCMessage> {
+    match msg {
+        NCMessage::Outgoing(msg) => matches!(msg, WebRTCMessage::Input(_)).then(|| (msg)),
+        _ => None,
     }
 }
+
+    I: TranslateFrom<TO>,
+    O: TranslateInto<TI>,
+*/

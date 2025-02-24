@@ -1,0 +1,25 @@
+[package]
+name = "flcrypto"
+version = "0.9.0"
+edition = "2021"
+
+[features]
+testing = []
+
+[dependencies]
+flarch = { path = "../flarch", version = "0.9" }
+flmacro = { path = "../flmacro", version = "0.9" }
+
+bytes = { version = "1", features = ["serde"] }
+ed25519-dalek = { version="2", features = ["serde", "rand_core"] }
+log = "0.4"
+rand = "0.8"
+rmp-serde = "1"
+serde = { version = "1", features = ["derive"] }
+serde_with = { version = "3", features = ["hex", "json", "base64"] }
+sha2 = "0.10"
+thiserror = "2"
+typetag = "0.2"
+
+[dev-dependencies]
+flcrypto = { path=".", features = ["testing"]}

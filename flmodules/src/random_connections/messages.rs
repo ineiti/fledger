@@ -1,11 +1,19 @@
 use itertools::concat;
 use serde::{Deserialize, Serialize};
 
-use flarch::nodeids::{NodeID, NodeIDs, U256};
+use flarch::{
+    broker::SubsystemHandler,
+    nodeids::{NodeIDs, U256},
+    platform_async_trait,
+};
+use tokio::sync::watch;
 
-use crate::{nodeconfig::NodeInfo, overlay::messages::NetworkWrapper};
+use crate::router::messages::NetworkWrapper;
 
-use super::core::RandomStorage;
+use super::{
+    broker::{RandomIn, RandomOut},
+    core::RandomStorage,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ModuleMessage {
@@ -13,50 +21,31 @@ pub enum ModuleMessage {
     DropConnection,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum RandomMessage {
-    Input(RandomIn),
-    Output(RandomOut),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum RandomIn {
-    NodeList(Vec<NodeInfo>),
-    NodeFailure(NodeID),
-    NodeConnected(NodeID),
-    NodeDisconnected(NodeID),
-    NodeCommFromNetwork(NodeID, ModuleMessage),
-    NetworkMapperToNetwork(NodeID, NetworkWrapper),
-    Tick,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum RandomOut {
-    ConnectNode(NodeID),
-    DisconnectNode(NodeID),
-    NodeIDsConnected(NodeIDs),
-    NodeInfosConnected(Vec<NodeInfo>),
-    NodeCommToNetwork(NodeID, ModuleMessage),
-    NetworkWrapperFromNetwork(NodeID, NetworkWrapper),
-    Storage(RandomStorage),
-}
-
 /// RandomConnections listens for new available nodes and then chooses
 /// to randomly connect to a set number of nodes.
 #[derive(Debug)]
-pub struct RandomConnections {
+pub struct Messages {
+    id: U256,
     cfg: Config,
-    pub storage: RandomStorage,
+    storage: RandomStorage,
+    tx: Option<watch::Sender<RandomStorage>>,
     fill: u32,
 }
 
-impl RandomConnections {
-    pub fn new(cfg: Config) -> Self {
-        RandomConnections {
-            cfg,
-            storage: RandomStorage::default(),
-            fill: 0,
-        }
+impl Messages {
+    pub fn new(id: U256) -> (Self, watch::Receiver<RandomStorage>) {
+        let storage = RandomStorage::default();
+        let (tx, rx) = watch::channel(storage.clone());
+        (
+            Self {
+                id,
+                cfg: Config::default(),
+                storage,
+                tx: Some(tx),
+                fill: 0,
+            },
+            rx,
+        )
     }
 
     /// Processes one message and returns messages that need to be treated by the
@@ -95,7 +84,7 @@ impl RandomConnections {
                 ])
             }
             RandomIn::NodeCommFromNetwork(id, node_msg) => self.network_msg(id, node_msg),
-            RandomIn::NetworkMapperToNetwork(dst, msg) => {
+            RandomIn::NetworkWrapperToNetwork(dst, msg) => {
                 if self.storage.connected.contains(&dst) {
                     vec![RandomOut::NodeCommToNetwork(
                         dst,
@@ -103,11 +92,12 @@ impl RandomConnections {
                     )]
                 } else {
                     log::warn!(
-                        "{self:p} Dropping message to unconnected node {dst} - making sure we're disconnected"
+                        "{self:p} Dropping message {msg:?} to unconnected node {dst} - making sure we're disconnected"
                     );
                     vec![
                         RandomOut::DisconnectNode(dst),
                         RandomOut::NodeIDsConnected(self.storage.connected.get_nodes()),
+                        RandomOut::NodeInfosConnected(self.storage.get_connected_info()),
                     ]
                 }
             }
@@ -118,7 +108,9 @@ impl RandomConnections {
     /// Processes one message from the network.
     pub fn network_msg(&mut self, id: U256, msg: ModuleMessage) -> Vec<RandomOut> {
         match msg {
-            ModuleMessage::Module(msg_mod) => vec![RandomOut::NetworkWrapperFromNetwork(id, msg_mod)],
+            ModuleMessage::Module(msg_mod) => {
+                vec![RandomOut::NetworkWrapperFromNetwork(id, msg_mod)]
+            }
             ModuleMessage::DropConnection => {
                 self.storage.disconnect((&vec![id]).into());
                 concat([vec![RandomOut::DisconnectNode(id)], self.new_connection()])
@@ -192,12 +184,29 @@ impl RandomConnections {
         vec![]
     }
 
-    fn update(&self) -> Vec<RandomOut> {
+    fn update(&mut self) -> Vec<RandomOut> {
+        self.tx.clone().map(|tx| {
+            tx.send(self.storage.clone())
+                .is_err()
+                .then(|| self.tx = None)
+        });
         vec![
             RandomOut::NodeIDsConnected(self.storage.connected.get_nodes()),
             RandomOut::NodeInfosConnected(self.storage.get_connected_info()),
-            RandomOut::Storage(self.storage.clone()),
         ]
+    }
+}
+
+#[platform_async_trait()]
+impl SubsystemHandler<RandomIn, RandomOut> for Messages {
+    async fn messages(&mut self, msgs: Vec<RandomIn>) -> Vec<RandomOut> {
+        let mut out = vec![];
+        for msg in msgs {
+            log::trace!("{} processing {msg:?}", self.id);
+            out.extend(self.process_message(msg));
+        }
+
+        out
     }
 }
 
@@ -228,18 +237,6 @@ impl Config {
     }
 }
 
-impl From<RandomIn> for RandomMessage {
-    fn from(msg: RandomIn) -> RandomMessage {
-        RandomMessage::Input(msg)
-    }
-}
-
-impl From<RandomOut> for RandomMessage {
-    fn from(msg: RandomOut) -> RandomMessage {
-        RandomMessage::Output(msg)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use flarch::start_logging;
@@ -264,7 +261,7 @@ mod tests {
         start_logging();
 
         let nodes = vec![NodeConfig::new().info];
-        let mut rc = RandomConnections::new(Config::default());
+        let mut rc = Messages::new(nodes[0].get_id()).0;
         let reply = rc.process_message(RandomIn::NodeList(nodes));
         log::debug!("{reply:?}");
 

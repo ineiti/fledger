@@ -4,7 +4,7 @@ RUN apt update && apt install -y patchelf ca-certificates
 
 WORKDIR /home
 COPY flarch ./flarch
-COPY flarch_macro ./flarch_macro
+COPY flmacro ./flmacro
 COPY flmodules ./flmodules
 COPY flnode ./flnode
 COPY cli ./cli

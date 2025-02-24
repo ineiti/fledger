@@ -1,11 +1,11 @@
 [package]
 edition = "2021"
 name = "shared"
-version = "0.8.0"
+version = "0.9.0"
 
 [dependencies]
-flmodules = {path = "../../../flmodules", version = "0.8"}
-flarch = {path = "../../../flarch", version = "0.8"}
+flmodules = {path = "../../../flmodules", version = "0.9"}
+flarch = {path = "../../../flarch", version = "0.9"}
 
 async-trait = "0.1"
 log = "0.4"
@@ -15,5 +15,5 @@ tokio = "1"
 tokio-stream = "0.1"
 
 [dev-dependencies]
-flmodules = {path = "../../../flmodules", version = "0.8", features = ["testing"]}
+flmodules = {path = "../../../flmodules", version = "0.9", features = ["testing"]}
 tokio = {version = "1", features = ["rt-multi-thread"]}

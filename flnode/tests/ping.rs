@@ -1,4 +1,4 @@
-use flarch::{broker::Broker, start_logging};
+use flarch::start_logging;
 use flmodules::{timer::TimerMessage, Modules};
 mod helpers;
 use helpers::*;
@@ -6,20 +6,17 @@ use helpers::*;
 async fn ping_n(nbr_nodes: usize) -> Result<(), NetworkError> {
     let mut net = NetworkSimul::new();
     log::info!("Creating {nbr_nodes} nodes");
-    let mut timer = Broker::new();
-    net.add_nodes(Modules::ENABLE_RAND | Modules::ENABLE_PING, nbr_nodes)
+    net.add_nodes(Modules::RAND | Modules::PING, nbr_nodes)
         .await?;
-    for node_timer in net.nodes.values_mut() {
-        node_timer.node.add_timer(timer.clone()).await;
-    }
     net.process(5).await;
-    timer.emit_msg(TimerMessage::Second)?;
+    for node_timer in net.nodes.values_mut() {
+        node_timer.node.timer.broker.emit_msg_out(TimerMessage::Second)?;
+    }
 
     for node_timer in net.nodes.values_mut() {
-        node_timer.node.update();
         assert_eq!(
             0,
-            node_timer.node.ping.as_ref().unwrap().storage.failed.len()
+            node_timer.node.ping.as_ref().unwrap().storage.borrow().failed.len()
         );
         assert_eq!(
             node_timer
@@ -28,10 +25,11 @@ async fn ping_n(nbr_nodes: usize) -> Result<(), NetworkError> {
                 .as_ref()
                 .unwrap()
                 .storage
+                .borrow()
                 .connected
                 .0
                 .len(),
-            node_timer.node.ping.as_ref().unwrap().storage.stats.len()
+            node_timer.node.ping.as_ref().unwrap().storage.borrow().stats.len()
         );
     }
 

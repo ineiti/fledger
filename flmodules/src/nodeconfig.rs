@@ -5,9 +5,9 @@
 //! based serializations when using text-based serializations like `yaml` or `json`.
 
 use ed25519_compact::{KeyPair, Noise, PublicKey, Seed, Signature};
-use flarch::nodeids::U256;
+use flarch::nodeids::{NodeID, U256};
 use serde_derive::{Deserialize, Serialize};
-use serde_with::{base64::Base64, serde_as};
+use serde_with::{hex::Hex, serde_as};
 use std::{
     convert::TryFrom,
     fmt::{Debug, Error, Formatter},
@@ -42,11 +42,13 @@ pub struct NodeInfo {
     /// What client this node runs on - "Node" or the navigator id
     pub client: String,
     /// the public key of the node
-    #[serde_as(as = "Base64")]
+    #[serde_as(as = "Hex")]
     pub pubkey: Vec<u8>,
     // capabilities of this node
     #[serde(default = "Modules::all")]
     pub modules: Modules,
+    #[serde(skip)]
+    id: Option<NodeID>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -70,11 +72,30 @@ impl NodeInfo {
             client: "libc".to_string(),
             pubkey: pubkey.as_ref().to_vec(),
             modules: Modules::all(),
+            id: None,
+        }
+    }
+
+    pub fn new_from_id(id: NodeID) -> NodeInfo {
+        let keypair = KeyPair::from_seed(Seed::default());
+        Self::new_from_id_kp(id, keypair.pk)
+    }
+
+    pub fn new_from_id_kp(id: NodeID, pubkey: PublicKey) -> NodeInfo {
+        NodeInfo {
+            name: names::Generator::default().next().unwrap(),
+            client: "libc".to_string(),
+            pubkey: pubkey.as_ref().to_vec(),
+            modules: Modules::all(),
+            id: Some(id),
         }
     }
 
     /// Returns the unique id, based on the public key.
     pub fn get_id(&self) -> U256 {
+        if let Some(id) = self.id {
+            return id;
+        }
         let a: [u8; PublicKey::BYTES] = self.pubkey.clone().try_into().unwrap();
         U256::from(a)
     }
@@ -135,6 +156,7 @@ impl From<NodeInfoV1> for NodeInfo {
             client: ni.client,
             pubkey: ni.pubkey,
             modules: Modules::empty(),
+            id: None,
         }
     }
 }
@@ -147,6 +169,7 @@ impl TryFrom<NodeInfoToml> for NodeInfo {
             client: nit.client,
             pubkey: nit.pubkey.ok_or(ConfigError::PublicKeyMissing)?,
             modules: Modules::empty(),
+            id: None,
         })
     }
 }
@@ -178,7 +201,7 @@ pub struct NodeConfig {
     /// info about this node
     pub info: NodeInfo,
     /// the cryptographic keypair as a vector of bytes
-    #[serde_as(as = "Base64")]
+    #[serde_as(as = "Hex")]
     pub keypair: Vec<u8>,
 }
 
@@ -194,6 +217,15 @@ impl NodeConfig {
         let keypair = KeyPair::from_seed(Seed::default());
         NodeConfig {
             info: NodeInfo::new(keypair.pk),
+            keypair: keypair.as_ref().to_vec(),
+        }
+    }
+
+    /// Returns a new NodeConfig with an overwriting id
+    pub fn new_id(id: NodeID) -> Self {
+        let keypair = KeyPair::from_seed(Seed::default());
+        NodeConfig {
+            info: NodeInfo::new_from_id_kp(id, keypair.pk),
             keypair: keypair.as_ref().to_vec(),
         }
     }

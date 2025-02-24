@@ -2,20 +2,22 @@ use async_trait::async_trait;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{ErrorEvent, MessageEvent, WebSocket};
 
-use crate::broker::{Broker, Subsystem, SubsystemHandler};
+use crate::broker::{Broker, SubsystemHandler};
 
 use crate::tasks::{now, wait_ms};
-use crate::web_rtc::websocket::{WSClientError, WSClientInput, WSClientMessage, WSClientOutput};
+use crate::web_rtc::websocket::{WSClientError, WSClientIn, WSClientOut};
 
 pub struct WebSocketClient {
     url: String,
     ws: Option<WebSocket>,
-    broker: Broker<WSClientMessage>,
+    broker: Broker<WSClientIn, WSClientOut>,
     last_connection: i64,
 }
 
 impl WebSocketClient {
-    pub async fn connect(url: &str) -> Result<Broker<WSClientMessage>, WSClientError> {
+    pub async fn connect(
+        url: &str,
+    ) -> Result<Broker<WSClientIn, WSClientOut>, WSClientError> {
         let wsw = WebSocketClient {
             url: url.to_string(),
             ws: None,
@@ -23,16 +25,14 @@ impl WebSocketClient {
             last_connection: 0,
         };
         let mut broker = wsw.broker.clone();
-        broker
-            .add_subsystem(Subsystem::Handler(Box::new(wsw)))
-            .await?;
-        broker.emit_msg(WSClientMessage::Input(WSClientInput::Connect))?;
+        broker.add_handler(Box::new(wsw)).await?;
+        broker.emit_msg_in(WSClientIn::Connect)?;
         Ok(broker)
     }
 
     async fn connect_ws(&mut self) -> Result<(), WSClientError> {
         if self.ws.is_some() && now() / 1000 < self.last_connection + 10 {
-            return Ok(())
+            return Ok(());
         }
         self.last_connection = now() / 1000;
 
@@ -72,7 +72,7 @@ impl WebSocketClient {
                 if let Ok(txt) = e.data().dyn_into::<js_sys::JsString>() {
                     let txt_str = txt.as_string().unwrap();
                     broker_clone
-                        .emit_msg(WSClientOutput::Message(txt_str).into())
+                        .emit_msg_out(WSClientOut::Message(txt_str))
                         .err()
                         .map(|e| log::error!("On_message_callback error: {e:?}"));
                 } else {
@@ -87,9 +87,7 @@ impl WebSocketClient {
             let mut broker_clone = self.broker.clone();
             let onerror_callback = Closure::wrap(Box::new(move |_: ErrorEvent| {
                 broker_clone
-                    .emit_msg(WSClientMessage::Output(WSClientOutput::Error(
-                        "WS-error".into(),
-                    )))
+                    .emit_msg_out(WSClientOut::Error("WS-error".into()))
                     .err()
                     .map(|e| log::error!("On_error_callback error: {e:?}"));
             }) as Box<dyn FnMut(ErrorEvent)>);
@@ -99,7 +97,7 @@ impl WebSocketClient {
             let mut broker_clone = self.broker.clone();
             let onopen_callback = Closure::wrap(Box::new(move |_| {
                 broker_clone
-                    .emit_msg(WSClientMessage::Output(WSClientOutput::Connected))
+                    .emit_msg_out(WSClientOut::Connected)
                     .err()
                     .map(|e| log::error!("On_open_callback error: {e:?}"));
             }) as Box<dyn FnMut(JsValue)>);
@@ -110,32 +108,30 @@ impl WebSocketClient {
 }
 
 #[async_trait(?Send)]
-impl SubsystemHandler<WSClientMessage> for WebSocketClient {
-    async fn messages(&mut self, msgs: Vec<WSClientMessage>) -> Vec<WSClientMessage> {
+impl SubsystemHandler<WSClientIn, WSClientOut> for WebSocketClient {
+    async fn messages(&mut self, msgs: Vec<WSClientIn>) -> Vec<WSClientOut> {
         for msg in msgs {
-            if let WSClientMessage::Input(msg_in) = msg {
-                match msg_in {
-                    WSClientInput::Message(msg) => {
-                        if let Some(ws) = self.ws.as_mut() {
-                            if ws.ready_state() != WebSocket::OPEN {
-                                log::debug!("WebSocket is not open for {msg:?}");
-                                if let Err(e) = self.connect_ws().await {
-                                    log::warn!("While reconnecting: {e}");
-                                }
-                                return vec![];
+            match msg {
+                WSClientIn::Message(msg) => {
+                    if let Some(ws) = self.ws.as_mut() {
+                        if ws.ready_state() != WebSocket::OPEN {
+                            log::debug!("WebSocket is not open for {msg:?}");
+                            if let Err(e) = self.connect_ws().await {
+                                log::warn!("While reconnecting: {e}");
                             }
-                            ws.send_with_str(&msg)
-                                .err()
-                                .map(|e| log::error!("Error sending message: {:?}", e));
+                            return vec![];
                         }
+                        ws.send_with_str(&msg)
+                            .err()
+                            .map(|e| log::error!("Error sending message: {:?}", e));
                     }
-                    WSClientInput::Disconnect => {
-                        // ws.disconnect();
-                    }
-                    WSClientInput::Connect => {
-                        if let Err(e) = self.connect_ws().await {
-                            log::warn!("While reconnecting: {e}");
-                        }
+                }
+                WSClientIn::Disconnect => {
+                    // ws.disconnect();
+                }
+                WSClientIn::Connect => {
+                    if let Err(e) = self.connect_ws().await {
+                        log::warn!("While reconnecting: {e}");
                     }
                 }
             }

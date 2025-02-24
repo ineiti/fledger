@@ -11,7 +11,7 @@ use flarch::{
     web_rtc::connection::ConnectionConfig,
 };
 use flmodules::nodeconfig::NodeConfig;
-use flmodules::network::messages::NetworkOut;
+use flmodules::network::broker::NetworkOut;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -47,7 +47,7 @@ async fn ping() -> Result<(), BrokerError> {
     let nc = NodeConfig::new();
     log::info!("Our node-ID is {:?}", nc.info.get_id());
     // Connect to the signalling server and wait for connection requests.
-    let mut net = flmodules::network::network_start(
+    let mut net = flmodules::network::network_webrtc_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )
@@ -82,7 +82,7 @@ async fn server() -> Result<(), BrokerError> {
     // Create a random node-configuration. It uses serde for easy serialization.
     let nc = NodeConfig::new();
     // Connect to the signalling server and wait for connection requests.
-    let mut net = flmodules::network::network_start(
+    let mut net = flmodules::network::network_webrtc_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )
@@ -101,7 +101,7 @@ async fn client(server_id: &str) -> Result<(), BrokerError> {
     // Create a random node-configuration. It uses serde for easy serialization.
     let nc = NodeConfig::new();
     // Connect to the signalling server and wait for connection requests.
-    let mut net = flmodules::network::network_start(
+    let mut net = flmodules::network::network_webrtc_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )

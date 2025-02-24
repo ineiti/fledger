@@ -5,20 +5,18 @@ use std::pin::Pin;
 use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 
-use crate::broker::{Broker, Subsystem, SubsystemHandler};
+use crate::broker::{Broker, SubsystemHandler};
 use crate::tasks::wait_ms;
-use crate::web_rtc::websocket::{
-    WSClientInput, WSClientMessage, WSClientOutput, WSError, WSSError,
-};
+use crate::web_rtc::websocket::{BrokerWSClient, WSClientIn, WSClientOut, WSError, WSSError};
 
 pub struct WebSocketClient {
     url: String,
     write: Option<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>>,
-    broker: Broker<WSClientMessage>,
+    broker: BrokerWSClient,
 }
 
 impl WebSocketClient {
-    pub async fn connect(url: &str) -> Result<Broker<WSClientMessage>, WSSError> {
+    pub async fn connect(url: &str) -> Result<BrokerWSClient, WSSError> {
         let wsb = WebSocketClient {
             url: url.to_string(),
             write: None,
@@ -26,9 +24,9 @@ impl WebSocketClient {
         };
         let mut broker = wsb.broker.clone();
         broker
-            .add_subsystem(Subsystem::Handler(Box::new(wsb)))
+            .add_handler(Box::new(wsb))
             .await?;
-        broker.emit_msg(WSClientMessage::Input(WSClientInput::Connect))?;
+        broker.emit_msg_in(WSClientIn::Connect)?;
         Ok(broker)
     }
 
@@ -42,7 +40,7 @@ impl WebSocketClient {
                         Ok(msg) => {
                             if msg.is_text() {
                                 broker_cl
-                                    .emit_msg(WSClientOutput::Message(msg.to_string()).into())
+                                    .emit_msg_out(WSClientOut::Message(msg.to_string()))
                                     .expect("Failed to emit message");
                             }
                         }
@@ -50,7 +48,7 @@ impl WebSocketClient {
                             log::warn!("Closing connection because of error: {:?}", e);
                             log::warn!("Trying to reconnect");
                             broker_cl
-                                .emit_msg(WSClientMessage::Input(WSClientInput::Connect))
+                                .emit_msg_in(WSClientIn::Connect)
                                 .expect("tried to reconnect");
                             return;
                         }
@@ -77,41 +75,39 @@ impl WebSocketClient {
 }
 
 #[async_trait]
-impl SubsystemHandler<WSClientMessage> for WebSocketClient {
-    async fn messages(&mut self, msgs: Vec<WSClientMessage>) -> Vec<WSClientMessage> {
+impl SubsystemHandler<WSClientIn, WSClientOut> for WebSocketClient {
+    async fn messages(&mut self, msgs: Vec<WSClientIn>) -> Vec<WSClientOut> {
         for msg in msgs {
-            if let WSClientMessage::Input(msg_in) = msg {
-                match msg_in {
-                    WSClientInput::Message(msg) => {
-                        if let Some(mut write) = self.write.as_mut() {
-                            Pin::new(&mut write)
-                                .start_send(tungstenite::Message::text(msg))
-                                .map_err(|e| WSError::Underlying(e.to_string()))
-                                .expect("Error sending message");
-                            Pin::new(&mut write)
-                                .flush()
-                                .await
-                                .map_err(|e| WSError::Underlying(e.to_string()))
-                                .expect("msg flush error");
-                        } else {
-                            log::warn!("Tried to write a message to a closed connection");
-                            if let Err(e) = self.connect_ws().await {
-                                log::error!("Couldn't connect: {e}");
-                            }
-                        }
-                    }
-                    WSClientInput::Disconnect => {
-                        if let Some(mut write) = self.write.take() {
-                            write.close().await.unwrap();
-                        } else {
-                            log::warn!("Trying to disconnect a disconnected connection");
-                        }
-                        return vec![WSClientOutput::Disconnect.into()];
-                    }
-                    WSClientInput::Connect => {
+            match msg {
+                WSClientIn::Message(msg) => {
+                    if let Some(mut write) = self.write.as_mut() {
+                        Pin::new(&mut write)
+                            .start_send(tungstenite::Message::text(msg))
+                            .map_err(|e| WSError::Underlying(e.to_string()))
+                            .expect("Error sending message");
+                        Pin::new(&mut write)
+                            .flush()
+                            .await
+                            .map_err(|e| WSError::Underlying(e.to_string()))
+                            .expect("msg flush error");
+                    } else {
+                        log::warn!("Tried to write a message to a closed connection");
                         if let Err(e) = self.connect_ws().await {
                             log::error!("Couldn't connect: {e}");
                         }
+                    }
+                }
+                WSClientIn::Disconnect => {
+                    if let Some(mut write) = self.write.take() {
+                        write.close().await.unwrap();
+                    } else {
+                        log::warn!("Trying to disconnect a disconnected connection");
+                    }
+                    return vec![WSClientOut::Disconnect];
+                }
+                WSClientIn::Connect => {
+                    if let Err(e) = self.connect_ws().await {
+                        log::error!("Couldn't connect: {e}");
                     }
                 }
             }

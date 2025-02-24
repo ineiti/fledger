@@ -3,14 +3,17 @@
 //! This is a list of messages that are used by the [`crate::web_rtc::WebRTCConn`] and
 //! [`crate::web_rtc::node_connection::NodeConnection`] brokers to communicate with the libc and wasm implementations
 //! of the WebRTC subsystem.
-//! Both the wasm and the libc implementation for the WebRTC system return a [`Broker<WebRTCMessage>`]
+//! Both the wasm and the libc implementation for the WebRTC system return a [`Broker<WebRTCInput, WebRTCOutput>`]
 //! that is then given to the [`crate::web_rtc::WebRTCConn`].
 use futures::{channel::oneshot::Canceled, Future};
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc::RecvError;
 use thiserror::Error;
 
-use crate::{broker::{Broker, BrokerError}, nodeids::NodeID};
+use crate::{
+    broker::{BrokerError, Broker},
+    nodeids::NodeID,
+};
 
 use super::node_connection::Direction;
 
@@ -38,12 +41,20 @@ pub enum SetupError {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-/// Messages used in the WebRTC subsystem.
-pub enum WebRTCMessage {
-    /// Sent from the WebRTC subsystem
-    Output(WebRTCOutput),
-    /// Commands for the WebRTC subsystem
-    Input(WebRTCInput),
+/// Command for the WebRTC subsystem
+pub enum WebRTCInput {
+    /// Send a text message
+    Text(String),
+    /// Treat a setup message
+    Setup(PeerMessage),
+    /// Flush all pending messages
+    Flush,
+    /// Send the current state of the connection
+    UpdateState,
+    /// Try to reconnect, or throw an error if incoming connection
+    Reset,
+    /// Disconnect this node
+    Disconnect,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -63,36 +74,22 @@ pub enum WebRTCOutput {
     Error(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-/// Command for the WebRTC subsystem
-pub enum WebRTCInput {
-    /// Send a text message
-    Text(String),
-    /// Treat a setup message
-    Setup(PeerMessage),
-    /// Flush all pending messages
-    Flush,
-    /// Send the current state of the connection
-    UpdateState,
-    /// Try to reconnect, or throw an error if incoming connection
-    Reset,
-    /// Disconnect this node
-    Disconnect,
-}
-
-#[cfg(target_family="unix")]
-/// The spawner will create a new [`Broker<WebRTCMessage>`] ready to handle either an incoing
+#[cfg(target_family = "unix")]
+/// The spawner will create a new [`Broker<WebRTCInput, WebRTCOutput>`] ready to handle either an incoing
 /// or an outgoing connection.
 pub type WebRTCSpawner = Box<
-    dyn Fn() -> Box<dyn Future<Output = Result<Broker<WebRTCMessage>, SetupError>> + Unpin + Send>
-        + Send
+    dyn Fn() -> Box<
+            dyn Future<Output = Result<Broker<WebRTCInput, WebRTCOutput>, SetupError>>
+                + Unpin
+                + Send,
+        > + Send
         + Sync,
 >;
-#[cfg(target_family="wasm")]
-/// The spawner will create a new [`Broker<WebRTCMessage>`] ready to handle either an incoing
+#[cfg(target_family = "wasm")]
+/// The spawner will create a new [`Broker<WebRTCInput, WebRTCOutput>`] ready to handle either an incoing
 /// or an outgoing connection.
 pub type WebRTCSpawner =
-    Box<dyn Fn() -> Box<dyn Future<Output = Result<Broker<WebRTCMessage>, SetupError>> + Unpin>>;
+    Box<dyn Fn() -> Box<dyn Future<Output = Result<Broker<WebRTCInput, WebRTCOutput>, SetupError>> + Unpin>>;
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 /// How the current connection is being setup.

@@ -3,32 +3,40 @@ use std::sync::{
     Arc,
 };
 
-use crate::broker::{Broker, Subsystem, SubsystemHandler};
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use webrtc::{
     api::{
-        interceptor_registry::register_default_interceptors, media_engine::MediaEngine, setting_engine::SettingEngine, APIBuilder
-    }, data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel}, ice::mdns::MulticastDnsMode, ice_transport::{
+        interceptor_registry::register_default_interceptors, media_engine::MediaEngine,
+        setting_engine::SettingEngine, APIBuilder,
+    },
+    data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel},
+    ice::mdns::MulticastDnsMode,
+    ice_transport::{
         ice_candidate::{RTCIceCandidate, RTCIceCandidateInit},
         ice_connection_state::RTCIceConnectionState,
         ice_credential_type::RTCIceCredentialType,
         ice_server::RTCIceServer,
-    }, interceptor::registry::Registry, peer_connection::{
+    },
+    interceptor::registry::Registry,
+    peer_connection::{
         configuration::RTCConfiguration,
         peer_connection_state::RTCPeerConnectionState,
         sdp::{sdp_type::RTCSdpType, session_description::RTCSessionDescription},
         RTCPeerConnection,
-    }
+    },
 };
 
-use crate::web_rtc::{
-    connection::{ConnectionConfig, HostLogin},
-    messages::{
-        ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError, SignalingState,
-        WebRTCInput, WebRTCMessage, WebRTCOutput, WebRTCSpawner,
+use crate::{
+    broker::{Broker, SubsystemHandler},
+    web_rtc::{
+        connection::{ConnectionConfig, HostLogin},
+        messages::{
+            ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError,
+            SignalingState, WebRTCInput, WebRTCOutput, WebRTCSpawner,
+        },
+        node_connection::Direction,
     },
-    node_connection::Direction,
 };
 
 fn get_ice_server(host: HostLogin) -> RTCIceServer {
@@ -48,7 +56,7 @@ fn get_ice_server(host: HostLogin) -> RTCIceServer {
 pub struct WebRTCConnectionSetupLibc {
     connection: RTCPeerConnection,
     rtc_data: Arc<Mutex<Option<Arc<RTCDataChannel>>>>,
-    broker: Broker<WebRTCMessage>,
+    broker: Broker<WebRTCInput, WebRTCOutput>,
     // While the connection is not up, queue up messages in here.
     queue: Vec<String>,
     direction: Option<Direction>,
@@ -59,7 +67,7 @@ pub struct WebRTCConnectionSetupLibc {
 impl WebRTCConnectionSetupLibc {
     pub async fn new_box(
         connection_cfg: ConnectionConfig,
-    ) -> Result<Broker<WebRTCMessage>, SetupError> {
+    ) -> Result<Broker<WebRTCInput, WebRTCOutput>, SetupError> {
         let mut web_rtc = Box::new(WebRTCConnectionSetupLibc {
             connection: Self::make_connection(connection_cfg.clone()).await?,
             rtc_data: Arc::new(Mutex::new(None)),
@@ -73,7 +81,7 @@ impl WebRTCConnectionSetupLibc {
         web_rtc.setup_connection().await?;
 
         let mut broker = web_rtc.broker.clone();
-        broker.add_subsystem(Subsystem::Handler(web_rtc)).await?;
+        broker.add_handler(web_rtc).await?;
 
         Ok(broker)
     }
@@ -138,9 +146,7 @@ impl WebRTCConnectionSetupLibc {
                     if let Some(ice) = ice_op {
                         let ice_str = ice.to_json().unwrap().candidate;
                         broker_cl
-                            .emit_msg(WebRTCMessage::Output(WebRTCOutput::Setup(
-                                PeerMessage::IceCandidate(ice_str),
-                            )))
+                            .emit_msg_out(WebRTCOutput::Setup(PeerMessage::IceCandidate(ice_str)))
                             .err()
                             .map(|e| log::warn!("Ice candidate queued but not processed: {:?}", e));
                     }
@@ -159,18 +165,16 @@ impl WebRTCConnectionSetupLibc {
 
                 let mut broker_cl = broker_cl.clone();
                 Box::pin(async move {
-                    let msg = match s {
+                    match s {
                         RTCPeerConnectionState::Disconnected
                         | RTCPeerConnectionState::Failed
                         | RTCPeerConnectionState::Closed => {
-                            WebRTCMessage::Output(WebRTCOutput::Disconnected)
+                            broker_cl.emit_msg_out(WebRTCOutput::Disconnected)
                         }
-                        _ => WebRTCMessage::Input(WebRTCInput::UpdateState),
-                    };
-                    broker_cl
-                        .emit_msg(msg)
-                        .err()
-                        .map(|e| log::warn!("UpdateState queued but not processed: {:?}", e));
+                        _ => broker_cl.emit_msg_in(WebRTCInput::UpdateState),
+                    }
+                    .err()
+                    .map(|e| log::warn!("UpdateState queued but not processed: {:?}", e));
                 })
             },
         ));
@@ -367,7 +371,7 @@ impl WebRTCConnectionSetupLibc {
     async fn register_data_channel(
         rtc_data: Arc<Mutex<Option<Arc<RTCDataChannel>>>>,
         data_channel: Arc<RTCDataChannel>,
-        broker: Broker<WebRTCMessage>,
+        broker: Broker<WebRTCInput, WebRTCOutput>,
         resets: Arc<AtomicU32>,
     ) {
         let mut broker_cl = broker.clone();
@@ -382,11 +386,11 @@ impl WebRTCConnectionSetupLibc {
             log::trace!("DataChannel is opened");
             Box::pin(async move {
                 broker_cl
-                    .emit_msg(WebRTCMessage::Output(WebRTCOutput::Connected))
+                    .emit_msg_out(WebRTCOutput::Connected)
                     .err()
                     .map(|e| log::warn!("Connected queued but not processed: {:?}", e));
                 broker_cl
-                    .emit_msg(WebRTCMessage::Input(WebRTCInput::Flush))
+                    .emit_msg_in(WebRTCInput::Flush)
                     .err()
                     .map(|e| log::warn!("Flush queued but not processed: {:?}", e));
             })
@@ -400,7 +404,7 @@ impl WebRTCConnectionSetupLibc {
             let mut broker = broker.clone();
             Box::pin(async move {
                 broker
-                    .emit_msg(WebRTCMessage::Output(WebRTCOutput::Text(msg_str)))
+                    .emit_msg_out(WebRTCOutput::Text(msg_str))
                     .err()
                     .map(|e| log::warn!("Text queued but not processed: {:?}", e));
             })
@@ -413,21 +417,19 @@ impl WebRTCConnectionSetupLibc {
         rtc_data.lock().await.replace(data_channel);
     }
 
-    async fn msg_in(&mut self, msg: WebRTCInput) -> Result<Option<WebRTCMessage>, SetupError> {
+    async fn msg_in(&mut self, msg: WebRTCInput) -> Result<Option<WebRTCOutput>, SetupError> {
         match msg {
             WebRTCInput::Text(s) => self.send(s).await?,
             WebRTCInput::Setup(s) => {
                 if let Some(msg) = self.setup(s).await? {
-                    return Ok(Some(WebRTCMessage::Output(WebRTCOutput::Setup(msg))));
+                    return Ok(Some(WebRTCOutput::Setup(msg)));
                 }
             }
             WebRTCInput::Flush => {
                 self.send_queue().await?;
             }
             WebRTCInput::UpdateState => {
-                return Ok(Some(WebRTCMessage::Output(WebRTCOutput::State(
-                    self.get_state().await?,
-                ))));
+                return Ok(Some(WebRTCOutput::State(self.get_state().await?)));
             }
             WebRTCInput::Disconnect => {
                 if let Err(e) = self.reset().await {
@@ -477,17 +479,15 @@ impl WebRTCConnectionSetupLibc {
 }
 
 #[async_trait]
-impl SubsystemHandler<WebRTCMessage> for WebRTCConnectionSetupLibc {
-    async fn messages(&mut self, msgs: Vec<WebRTCMessage>) -> Vec<WebRTCMessage> {
+impl SubsystemHandler<WebRTCInput, WebRTCOutput> for WebRTCConnectionSetupLibc {
+    async fn messages(&mut self, msgs: Vec<WebRTCInput>) -> Vec<WebRTCOutput> {
         let mut out = vec![];
         for msg in msgs {
-            if let WebRTCMessage::Input(msg_in) = msg {
-                match self.msg_in(msg_in.clone()).await {
-                    Ok(Some(msg)) => out.push(msg),
-                    Ok(None) => {}
-                    Err(e) => {
-                        log::trace!("{:p} Error processing message {msg_in:?}: {:?}", self, e);
-                    }
+            match self.msg_in(msg.clone()).await {
+                Ok(Some(msg)) => out.push(msg),
+                Ok(None) => {}
+                Err(e) => {
+                    log::trace!("{:p} Error processing message {msg:?}: {:?}", self, e);
                 }
             }
         }

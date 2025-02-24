@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "test/signal-fledger",
+    "test/webrtc-libc-wasm/*",
+    "examples/ping",
+    "examples/ping-pong/libc",
+    "fl*",
+    "cli/*",
+]
+
+exclude = ["flbrowser", "test/webrtc-libc-wasm/wasm", "test/fledger-nodejs", "examples/ping-pong/wasm"]

@@ -15,13 +15,22 @@
     <h2><i id="node_info">Starting up</i></h2>
 
     <p>Nodes connected/online: <span id="nodes_connected"></span> /
-      <span id="nodes_online"></span></p>
+      <span id="nodes_online"></span>
+    </p>
 
     <ul class="nav nav-tabs" id="myTab" role="tablist">
       <li class="nav-item" role="presentation">
         <button class="nav-link active" id="welcome-tab" data-bs-toggle="tab" data-bs-target="#welcome" type="button"
           role="tab" aria-controls="welcome" aria-selected="true">Welcome</button>
       </li>
+      <!-- <li class="nav-item" role="presentation">
+        <button class="nav-link" id="dht-storage-tab" data-bs-toggle="tab" data-bs-target="#dht-storage" type="button"
+          role="tab" aria-controls="dht-storage" aria-selected="true">DHT-Storage</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="pages-tab" data-bs-toggle="tab" data-bs-target="#pages" type="button" role="tab"
+          aria-controls="pages" aria-selected="true">Manage Pages</button>
+      </li> -->
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="blackboard-tab" data-bs-toggle="tab" data-bs-target="#blackboard" type="button"
           role="tab" aria-controls="blackboard" aria-selected="true">Blackboard</button>
@@ -77,6 +86,55 @@
           <li>Anonymous surfing</li>
         </ul>
         <p></p>
+      </div>
+
+      <div class="tab-pane fade" id="dht-storage" role="tabpanel" aria-labelledby="dht-storage-tab">
+        <br>
+        <h3>DHT-Storage</h3>
+        <p>A DHT storage allows you to store data in a Distributed Hash Table.
+          All your data is split up in packets and then distributed over the available nodes.
+          The nodes exchange regularly to update which data they store.
+          In the ideal case, once you store data in the system, it will be kept even if nodes
+          come and go.
+          While your node (your browser) is connected to the network, it will also store data from other
+          nodes, so that it can be retrieved by them.
+        </p>
+        <h4>Statistics</h4>
+        <p>Here are some statistices about your node:</p>
+        <ul>
+          <li>Realm 1015da7a:</li>
+          <ul>
+            <li>Number of Flos (blobs): 23</li>
+            <li>Bucket distribution of Flos: 4 - 2 - 3 - 1 - 0 - 0 - 0 - 2 - 1</li>
+            <li>Bucket distribution of other nodes available: 0 - 1 - 0 - 2 - 0 - 1</li>
+            <li>Memory: Total (1MB), Used: (553kB)</li>
+          </ul>
+        </ul>
+      </div>
+
+      <div class="tab-pane fade" id="pages" role="tabpanel" aria-labelledby="pages-tab">
+        <br>
+        <h3>Pages</h3>
+        <p>On the DHT-Storage, you can search for other pages and upload your own web-pages.
+          Once you upload a web-page, it will be stored on the other nodes for visitors to be
+          seen.
+        </p>
+        <p>Here are the currently available pages:</p>
+        <ul>
+          <li>Root: Link
+            <ul>
+              <li>Fledger: Link
+                <ul>
+                  <li>Documentation: Link</li>
+                  <li>Ideas: Link</li>
+                </ul>
+              </li>
+              <li>Unofficial Pages: Add-Page</li>
+              <li>Something: Link</li>
+              <li>Else: Link</li>
+            </ul>
+          </li>
+        </ul>
       </div>
 
       <div class="tab-pane fade" id="blackboard" role="tabpanel" aria-labelledby="blackboard-tab">
@@ -146,7 +204,8 @@
     <br />
     <div style="float: right;" id="version"></div>
     <div style="float: left;">
-      <a href="https://github.com/ineiti/fledger">GitHub</a> - <a href="https://ioc.exchange/@ineiti">@ineiti@ioc.exchange</a>
+      <a href="https://github.com/ineiti/fledger">GitHub</a> - <a
+        href="https://social.epfl.ch/@ineiti">@ineiti@social.epfl.ch</a>
     </div>
   </div>
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use flarch::nodeids::NodeID;
+use flarch::nodeids::{NodeID, NodeIDs};
 use serde::{Deserialize, Serialize};
 
 use super::messages::PingConfig;
@@ -30,7 +30,29 @@ impl PingStorage {
         }
     }
 
-    pub fn new_node(&mut self, id: NodeID) {
+    pub fn set_nodes(&mut self, ids: NodeIDs) {
+        let failed = self
+            .stats
+            .keys()
+            .filter(|id| !ids.0.contains(id))
+            .cloned()
+            .collect::<Vec<_>>();
+        for id in &failed {
+            self.remove_node(id);
+        }
+
+        let new_nodes = ids
+            .0
+            .iter()
+            .filter(|id| !self.stats.contains_key(id))
+            .cloned()
+            .collect::<Vec<_>>();
+        for id in new_nodes {
+            self.add_node(id);
+        }
+    }
+
+    pub fn add_node(&mut self, id: NodeID) {
         if self.stats.contains_key(&id) {
             return;
         }
@@ -51,7 +73,7 @@ impl PingStorage {
             stat.rx += 1;
             self.stats.insert(id, stat);
         } else {
-            self.new_node(id);
+            self.add_node(id);
         }
     }
 
@@ -96,7 +118,7 @@ mod tests {
         let n1 = NodeID::rnd();
         let n2 = NodeID::rnd();
 
-        s.new_node(n1);
+        s.add_node(n1);
         assert_eq!(1, s.stats.len());
         assert_eq!(0, s.stats.get(&n1).unwrap().lastping);
         assert_eq!(vec![n1], s.ping);
@@ -108,14 +130,14 @@ mod tests {
         assert_eq!(0, s.stats.len());
         assert_eq!(1, s.failed.len());
 
-        s.new_node(n1);
+        s.add_node(n1);
         s.pong(n1);
         assert_eq!(1, s.stats.len());
         assert_eq!(0, s.stats.get(&n1).unwrap().lastping);
         s.tick();
         s.tick();
 
-        s.new_node(n2);
+        s.add_node(n2);
         assert_eq!(2, s.stats.len());
         s.tick();
         assert_eq!(1, s.stats.len());

@@ -1,14 +1,15 @@
 use flarch::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    nodeids::{NodeID, U256}, platform_async_trait,
+    broker::{Broker, BrokerError, SubsystemHandler},
+    nodeids::{NodeID, U256},
+    platform_async_trait,
 };
 use flmodules::{
+    network::broker::{BrokerNetwork, NetworkIn, NetworkOut},
     nodeconfig::NodeInfo,
-    timer::{TimerBroker, TimerMessage},
+    timer::Timer,
 };
-use flmodules::network::messages::{NetworkIn, NetworkMessage, NetworkOut};
 
-use crate::common::{PPMessage, PPMessageNode};
+use crate::common::{PPMessageNode, PingPongIn, PingPongOut};
 
 /// This only runs on localhost.
 pub const URL: &str = "ws://localhost:8765";
@@ -20,7 +21,6 @@ pub const URL: &str = "ws://localhost:8765";
 /// wasm library.
 pub struct PingPong {
     id: U256,
-    net: Broker<NetworkMessage>,
     nodes: Vec<NodeInfo>,
 }
 
@@ -30,30 +30,35 @@ impl PingPong {
     /// processed to interpret ping's and pong's.
     pub async fn new(
         id: U256,
-        mut net: Broker<NetworkMessage>,
-    ) -> Result<Broker<PPMessage>, BrokerError> {
+        net: BrokerNetwork,
+    ) -> Result<Broker<PingPongIn, PingPongOut>, BrokerError> {
         let mut pp_broker = Broker::new();
         // Interpret network messages and wrap relevant messages to ourselves.
-        net.forward(pp_broker.clone(), Box::new(Self::net_to_pp))
-            .await;
-        // Forward "second" ticks, but ignore minute ticks
-        TimerBroker::start()
-            .await?
-            .forward(
-                pp_broker.clone(),
-                Box::new(|msg| (msg == TimerMessage::Second).then(|| PPMessage::Tick)),
+        pp_broker
+            .add_translator_link(
+                net.clone(),
+                Box::new(|msg| {
+                    Some(match msg {
+                        PingPongOut::ToNetwork(dst, pp_msg) => {
+                            NetworkIn::MessageToNode(dst, serde_json::to_string(&pp_msg).unwrap())
+                        }
+                        PingPongOut::WSUpdateListRequest => NetworkIn::WSUpdateListRequest,
+                    })
+                }),
+                Box::new(Self::net_to_pp),
             )
-            .await;
+            .await?;
+        // Forward "second" ticks, but ignore minute ticks
+        Timer::start()
+            .await?
+            .tick_second(pp_broker.clone(), PingPongIn::Tick)
+            .await?;
         // Add ourselves as a handler to the broker.
         // Because of rust's ownership protection, this means that this structure is not available
         // anymore to the caller.
         // So the only way to interact with this structure is by sending messages to the broker.
         pp_broker
-            .add_subsystem(Subsystem::Handler(Box::new(Self {
-                id,
-                net,
-                nodes: vec![],
-            })))
+            .add_handler(Box::new(Self { id, nodes: vec![] }))
             .await
             .map(|_| ())?;
         Ok(pp_broker)
@@ -64,38 +69,16 @@ impl PingPong {
     // For MessageFromNode, the enclosed message is interpreted as a PPMessageNode and sent to this
     // broker.
     // All other messages coming from Network are ignored.
-    fn net_to_pp(msg: NetworkMessage) -> Option<PPMessage> {
-        if let NetworkMessage::Output(rep) = msg {
-            match rep {
-                NetworkOut::MessageFromNode(from, node_msg) => {
-                    serde_json::from_str::<PPMessageNode>(&node_msg)
-                        .ok()
-                        .map(|ppm| PPMessage::FromNetwork(from, ppm))
-                }
-                NetworkOut::NodeListFromWS(nodes) => Some(PPMessage::List(nodes)),
-                _ => None,
+    fn net_to_pp(msg: NetworkOut) -> Option<PingPongIn> {
+        match msg {
+            NetworkOut::MessageFromNode(from, node_msg) => {
+                serde_json::from_str::<PPMessageNode>(&node_msg)
+                    .ok()
+                    .map(|ppm| PingPongIn::FromNetwork(from, ppm))
             }
-        } else {
-            None
+            NetworkOut::NodeListFromWS(nodes) => Some(PingPongIn::List(nodes)),
+            _ => None,
         }
-    }
-
-    // Sends a generic NetworkIn type message to the network-broker.
-    async fn send_net(&mut self, msg: NetworkIn) {
-        self.net
-            .emit_msg(NetworkMessage::Input(msg.clone()))
-            .err()
-            .map(|e| log::error!("While sending {:?} to net: {:?}", msg, e));
-    }
-
-    // Wraps a PPMessageNode into a json and sends it over the network to the
-    // dst address.
-    async fn send_net_ppm(&mut self, dst: U256, msg: &PPMessageNode) {
-        self.send_net(NetworkIn::MessageToNode(
-            dst,
-            serde_json::to_string(msg).unwrap(),
-        ))
-        .await;
     }
 }
 
@@ -104,21 +87,19 @@ impl PingPong {
 // For PPMessageNode::Ping messages, a pong is replied, and an update list request is sent to
 // the signalling server.
 #[platform_async_trait()]
-impl SubsystemHandler<PPMessage> for PingPong {
-    async fn messages(&mut self, msgs: Vec<PPMessage>) -> Vec<PPMessage> {
+impl SubsystemHandler<PingPongIn, PingPongOut> for PingPong {
+    async fn messages(&mut self, msgs: Vec<PingPongIn>) -> Vec<PingPongOut> {
+        let mut out = vec![];
         for msg in msgs {
             log::trace!("{}: got message {:?}", self.id, msg);
 
             match msg {
-                PPMessage::ToNetwork(from, ppm) => {
-                    self.send_net_ppm(from, &ppm).await;
+                PingPongIn::FromNetwork(from, PPMessageNode::Ping) => {
+                    out.push(PingPongOut::ToNetwork(from, PPMessageNode::Pong));
+                    out.push(PingPongOut::WSUpdateListRequest);
                 }
-                PPMessage::FromNetwork(from, PPMessageNode::Ping) => {
-                    self.send_net_ppm(from, &PPMessageNode::Pong).await;
-                    self.send_net(NetworkIn::WSUpdateListRequest).await;
-                }
-                PPMessage::List(list) => self.nodes = list,
-                PPMessage::Tick => {
+                PingPongIn::List(list) => self.nodes = list,
+                PingPongIn::Tick => {
                     let nodes = self
                         .nodes
                         .iter()
@@ -126,15 +107,14 @@ impl SubsystemHandler<PPMessage> for PingPong {
                         .filter(|n| *n != self.id)
                         .collect::<Vec<NodeID>>();
                     for node in nodes {
-                        self.send_net_ppm(node, &PPMessageNode::Ping).await;
+                        out.push(PingPongOut::ToNetwork(node, PPMessageNode::Ping));
                     }
                 }
                 _ => {}
             }
         }
 
-        // All messages are sent directly to the network broker.
-        vec![]
+        out
     }
 }
 
@@ -143,8 +123,9 @@ mod test {
     use std::time::Duration;
 
     use flarch::{broker::Destination, start_logging};
+    use flmodules::network::{broker::NetworkOut, NetworkSetupError};
     use flmodules::nodeconfig::NodeConfig;
-    use flmodules::network::{messages::NetworkOut, NetworkSetupError};
+    use flmodules::testing::network_simul::{NetworkSimul, RouterNode};
 
     use super::*;
 
@@ -162,17 +143,17 @@ mod test {
 
         let nc_src = NodeConfig::new();
         let mut net = Broker::new();
-        let (net_tap, _) = net.get_tap_sync().await?;
+        let (net_tap, _) = net.get_tap_in_sync().await?;
         let mut pp = PingPong::new(nc_src.info.get_id(), net.clone()).await?;
-        let (pp_tap, _) = pp.get_tap_sync().await?;
+        let (pp_tap, _) = pp.get_tap_in_sync().await?;
 
         let nc_dst = NodeConfig::new();
         let dst_id = nc_dst.info.get_id();
 
         // Send a Ping message from src to dst
-        pp.emit_msg_dest(
+        pp.emit_msg_out_dest(
             Destination::NoTap,
-            PPMessage::ToNetwork(dst_id.clone(), PPMessageNode::Ping),
+            PingPongOut::ToNetwork(dst_id.clone(), PPMessageNode::Ping),
         )?;
         assert_eq!(
             node_msg(&dst_id, &PPMessageNode::Ping),
@@ -183,37 +164,30 @@ mod test {
         pp_tap.recv().unwrap();
 
         // Receive a ping message through the network
-        net.emit_msg_dest(
+        net.emit_msg_out_dest(
             Destination::NoTap,
-            NetworkMessage::Output(NetworkOut::MessageFromNode(
+            NetworkOut::MessageFromNode(
                 dst_id.clone(),
                 serde_json::to_string(&PPMessageNode::Ping).unwrap(),
-            )),
+            ),
         )?;
         assert_eq!(
-            PPMessage::FromNetwork(dst_id.clone(), PPMessageNode::Ping),
+            PingPongIn::FromNetwork(dst_id.clone(), PPMessageNode::Ping),
             pp_tap.recv().unwrap()
         );
         assert_eq!(
             node_msg(&dst_id, &PPMessageNode::Pong),
             net_tap.recv().unwrap()
         );
-        assert_eq!(
-            NetworkMessage::Input(NetworkIn::WSUpdateListRequest),
-            net_tap.recv().unwrap()
-        );
+        assert_eq!(NetworkIn::WSUpdateListRequest, net_tap.recv().unwrap());
 
         Ok(())
     }
 
-    fn node_msg(dst: &U256, msg: &PPMessageNode) -> NetworkMessage {
-        NetworkMessage::Input(NetworkIn::MessageToNode(
-            dst.clone(),
-            serde_json::to_string(msg).unwrap(),
-        ))
+    fn node_msg(dst: &U256, msg: &PPMessageNode) -> NetworkIn {
+        NetworkIn::MessageToNode(dst.clone(), serde_json::to_string(msg).unwrap())
     }
 
-    use flmodules::network::testing::NetworkBrokerSimul;
     use tokio::time::sleep;
 
     // Test a simulation of two nodes with the NetworkBrokerSimul
@@ -222,16 +196,24 @@ mod test {
     async fn test_network() -> Result<(), NetworkSetupError> {
         start_logging();
 
-        let mut simul = NetworkBrokerSimul::new().await?;
+        let mut simul = NetworkSimul::new().await?;
 
-        let (nc1, net1) = simul.new_node().await?;
+        let RouterNode {
+            config: nc1,
+            net: net1,
+            ..
+        } = simul.new_node().await?;
         let mut pp1 = PingPong::new(nc1.info.get_id(), net1).await?;
-        let (pp1_tap, _) = pp1.get_tap_sync().await?;
+        let (pp1_tap, _) = pp1.get_tap_out_sync().await?;
         log::info!("PingPong1 is: {}", nc1.info.get_id());
 
-        let (nc2, net2) = simul.new_node().await?;
+        let RouterNode {
+            config: nc2,
+            net: net2,
+            ..
+        } = simul.new_node().await?;
         let mut pp2 = PingPong::new(nc2.info.get_id(), net2).await?;
-        let (pp2_tap, _) = pp2.get_tap_sync().await?;
+        let (pp2_tap, _) = pp2.get_tap_out_sync().await?;
         log::info!("PingPong2 is: {}", nc2.info.get_id());
 
         for _ in 0..3 {
@@ -244,8 +226,14 @@ mod test {
 
             sleep(Duration::from_millis(1000)).await;
 
-            pp1.emit_msg(PPMessage::ToNetwork(nc2.info.get_id(), PPMessageNode::Ping))?;
-            pp2.emit_msg(PPMessage::ToNetwork(nc1.info.get_id(), PPMessageNode::Ping))?;
+            pp1.emit_msg_out(PingPongOut::ToNetwork(
+                nc2.info.get_id(),
+                PPMessageNode::Ping,
+            ))?;
+            pp2.emit_msg_out(PingPongOut::ToNetwork(
+                nc1.info.get_id(),
+                PPMessageNode::Ping,
+            ))?;
         }
 
         Ok(())

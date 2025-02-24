@@ -1,10 +1,10 @@
-CARGOS := cli/{fledger,flsignal} flarch flarch_macro flbrowser \
-			flmodules flnode test/{fledger-nodejs,signal-fledger,webrtc-libc-wasm/{libc,wasm}} \
-			examples/ping-pong/{wasm,shared,libc}
-MAKE_TESTS := test/{webrtc-libc-wasm,signal-fledger} examples/ping-pong
-CRATES := flarch_macro flarch flmodules flnode
+CARGOS := cli/{fledger,flsignal} flarch flbrowser flcrypto flmacro \
+			flmodules flnode test/signal-fledger \
+			examples/ping-pong/{shared,libc}
+MAKE_TESTS := 
+CRATES := flmacro flarch flmodules flnode
 SHELL := /bin/bash
-PKILL = @ps aux | grep "$1" | grep -v grep | awk '{print $$2}' | xargs -r kill
+PKILL = @/bin/ps aux | grep "$1" | egrep -v "(grep|vscode|rust-analyzer)" | awk '{print $$2}' | xargs -r kill
 
 cargo_check:
 	for c in ${CARGOS}; do \
@@ -87,8 +87,8 @@ build_local: build_local_web build_cli
 serve_two: kill build_cli
 	( cd cli && cargo run --bin flsignal -- -vv ) &
 	sleep 4
-	( cd cli && ( cargo run --bin fledger -- --config fledger/flnode -vv -s ws://localhost:8765 & \
-		cargo run --bin fledger -- --config fledger/flnode2 -vv -s ws://localhost:8765 & ) )
+	( cd cli && ( cargo run --bin fledger -- --config fledger/flnode --log-dht-storage -vv -s ws://localhost:8765 & \
+		cargo run --bin fledger -- --config fledger/flnode2 --log-dht-storage -vv -s ws://localhost:8765 & ) )
 
 serve_local: kill build_local_web serve_two
 	cd flbrowser && trunk serve --features local &

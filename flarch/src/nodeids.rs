@@ -1,7 +1,10 @@
+use bytes::Bytes;
 use rand::random;
 use serde::{Deserialize, Serialize};
 use serde_with::{hex::Hex, serde_as};
 use sha2::digest::{consts::U32, generic_array::GenericArray};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::num::ParseIntError;
 use std::{fmt, str::FromStr};
 use thiserror::Error;
@@ -15,9 +18,8 @@ pub enum ParseError {
 }
 
 /// Nicely formatted 256 bit structure
-// #[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde_as]
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct U256(#[serde_as(as = "Hex")] [u8; 32]);
 
 impl fmt::Display for U256 {
@@ -47,13 +49,72 @@ impl fmt::Debug for U256 {
     }
 }
 
+fn to_varint(i: usize) -> Vec<u8> {
+    if i < 0x80 {
+        return vec![i as u8];
+    }
+    let mut out = i.to_be_bytes().to_vec();
+    out = out.into_iter().skip_while(|&x| x == 0).collect();
+    let len = out.len();
+    let mut result = vec![len as u8 | 0x80];
+    result.extend(out);
+    result
+}
+
 impl U256 {
     pub fn rnd() -> U256 {
         U256 { 0: random() }
     }
 
+    pub fn hash_data(data: &[u8]) -> Self {
+        let mut hasher = Sha256::new();
+        hasher.update(to_varint(data.len()));
+        hasher.update(data);
+        Self(hasher.finalize().into())
+    }
+
+    pub fn hash_domain_parts(domain: &str, parts: &[&[u8]]) -> Self {
+        let mut hasher = Sha256::new();
+        hasher.update(to_varint(domain.len()));
+        hasher.update(domain);
+        hasher.update(to_varint(parts.len()));
+        for part in parts {
+            hasher.update(to_varint(part.len()));
+            hasher.update(part);
+        }
+
+        Self(hasher.finalize().into())
+    }
+
+    pub fn hash_domain_hashmap<K: Serialize, V: Serialize>(domain: &str, hm: &HashMap<K, V>) -> Self {
+        let mut parts = vec![];
+        for (k, v) in hm {
+            parts.push(rmp_serde::to_vec(k).unwrap());
+            parts.push(rmp_serde::to_vec(v).unwrap());
+        }
+        let slices: Vec<&[u8]> = parts.iter().map(|e| e.as_slice()).collect();
+        Self::hash_domain_parts(domain, &slices)
+    }
+
+    pub fn from_vec<V: Serialize>(domain: &str, vec: &Vec<V>) -> Self {
+        let mut parts = vec![];
+        for v in vec {
+            parts.push(rmp_serde::to_vec(v).unwrap());
+        }
+        let slices: Vec<&[u8]> = parts.iter().map(|e| e.as_slice()).collect();
+        Self::hash_domain_parts(domain, &slices)
+    }
+
     pub fn to_bytes(self) -> [u8; 32] {
         self.0
+    }
+
+    pub fn bytes(&self) -> Bytes {
+        Bytes::copy_from_slice(self.as_ref())
+    }
+
+    pub fn zero() -> U256 {
+        U256 { 0: [0; 32] }
     }
 }
 
@@ -209,6 +270,20 @@ impl From<Vec<U256>> for NodeIDs {
 impl From<&Vec<U256>> for NodeIDs {
     fn from(nodes: &Vec<U256>) -> Self {
         Self { 0: nodes.to_vec() }
+    }
+}
+
+impl fmt::Display for NodeIDs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "[{}]",
+            &self
+                .0
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        ))
     }
 }
 

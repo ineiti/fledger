@@ -61,7 +61,7 @@ impl DataStorage for DataStorageNode {
         Ok(())
     }
 
-    fn clone(&self) -> Box<dyn DataStorage + Send> {
+    fn clone_box(&self) -> Box<dyn DataStorage + Send> {
         Box::new(Self {
             base: self.base.clone(),
         })

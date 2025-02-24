@@ -3,14 +3,14 @@ use tokio::select;
 use tokio_stream::StreamExt;
 
 use flarch::{
-    broker::{Broker, BrokerError},
+    broker::{BrokerError, Broker},
     nodeids::NodeID,
     tasks::{spawn_local, Interval},
 };
+use flmodules::network::broker::{BrokerNetwork, NetworkIn, NetworkOut};
 use flmodules::nodeconfig::NodeInfo;
-use flmodules::network::messages::{NetworkIn, NetworkOut, NetworkMessage};
 
-use crate::common::{PPMessage, PPMessageNode};
+use crate::common::{PPMessageNode, PingPongIn, PingPongOut};
 
 /// This is a more straightforward use of the network-broker. It loops over incoming
 /// messages and then sends out new messages by sending it over the network-broker.
@@ -18,8 +18,8 @@ use crate::common::{PPMessage, PPMessageNode};
 /// as a simple channel.
 pub async fn start(
     id: NodeID,
-    net: Broker<NetworkMessage>,
-) -> Result<Broker<PPMessage>, BrokerError> {
+    net: BrokerNetwork,
+) -> Result<Broker<PingPongIn, PingPongOut>, BrokerError> {
     let ret = Broker::new();
 
     let ret_clone = ret.clone();
@@ -36,10 +36,10 @@ pub async fn start(
 /// once a second.
 async fn event_loop(
     id: NodeID,
-    mut net: Broker<NetworkMessage>,
-    mut ret: Broker<PPMessage>,
+    mut net: BrokerNetwork,
+    mut ret: Broker<PingPongIn, PingPongOut>,
 ) -> Result<(), BrokerError> {
-    let (mut tap, _) = net.get_tap().await?;
+    let (mut tap, _) = net.get_tap_out().await?;
     let mut nodes: Vec<NodeInfo> = vec![];
     let mut interval_sec = Interval::new_interval(Duration::from_secs(1));
 
@@ -56,16 +56,16 @@ async fn event_loop(
 /// Requests a new list and sends a ping to all other nodes.
 fn update_list(
     id: NodeID,
-    net: &mut Broker<NetworkMessage>,
+    net: &mut BrokerNetwork,
     nodes: &Vec<NodeInfo>,
 ) -> Result<(), BrokerError> {
-    net.emit_msg(NetworkMessage::Input(NetworkIn::WSUpdateListRequest))?;
+    net.emit_msg_in(NetworkIn::WSUpdateListRequest)?;
     for node in nodes.iter() {
         if node.get_id() != id {
-            net.emit_msg(NetworkMessage::Input(NetworkIn::MessageToNode(
+            net.emit_msg_in(NetworkIn::MessageToNode(
                 node.get_id(),
                 serde_json::to_string(&PPMessageNode::Ping).unwrap(),
-            )))?;
+            ))?;
         }
     }
 
@@ -73,25 +73,25 @@ fn update_list(
 }
 
 fn new_msg(
-    net: &mut Broker<NetworkMessage>,
-    ret: &mut Broker<PPMessage>,
-    msg: Option<NetworkMessage>,
+    net: &mut BrokerNetwork,
+    ret: &mut Broker<PingPongIn, PingPongOut>,
+    msg: Option<NetworkOut>,
 ) -> Result<Option<Vec<NodeInfo>>, BrokerError> {
-    if let Some(NetworkMessage::Output(msg_tap)) = msg {
+    if let Some(msg_tap) = msg {
         match msg_tap {
             NetworkOut::MessageFromNode(from, msg_net) => {
                 if let Ok(msg) = serde_json::from_str::<PPMessageNode>(&msg_net) {
-                    ret.emit_msg(PPMessage::FromNetwork(from, msg.clone()))?;
+                    ret.emit_msg_in(PingPongIn::FromNetwork(from, msg.clone()))?;
                     if msg == PPMessageNode::Ping {
-                        net.emit_msg(NetworkMessage::Input(NetworkIn::MessageToNode(
+                        net.emit_msg_in(NetworkIn::MessageToNode(
                             from,
                             serde_json::to_string(&PPMessageNode::Pong).unwrap(),
-                        )))?;
+                        ))?;
                     }
                 }
             }
             NetworkOut::NodeListFromWS(list) => {
-                ret.emit_msg(PPMessage::List(list.clone()))?;
+                ret.emit_msg_in(PingPongIn::List(list.clone()))?;
                 return Ok(Some(list));
             }
             _ => {}
