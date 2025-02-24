@@ -1,3 +1,4 @@
+// pub mod broker;
 pub mod broker;
 pub mod data_storage;
 pub mod nodeids;
@@ -9,7 +10,7 @@ pub fn start_logging() {
 }
 
 pub fn start_logging_filter(filters: Vec<&str>) {
-    start_logging_filter_level(filters, log::LevelFilter::Debug);
+    start_logging_filter_level(filters, log::LevelFilter::Info);
 }
 
 pub fn start_logging_filter_level(filters: Vec<&str>, level: log::LevelFilter) {
@@ -27,5 +28,18 @@ pub fn start_logging_filter_level(filters: Vec<&str>, level: log::LevelFilter) {
     }
 }
 
-pub use flarch_macro::platform_async_trait;
+pub fn log_backtrace() -> String {
+    let backtrace = std::backtrace::Backtrace::force_capture();
+    let backtrace = btparse::deserialize(&backtrace).unwrap();
+    backtrace
+        .frames
+        .iter()
+        .skip(3)
+        .map(|f| format!("{f:?}"))
+        .take(9)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub use flmacro::platform_async_trait;
 pub use rand::random;

@@ -54,7 +54,7 @@ impl DataStorage for DataStorageLocal {
             .map_err(|e| StorageError::Underlying(e.as_string().unwrap()))
     }
 
-    fn clone(&self) -> Box<dyn DataStorage + Send> {
+    fn clone_box(&self) -> Box<dyn DataStorage + Send> {
         Box::new(DataStorageLocal {base: self.base.clone()})
     }
 }

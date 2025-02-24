@@ -1,6 +1,6 @@
 use clap::Parser;
-use flmodules::network::signal::{SignalServer, SignalMessage, SignalOutput};
 use flarch::web_rtc::web_socket_server::WebSocketServer;
+use flmodules::network::signal::{SignalOut, SignalServer};
 
 /// Fledger signalling server
 #[derive(Parser, Debug)]
@@ -22,12 +22,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let wss = WebSocketServer::new(8765).await?;
     let mut signal_server = SignalServer::new(wss, 2).await?;
-    let (msgs, _) = signal_server.get_tap_sync().await?;
+    let (msgs, _) = signal_server.get_tap_out_sync().await?;
 
     log::info!("Started listening on port 8765");
     for msg in msgs {
         log::debug!("{:?}", msg);
-        if matches!(msg, SignalMessage::Output(SignalOutput::Stopped)) {
+        if matches!(msg, SignalOut::Stopped) {
             log::error!("Server stopped working - exiting");
             return Ok(());
         }

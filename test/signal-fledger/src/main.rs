@@ -7,7 +7,7 @@ use flarch::{
         connection::ConnectionConfig, web_socket_server::WebSocketServer, websocket::WSSError,
     },
 };
-use flmodules::network::{network_broker_start, signal::SignalServer, NetworkSetupError};
+use flmodules::network::{network_start, signal::SignalServer, NetworkSetupError};
 use flnode::node::{Node, NodeError};
 use thiserror::Error;
 
@@ -29,21 +29,25 @@ async fn main() -> Result<(), TestError> {
 
     let wss = WebSocketServer::new(8765).await?;
     let mut signal_server = SignalServer::new(wss, 2).await?;
-    let (msgs_signal, _) = signal_server.get_tap_sync().await?;
+    let (msgs_signal, _) = signal_server.get_tap_out_sync().await?;
     log::info!("Started listening on port 8765");
 
-    let mut node1 = create_node().await?;
+    let node1 = create_node().await?;
     log::info!("Node1: {}", node1.node_config.info.get_id());
-    let mut node2 = create_node().await?;
+    let node2 = create_node().await?;
     log::info!("Node2: {}", node2.node_config.info.get_id());
 
     for i in 0..5 {
         log::info!("Running step {i}");
-        node1.process().await?;
-        log::info!("Node 1: {:?}", node1.ping.as_ref().unwrap().storage.stats);
+        log::info!(
+            "Node 1: {:?}",
+            node1.ping.as_ref().unwrap().storage.borrow().stats
+        );
 
-        node2.process().await?;
-        log::info!("Node 2: {:?}", node2.ping.as_ref().unwrap().storage.stats);
+        log::info!(
+            "Node 2: {:?}",
+            node2.ping.as_ref().unwrap().storage.borrow().stats
+        );
 
         for msg in msgs_signal.try_iter() {
             log::debug!("Signal: {msg:?}");
@@ -57,9 +61,11 @@ async fn main() -> Result<(), TestError> {
         .as_ref()
         .unwrap()
         .storage
+        .borrow()
         .stats
         .get(&node2.node_config.info.get_id())
-        .unwrap();
+        .unwrap()
+        .clone();
     assert_eq!(1, ping1.tx);
     assert_eq!(1, ping1.rx);
 
@@ -68,9 +74,11 @@ async fn main() -> Result<(), TestError> {
         .as_ref()
         .unwrap()
         .storage
+        .borrow()
         .stats
         .get(&node1.node_config.info.get_id())
-        .unwrap();
+        .unwrap()
+        .clone();
     assert_eq!(1, ping2.tx);
     assert_eq!(1, ping2.rx);
 
@@ -81,13 +89,13 @@ async fn main() -> Result<(), TestError> {
 
 async fn create_node() -> Result<Node, TestError> {
     let storage = DataStorageTemp::new();
-    let node_config = Node::get_config(storage.clone())?;
-    let network = network_broker_start(
+    let node_config = Node::get_config(storage.clone_box())?;
+    let network = network_start(
         node_config.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )
     .await?;
-    Node::start(Box::new(storage), node_config, network)
+    Node::start(Box::new(storage), node_config, network.broker)
         .await
         .map_err(|e| e.into())
 }

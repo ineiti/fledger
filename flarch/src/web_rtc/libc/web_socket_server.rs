@@ -13,9 +13,10 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
 
-use crate::broker::{Broker, Subsystem, SubsystemHandler};
-use crate::web_rtc::websocket::{
-    WSError, WSSError, WSServerInput, WSServerMessage, WSServerOutput,
+use crate::web_rtc::websocket::{WSError, WSSError, WSServerIn, WSServerOut};
+use crate::{
+    broker::{Broker, SubsystemHandler},
+    web_rtc::websocket::BrokerWSServer,
 };
 
 pub struct WebSocketServer {
@@ -24,7 +25,7 @@ pub struct WebSocketServer {
 }
 
 impl WebSocketServer {
-    pub async fn new(port: u16) -> Result<Broker<WSServerMessage>, WSSError> {
+    pub async fn new(port: u16) -> Result<BrokerWSServer, WSSError> {
         let server = TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
         let connections = Arc::new(Mutex::new(Vec::new()));
         let connections_cl = Arc::clone(&connections);
@@ -40,9 +41,7 @@ impl WebSocketServer {
                             log::trace!("Got new connection");
                             connections_cl.lock().await.push(conn);
                             broker_cl
-                                .emit_msg(WSServerMessage::Output(WSServerOutput::NewConnection(
-                                    connection_id,
-                                )))
+                                .emit_msg_out(WSServerOut::NewConnection(connection_id))
                                 .expect("Error sending connect message");
                         }
                         Err(e) => log::error!("Error while getting connection: {:?}", e),
@@ -53,10 +52,10 @@ impl WebSocketServer {
         });
 
         broker
-            .add_subsystem(Subsystem::Handler(Box::new(WebSocketServer {
+            .add_handler(Box::new(WebSocketServer {
                 connections,
                 conn_thread,
-            })))
+            }))
             .await?;
 
         Ok(broker)
@@ -64,33 +63,31 @@ impl WebSocketServer {
 }
 
 #[async_trait]
-impl SubsystemHandler<WSServerMessage> for WebSocketServer {
-    async fn messages(&mut self, from_broker: Vec<WSServerMessage>) -> Vec<WSServerMessage> {
+impl SubsystemHandler<WSServerIn, WSServerOut> for WebSocketServer {
+    async fn messages(&mut self, from_broker: Vec<WSServerIn>) -> Vec<WSServerOut> {
         for msg in from_broker {
-            if let WSServerMessage::Input(msg_in) = msg {
-                match msg_in {
-                    WSServerInput::Message(id, msg) => {
-                        let mut connections = self.connections.lock().await;
-                        if let Some(conn) = connections.get_mut(id) {
-                            if let Err(e) = conn.send(msg).await {
-                                log::error!("Error while sending: {e}");
-                                conn.close();
-                                connections.remove(id);
-                            }
-                        }
-                    }
-                    WSServerInput::Close(id) => {
-                        let mut connections = self.connections.lock().await;
-                        if let Some(conn) = connections.get_mut(id) {
+            match msg {
+                WSServerIn::Message(id, msg) => {
+                    let mut connections = self.connections.lock().await;
+                    if let Some(conn) = connections.get_mut(id) {
+                        if let Err(e) = conn.send(msg).await {
+                            log::error!("Error while sending: {e}");
                             conn.close();
                             connections.remove(id);
                         }
                     }
-                    WSServerInput::Stop => {
-                        log::warn!("Stopping thread");
-                        self.conn_thread.abort();
-                        return vec![WSServerMessage::Output(WSServerOutput::Stopped)];
+                }
+                WSServerIn::Close(id) => {
+                    let mut connections = self.connections.lock().await;
+                    if let Some(conn) = connections.get_mut(id) {
+                        conn.close();
+                        connections.remove(id);
                     }
+                }
+                WSServerIn::Stop => {
+                    log::trace!("Stopping thread");
+                    self.conn_thread.abort();
+                    return vec![WSServerOut::Stopped];
                 }
             }
         }
@@ -106,7 +103,7 @@ pub struct WSConnection {
 impl WSConnection {
     async fn new(
         stream: TcpStream,
-        broker: Broker<WSServerMessage>,
+        broker: BrokerWSServer,
         id: usize,
     ) -> Result<WSConnection, WSError> {
         let websocket = accept_async(stream)
@@ -124,7 +121,7 @@ impl WSConnection {
     }
 
     async fn loop_read(
-        mut broker: Broker<WSServerMessage>,
+        mut broker: BrokerWSServer,
         mut ws: SplitStream<WebSocketStream<TcpStream>>,
         mut rx: oneshot::Receiver<bool>,
         id: usize,
@@ -134,7 +131,7 @@ impl WSConnection {
                 select! {
                     _ = (&mut rx) => {
                         broker
-                        .emit_msg(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
+                        .emit_msg_out(WSServerOut::Disconnection(id))
                         .expect("While sending message to broker.");
                         return;
                     },
@@ -143,24 +140,24 @@ impl WSConnection {
                             if let Some(out) = match msg_ws {
                                 Ok(msg) => match msg {
                                     Message::Text(s) => {
-                                        Some(WSServerMessage::Output(WSServerOutput::Message(id, s)))
+                                        Some(WSServerOut::Message(id, s))
                                     }
                                     Message::Close(_) => {
-                                        Some(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
+                                        Some(WSServerOut::Disconnection(id))
                                     }
                                     _ => None,
                                 },
                                 Err(e) => {
                                     log::warn!("Closing connection because of error: {e:?}");
-                                    Some(WSServerMessage::Output(WSServerOutput::Disconnection(id)))
+                                    Some(WSServerOut::Disconnection(id))
                                 }
                             } {
                                 broker
-                                    .emit_msg(out.clone())
+                                    .emit_msg_out(out.clone())
                                     .expect("While sending message to broker.");
                                 if matches!(
                                     out,
-                                    WSServerMessage::Output(WSServerOutput::Disconnection(_))
+                                    WSServerOut::Disconnection(_)
                                 ) {
                                     return;
                                 }
@@ -191,64 +188,70 @@ impl WSConnection {
 mod tests {
     use super::*;
     use crate::broker::Destination;
-    use crate::start_logging;
+    use crate::start_logging_filter_level;
+    use crate::tasks::wait_ms;
     use crate::web_rtc::web_socket_client::WebSocketClient;
-    use crate::web_rtc::websocket::{WSClientInput, WSClientMessage, WSClientOutput};
+    use crate::web_rtc::websocket::{BrokerWSClient, WSClientIn, WSClientOut};
+    use std::error::Error;
     use std::sync::mpsc::Receiver;
 
     async fn send_client_server(
-        client: &mut Broker<WSClientMessage>,
-        server_tap: &Receiver<WSServerMessage>,
+        client: &mut BrokerWSClient,
+        server_tap: &Receiver<WSServerOut>,
         ch_index: usize,
         txt: String,
     ) {
         client
-            .emit_msg_dest(
-                Destination::NoTap,
-                WSClientInput::Message(txt.clone()).into(),
-            )
+            .settle_msg_in_dest(Destination::NoTap, WSClientIn::Message(txt.clone()))
+            .await
             .unwrap();
         assert_eq!(
             server_tap.recv().unwrap(),
-            WSServerMessage::Output(WSServerOutput::Message(ch_index, txt))
+            WSServerOut::Message(ch_index, txt)
         );
     }
 
     async fn send_server_client(
-        server: &mut Broker<WSServerMessage>,
-        client_tap: &Receiver<WSClientMessage>,
+        server: &mut BrokerWSServer,
+        client_tap: &Receiver<WSClientOut>,
         ch_index: usize,
         txt: String,
     ) {
         server
-            .emit_msg_dest(
+            .settle_msg_in_dest(
                 Destination::NoTap,
-                WSServerInput::Message(ch_index, txt.clone()).into(),
+                WSServerIn::Message(ch_index, txt.clone()),
             )
+            .await
             .unwrap();
-        assert_eq!(
-            client_tap.recv().unwrap(),
-            WSClientOutput::Message(txt).into()
-        );
+        assert_eq!(client_tap.recv().unwrap(), WSClientOut::Message(txt));
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_server() {
-        start_logging();
+    async fn test_server() -> Result<(), Box<dyn Error>> {
+        start_logging_filter_level(vec![], log::LevelFilter::Info);
         let mut server = WebSocketServer::new(8080).await.unwrap();
-        let (server_tap, _) = server.get_tap_sync().await.unwrap();
+        let (server_tap, tap0) = server.get_tap_out_sync().await.unwrap();
+
+        wait_ms(100).await;
 
         let mut client1 = WebSocketClient::connect("ws://localhost:8080")
             .await
             .unwrap();
-        let (client1_tap, _) = client1.get_tap_sync().await.unwrap();
-        log::debug!("Server reply from client 1: {:?}", server_tap.recv());
+        let (client1_tap, tap1) = client1.get_tap_out_sync().await.unwrap();
+        let reply = server_tap.recv();
+        log::debug!("Server reply from client 1: {:?}", reply);
+
+        wait_ms(100).await;
 
         let mut client2 = WebSocketClient::connect("ws://localhost:8080")
             .await
             .unwrap();
-        let (client2_tap, _) = client2.get_tap_sync().await.unwrap();
-        log::debug!("Server reply from client 2: {:?}", server_tap.recv());
+        let (client2_tap, _) = client2.get_tap_out_sync().await.unwrap();
+        let reply = server_tap.recv();
+        log::debug!("Server reply from client 2: {:?}", reply);
+
+        wait_ms(100).await;
 
         for _ in 1..=2 {
             send_client_server(&mut client1, &server_tap, 0, "Hello 1".to_string()).await;
@@ -258,10 +261,13 @@ mod tests {
             send_server_client(&mut server, &client2_tap, 1, "there 2".to_string()).await;
         }
 
-        client1.emit_msg(WSClientInput::Disconnect.into()).unwrap();
-        client2.emit_msg(WSClientInput::Disconnect.into()).unwrap();
-        server
-            .emit_msg(WSServerMessage::Input(WSServerInput::Stop))
-            .unwrap();
+        client1.emit_msg_in(WSClientIn::Disconnect).unwrap();
+        client2.emit_msg_in(WSClientIn::Disconnect).unwrap();
+        server.emit_msg_in(WSServerIn::Stop).unwrap();
+
+        server.remove_subsystem(tap0).await?;
+        client1.remove_subsystem(tap1).await?;
+
+        Ok(())
     }
 }

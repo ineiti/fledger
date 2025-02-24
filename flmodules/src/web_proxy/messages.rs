@@ -1,18 +1,19 @@
 use bytes::Bytes;
+use flarch::broker::{Broker, SubsystemHandler};
+use flarch::data_storage::DataStorage;
+use flarch::nodeids::{NodeID, U256};
+use flarch::platform_async_trait;
 use flarch::tasks::spawn_local;
-use flarch::{
-    broker::Broker,
-    nodeids::{NodeID, U256},
-};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
+use tokio::sync::watch;
 
+use crate::gossip_events::broker::MODULE_NAME;
 use crate::nodeconfig::NodeInfo;
 use crate::Modules;
 
 use super::{
-    broker::WebProxyError,
     core::*,
     response::{ResponseHeader, ResponseMessage},
 };
@@ -28,14 +29,6 @@ pub enum ModuleMessage {
     Response(U256, ResponseMessage),
 }
 
-/// First wrap all messages coming into this module and all messages going out in
-/// a single message.
-#[derive(Clone, Debug)]
-pub enum WebProxyMessage {
-    Input(WebProxyIn),
-    Output(WebProxyOut),
-}
-
 /// All possible calls TO this module.
 #[derive(Debug, Clone)]
 pub enum WebProxyIn {
@@ -49,27 +42,35 @@ pub enum WebProxyIn {
 pub enum WebProxyOut {
     ToNetwork(NodeID, ModuleMessage),
     ResponseGet(NodeID, U256, ResponseHeader),
-    UpdateStorage(WebProxyStorage),
 }
 
 /// The message handling part, but only for WebProxy messages.
-pub struct WebProxyMessages {
-    pub core: WebProxyCore,
-    broker: Broker<WebProxyMessage>,
+pub struct Messages {
+    core: WebProxyCore,
+    broker: Broker<WebProxyIn, WebProxyOut>,
+    tx: Option<watch::Sender<WebProxyStorage>>,
 }
 
-impl WebProxyMessages {
+impl Messages {
     /// Returns a new chat module.
     pub fn new(
-        storage: WebProxyStorage,
+        ds: Box<dyn DataStorage + Send>,
         cfg: WebProxyConfig,
         our_id: NodeID,
-        broker: Broker<WebProxyMessage>,
-    ) -> Result<Self, WebProxyError> {
-        Ok(Self {
-            core: WebProxyCore::new(storage, cfg, our_id),
-            broker,
-        })
+        broker: Broker<WebProxyIn, WebProxyOut>,
+    ) -> (Self, watch::Receiver<WebProxyStorage>) {
+        let str = ds.get(MODULE_NAME).unwrap_or("".into());
+        let storage = WebProxyStorageSave::from_str(&str).unwrap_or_default();
+
+        let (tx, rx) = watch::channel(storage.clone());
+        (
+            Self {
+                core: WebProxyCore::new(storage, cfg, our_id),
+                broker,
+                tx: Some(tx),
+            },
+            rx,
+        )
     }
 
     /// Processes one generic message and returns either an error
@@ -88,11 +89,15 @@ impl WebProxyMessages {
     /// Processes a node to node message and returns zero or more
     /// MessageOut.
     pub fn process_node_message(&mut self, src: NodeID, msg: ModuleMessage) -> Vec<WebProxyOut> {
-        let mut out = match msg {
+        let out = match msg {
             ModuleMessage::Request(nonce, request) => self.start_request(src, nonce, request),
             ModuleMessage::Response(nonce, response) => self.handle_response(src, nonce, response),
         };
-        out.push(WebProxyOut::UpdateStorage(self.core.storage.clone()));
+        self.tx.clone().map(|tx| {
+            tx.send(self.core.storage.clone())
+                .is_err()
+                .then(|| self.tx = None)
+        });
         out
     }
 
@@ -101,7 +106,7 @@ impl WebProxyMessages {
         self.core.node_list(
             nodes
                 .iter()
-                .filter(|ni| ni.modules.contains(Modules::ENABLE_WEBPROXY_REQUESTS))
+                .filter(|ni| ni.modules.contains(Modules::WEBPROXY_REQUESTS))
                 .map(|ni| ni.get_id())
                 .collect::<Vec<NodeID>>()
                 .into(),
@@ -111,7 +116,10 @@ impl WebProxyMessages {
 
     fn request_get(&mut self, rnd: U256, url: String, tx: Sender<Bytes>) -> Vec<WebProxyOut> {
         self.core.request_get(rnd, tx).map_or(vec![], |node| {
-            vec![WebProxyOut::ToNetwork(node, ModuleMessage::Request(rnd, url))]
+            vec![WebProxyOut::ToNetwork(
+                node,
+                ModuleMessage::Request(rnd, url),
+            )]
         })
     }
 
@@ -121,47 +129,47 @@ impl WebProxyMessages {
             match reqwest::get(request).await {
                 Ok(resp) => {
                     broker
-                        .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
+                        .emit_msg_out(WebProxyOut::ToNetwork(
                             src,
                             ModuleMessage::Response(nonce, ResponseMessage::Header((&resp).into())),
-                        )))
+                        ))
                         .expect("sending header");
                     let mut stream = resp.bytes_stream().chunks(1024);
                     while let Some(chunks) = stream.next().await {
                         for chunk in chunks {
                             broker
-                                .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
+                                .emit_msg_out(WebProxyOut::ToNetwork(
                                     src,
                                     ModuleMessage::Response(
                                         nonce,
                                         ResponseMessage::Body(chunk.expect("getting chunk")),
                                     ),
-                                )))
+                                ))
                                 .expect("sending body");
                         }
                     }
                     broker
-                        .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
+                        .emit_msg_out(WebProxyOut::ToNetwork(
                             src,
                             ModuleMessage::Response(nonce, ResponseMessage::Done),
-                        )))
+                        ))
                         .expect("sending done");
                 }
                 Err(e) => {
                     broker
-                        .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
+                        .emit_msg_out(WebProxyOut::ToNetwork(
                             src,
                             ModuleMessage::Response(nonce, ResponseMessage::Error(e.to_string())),
-                        )))
+                        ))
                         .expect("Sending done message for");
                     return;
                 }
             }
             broker
-                .emit_msg(WebProxyMessage::Output(WebProxyOut::ToNetwork(
+                .emit_msg_out(WebProxyOut::ToNetwork(
                     src,
                     ModuleMessage::Response(nonce, ResponseMessage::Done),
-                )))
+                ))
                 .expect("Sending done message for");
         });
         vec![]
@@ -181,26 +189,9 @@ impl WebProxyMessages {
     }
 }
 
-/// Convenience method to reduce long lines.
-impl From<WebProxyIn> for WebProxyMessage {
-    fn from(msg: WebProxyIn) -> Self {
-        WebProxyMessage::Input(msg)
-    }
-}
-
-/// Convenience method to reduce long lines.
-impl From<WebProxyOut> for WebProxyMessage {
-    fn from(msg: WebProxyOut) -> Self {
-        WebProxyMessage::Output(msg)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_something() -> Result<(), WebProxyError> {
-        Ok(())
+#[platform_async_trait()]
+impl SubsystemHandler<WebProxyIn, WebProxyOut> for Messages {
+    async fn messages(&mut self, msgs: Vec<WebProxyIn>) -> Vec<WebProxyOut> {
+        self.process_messages(msgs)
     }
 }

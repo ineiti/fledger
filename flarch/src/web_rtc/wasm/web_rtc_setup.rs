@@ -12,13 +12,12 @@ use web_sys::{
     RtcSessionDescriptionInit, RtcSignalingState,
 };
 
-use crate::broker::{Broker, Subsystem, SubsystemHandler};
+use crate::broker::{Broker, SubsystemHandler};
 use crate::web_rtc::{
     connection::{ConnectionConfig, HostLogin},
     messages::{
         ConnType, ConnectionStateMap, DataChannelState, IceConnectionState, IceGatheringState,
-        PeerMessage, SetupError, SignalingState, WebRTCInput, WebRTCMessage, WebRTCOutput,
-        WebRTCSpawner,
+        PeerMessage, SetupError, SignalingState, WebRTCInput, WebRTCOutput, WebRTCSpawner,
     },
     node_connection::Direction,
 };
@@ -26,7 +25,7 @@ use crate::web_rtc::{
 pub struct WebRTCConnectionSetup {
     pub rp_conn: RtcPeerConnection,
     rtc_data: Arc<Mutex<Option<RtcDataChannel>>>,
-    broker: Broker<WebRTCMessage>,
+    broker: Broker<WebRTCInput, WebRTCOutput>,
     // While the connection is not up, queue up messages in here.
     queue: Vec<String>,
     direction: Option<Direction>,
@@ -52,7 +51,7 @@ fn get_ice_server(host: HostLogin) -> IceServer {
 
 impl WebRTCConnectionSetup {
     pub async fn new(
-        broker: Broker<WebRTCMessage>,
+        broker: Broker<WebRTCInput, WebRTCOutput>,
         config: ConnectionConfig,
     ) -> Result<WebRTCConnectionSetup, SetupError> {
         Ok(WebRTCConnectionSetup {
@@ -119,7 +118,7 @@ impl WebRTCConnectionSetup {
         }
     }
 
-    pub fn ice_start(rp_conn: &RtcPeerConnection, broker: Broker<WebRTCMessage>) {
+    pub fn ice_start(rp_conn: &RtcPeerConnection, broker: Broker<WebRTCInput, WebRTCOutput>) {
         let broker_cl = broker.clone();
         let onicecandidate_callback1 =
             Closure::wrap(Box::new(move |ev: RtcPeerConnectionIceEvent| {
@@ -128,9 +127,7 @@ impl WebRTCConnectionSetup {
                     let cand = format!("{}", candidate.candidate());
                     wasm_bindgen_futures::spawn_local(async move {
                         broker
-                            .emit_msg(WebRTCMessage::Output(WebRTCOutput::Setup(
-                                PeerMessage::IceCandidate(cand),
-                            )))
+                            .emit_msg_out(WebRTCOutput::Setup(PeerMessage::IceCandidate(cand)))
                             .err()
                             .map(|e| log::error!("While sending ICE candidate: {:?}", e));
                     });
@@ -142,18 +139,17 @@ impl WebRTCConnectionSetup {
         let rp_conn_cl = rp_conn.clone();
         let oniceconnectionstatechange =
             Closure::wrap(Box::new(move |_: RtcPeerConnectionIceEvent| {
-                let msg = match rp_conn_cl.ice_connection_state() {
-                    RtcIceConnectionState::Failed | RtcIceConnectionState::Disconnected => {
-                        WebRTCMessage::Output(WebRTCOutput::Disconnected)
-                    }
-                    _ => WebRTCMessage::Input(WebRTCInput::UpdateState),
-                };
                 let mut broker = broker_cl.clone();
+                let rp_conn = rp_conn_cl.clone();
                 wasm_bindgen_futures::spawn_local(async move {
-                    broker
-                        .emit_msg(msg)
-                        .err()
-                        .map(|e| log::error!("While sending ICE candidate: {:?}", e));
+                    match rp_conn.ice_connection_state() {
+                        RtcIceConnectionState::Failed | RtcIceConnectionState::Disconnected => {
+                            broker.emit_msg_out(WebRTCOutput::Disconnected)
+                        }
+                        _ => broker.emit_msg_in(WebRTCInput::UpdateState),
+                    }
+                    .err()
+                    .map(|e| log::error!("While sending ICE candidate: {:?}", e));
                 });
             }) as Box<dyn FnMut(RtcPeerConnectionIceEvent)>);
         rp_conn.set_oniceconnectionstatechange(Some(
@@ -297,7 +293,7 @@ impl WebRTCConnectionSetup {
     }
 
     fn dc_set_onopen(
-        broker: Broker<WebRTCMessage>,
+        broker: Broker<WebRTCInput, WebRTCOutput>,
         rtc_data: Arc<Mutex<Option<RtcDataChannel>>>,
         dc: RtcDataChannel,
     ) {
@@ -310,7 +306,7 @@ impl WebRTCConnectionSetup {
             wasm_bindgen_futures::spawn_local(async move {
                 rtc_data.lock().await.replace(dc_clone2.clone());
                 broker_clone
-                    .emit_msg(WebRTCMessage::Output(WebRTCOutput::Connected))
+                    .emit_msg_out(WebRTCOutput::Connected)
                     .err()
                     .map(|e| log::error!("While sending connection: {:?}", e));
             });
@@ -321,7 +317,7 @@ impl WebRTCConnectionSetup {
                     let mut broker = broker_cl.clone();
                     wasm_bindgen_futures::spawn_local(async move {
                         broker
-                            .emit_msg(WebRTCMessage::Output(WebRTCOutput::Text(message)))
+                            .emit_msg_out(WebRTCOutput::Text(message))
                             .err()
                             .map(|e| log::error!("While sending message: {:?}", e));
                     });
@@ -335,7 +331,7 @@ impl WebRTCConnectionSetup {
                 let mut broker = broker_cl.clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     broker
-                        .emit_msg(WebRTCMessage::Output(WebRTCOutput::Disconnected))
+                        .emit_msg_out(WebRTCOutput::Disconnected)
                         .err()
                         .map(|e| log::error!("While sending message: {:?}", e));
                 });
@@ -437,17 +433,16 @@ pub struct WebRTCConnection {
 }
 
 impl WebRTCConnection {
-    pub async fn new_box(config: ConnectionConfig) -> Result<Broker<WebRTCMessage>, SetupError> {
+    pub async fn new_box(
+        config: ConnectionConfig,
+    ) -> Result<Broker<WebRTCInput, WebRTCOutput>, SetupError> {
         let broker = Broker::new();
         let rn = WebRTCConnection {
             setup: WebRTCConnectionSetup::new(broker.clone(), config).await?,
         };
         let rp_conn = rn.setup.rp_conn.clone();
 
-        broker
-            .clone()
-            .add_subsystem(Subsystem::Handler(Box::new(rn)))
-            .await?;
+        broker.clone().add_handler(Box::new(rn)).await?;
         WebRTCConnectionSetup::ice_start(&rp_conn, broker.clone());
         Ok(broker)
     }
@@ -467,21 +462,19 @@ impl WebRTCConnection {
         })
     }
 
-    async fn msg_in(&mut self, msg: WebRTCInput) -> Result<Option<WebRTCMessage>, SetupError> {
+    async fn msg_in(&mut self, msg: WebRTCInput) -> Result<Option<WebRTCOutput>, SetupError> {
         match msg {
             WebRTCInput::Text(s) => self.setup.send(s).await?,
             WebRTCInput::Setup(s) => {
                 if let Some(msg) = self.setup(s).await? {
-                    return Ok(Some(WebRTCMessage::Output(WebRTCOutput::Setup(msg))));
+                    return Ok(Some(WebRTCOutput::Setup(msg)));
                 }
             }
             WebRTCInput::Flush => {
                 self.setup.send_queue().await?;
             }
             WebRTCInput::UpdateState => {
-                return Ok(Some(WebRTCMessage::Output(WebRTCOutput::State(
-                    self.setup.get_state().await?,
-                ))));
+                return Ok(Some(WebRTCOutput::State(self.setup.get_state().await?)));
             }
             WebRTCInput::Disconnect => self.setup.reset()?,
             WebRTCInput::Reset => self.setup.reset()?,
@@ -491,17 +484,15 @@ impl WebRTCConnection {
 }
 
 #[async_trait(?Send)]
-impl SubsystemHandler<WebRTCMessage> for WebRTCConnection {
-    async fn messages(&mut self, msgs: Vec<WebRTCMessage>) -> Vec<WebRTCMessage> {
+impl SubsystemHandler<WebRTCInput, WebRTCOutput> for WebRTCConnection {
+    async fn messages(&mut self, msgs: Vec<WebRTCInput>) -> Vec<WebRTCOutput> {
         let mut out = vec![];
         for msg in msgs {
-            if let WebRTCMessage::Input(msg_in) = msg {
-                match self.msg_in(msg_in.clone()).await {
-                    Ok(Some(msg)) => out.push(msg),
-                    Ok(None) => {}
-                    Err(e) => {
-                        log::trace!("{:p} Error processing message {msg_in:?}: {:?}", self, e);
-                    }
+            match self.msg_in(msg.clone()).await {
+                Ok(Some(msg)) => out.push(msg),
+                Ok(None) => {}
+                Err(e) => {
+                    log::trace!("{:p} Error processing message {msg:?}: {:?}", self, e);
                 }
             }
         }

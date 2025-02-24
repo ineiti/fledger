@@ -1,7 +1,13 @@
-use flarch::nodeids::{NodeID, NodeIDs, U256};
+use flarch::{
+    broker::SubsystemHandler,
+    data_storage::DataStorage,
+    nodeids::{NodeID, NodeIDs, U256},
+    platform_async_trait,
+};
 use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
-use super::core::*;
+use super::{broker::MODULE_NAME, core::*};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ModuleMessage {
@@ -11,61 +17,81 @@ pub enum ModuleMessage {
     RequestEvents(Vec<U256>),
 }
 
-#[derive(Clone, Debug)]
-pub enum GossipMessage {
-    Input(GossipIn),
-    Output(GossipOut),
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum GossipIn {
     Tick,
     FromNetwork(NodeID, ModuleMessage),
-    SetStorage(EventsStorage),
-    GetStorage,
     AddEvent(Event),
-    NodeList(NodeIDs),
+    UpdateNodeList(NodeIDs),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum GossipOut {
     ToNetwork(NodeID, ModuleMessage),
-    Storage(EventsStorage),
-    Updated,
-}
-
-#[derive(Debug)]
-pub struct Config {
-    pub our_id: NodeID,
-}
-
-impl Config {
-    pub fn new(our_id: NodeID) -> Self {
-        Self { our_id }
-    }
 }
 
 /// The first module to use the random_connections is a copy of the previous
 /// chat.
 /// Now it holds events of multiple categories and exchanges them between the
 /// nodes.
-#[derive(Debug)]
-pub struct GossipEvents {
-    storage: EventsStorage,
-    cfg: Config,
+pub struct Messages {
+    events: EventsStorage,
+    storage: Box<dyn DataStorage + Send>,
+    tx: Option<watch::Sender<EventsStorage>>,
+    id: NodeID,
     nodes: NodeIDs,
     outstanding: Vec<U256>,
 }
 
-impl GossipEvents {
+impl std::fmt::Debug for Messages {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GossipEvents")
+            .field("events", &self.events)
+            .field("id", &self.id)
+            .field("nodes", &self.nodes)
+            .field("outstanding", &self.outstanding)
+            .finish()
+    }
+}
+
+impl Messages {
     /// Returns a new chat module.
-    pub fn new(cfg: Config) -> Self {
-        Self {
-            storage: EventsStorage::new(),
-            cfg,
-            nodes: NodeIDs::empty(),
-            outstanding: vec![],
+    pub fn new(
+        id: NodeID,
+        storage: Box<dyn DataStorage + Send>,
+    ) -> (Self, watch::Receiver<EventsStorage>) {
+        let mut events = EventsStorage::new();
+        let gossip_msgs_str = storage.get(MODULE_NAME).unwrap();
+        if !gossip_msgs_str.is_empty() {
+            if let Err(e) = events.set(&gossip_msgs_str) {
+                log::warn!("Couldn't load gossip messages: {}", e);
+            }
         }
+        let (storage_tx, storage_rx) = watch::channel(events.clone());
+        (
+            Self {
+                events,
+                storage,
+                tx: Some(storage_tx),
+                id,
+                nodes: NodeIDs::empty(),
+                outstanding: vec![],
+            },
+            storage_rx,
+        )
+    }
+
+    fn store(&mut self) {
+        self.tx.clone().map(|tx| {
+            tx.send(self.events.clone())
+                .is_err()
+                .then(|| self.tx = None)
+        });
+        self.events
+            .get()
+            .map(|events_str| self.storage.set(MODULE_NAME, &events_str))
+            .err()
+            .map(|e| log::warn!("Couldn't store gossip: {e:?}"));
     }
 
     /// Processes many messages at a time.
@@ -75,26 +101,20 @@ impl GossipEvents {
     ) -> Result<Vec<GossipOut>, serde_yaml::Error> {
         let mut out = vec![];
         for msg in msgs {
-            out.extend(self.process_message(msg)?);
+            out.extend(self.process_message(msg));
         }
         Ok(out)
     }
 
-    /// Processes one generic message and returns either an error
-    /// or a Vec<MessageOut>.
-    pub fn process_message(&mut self, msg: GossipIn) -> Result<Vec<GossipOut>, serde_yaml::Error> {
-        log::trace!("{} got message {:?}", self.cfg.our_id, msg);
-        Ok(match msg {
+    /// Processes one generic message and returns the result.
+    pub fn process_message(&mut self, msg: GossipIn) -> Vec<GossipOut> {
+        // log::trace!("{} got message {:?}", self.id, msg);
+        match msg {
             GossipIn::Tick => self.tick(),
             GossipIn::FromNetwork(src, node_msg) => self.process_node_message(src, node_msg),
             GossipIn::AddEvent(ev) => self.add_event(ev),
-            GossipIn::NodeList(ids) => self.node_list(ids),
-            GossipIn::GetStorage => vec![GossipOut::Storage(self.storage.clone())],
-            GossipIn::SetStorage(data) => {
-                self.storage = data;
-                vec![]
-            }
-        })
+            GossipIn::UpdateNodeList(ids) => self.node_list(ids),
+        }
     }
 
     /// Processes a node to node message and returns zero or more
@@ -111,11 +131,9 @@ impl GossipEvents {
     /// Adds an event if it's not known yet or not too old.
     /// This will send out the event to all other nodes.
     pub fn add_event(&mut self, event: Event) -> Vec<GossipOut> {
-        if self.storage.add_event(event.clone()) {
-            return itertools::concat([
-                self.send_events(self.cfg.our_id, &[event]),
-                vec![GossipOut::Updated, GossipOut::Storage(self.storage.clone())],
-            ]);
+        if self.events.add_event(event.clone()) {
+            self.store();
+            return self.send_events(self.id, &[event]);
         }
         vec![]
     }
@@ -126,7 +144,7 @@ impl GossipEvents {
         events
             .into_iter()
             .inspect(|e| self.outstanding.retain(|os| os != &e.get_id()))
-            .filter(|e| self.storage.add_event(e.clone()))
+            .filter(|e| self.events.add_event(e.clone()))
             .collect()
     }
 
@@ -134,7 +152,7 @@ impl GossipEvents {
         self.nodes
             .0
             .iter()
-            .filter(|&&node_id| node_id != src && node_id != self.cfg.our_id)
+            .filter(|&&node_id| node_id != src && node_id != self.id)
             .map(|node_id| {
                 GossipOut::ToNetwork(
                     *node_id,
@@ -161,7 +179,7 @@ impl GossipEvents {
         let reply = ids
             .0
             .iter()
-            .filter(|&id| !self.nodes.0.contains(id) && id != &self.cfg.our_id)
+            .filter(|&id| !self.nodes.0.contains(id) && id != &self.id)
             .map(|&id| GossipOut::ToNetwork(id, ModuleMessage::RequestEventIDs))
             .collect();
         self.nodes = ids;
@@ -189,12 +207,9 @@ impl GossipEvents {
         // other nodes available yet. So it's not enough to check the 'output' variable
         // to know if the MessageOut::Updated needs to be sent or not.
         let events_out = self.add_events(events);
-        let mut output: Vec<GossipOut> = self.send_events(src, &events_out);
+        let output: Vec<GossipOut> = self.send_events(src, &events_out);
         if !events_out.is_empty() {
-            output.extend(vec![
-                GossipOut::Updated,
-                GossipOut::Storage(self.storage.clone()),
-            ]);
+            self.store();
         }
         output
     }
@@ -202,7 +217,7 @@ impl GossipEvents {
     /// Send the events to the other node. One or more of the requested
     /// events might be missing.
     pub fn node_request_events(&mut self, src: NodeID, ids: Vec<U256>) -> Vec<GossipOut> {
-        let events: Vec<Event> = self.storage.get_events_by_ids(ids);
+        let events: Vec<Event> = self.events.get_events_by_ids(ids);
         if !events.is_empty() {
             vec![GossipOut::ToNetwork(src, ModuleMessage::Events(events))]
         } else {
@@ -214,13 +229,13 @@ impl GossipEvents {
     pub fn node_request_event_list(&mut self, src: NodeID) -> Vec<GossipOut> {
         vec![GossipOut::ToNetwork(
             src,
-            ModuleMessage::KnownEventIDs(self.storage.event_ids()),
+            ModuleMessage::KnownEventIDs(self.events.event_ids()),
         )]
     }
 
     /// Returns all ids that are not in our storage
     pub fn filter_known_events(&self, eventids: Vec<U256>) -> Vec<U256> {
-        let our_ids = self.storage.event_ids();
+        let our_ids = self.events.event_ids();
         eventids
             .into_iter()
             .filter(|id| !our_ids.contains(id) && !self.outstanding.contains(id))
@@ -228,7 +243,7 @@ impl GossipEvents {
     }
 
     pub fn storage(&self) -> EventsStorage {
-        self.storage.clone()
+        self.events.clone()
     }
 
     /// Every tick clear the outstanding vector and request new event IDs.
@@ -242,14 +257,11 @@ impl GossipEvents {
     }
 }
 
-impl From<GossipIn> for GossipMessage {
-    fn from(msg: GossipIn) -> Self {
-        GossipMessage::Input(msg)
-    }
-}
-
-impl From<GossipOut> for GossipMessage {
-    fn from(msg: GossipOut) -> Self {
-        GossipMessage::Output(msg)
+#[platform_async_trait()]
+impl SubsystemHandler<GossipIn, GossipOut> for Messages {
+    async fn messages(&mut self, msgs: Vec<GossipIn>) -> Vec<GossipOut> {
+        msgs.into_iter()
+            .flat_map(|msg| self.process_message(msg))
+            .collect()
     }
 }

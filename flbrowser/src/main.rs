@@ -25,8 +25,8 @@ use flarch::{
     tasks::{spawn_local_nosend, wait_ms},
     web_rtc::connection::{ConnectionConfig, HostLogin, Login},
 };
-use flmodules::network::messages::NetworkConnectionState;
-use flmodules::network::network_broker_start;
+use flmodules::network::broker::NetworkConnectionState;
+use flmodules::network::network_start;
 use flnode::{node::Node, version::VERSION_STRING};
 
 #[cfg(not(feature = "local"))]
@@ -82,7 +82,7 @@ pub fn main() {
                         }
                     }
                     Button::DownloadData => {
-                        let data = web.node.gossip.as_ref().unwrap().storage.get().unwrap();
+                        let data = web.node.gossip.as_ref().unwrap().storage.borrow().get().unwrap();
                         downloadFile("gossip_event.toml".into(), data.into());
                     }
                     Button::WebProxy => {
@@ -219,10 +219,6 @@ impl FledgerWeb {
             .request_list()
             .await
             .expect("Couldn't request list");
-        self.node
-            .process()
-            .await
-            .expect("Should be able to push process");
         fs
     }
 
@@ -240,9 +236,9 @@ impl FledgerWeb {
                 }),
             }),
         );
-        let network = network_broker_start(node_config.clone(), config).await?;
-        node_config.info.modules = Modules::all() - Modules::ENABLE_WEBPROXY_REQUESTS;
-        Ok(Node::start(my_storage, node_config, network)
+        let network = network_start(node_config.clone(), config).await?;
+        node_config.info.modules = Modules::all() - Modules::WEBPROXY_REQUESTS;
+        Ok(Node::start(my_storage, node_config, network.broker)
             .await
             .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
     }
@@ -319,8 +315,8 @@ impl FledgerState {
             mana: 0,
             msgs: FledgerMessages::new(msgs, &nodes_info.clone().into_values().collect()),
             nodes_info,
-            states: node.stat.as_ref().unwrap().states.clone(),
-            pings: node.ping.as_ref().unwrap().storage.clone(),
+            states: node.stat.as_ref().unwrap().borrow().clone(),
+            pings: node.ping.as_ref().unwrap().storage.borrow().clone(),
         })
     }
 

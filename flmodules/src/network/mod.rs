@@ -162,13 +162,13 @@
 //! platform.
 //! It can be used for the browser or for node.
 
+use broker::Network;
 use thiserror::Error;
 
-pub mod messages;
+pub mod broker;
 pub mod signal;
 
 use flarch::{
-    broker::Broker,
     broker::BrokerError,
     web_rtc::{
         connection::ConnectionConfig, web_rtc_setup::web_rtc_spawner,
@@ -176,7 +176,6 @@ use flarch::{
     },
 };
 
-use crate::network::messages::NetworkMessage;
 use crate::nodeconfig::NodeConfig;
 
 #[derive(Error, Debug)]
@@ -190,19 +189,16 @@ pub enum NetworkSetupError {
     WebSocketClient(#[from] WSClientError),
     /// Generic network error
     #[error(transparent)]
-    Network(#[from] messages::NetworkError),
+    Network(#[from] broker::NetworkError),
     #[cfg(target_family = "unix")]
     /// Problem in the websocket server
     #[error(transparent)]
     WebSocketServer(#[from] flarch::web_rtc::websocket::WSSError),
 }
 
-#[cfg(feature = "testing")]
-pub mod testing;
-
-/// Starts a new [`broker::Broker<NetworkMessage>`] with a given `node`- and `connection`-configuration.
+/// Starts a new [`BrokerNetwork`] with a given `node`- and `connection`-configuration.
 /// This returns a raw broker which is mostly suited to connect to other brokers.
-/// If you need an easier access to the WebRTC network, use [`network_start`], which returns
+/// If you need an easier access to the WebRTC network, use [`network_webrtc_start`], which returns
 /// a structure with a more user-friendly API.
 ///
 /// # Example
@@ -212,15 +208,15 @@ pub mod testing;
 ///   let net = network_broker_start();
 /// }
 /// ```
-pub async fn network_broker_start(
+pub async fn network_start(
     node: NodeConfig,
     connection: ConnectionConfig,
-) -> Result<Broker<NetworkMessage>, NetworkSetupError> {
-    use crate::network::messages::NetworkBroker;
+) -> Result<Network, NetworkSetupError> {
+    use crate::network::broker::Network;
 
     let ws = WebSocketClient::connect(&connection.signal()).await?;
     let webrtc = WebRTCConn::new(web_rtc_spawner(connection)).await?;
-    Ok(NetworkBroker::start(node.clone(), ws, webrtc).await?)
+    Ok(Network::start(node.clone(), ws, webrtc).await?)
 }
 
 /// Starts a new connection to the signalling server using the `node`-
@@ -228,11 +224,11 @@ pub async fn network_broker_start(
 /// It returns a user-friendly API that can be used to send and
 /// receive messages.
 /// If you want to connect the network with other brokers, then use
-/// the [`network_broker_start`] method.
-pub async fn network_start(
+/// the [`network_start`] method.
+pub async fn network_webrtc_start(
     node: NodeConfig,
     connection: ConnectionConfig,
-) -> Result<messages::Network, NetworkSetupError> {
-    let net_broker = network_broker_start(node, connection).await?;
-    Ok(messages::Network::start(net_broker).await?)
+) -> Result<broker::NetworkWebRTC, NetworkSetupError> {
+    let net = network_start(node, connection).await?;
+    Ok(broker::NetworkWebRTC::start(net.broker).await?)
 }

@@ -1,5 +1,5 @@
 all: kill build run
-PKILL = @ps aux | grep "$1" | grep -v grep | awk '{print $$2}' | xargs -r kill
+PKILL = @/bin/ps aux | grep "$1" | egrep -v "(grep|vscode|rust-analyzer)" | awk '{print $$2}' | xargs -r kill
 
 run:
 	$(MAKE) libc &

@@ -1,8 +1,7 @@
-use flarch::platform_async_trait;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
-use flarch::broker::{Broker, BrokerError, Subsystem, SubsystemHandler};
+use flarch::broker::{Broker, BrokerError, Message};
 use flarch::tasks::{spawn_local, Interval};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -11,42 +10,76 @@ pub enum TimerMessage {
     Minute,
 }
 
+pub type BrokerTimer = Broker<(), TimerMessage>;
+
 /// The Timer structure sends out periodic signals to the system so that
 /// services can subscribe to them.
-pub struct TimerBroker {
-    seconds: u32,
+#[derive(Clone, Debug)]
+pub struct Timer {
+    pub broker: BrokerTimer,
 }
 
-impl TimerBroker {
-    pub async fn start() -> Result<Broker<TimerMessage>, BrokerError> {
-        let mut broker = Broker::new();
-        let timer_struct = TimerBroker { seconds: 0 };
-        broker
-            .add_subsystem(Subsystem::Handler(Box::new(timer_struct)))
-            .await?;
+impl Timer {
+    pub async fn start() -> Result<Timer, BrokerError> {
+        let broker = Broker::new();
         let mut broker_cl = broker.clone();
         spawn_local(async move {
-            let mut interval = Interval::new_interval(Duration::from_millis(1000));
+            let mut seconds = 0;
+            let mut interval = Interval::new_interval(Duration::from_secs(1));
             loop {
                 interval.next().await;
-                if let Err(e) = broker_cl.emit_msg(TimerMessage::Second) {
-                    log::error!("While emitting timer: {e:?}");
+                seconds += 1;
+                broker_cl
+                    .emit_msg_out(TimerMessage::Second)
+                    .err()
+                    .map(|e| log::error!("While emitting timer: {e:?}"));
+                if seconds == 60 {
+                    broker_cl
+                        .emit_msg_out(TimerMessage::Minute)
+                        .err()
+                        .map(|e| log::error!("While emitting timer: {e:?}"));
+                    seconds = 0;
                 }
             }
         });
-        Ok(broker)
+        Ok(Timer { broker })
     }
-}
 
-#[platform_async_trait()]
-impl SubsystemHandler<TimerMessage> for TimerBroker {
-    async fn messages(&mut self, _: Vec<TimerMessage>) -> Vec<TimerMessage> {
-        if self.seconds == 0 {
-            self.seconds = 59;
-            vec![TimerMessage::Minute]
-        } else {
-            self.seconds -= 1;
-            vec![]
+    pub fn simul() -> Timer {
+        Timer {
+            broker: Broker::new(),
         }
+    }
+
+    pub async fn tick<I: Message + 'static, O: Message + 'static>(
+        &mut self,
+        broker: Broker<I, O>,
+        msg: I,
+        tick: TimerMessage,
+    ) -> Result<(), BrokerError> {
+        self.broker
+            .add_translator_o_ti(
+                broker,
+                Box::new(move |tm| (tm == tick).then_some(msg.clone())),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn tick_second<I: Message + 'static, O: Message + 'static>(
+        &mut self,
+        broker: Broker<I, O>,
+        msg: I,
+    ) -> Result<(), BrokerError> {
+        self.tick(broker, msg, TimerMessage::Second).await
+    }
+
+    pub async fn tick_minute<I: Message + 'static, O: Message + 'static>(
+        &mut self,
+        broker: Broker<I, O>,
+        msg: I,
+    ) -> Result<(), BrokerError> {
+        self.tick(broker, msg, TimerMessage::Minute).await
     }
 }

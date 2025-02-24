@@ -1,27 +1,35 @@
 use log::{error, info};
 use std::collections::HashMap;
 use thiserror::Error;
+use tokio::sync::watch;
 
-use flarch::{
-    broker::{Broker, BrokerError},
-    nodeids::NodeID,
-};
+use flarch::{broker::BrokerError, nodeids::NodeID};
 use flarch::{
     data_storage::{DataStorage, StorageError},
     tasks::now,
 };
 use flmodules::{
+    dht_router::{broker::DHTRouter, kademlia},
+    dht_storage::{self, broker::DHTStorage, core::DHTConfig},
+    flo::storage::CryptoStorage,
     gossip_events::{
-        broker::GossipBroker,
-        core::{self, Category, Event},
-        messages::{GossipIn, GossipMessage},
-    }, network::messages::{NetworkError, NetworkIn, NetworkMessage}, nodeconfig::{ConfigError, NodeConfig, NodeInfo}, overlay::broker::OverlayRandom, ping::{broker::PingBroker, messages::PingConfig}, random_connections::broker::RandomBroker, timer::{TimerBroker, TimerMessage}, web_proxy::{
+        broker::Gossip,
+        core::{self, Category},
+    },
+    network::broker::{BrokerNetwork, NetworkError, NetworkIn},
+    nodeconfig::{ConfigError, NodeConfig, NodeInfo},
+    ping::{broker::Ping, messages::PingConfig},
+    random_connections::broker::RandomBroker,
+    router::broker::{BrokerRouter, RouterNetwork, RouterRandom},
+    timer::Timer,
+    web_proxy::{
         broker::{WebProxy, WebProxyError},
         core::WebProxyConfig,
-    }, Modules
+    },
+    Modules,
 };
 
-use crate::stat::StatBroker;
+use crate::stat::{NetStats, NetworkStats};
 
 #[derive(Error, Debug)]
 pub enum NodeError {
@@ -41,6 +49,8 @@ pub enum NodeError {
     Yaml(#[from] serde_yaml::Error),
     #[error(transparent)]
     WebProxy(#[from] WebProxyError),
+    #[error(transparent)]
+    DHTStorage(#[from] dht_storage::broker::StorageError),
 }
 
 /// The node structure holds it all together. It is the main structure of the project.
@@ -48,24 +58,33 @@ pub struct Node {
     /// The node configuration
     pub node_config: NodeConfig,
     /// Storage to be used
-    pub storage: Box<dyn DataStorage>,
+    pub storage: Box<dyn DataStorage + Send>,
     /// Network broker
-    pub broker_net: Broker<NetworkMessage>,
+    pub broker_net: BrokerNetwork,
+    /// Network IO broker
+    pub network_io: BrokerRouter,
+    /// Timer broker
+    pub timer: Timer,
+    /// Storing all the signers and ACEs
+    pub crypto_storage: CryptoStorage,
 
     // Subsystem data
     /// Stores the connection data
-    pub stat: Option<StatBroker>,
+    pub stat: Option<watch::Receiver<NetStats>>,
     /// Handles a random number of connections
     pub random: Option<RandomBroker>,
     /// Gossip-events sent and received
-    pub gossip: Option<GossipBroker>,
+    pub gossip: Option<Gossip>,
     /// Pings all connected nodes and informs about failing nodes
-    pub ping: Option<PingBroker>,
+    pub ping: Option<Ping>,
     /// Answers GET requests from another node
     pub webproxy: Option<WebProxy>,
+    /// Sets up a dht routing system using Kademlia
+    pub dht_router: Option<DHTRouter>,
+    /// Decentralized storage system using DHTRouting
+    pub dht_storage: Option<DHTStorage>,
 }
 
-const STORAGE_GOSSIP_EVENTS: &str = "gossip_events";
 const STORAGE_CONFIG: &str = "nodeConfig";
 
 impl Node {
@@ -76,7 +95,7 @@ impl Node {
     pub async fn start(
         storage: Box<dyn DataStorage + Send>,
         node_config: NodeConfig,
-        broker_net: Broker<NetworkMessage>,
+        broker_net: BrokerNetwork,
     ) -> Result<Self, NodeError> {
         info!(
             "Starting node: {} = {}",
@@ -84,32 +103,44 @@ impl Node {
             node_config.info.get_id()
         );
 
+        let mut timer = Timer::start().await?;
+        timer
+            .tick_second(broker_net.clone(), NetworkIn::Tick)
+            .await?;
+        let network_io = RouterNetwork::start(broker_net.clone()).await?;
+
         let modules = node_config.info.modules;
         let id = node_config.info.get_id();
         let mut random = None;
         let mut gossip = None;
         let mut ping = None;
         let mut webproxy = None;
-        if modules.contains(Modules::ENABLE_RAND) {
-            let rnd = RandomBroker::start(id, broker_net.clone()).await?;
-            if modules.contains(Modules::ENABLE_GOSSIP) {
-                gossip = Some(GossipBroker::start(id, rnd.broker.clone()).await?);
-                Self::init_gossip(
-                    &mut gossip.as_mut().unwrap(),
-                    storage.clone(),
-                    &node_config.info,
-                )
-                .await?;
+        let mut stat = None;
+        let mut dht_router = None;
+        let mut dht_storage = None;
+        if modules.contains(Modules::RAND) {
+            let rnd = RandomBroker::start(id, broker_net.clone(), &mut timer).await?;
+            if modules.contains(Modules::GOSSIP) {
+                gossip = Some(
+                    Gossip::start(
+                        storage.clone(),
+                        node_config.info.clone(),
+                        rnd.broker.clone(),
+                        &mut timer,
+                    )
+                    .await?,
+                );
             }
-            if modules.contains(Modules::ENABLE_PING) {
-                ping = Some(PingBroker::start(PingConfig::default(), rnd.broker.clone()).await?);
+            if modules.contains(Modules::PING) {
+                ping =
+                    Some(Ping::start(PingConfig::default(), rnd.broker.clone(), &mut timer).await?);
             }
-            if modules.contains(Modules::ENABLE_WEBPROXY) {
+            if modules.contains(Modules::WEBPROXY) {
                 webproxy = Some(
                     WebProxy::start(
-                        storage.clone(),
+                        storage.clone_box(),
                         id,
-                        OverlayRandom::start(rnd.broker.clone()).await?,
+                        RouterRandom::start(rnd.broker.clone()).await?,
                         WebProxyConfig::default(),
                     )
                     .await?,
@@ -117,77 +148,53 @@ impl Node {
             }
             random = Some(rnd);
         }
-        let stat = if modules.contains(Modules::ENABLE_STAT) {
-            Some(StatBroker::start(broker_net.clone()).await?)
-        } else {
-            None
-        };
+        if modules.contains(Modules::STAT) {
+            stat = Some(NetworkStats::start(broker_net.clone()).await?)
+        }
+        if modules.contains(Modules::DHT_ROUTER) {
+            let routing = DHTRouter::start(
+                id,
+                network_io.clone(),
+                &mut timer,
+                kademlia::Config::default(),
+            )
+            .await?;
+            if modules.contains(Modules::DHT_STORAGE) {
+                dht_storage = Some(
+                    DHTStorage::start(
+                        storage.clone_box(),
+                        id,
+                        DHTConfig::default(),
+                        routing.broker.clone(),
+                        &mut timer,
+                    )
+                    .await?,
+                );
+            }
+            dht_router = Some(routing);
+        }
 
-        let mut node = Self {
+        Ok(Self {
+            crypto_storage: CryptoStorage::new(storage.clone()),
             storage,
             node_config,
             broker_net,
+            network_io,
+            timer,
             stat,
             random,
             gossip,
             ping,
             webproxy,
-        };
-        node.add_timer(TimerBroker::start().await?).await;
-        Ok(node)
-    }
-
-    /// Adds a timer broker to the Node. Automatically called by Node::start.
-    pub async fn add_timer(&mut self, mut timer: Broker<TimerMessage>) {
-        timer
-            .forward(
-                self.broker_net.clone(),
-                Box::new(|msg| (msg == TimerMessage::Second).then(|| NetworkIn::Tick.into())),
-            )
-            .await;
-        if let Some(r) = self.random.as_mut() {
-            r.add_timer(timer.clone()).await;
-        }
-        if let Some(g) = self.gossip.as_mut() {
-            g.add_timer(timer.clone()).await;
-        }
-        if let Some(p) = self.ping.as_mut() {
-            p.add_timer(timer).await;
-        }
-    }
-
-    /// Update all data-storage. Goes through all storage modules, reads the queues of messages,
-    /// and processes the ones with updated data.
-    pub fn update(&mut self) {
-        if let Some(s) = self.stat.as_mut() {
-            s.update();
-        }
-        if let Some(r) = self.random.as_mut() {
-            r.update();
-        }
-        if let Some(g) = self.gossip.as_mut() {
-            g.update();
-        }
-        if let Some(p) = self.ping.as_mut() {
-            p.update();
-        }
-    }
-
-    /// Start processing of network and logic messages, in case they haven't been
-    /// called automatically.
-    /// Also updates all storage fields in the node_data field.
-    pub async fn process(&mut self) -> Result<(), NodeError> {
-        self.update();
-        if let Some(g) = self.gossip.as_mut() {
-            self.storage.set(STORAGE_GOSSIP_EVENTS, &g.storage.get()?)?;
-        }
-        Ok(())
+            dht_router,
+            dht_storage,
+        })
     }
 
     /// Requests a list of all connected nodes
     pub async fn request_list(&mut self) -> Result<(), NodeError> {
         self.broker_net
-            .emit_msg(NetworkIn::WSUpdateListRequest.into())?;
+            .emit_msg_in(NetworkIn::WSUpdateListRequest)?;
         Ok(())
     }
 
@@ -202,7 +209,7 @@ impl Node {
     /// currently connected to, and can be shorter than the list of all nodes in the system.
     pub fn nodes_connected(&self) -> Result<Vec<NodeInfo>, NodeError> {
         if let Some(r) = self.random.as_ref() {
-            return self.nodes_info(r.storage.connected.get_nodes().0);
+            return self.nodes_info(r.storage.borrow().connected.get_nodes().0);
         }
         Err(NodeError::Missing("Random".into()))
     }
@@ -211,7 +218,7 @@ impl Node {
     /// to a subset of these nodes, which can be get with `nodes_connected`.
     pub fn nodes_online(&self) -> Result<Vec<NodeInfo>, NodeError> {
         if let Some(r) = self.random.as_ref() {
-            return self.nodes_info(r.storage.known.0.clone());
+            return self.nodes_info(r.storage.borrow().known.0.clone());
         }
         Err(NodeError::Missing("Random".into()))
     }
@@ -253,32 +260,6 @@ impl Node {
         }
     }
 
-    // Reads the gossip configuration and stores it in the gossip-storage.
-    async fn init_gossip(
-        gossip: &mut GossipBroker,
-        gossip_storage: Box<dyn DataStorage>,
-        node_info: &NodeInfo,
-    ) -> Result<(), NodeError> {
-        let gossip_msgs_str = gossip_storage.get(STORAGE_GOSSIP_EVENTS).unwrap();
-        if !gossip_msgs_str.is_empty() {
-            if let Err(e) = gossip.storage.set(&gossip_msgs_str) {
-                log::warn!("Couldn't load gossip messages: {}", e);
-            }
-        }
-        gossip.storage.add_event(Event {
-            category: Category::NodeInfo,
-            src: node_info.get_id(),
-            created: now(),
-            msg: node_info.encode(),
-        });
-        gossip
-            .broker
-            .emit_msg(GossipMessage::Input(GossipIn::SetStorage(
-                gossip.storage.clone(),
-            )))?;
-        Ok(())
-    }
-
     /// Static method
 
     /// Fetches the config
@@ -300,7 +281,7 @@ impl Node {
         config
             .info
             .modules
-            .set(Modules::ENABLE_WEBPROXY_REQUESTS, enable_webproxy_request);
+            .set(Modules::WEBPROXY_REQUESTS, enable_webproxy_request);
         Self::set_config(storage, &config.encode())?;
         Ok(config)
     }
@@ -314,7 +295,7 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use flarch::{data_storage::DataStorageTemp, start_logging};
+    use flarch::{broker::Broker, data_storage::DataStorageTemp, start_logging, start_logging_filter_level};
     use flmodules::gossip_events::{
         core::{Category, Event},
         messages::GossipIn,
@@ -328,7 +309,7 @@ mod tests {
 
         let storage = DataStorageTemp::new();
         let nc = NodeConfig::new();
-        let mut nd = Node::start(storage.clone(), nc.clone(), Broker::new()).await?;
+        let mut nd = Node::start(storage.clone_box(), nc.clone(), Broker::new()).await?;
         let event = Event {
             category: Category::TextMessage,
             src: nc.info.get_id(),
@@ -339,12 +320,16 @@ mod tests {
             .as_mut()
             .unwrap()
             .broker
-            .settle_msg(GossipIn::AddEvent(event.clone()).into())
+            .settle_msg_in(GossipIn::AddEvent(event.clone()).into())
             .await?;
-        nd.process().await?;
 
-        let nd2 = Node::start(storage.clone(), nc.clone(), Broker::new()).await?;
-        let events = nd2.gossip.unwrap().storage.events(Category::TextMessage);
+        let nd2 = Node::start(storage.clone_box(), nc.clone(), Broker::new()).await?;
+        let events = nd2
+            .gossip
+            .unwrap()
+            .storage
+            .borrow()
+            .events(Category::TextMessage);
         assert_eq!(1, events.len());
         assert_eq!(&event, events.get(0).unwrap());
         Ok(())
@@ -352,7 +337,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_store_node() -> Result<(), Box<dyn std::error::Error>> {
-        start_logging();
+        start_logging_filter_level(vec![], log::LevelFilter::Info);
 
         let mut node = Node::start(
             Box::new(DataStorageTemp::new()),
@@ -360,8 +345,12 @@ mod tests {
             Broker::new(),
         )
         .await?;
-        node.update();
-        log::debug!("storage is: {:?}", node.gossip.as_ref().unwrap().storage);
+        node.gossip.as_mut().unwrap().broker.settle(vec![]).await?;
+
+        log::debug!(
+            "storage is: {:?}",
+            node.gossip.as_ref().unwrap().storage.borrow()
+        );
         assert_eq!(1, node.gossip.unwrap().events(Category::NodeInfo).len());
         Ok(())
     }

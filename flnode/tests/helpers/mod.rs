@@ -4,14 +4,20 @@ use flarch::{
     broker::{Broker, BrokerError},
     data_storage::DataStorageTemp,
     nodeids::U256,
-    web_rtc::{node_connection::NCInput, WebRTCConnMessage},
+    web_rtc::{
+        node_connection::{NCInput, NCOutput},
+        WebRTCConnInput, WebRTCConnOutput,
+    },
+};
+use flmodules::{
+    network::broker::{BrokerNetwork, NetworkIn, NetworkOut},
+    timer::BrokerTimer,
 };
 use flmodules::{
     nodeconfig::{NodeConfig, NodeInfo},
     timer::TimerMessage,
     Modules,
 };
-use flmodules::network::messages::{NetworkIn, NetworkOut, NetworkMessage};
 
 use flnode::node::{Node, NodeError};
 use thiserror::Error;
@@ -27,8 +33,8 @@ pub enum NetworkError {
 pub struct NetworkSimul {
     pub nodes: HashMap<U256, NodeTimer>,
     pub messages: u64,
-    node_brokers: HashMap<U256, Broker<NetworkMessage>>,
-    node_taps: HashMap<U256, Receiver<NetworkMessage>>,
+    node_brokers: HashMap<U256, BrokerNetwork>,
+    node_taps: HashMap<U256, Receiver<NetworkIn>>,
 }
 
 impl NetworkSimul {
@@ -51,7 +57,7 @@ impl NetworkSimul {
 
     pub async fn tick(&mut self) -> Result<(), NetworkError> {
         for node in self.nodes.values_mut() {
-            node.timer.settle_msg(TimerMessage::Second).await?;
+            node.timer.settle_msg_out(TimerMessage::Second).await?;
         }
         Ok(())
     }
@@ -66,7 +72,7 @@ impl NetworkSimul {
         for id in self.nodes.keys() {
             if let Some(broker) = self.node_brokers.get_mut(id) {
                 broker
-                    .settle_msg(NetworkOut::NodeListFromWS(list.clone()).into())
+                    .settle_msg_out(NetworkOut::NodeListFromWS(list.clone()))
                     .await?;
             }
         }
@@ -77,7 +83,7 @@ impl NetworkSimul {
         let mut broker = Broker::new();
         let node_timer = NodeTimer::new(broker.clone(), self.nodes.len() as u32, modules).await?;
         let id = node_timer.node.node_config.info.get_id();
-        let (tap, _) = broker.get_tap_sync().await?;
+        let (tap, _) = broker.get_tap_in_sync().await?;
         self.node_taps.insert(id, tap);
         self.node_brokers.insert(id, broker);
         self.nodes.insert(id, node_timer);
@@ -96,13 +102,6 @@ impl NetworkSimul {
         }
     }
 
-    #[allow(dead_code)]
-    pub async fn send_message(&mut self, id: &U256, bm: NetworkMessage) {
-        if let Some(ch) = self.node_brokers.get_mut(id) {
-            ch.settle_msg(bm).await.expect("Couldn't send message");
-        }
-    }
-
     async fn process_one(&mut self) {
         self.tick().await.unwrap();
         let ids: Vec<U256> = self.nodes.keys().cloned().collect();
@@ -112,7 +111,7 @@ impl NetworkSimul {
                     if let Some(broker) = self.node_brokers.get_mut(&id_dst) {
                         log::trace!("Send: {} -> {}: {:?}", id, id_dst, msg_out);
                         broker
-                            .settle_msg(msg_out)
+                            .settle_msg_out(msg_out)
                             .await
                             .expect("processing one message");
                         self.messages += 1;
@@ -120,35 +119,26 @@ impl NetworkSimul {
                 }
             }
         }
-
-        for id in ids.iter() {
-            self.nodes.get_mut(id).unwrap().process().await;
-        }
     }
 
-    fn process_msg(&self, id: &U256, msg: NetworkMessage) -> Vec<(U256, NetworkMessage)> {
+    fn process_msg(&self, id: &U256, msg: NetworkIn) -> Vec<(U256, NetworkOut)> {
         match msg {
-            NetworkMessage::Input(NetworkIn::Connect(id_dst)) => {
+            NetworkIn::Connect(id_dst) => {
                 vec![
-                    (*id, NetworkOut::Connected(id_dst).into()),
-                    (id_dst, NetworkOut::Connected(*id).into()),
+                    (*id, NetworkOut::Connected(id_dst)),
+                    (id_dst, NetworkOut::Connected(*id)),
                 ]
             }
-            NetworkMessage::Input(NetworkIn::MessageToNode(from_id, msg_str)) => vec![(
-                from_id,
-                NetworkOut::MessageFromNode(id.clone(), msg_str).into(),
-            )],
-            NetworkMessage::WebRTC(WebRTCConnMessage::InputNC(
-                id_dst,
-                NCInput::Text(msg_node),
-            )) => {
+            NetworkIn::MessageToNode(from_id, msg_str) => {
+                vec![(from_id, NetworkOut::MessageFromNode(id.clone(), msg_str))]
+            }
+            NetworkIn::WebRTC(WebRTCConnOutput::Message(id_dst, NCOutput::Text(msg_node))) => {
                 vec![(
                     id_dst.clone(),
-                    NetworkMessage::WebRTC(WebRTCConnMessage::InputNC(
+                    NetworkOut::WebRTC(WebRTCConnInput::Message(
                         *id,
-                        NCInput::Text(msg_node.clone()).into(),
-                    ))
-                    .into(),
+                        NCInput::Text(msg_node.clone()),
+                    )),
                 )]
             }
             _ => vec![],
@@ -158,12 +148,12 @@ impl NetworkSimul {
 
 pub struct NodeTimer {
     pub node: Node,
-    pub timer: Broker<TimerMessage>,
+    pub timer: BrokerTimer,
 }
 
 impl NodeTimer {
     pub async fn new(
-        broker_net: Broker<NetworkMessage>,
+        broker_net: BrokerNetwork,
         start: u32,
         modules: Modules,
     ) -> Result<Self, NodeError> {
@@ -181,31 +171,21 @@ impl NodeTimer {
             node_config = NodeConfig::new();
         }
         node_config.info.modules = modules;
-        let mut node_data = Node::start(
+        let node_data = Node::start(
             Box::new(DataStorageTemp::new()),
             node_config,
             broker_net.clone(),
         )
         .await?;
-        let timer = Broker::new();
-        node_data.add_timer(timer.clone()).await;
 
         Ok(Self {
+            timer: node_data.timer.broker.clone(),
             node: node_data,
-            timer,
         })
     }
 
     pub fn node_info(&self) -> NodeInfo {
         self.node.node_config.info.clone()
-    }
-
-    pub async fn process(&mut self) {
-        self.node
-            .process()
-            .await
-            .err()
-            .map(|e| log::error!("While processing node-data: {e:?}"));
     }
 
     #[allow(dead_code)]

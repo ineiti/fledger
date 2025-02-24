@@ -152,15 +152,3 @@ impl Default for WebProxyStorage {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use std::error::Error;
-
-    // use super::*;
-
-    #[test]
-    fn test_increase() -> Result<(), Box<dyn Error>> {
-        Ok(())
-    }
-}

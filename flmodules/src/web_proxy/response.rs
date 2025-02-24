@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::Utf8Error};
 
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
-use serde_with::{base64::Base64, serde_as};
+use serde_with::{hex::Hex, serde_as};
 use tokio::sync::mpsc::Receiver;
 
 use flarch::nodeids::NodeID;
@@ -48,7 +48,7 @@ impl Response {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ResponseMessage {
     Header(ResponseHeader),
-    Body(#[serde_as(as = "Base64")]Bytes),
+    Body(#[serde_as(as = "Hex")]Bytes),
     Error(String),
     Done,
 }

@@ -49,49 +49,43 @@
 
 use bimap::BiMap;
 use serde::{Deserialize, Serialize};
-use serde_with::{base64::Base64, serde_as};
+use serde_with::{hex::Hex, serde_as};
 use std::{
     collections::HashMap,
     fmt::{Error, Formatter},
 };
 
+use crate::{nodeconfig::NodeInfo, timer::Timer};
 use flarch::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler}, nodeids::{NodeID, U256}, platform_async_trait, web_rtc::{
+    broker::{Broker, BrokerError, SubsystemHandler, TranslateFrom, TranslateInto},
+    nodeids::{NodeID, U256},
+    platform_async_trait,
+    web_rtc::{
         messages::PeerInfo,
-        websocket::{WSServerInput, WSServerMessage, WSServerOutput},
-    }
-};
-use crate::{
-    nodeconfig::NodeInfo,
-    timer::{TimerBroker, TimerMessage},
+        websocket::{BrokerWSServer, WSServerIn, WSServerOut},
+    },
 };
 
-#[derive(Clone, Debug)]
-/// The possible messages for the signalling server broker, including the
-/// connected websocket messages.
-pub enum SignalMessage {
-    /// Messages being sent to the signalling server
-    Input(SignalInput),
-    /// Messages coming from the signalling server
-    Output(SignalOutput),
-    /// Messages exchanged with the WebSocketServer
-    WSServer(WSServerMessage),
-}
+pub type BrokerSignal = Broker<SignalIn, SignalOut>;
 
 #[derive(Clone)]
 /// Messages for the signalling server
-pub enum SignalInput {
+pub enum SignalIn {
     /// One minute timer clock for removing stale connections
     Timer,
+    /// Message coming from the WebSocket server.
+    WSServer(WSServerOut),
 }
 
 #[derive(Clone, Debug)]
 /// Messages sent by the signalling server to an evenutal listener
-pub enum SignalOutput {
+pub enum SignalOut {
     /// Statistics about the connected nodes
     NodeStats(Vec<NodeStat>),
     /// Whenever a new node has joined the signalling server
     NewNode(NodeID),
+    /// Messages going to the WebSocketServer
+    WSServer(WSServerIn),
     /// If the server has been stopped
     Stopped,
 }
@@ -118,62 +112,41 @@ impl SignalServer {
     /// `ttl_minutes` is the minimum time an idle node will be
     /// kept in the list.
     pub async fn new(
-        ws_server: Broker<WSServerMessage>,
+        ws_server: BrokerWSServer,
         ttl_minutes: u64,
-    ) -> Result<Broker<SignalMessage>, BrokerError> {
+    ) -> Result<BrokerSignal, BrokerError> {
         let mut broker = Broker::new();
         broker
-            .add_subsystem(Subsystem::Handler(Box::new(SignalServer {
+            .add_handler(Box::new(SignalServer {
                 connection_ids: BiMap::new(),
                 info: HashMap::new(),
                 ttl: HashMap::new(),
                 // Add 2 to the ttl_minutes to make sure that nodes are kept at least
                 // 1 minute in the list.
                 ttl_minutes: ttl_minutes + 2,
-            })))
+            }))
             .await?;
-        broker
-            .link_bi(
-                ws_server,
-                Box::new(Self::link_wss_ss),
-                Box::new(Self::link_ss_wss),
-            )
-            .await?;
-        TimerBroker::start()
+        broker.link_bi(ws_server).await?;
+        Timer::start()
             .await?
-            .forward(
-                broker.clone(),
-                Box::new(|msg| {
-                    matches!(msg, TimerMessage::Minute)
-                        .then(|| SignalMessage::Input(SignalInput::Timer))
-                }),
-            )
-            .await;
+            .tick_minute(broker.clone(), SignalIn::Timer)
+            .await?;
         Ok(broker)
     }
 
-    fn link_wss_ss(msg: WSServerMessage) -> Option<SignalMessage> {
-        matches!(msg, WSServerMessage::Output(_)).then(|| SignalMessage::WSServer(msg))
-    }
-
-    fn link_ss_wss(msg: SignalMessage) -> Option<WSServerMessage> {
-        if let SignalMessage::WSServer(msg_wss) = msg {
-            matches!(msg_wss, WSServerMessage::Input(_)).then(|| msg_wss)
-        } else {
-            None
-        }
-    }
-
-    fn msg_in(&mut self, msg_in: SignalInput) -> Vec<SignalMessage> {
+    fn msg_in(&mut self, msg_in: SignalIn) -> Vec<SignalOut> {
         match msg_in {
-            SignalInput::Timer => self.msg_in_timer(),
+            SignalIn::Timer => {
+                self.msg_in_timer();
+                vec![]
+            }
+            SignalIn::WSServer(msg_wss) => self.msg_wss(msg_wss),
         }
-        vec![]
     }
 
-    fn msg_wss(&mut self, msg: WSServerOutput) -> Vec<SignalMessage> {
+    fn msg_wss(&mut self, msg: WSServerOut) -> Vec<SignalOut> {
         match msg {
-            WSServerOutput::Message(index, msg_s) => {
+            WSServerOut::Message(index, msg_s) => {
                 self.ttl
                     .entry(index.clone())
                     .and_modify(|ttl| *ttl = self.ttl_minutes);
@@ -181,9 +154,9 @@ impl SignalServer {
                     return self.msg_ws_process(index, msg_ws);
                 }
             }
-            WSServerOutput::NewConnection(index) => return self.msg_ws_connect(index),
-            WSServerOutput::Disconnection(id) => self.remove_node(id),
-            WSServerOutput::Stopped => return vec![SignalMessage::Output(SignalOutput::Stopped)],
+            WSServerOut::NewConnection(index) => return self.msg_ws_connect(index),
+            WSServerOut::Disconnection(id) => self.remove_node(id),
+            WSServerOut::Stopped => return vec![SignalOut::Stopped],
         }
         vec![]
     }
@@ -204,7 +177,7 @@ impl SignalServer {
 
     // The id is the challange until the announcement succeeds. Then ws_announce calls
     // set_cb_message again to create a new callback using the node-id as id.
-    fn msg_ws_process(&mut self, index: usize, msg: WSSignalMessageFromNode) -> Vec<SignalMessage> {
+    fn msg_ws_process(&mut self, index: usize, msg: WSSignalMessageFromNode) -> Vec<SignalOut> {
         match msg {
             WSSignalMessageFromNode::Announce(ann) => self.ws_announce(index, ann),
             WSSignalMessageFromNode::ListIDsRequest => self.ws_list_ids(index),
@@ -213,7 +186,7 @@ impl SignalServer {
         }
     }
 
-    fn msg_ws_connect(&mut self, index: usize) -> Vec<SignalMessage> {
+    fn msg_ws_connect(&mut self, index: usize) -> Vec<SignalOut> {
         log::debug!("Sending challenge to new connection");
         let challenge = U256::rnd();
         self.connection_ids.insert(challenge, index);
@@ -221,10 +194,13 @@ impl SignalServer {
         let challenge_msg =
             serde_json::to_string(&WSSignalMessageToNode::Challenge(SIGNAL_VERSION, challenge))
                 .unwrap();
-        vec![WSServerInput::Message(index, challenge_msg).into()]
+        vec![SignalOut::WSServer(WSServerIn::Message(
+            index,
+            challenge_msg,
+        ))]
     }
 
-    fn ws_announce(&mut self, index: usize, msg: MessageAnnounce) -> Vec<SignalMessage> {
+    fn ws_announce(&mut self, index: usize, msg: MessageAnnounce) -> Vec<SignalOut> {
         let challenge = match self.connection_ids.get_by_right(&index) {
             Some(id) => id,
             None => {
@@ -241,10 +217,10 @@ impl SignalServer {
 
         log::info!("Registration of node-id {}: {}", id, msg.node_info.name);
         self.info.insert(id, msg.node_info);
-        vec![SignalOutput::NewNode(id).into()]
+        vec![SignalOut::NewNode(id)]
     }
 
-    fn ws_list_ids(&mut self, id: usize) -> Vec<SignalMessage> {
+    fn ws_list_ids(&mut self, id: usize) -> Vec<SignalOut> {
         log::info!("Current list is: {:?}", self.info.values());
         self.send_msg_node(
             id,
@@ -252,7 +228,7 @@ impl SignalServer {
         )
     }
 
-    fn ws_peer_setup(&mut self, index: usize, pi: PeerInfo) -> Vec<SignalMessage> {
+    fn ws_peer_setup(&mut self, index: usize, pi: PeerInfo) -> Vec<SignalOut> {
         let id = match self.connection_ids.get_by_right(&index) {
             Some(id) => id,
             None => {
@@ -269,12 +245,15 @@ impl SignalServer {
         vec![]
     }
 
-    fn ws_node_stats(&mut self, ns: Vec<NodeStat>) -> Vec<SignalMessage> {
-        vec![SignalOutput::NodeStats(ns).into()]
+    fn ws_node_stats(&mut self, ns: Vec<NodeStat>) -> Vec<SignalOut> {
+        vec![SignalOut::NodeStats(ns)]
     }
 
-    fn send_msg_node(&self, index: usize, msg: WSSignalMessageToNode) -> Vec<SignalMessage> {
-        vec![WSServerInput::Message(index, serde_json::to_string(&msg).unwrap()).into()]
+    fn send_msg_node(&self, index: usize, msg: WSSignalMessageToNode) -> Vec<SignalOut> {
+        vec![SignalOut::WSServer(WSServerIn::Message(
+            index,
+            serde_json::to_string(&msg).unwrap(),
+        ))]
     }
 
     fn remove_node(&mut self, index: usize) {
@@ -286,19 +265,24 @@ impl SignalServer {
 }
 
 #[platform_async_trait()]
-impl SubsystemHandler<SignalMessage> for SignalServer {
-    async fn messages(&mut self, from_broker: Vec<SignalMessage>) -> Vec<SignalMessage> {
-        let mut out = vec![];
-        for msg in from_broker {
-            match msg {
-                SignalMessage::Input(msg_in) => out.extend(self.msg_in(msg_in)),
-                SignalMessage::WSServer(WSServerMessage::Output(msg_wss)) => {
-                    out.extend(self.msg_wss(msg_wss))
-                }
-                _ => {}
-            }
+impl SubsystemHandler<SignalIn, SignalOut> for SignalServer {
+    async fn messages(&mut self, msgs: Vec<SignalIn>) -> Vec<SignalOut> {
+        msgs.into_iter().flat_map(|msg| self.msg_in(msg)).collect()
+    }
+}
+
+impl TranslateFrom<WSServerOut> for SignalIn {
+    fn translate(msg: WSServerOut) -> Option<Self> {
+        Some(SignalIn::WSServer(msg))
+    }
+}
+impl TranslateInto<WSServerIn> for SignalOut {
+    fn translate(self) -> Option<WSServerIn> {
+        if let SignalOut::WSServer(msg_wss) = self {
+            Some(msg_wss)
+        } else {
+            None
         }
-        out
     }
 }
 
@@ -372,7 +356,7 @@ pub struct MessageAnnounce {
     /// Information about the remote node.
     /// The [`NodeInfo.get_id()`] will be used as the ID of this node.
     pub node_info: NodeInfo,
-    #[serde_as(as = "Base64")]
+    #[serde_as(as = "Hex")]
     /// The signature of the challenge with the private key of the node.
     pub signature: Vec<u8>,
 }
@@ -390,41 +374,11 @@ pub struct NodeStat {
     pub ping_rx: u32,
 }
 
-impl std::fmt::Debug for SignalInput {
+impl std::fmt::Debug for SignalIn {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match self {
-            // SignalInput::WebSocket(_) => write!(f, "WebSocket"),
-            SignalInput::Timer => write!(f, "Timer"),
+            SignalIn::WSServer(_) => write!(f, "WebSocket"),
+            SignalIn::Timer => write!(f, "Timer"),
         }
-    }
-}
-
-impl From<WSServerMessage> for SignalMessage {
-    fn from(msg: WSServerMessage) -> Self {
-        SignalMessage::WSServer(msg)
-    }
-}
-
-impl From<WSServerInput> for SignalMessage {
-    fn from(msg: WSServerInput) -> Self {
-        SignalMessage::WSServer(msg.into())
-    }
-}
-
-impl From<WSServerOutput> for SignalMessage {
-    fn from(msg: WSServerOutput) -> Self {
-        SignalMessage::WSServer(msg.into())
-    }
-}
-
-impl From<SignalInput> for SignalMessage {
-    fn from(msg: SignalInput) -> Self {
-        SignalMessage::Input(msg)
-    }
-}
-
-impl From<SignalOutput> for SignalMessage {
-    fn from(msg: SignalOutput) -> Self {
-        SignalMessage::Output(msg)
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "flnode"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "Glue code for flmodules"
@@ -11,8 +11,8 @@ readme = "README.md"
 keywords = ["test", "utils", "fledger"]
 
 [dependencies]
-flmodules = {path = "../flmodules", version = "0.8"}
-flarch = {path = "../flarch", version = "0.8"}
+flmodules = {path = "../flmodules", version = "0.9"}
+flarch = {path = "../flarch", version = "0.9"}
 
 async-trait = "0.1"
 rand = "0.8"

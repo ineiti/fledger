@@ -6,7 +6,18 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
-## [Unreleased]
+## [0.9.0] - 2025-02-24
+
+This release is mostly for the start of the student project.
+It is a mostly working version of the dht_storage module, but most of the CLI tools 
+and web-frontend are still missing.
+
+### Added
+- flcrypto: for some basic cryptography wrappers around different types of signatures
+- flmacro: with macros for simplifying the `Send` / `Sync`
+- flmodules::flo handling Fledger Objects
+- flmodules::dht_router implements a routing based on Kademlia
+- flmodules::dht_storage to store FLOs in a distributed hash table
 
 ### Fixed
 - reconnections should work better now, both for libc and wasm
@@ -17,6 +28,16 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - changed the names of the networking messages
 - added an `Overlay` module to abstract the network handling
 - more changes in names of the messages to remove ambiguities
+- Renamed `Overlay` to `Router`
+  - think how the `Overlay` (should be renamed to `Adapter` or so) can be
+  redone. One possibility is to have the network module using a good
+  `NetworkMessage` which includes the `NetworkWrapper` and can also be used
+  by `Random` and `Loopix`.
+      - Question: how to handle special messages then? Like asking to reshuffle
+      connections in `random` or accessing the providers in `loopix`?
+      - Answer: they can be added as a broker with another message type, which is also
+      added to the broker structure
+        - add an internal message enum to separate them from the outside messages
 
 ## [0.8.0] - 2024-09-09
 

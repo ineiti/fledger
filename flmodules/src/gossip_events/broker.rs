@@ -1,209 +1,146 @@
-use std::sync::mpsc::{channel, Receiver, Sender};
-
 use flarch::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
-    nodeids::{NodeID, U256},
-    platform_async_trait,
+    broker::{Broker, BrokerError, TranslateFrom, TranslateInto},
+    data_storage::DataStorage,
+    nodeids::U256,
+    tasks::now,
 };
+use tokio::sync::watch;
 
 use super::{
     core::{Category, Event, EventsStorage},
-    messages::{Config, GossipEvents, GossipIn, GossipMessage, GossipOut},
+    messages::{GossipIn, GossipOut, Messages},
 };
 use crate::{
-    overlay::messages::NetworkWrapper,
-    random_connections::messages::{RandomIn, RandomMessage, RandomOut},
-    timer::TimerMessage,
+    nodeconfig::NodeInfo,
+    random_connections::broker::{BrokerRandom, RandomIn, RandomOut},
+    router::messages::NetworkWrapper,
+    timer::Timer,
 };
 
-const MODULE_NAME: &str = "Gossip";
+pub type BrokerGossip = Broker<GossipIn, GossipOut>;
+
+pub const MODULE_NAME: &str = "Gossip";
 
 /// This links the GossipEvent module with a RandomConnections module, so that
 /// all messages are correctly translated from one to the other.
-pub struct GossipBroker {
-    /// This is always updated with the latest view of the GossipEvent module.
-    pub storage: EventsStorage,
+pub struct Gossip {
     /// Represents the underlying broker.
-    pub broker: Broker<GossipMessage>,
+    pub broker: BrokerGossip,
     /// Is used to pass the EventsStorage structure from the Translate to the GossipLink.
-    storage_rx: Receiver<EventsStorage>,
+    pub storage: watch::Receiver<EventsStorage>,
 }
 
-impl GossipBroker {
-    pub async fn start(id: NodeID, rc: Broker<RandomMessage>) -> Result<Self, BrokerError> {
-        let (storage_tx, storage_rx) = channel();
-        let broker = Translate::start(rc, Config::new(id), storage_tx).await?;
-        Ok(GossipBroker {
-            storage: EventsStorage::new(),
-            storage_rx,
-            broker,
+impl Gossip {
+    pub async fn start(
+        storage: Box<dyn DataStorage + Send>,
+        node_info: NodeInfo,
+        rc: BrokerRandom,
+        timer: &mut Timer,
+    ) -> Result<Self, BrokerError> {
+        let (messages, storage) = Messages::new(node_info.get_id(), storage);
+        let mut broker = Broker::new();
+        broker.add_handler(Box::new(messages)).await?;
+
+        timer.tick_minute(broker.clone(), GossipIn::Tick).await?;
+        broker.link_bi(rc).await?;
+
+        let mut gb = Gossip { storage, broker };
+        gb.add_event(Event {
+            category: Category::NodeInfo,
+            src: node_info.get_id(),
+            created: now(),
+            msg: node_info.encode(),
         })
-    }
+        .await?;
 
-    pub async fn add_timer(&mut self, mut timer: Broker<TimerMessage>) {
-        timer
-            .forward(
-                self.broker.clone(),
-                Box::new(|msg: TimerMessage| {
-                    matches!(msg, TimerMessage::Minute)
-                        .then(|| GossipMessage::Input(GossipIn::Tick))
-                }),
-            )
-            .await;
-    }
-
-    pub fn update(&mut self) {
-        for update in self.storage_rx.try_iter() {
-            self.storage = update;
-        }
+        Ok(gb)
     }
 
     /// Adds a new event to the GossipMessage module.
     /// The new event will automatically be propagated to all connected nodes.
     pub async fn add_event(&mut self, event: Event) -> Result<(), BrokerError> {
-        self.broker
-            .emit_msg(GossipMessage::Input(GossipIn::AddEvent(event)))?;
+        self.broker.emit_msg_in(GossipIn::AddEvent(event))?;
         Ok(())
     }
 
     /// Gets a copy of all chat events stored in the module.
     pub fn chat_events(&self) -> Vec<Event> {
-        self.storage.events(Category::TextMessage)
+        self.storage.borrow().events(Category::TextMessage)
     }
 
     /// Gets all event-ids that are stored in the module.
     pub fn event_ids(&self) -> Vec<U256> {
-        self.storage.event_ids()
+        self.storage.borrow().event_ids()
     }
 
     /// Gets a single event of the module.
     pub fn event(&self, id: &U256) -> Option<Event> {
-        self.storage.event(id)
+        self.storage.borrow().event(id)
     }
 
     /// Returns all events from a given category
     pub fn events(&self, cat: Category) -> Vec<Event> {
-        self.storage.events(cat)
+        self.storage.borrow().events(cat)
     }
 }
 
-struct Translate {
-    storage_tx: Sender<EventsStorage>,
-    module: GossipEvents,
-}
-
-impl Translate {
-    async fn start(
-        random: Broker<RandomMessage>,
-        config: Config,
-        storage_tx: Sender<EventsStorage>,
-    ) -> Result<Broker<GossipMessage>, BrokerError> {
-        let mut gossip = Broker::new();
-        gossip
-            .add_subsystem(Subsystem::Handler(Box::new(Translate {
-                storage_tx,
-                module: GossipEvents::new(config),
-            })))
-            .await?;
-        gossip
-            .link_bi(
-                random,
-                Box::new(Self::link_rnd_gossip),
-                Box::new(Self::link_gossip_rnd),
-            )
-            .await?;
-        Ok(gossip)
-    }
-
-    fn link_rnd_gossip(msg: RandomMessage) -> Option<GossipMessage> {
-        if let RandomMessage::Output(msg_out) = msg {
-            match msg_out {
-                RandomOut::NodeIDsConnected(list) => Some(GossipIn::NodeList(list.into()).into()),
-                RandomOut::NetworkWrapperFromNetwork(id, msg) => msg
-                    .unwrap_yaml(MODULE_NAME)
-                    .map(|msg| GossipIn::FromNetwork(id, msg).into()),
-                _ => None,
-            }
-        } else {
-            None
-        }
-    }
-
-    fn link_gossip_rnd(msg: GossipMessage) -> Option<RandomMessage> {
-        if let GossipMessage::Output(GossipOut::ToNetwork(id, msg_node)) = msg {
-            Some(
-                RandomIn::NetworkMapperToNetwork(
-                    id,
-                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
-                )
-                .into(),
-            )
-        } else {
-            None
-        }
-    }
-
-    fn handle_input(&mut self, msg_in: GossipIn) -> Vec<GossipOut> {
-        match self.module.process_message(msg_in) {
-            Ok(ret) => return ret.into_iter().map(|m| m.into()).collect(),
-            Err(e) => log::warn!("While processing message: {e:?}"),
-        }
-        vec![]
-    }
-
-    fn handle_output(&mut self, msg_out: &GossipOut) {
-        if let GossipOut::Storage(s) = msg_out {
-            self.storage_tx
-                .send(s.clone())
-                .err()
-                .map(|e| log::error!("Couldn't send to storage_tx: {e:?}"));
+impl TranslateFrom<RandomOut> for GossipIn {
+    fn translate(msg: RandomOut) -> Option<Self> {
+        match msg {
+            RandomOut::NodeIDsConnected(list) => Some(GossipIn::UpdateNodeList(list.into())),
+            RandomOut::NetworkWrapperFromNetwork(id, msg) => msg
+                .unwrap_yaml(MODULE_NAME)
+                .map(|msg| GossipIn::FromNetwork(id, msg)),
+            _ => None,
         }
     }
 }
 
-#[platform_async_trait()]
-impl SubsystemHandler<GossipMessage> for Translate {
-    async fn messages(&mut self, msgs: Vec<GossipMessage>) -> Vec<GossipMessage> {
-        let mut out = vec![];
-        for msg in msgs {
-            log::trace!("Got msg: {msg:?}");
-            if let GossipMessage::Input(msg_in) = msg {
-                out.extend(self.handle_input(msg_in));
-            }
-        }
-        for msg in out.iter() {
-            log::trace!("Outputting: {msg:?}");
-            self.handle_output(msg);
-        }
-        out.into_iter().map(|o| o.into()).collect()
+impl TranslateInto<RandomIn> for GossipOut {
+    fn translate(self) -> Option<RandomIn> {
+        let GossipOut::ToNetwork(id, msg_node) = self;
+        Some(RandomIn::NetworkWrapperToNetwork(
+            id,
+            NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::error::Error;
+    use std::sync::mpsc;
 
     use crate::gossip_events::core::{Category, Event};
     use crate::gossip_events::messages::ModuleMessage;
+    use crate::nodeconfig::NodeConfig;
+    use crate::timer::TimerMessage;
+    use flarch::data_storage::DataStorageTemp;
     use flarch::nodeids::NodeID;
-    use flarch::{start_logging, tasks::now};
+    use flarch::start_logging_filter_level;
+    use flarch::tasks::now;
 
     use super::*;
 
     #[tokio::test]
     async fn test_translation() -> Result<(), Box<dyn Error>> {
-        start_logging();
+        start_logging_filter_level(vec![], log::LevelFilter::Info);
 
-        let id = NodeID::rnd();
+        let node_info = NodeConfig::new().info;
         let mut broker_rnd = Broker::new();
-        let mut gossip = GossipBroker::start(id, broker_rnd.clone()).await?;
+        let mut timer = Timer::simul();
+        let gossip = Gossip::start(
+            Box::new(DataStorageTemp::new()),
+            node_info,
+            broker_rnd.clone(),
+            &mut timer,
+        )
+        .await?;
 
         let id2 = NodeID::rnd();
-        let (tap_rnd, _) = broker_rnd.get_tap_sync().await?;
+        let (tap_rnd, _) = broker_rnd.get_tap_in_sync().await?;
         broker_rnd
-            .settle_msg(RandomMessage::Output(RandomOut::NodeIDsConnected(
-                vec![id2].into(),
-            )))
+            .settle_msg_out(RandomOut::NodeIDsConnected(vec![id2].into()))
             .await?;
         assert_msg_reid(&tap_rnd, &id2)?;
 
@@ -215,7 +152,7 @@ mod tests {
         };
         let msg = ModuleMessage::Events(vec![event.clone()]);
         broker_rnd
-            .settle_msg(
+            .settle_msg_out(
                 RandomOut::NetworkWrapperFromNetwork(
                     id2,
                     NetworkWrapper::wrap_yaml(MODULE_NAME, &msg).unwrap(),
@@ -223,17 +160,16 @@ mod tests {
                 .into(),
             )
             .await?;
-        gossip.update();
-        assert_eq!(1, gossip.storage.events(event.category).len());
+        assert_eq!(1, gossip.storage.borrow().events(event.category).len());
 
-        gossip.broker.settle_msg(GossipIn::Tick.into()).await?;
+        timer.broker.settle_msg_out(TimerMessage::Second).await?;
         assert_msg_reid(&tap_rnd, &id2)?;
         Ok(())
     }
 
-    fn assert_msg_reid(tap: &Receiver<RandomMessage>, id2: &NodeID) -> Result<(), Box<dyn Error>> {
+    fn assert_msg_reid(tap: &mpsc::Receiver<RandomIn>, id2: &NodeID) -> Result<(), Box<dyn Error>> {
         for msg in tap.try_iter() {
-            if let RandomMessage::Input(RandomIn::NetworkMapperToNetwork(id, msg_mod)) = msg {
+            if let RandomIn::NetworkWrapperToNetwork(id, msg_mod) = msg {
                 assert_eq!(id2, &id);
                 assert_eq!(MODULE_NAME.to_string(), msg_mod.module);
                 let msg_yaml = serde_yaml::from_str(&msg_mod.msg)?;

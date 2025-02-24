@@ -1,19 +1,84 @@
 # Work in progress
 
+This file is in place of github issues, as currently I'm mostly developing on my own.
+
+## Removing Broker and replace it with BrokerIO
+
+- update documentation
+  - `flmoduls::network`
+
 ## Current high-level goal
 
+- Store a webpage in fledger
+
 ## Current concrete goal
+
+### User-facing
+
+Implement [DHT_STORAGE.md](./DHT_STORAGE.md).
+
+### DHT_storage
+
+1. Link it correctly to DHT_router
+  - implement and test the `DHTStorage(In|Out)` messages for interaction with local modules
+  - Implement and test the `MessageNodeDirect` messages to automatically update the FLOs stored
+2. Store up to 1MB of data
+3. Delete oldest/farthest data
+4. Re-arranged everything to fit it better - probably should create a diagram to make sure it
+still makes sense...
+5. Implement the case when not all Flos are stored in all nodes, searching in other nodes, synching
+   cuckoo-IDs, remove furthest (shallowest) flos if memory is full
+
+TODO:
+- verify Flos when they enter the system
+- when new FloMetas enter the system, check which are the most probable to be kept:
+  - choose the closest (with the highest depth) not-yet-stored Flos for synching
+- Add a timeout to FloCuckoos when they are purged from the system
+- Add a timeout for Flos to purge them from the system
+
+### Testing
+
+Test in `flmodules/test/webpage.rs`:
+- complete, including cuckoos, limited memory.
+Make the following tests work again:
+- `make cargo_test`
+- `examples/ping-pong`
+- `test/webrtc-libc-wasm`
+
+
+### Crypto
+
+Have working `Identities` (`Identity`), and `Condition`s.
+
+TODO:
+- finish access::test_badge
+
+### Flo
+
+Uses real signatures and verifications now
+
+TODO:
+- Clean up the mess - it's still too much stuff calling criss-cross each other.
+- Where are the Verifiers stored? 
+- There must be something shady going on with regard
+  to the verifierIDs which definitely don't match the FloID.
+- Store all necessary data for verification in the Flo itself
+
+### DHT_router
+
+-- seems to be more or less OK, at least if it's usable by DHT_storage --
+
+1. KBucket.active is only be populated once a node has been confirmed.
+  - Needs more testing if nodes fail and how they will be replaced
+
+TODO:
+- should it also store one kademlia per realm?
+  - active nodes are stored in their own vec
+  - each realm-kademlia looks in these nodes first to populate the buckets
 
 # TODO
 
 ## Features
-
-- Needed for semester project:
-  - Import library for html serving with callbacks for loading of elements
-  - Easy simulation 
-    - w/o network
-    - local network
-    - network with bw and delay -> on Deterlab
 
 ## Bugs
 
@@ -24,6 +89,11 @@
 
 ## Cleanups / improvements
 
+- flnode/src/node.rs changes:
+  - instead of calling `update`, use the `template` version with a tap and a watcher
+  - add the timer as an argument to the brokers which need it and remove the `add_timer` method
+- rewrite the flmodules/src/\*/broker.rs :
+  - move dht_storage way of broker.rs/message.rs to other brokers, too
 - yaml files are stored as .toml
   - make sure old files can be read as .toml
   - save new files as .yaml
@@ -31,16 +101,7 @@
 - serde_yaml is deprecated
   - use serde_yaml_ng with singleton_map_recursive
 - use matchbox from https://github.com/johanhelsing/matchbox
-- rewrite the flmodules/src/*/broker.rs :
-  - the returned broker should only represent the actual i/o messages
-  - add an internal message enum to separate them from the outside messages
-  - think how the `Overlay` (should be renamed to `Adapter` or so) can be
-  redone. One possibility is to have the network module using a good
-  `NetworkMessage` which includes the `NetworkWrapper` and can also be used
-  by `Random` and `Loopix`.
-    - Question: how to handle special messages then? Like asking to reshuffle
-    connections in `random` or accessing the providers in `loopix`?
-- Clean up broker / network:
+- Clean up broker:
   - Remove `Destination::{All,Others,This}` - Test it
     only `Destination::All` is ever used
   - Replace `process` with `async-task`
@@ -50,14 +111,45 @@
 
 ## Reaching out
 
-- Sign up for dev6
+Added fledger to blog: https://ineiti.ch/projects/fledger/
+
+# Some things done
+
+### Done
+- Look at all TODOs
+- make all tests pass again
+- also compile for wasm
+- replace `add_subsystem(Subsystem::Handler` with `add_handler`
+- `BrokerIO`
+  - be renamed to `Broker`? Yes
+  - look which `add_translate` are actually used
+    -    4 add_translator_dire
+    -    7 add_translator_link
+    -    4 add_translator_i_ti
+    -    19 add_translator_o_ti
+    -    4 add_translator_o_to
+  - use `add_translator_link`
+- unify `flmodules/*/broker.rs`:
+  - make sure no trailing `.into()` for the messages are left
+- unify `flmodules/*/broker.rs`:
+  - naming: is it a verb? Subject?
+  - rename `(From|To)Router` and `(From|To)*` into `Router(In|Out)` and `*(In|Out)`
+  - add `type BrokerSome = Broker<SomeIn, SomeOut>`
+  - always return a structure
+    - should it `add_translate` with a `Self::translate...` method, or in-line with `Box::new`?
+  - same functionality:
+    - structure creates broker and `add_handler` the `message` structure
+    - `message` structure takes zero or more of: config, DataStorage, `tokio::sync::watch<Stats>` and is a `Subsystem::Handler`
+    - `core` does the core business
+- [flmodules::random_connections::messages] 0x6000007c4ab0 Dropping message to unconnected node f88f09414a048f67
+  - fixed it, but there might still be some random droppings around. Keeping the log for the moment.
 
 # Dates
 
-2022-09-12:
+2024-09-12:
 - update to latest versions of wasm libraries
 
-2022-09-09:
+2024-09-09:
 - Clean up broker / network:
   - change enums with `((a, b))` arguments to simple `(a, b)` arguments
   - remove `Destination` from `SubsystemListener`

@@ -19,7 +19,7 @@ const VERSION_STRING: &str = "123";
 pub async fn main() {
     console_error_panic_hook::set_once();
 
-    femme::with_level(femme::LevelFilter::Debug);
+    femme::with_level(femme::LevelFilter::Info);
 
     log::info!("Starting app with version {}", VERSION_STRING);
 

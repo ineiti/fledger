@@ -5,13 +5,14 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 use console_error_panic_hook::set_once as set_panic_hook;
 use flmodules::nodeconfig::NodeConfig;
+use tokio::select;
 use ybc::TileCtx::{Ancestor, Child, Parent};
 use yew::prelude::*;
 
 use flarch::{broker::Broker, tasks::now, web_rtc::connection::ConnectionConfig};
 
 use shared::{
-    common::{NodeList, PPMessage},
+    common::{NodeList, PingPongIn, PingPongOut},
     handler::PingPong,
 };
 
@@ -23,7 +24,7 @@ struct App {
 
 enum AppMessage {
     Init,
-    NewPingPong(Broker<PPMessage>),
+    NewPingPong(Broker<PingPongIn, PingPongOut>),
     NewMessage(String),
 }
 
@@ -49,12 +50,13 @@ impl Component for App {
                 let pp_imp = self.pp_imp;
                 wasm_bindgen_futures::spawn_local(async move {
                     let id = config.info.get_id();
-                    let net = flmodules::network::network_broker_start(
+                    let net = flmodules::network::network_start(
                         config,
                         ConnectionConfig::from_signal(shared::handler::URL),
                     )
                     .await
-                    .expect("Couldn't start network");
+                    .expect("Couldn't start network")
+                    .broker;
 
                     let pp = match pp_imp {
                         true => PingPong::new(id, net)
@@ -73,31 +75,39 @@ impl Component for App {
                 let link = s.link().clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     let mut list = NodeList::new(vec![]);
-                    let (mut tap, _) = pp.get_tap().await.expect("Couldn't get tap");
-                    loop {
-                        match tap.recv().await.expect("Tap has been closed") {
-                            PPMessage::FromNetwork(id, ppmsg) => {
-                                link.send_message(AppMessage::NewMessage(format!(
-                                    "Received {ppmsg:?} from {}",
-                                    list.get_name(&id)
-                                )));
-                            }
-                            PPMessage::ToNetwork(id, ppmsg) => {
-                                link.send_message(AppMessage::NewMessage(format!(
-                                    "Sending {ppmsg:?} to {}",
-                                    list.get_name(&id)
-                                )));
-                            }
-                            PPMessage::List(new_list) => {
-                                if list.update(new_list) {
+                    let mut tap_in = pp.get_tap_in().await.expect("Couldn't get tap").0;
+                    let mut tap_out = pp.get_tap_out().await.expect("Couldn't get tap").0;
+                    select! {
+                        Some(msg) = tap_in.recv() => {
+                            match msg{
+                                PingPongIn::FromNetwork(from, ppmsg) => {
                                     link.send_message(AppMessage::NewMessage(format!(
-                                        "list: {}",
-                                        list.names()
+                                        "Received {ppmsg:?} from {}",
+                                        list.get_name(&from)
                                     )));
                                 }
+                                PingPongIn::List(new_list) => {
+                                    if list.update(new_list) {
+                                        link.send_message(AppMessage::NewMessage(format!(
+                                            "list: {}",
+                                            list.names()
+                                        )));
+                                    }
+                                }
+                                _ => {}
                             }
-                            _ => {}
-                        }
+                        },
+                        Some(msg) = tap_out.recv() => {
+                            match msg {
+                                PingPongOut::ToNetwork(to, ppmsg) => {
+                                    link.send_message(AppMessage::NewMessage(format!(
+                                        "Sending {ppmsg:?} to {}",
+                                        list.get_name(&to)
+                                    )));
+                                }
+                                _ => {}
+                            }
+                        },
                     }
                 })
             }

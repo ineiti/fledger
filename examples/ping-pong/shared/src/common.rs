@@ -3,15 +3,8 @@ use serde::{Deserialize, Serialize};
 use flarch::nodeids::NodeID;
 use flmodules::nodeconfig::NodeInfo;
 
-/// A PPMessage includes messages from the network, messages to be sent to
-/// the network, and receiving an updated list from the signalling server.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum PPMessage {
-    /// Contains the destination-id and the message to be sent. The
-    /// user only has to send the 'ping', the PingPong implementation
-    /// automatically sends a 'pong' reply and requests for an updated
-    /// list of nodes.
-    ToNetwork(NodeID, PPMessageNode),
+pub enum PingPongIn {
     /// Contains source-id of the message as well as the message itself.
     /// The user does not have to reply to incoming ping messages.
     FromNetwork(NodeID, PPMessageNode),
@@ -19,6 +12,17 @@ pub enum PPMessage {
     List(Vec<NodeInfo>),
     /// Tick once per second
     Tick,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum PingPongOut {
+    /// Contains the destination-id and the message to be sent. The
+    /// user only has to send the 'ping', the PingPong implementation
+    /// automatically sends a 'pong' reply and requests for an updated
+    /// list of nodes.
+    ToNetwork(NodeID, PPMessageNode),
+    /// Request an updated list of nodes
+    WSUpdateListRequest,
 }
 
 /// Every  contact is started with a ping and replied with a pong.

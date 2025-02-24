@@ -1,21 +1,21 @@
+use async_trait::async_trait;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
 use thiserror::Error;
-use async_trait::async_trait;
 
-#[cfg(all(target_family="wasm", feature = "node"))]
+#[cfg(all(target_family = "wasm", feature = "node"))]
 mod node;
-#[cfg(all(target_family="wasm", feature = "node"))]
+#[cfg(all(target_family = "wasm", feature = "node"))]
 pub use node::*;
-#[cfg(all(target_family="wasm", not(feature = "node")))]
+#[cfg(all(target_family = "wasm", not(feature = "node")))]
 mod wasm;
-#[cfg(all(target_family="wasm", not(feature = "node")))]
+#[cfg(all(target_family = "wasm", not(feature = "node")))]
 pub use wasm::*;
-#[cfg(target_family="unix")]
+#[cfg(target_family = "unix")]
 mod libc;
-#[cfg(target_family="unix")]
+#[cfg(target_family = "unix")]
 pub use libc::*;
 
 #[derive(Error, Debug)]
@@ -33,7 +33,19 @@ pub trait DataStorage {
 
     fn remove(&mut self, key: &str) -> Result<(), StorageError>;
 
-    fn clone(&self) -> Box<dyn DataStorage + Send>;
+    fn clone_box(&self) -> Box<dyn DataStorage + Send>;
+}
+
+impl Clone for Box<dyn DataStorage + Send> {
+    fn clone(&self) -> Box<dyn DataStorage + Send> {
+        self.clone_box()
+    }
+}
+
+impl std::fmt::Debug for Box<dyn DataStorage + Send>{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Box<DataStorage>").finish()
+    }
 }
 
 /// A temporary DataStorage that keeps the data only during its lifetime.
@@ -42,9 +54,16 @@ pub struct DataStorageTemp {
 }
 
 impl DataStorageTemp {
-    pub fn new(
-    ) -> Self {
-        Self { kvs: Arc::new(Mutex::new(HashMap::new()))}
+    pub fn new() -> Self {
+        Self {
+            kvs: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+    
+    pub fn new_box() -> Box<Self> {
+        Box::new(Self {
+            kvs: Arc::new(Mutex::new(HashMap::new())),
+        })
     }
 }
 
@@ -79,8 +98,10 @@ impl DataStorage for DataStorageTemp {
         Ok(())
     }
 
-    fn clone(&self) -> Box<dyn DataStorage + Send>{
-        Box::new(Self{kvs: Arc::clone(&self.kvs)})
+    fn clone_box(&self) -> Box<dyn DataStorage + Send> {
+        Box::new(Self {
+            kvs: Arc::clone(&self.kvs),
+        })
     }
 }
 
@@ -89,11 +110,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_storage() -> Result<(), Box<dyn std::error::Error>>{
+    fn test_storage() -> Result<(), Box<dyn std::error::Error>> {
         let mut ds = DataStorageTemp::new();
         ds.set("two", "three")?;
 
-        let ds2 = ds.clone();
+        let ds2 = ds.clone_box();
         assert_eq!("three", ds2.get("two")?);
         Ok(())
     }

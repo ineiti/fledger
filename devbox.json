@@ -20,13 +20,12 @@
     "trunk":     "latest",
     "wasm-pack": "latest",
     "nodejs":    "18",
-    "procps":    "latest",
     "vscode":    "latest"
   },
   "shell": {
     "init_hook": [
-      "if [ ! -d $RUSTUP_HOME/toolchains/stable* ]; then rustup default stable; fi",
-      "if [ ! -d $RUSTUP_HOME/toolchains/stable*/lib/rustlib/wasm32-unknown-unknown ]; then rustup target add wasm32-unknown-unknown; fi",
+      "if [ -z \"$(echo $RUSTUP_HOME/toolchains/stable*)\" ]; then rustup default stable; fi",
+      "if [ -z \"$(echo $RUSTUP_HOME/toolchains/stable*/lib/rustlib/wasm32-unknown-unknown)\" ]; then rustup target add wasm32-unknown-unknown; fi",
       "alias ls='ls --color'"
     ],
     "scripts": {
@@ -35,6 +34,12 @@
       ],
       "fledger": [
         "cd cli && cargo run -p fledger"
+      ],
+      "code": [
+        "Code --user-data-dir .vscode ."
+      ],
+      "clean": [
+  "make clean"
       ]
     }
   },

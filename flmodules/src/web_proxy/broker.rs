@@ -1,22 +1,20 @@
 use core::str;
 use flarch::{
     data_storage::DataStorage,
-    platform_async_trait,
-    tasks::spawn_local,
     tasks::time::{timeout, Duration},
 };
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
 
-use crate::overlay::messages::{NetworkWrapper, OverlayIn, OverlayMessage, OverlayOut};
+use crate::router::{broker::BrokerRouter, messages::{NetworkWrapper, RouterIn, RouterOut}};
 use flarch::{
-    broker::{Broker, BrokerError, Subsystem, SubsystemHandler},
+    broker::{Broker, BrokerError},
     nodeids::{NodeID, U256},
 };
 
 use super::{
-    core::{Counters, WebProxyConfig, WebProxyStorage, WebProxyStorageSave},
-    messages::{WebProxyIn, WebProxyMessage, WebProxyMessages, WebProxyOut},
+    core::{Counters, WebProxyConfig, WebProxyStorage},
+    messages::{Messages, WebProxyIn, WebProxyOut},
     response::Response,
 };
 
@@ -37,38 +35,28 @@ pub enum WebProxyError {
 #[derive(Clone)]
 pub struct WebProxy {
     /// Represents the underlying broker.
-    pub web_proxy: Broker<WebProxyMessage>,
+    pub web_proxy: Broker<WebProxyIn, WebProxyOut>,
     storage: watch::Receiver<WebProxyStorage>,
 }
 
 impl WebProxy {
     pub async fn start(
-        mut ds: Box<dyn DataStorage + Send>,
+        ds: Box<dyn DataStorage + Send>,
         our_id: NodeID,
-        overlay: Broker<OverlayMessage>,
+        router: BrokerRouter,
         config: WebProxyConfig,
     ) -> Result<Self, WebProxyError> {
-        let str = ds.get(MODULE_NAME).unwrap_or("".into());
-        let storage = WebProxyStorageSave::from_str(&str).unwrap_or_default();
         let mut web_proxy = Broker::new();
-        let messages = WebProxyMessages::new(storage.clone(), config, our_id, web_proxy.clone())?;
+        let (messages, storage) = Messages::new(ds, config, our_id, web_proxy.clone());
 
-        Translate::start(web_proxy.clone(), overlay, messages).await?;
-
-        let (tx, storage) = watch::channel(storage);
-        let (mut tap, _) = web_proxy.get_tap().await?;
-        spawn_local(async move {
-            loop {
-                if let Some(WebProxyMessage::Output(WebProxyOut::UpdateStorage(sto))) =
-                    tap.recv().await
-                {
-                    tx.send(sto.clone()).expect("updated storage");
-                    if let Ok(val) = sto.to_yaml() {
-                        ds.set(MODULE_NAME, &val).expect("updating storage");
-                    }
-                }
-            }
-        });
+        web_proxy.add_handler(Box::new(messages)).await?;
+        web_proxy
+            .add_translator_link(
+                router,
+                Box::new(Self::link_proxy_router),
+                Box::new(Self::link_router_proxy),
+            )
+            .await?;
 
         Ok(Self { web_proxy, storage })
     }
@@ -82,17 +70,18 @@ impl WebProxy {
         let our_rnd = U256::rnd();
         let (tx, rx) = channel(128);
         self.web_proxy
-            .emit_msg(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx).into())?;
-        let (mut tap, id) = self.web_proxy.get_tap().await?;
+            .emit_msg_in(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx))?;
+        let (mut tap, id) = self.web_proxy.get_tap_out().await?;
         timeout(Duration::from_secs(5), async move {
             while let Some(msg) = tap.recv().await {
-                if let WebProxyMessage::Output(WebProxyOut::ResponseGet(proxy, rnd, header)) = msg {
+                if let WebProxyOut::ResponseGet(proxy, rnd, header) = msg {
                     if rnd == our_rnd {
                         self.web_proxy.remove_subsystem(id).await?;
                         return Ok(Response::new(proxy, header, rx));
                     }
                 }
             }
+            // TODO: is this really called sometime?
             self.web_proxy.remove_subsystem(id).await?;
             return Err(WebProxyError::ResponseTimeout);
         })
@@ -103,83 +92,32 @@ impl WebProxy {
     pub fn get_counters(&mut self) -> Counters {
         self.storage.borrow().counters.clone()
     }
-}
 
-struct Translate {
-    messages: WebProxyMessages,
-}
-
-impl Translate {
-    async fn start(
-        mut web_proxy: Broker<WebProxyMessage>,
-        overlay: Broker<OverlayMessage>,
-        messages: WebProxyMessages,
-    ) -> Result<(), WebProxyError> {
-        web_proxy
-            .add_subsystem(Subsystem::Handler(Box::new(Translate { messages })))
-            .await?;
-        web_proxy
-            .link_bi(
-                overlay,
-                Box::new(Self::link_overlay_proxy),
-                Box::new(Self::link_proxy_overlay),
-            )
-            .await?;
-        Ok(())
-    }
-
-    fn link_overlay_proxy(msg: OverlayMessage) -> Option<WebProxyMessage> {
-        if let OverlayMessage::Output(msg_out) = msg {
-            match msg_out {
-                OverlayOut::NodeInfosConnected(list) => {
-                    Some(WebProxyIn::NodeInfoConnected(list).into())
-                }
-                OverlayOut::NetworkWrapperFromNetwork(id, msg) => msg
-                    .unwrap_yaml(MODULE_NAME)
-                    .map(|msg| WebProxyIn::FromNetwork(id, msg).into()),
-                _ => None,
-            }
-        } else {
-            None
+    fn link_router_proxy(msg: RouterOut) -> Option<WebProxyIn> {
+        match msg {
+            RouterOut::NodeInfosConnected(list) => Some(WebProxyIn::NodeInfoConnected(list)),
+            RouterOut::NetworkWrapperFromNetwork(id, msg) => msg
+                .unwrap_yaml(MODULE_NAME)
+                .map(|msg| WebProxyIn::FromNetwork(id, msg)),
+            _ => None,
         }
     }
 
-    fn link_proxy_overlay(msg: WebProxyMessage) -> Option<OverlayMessage> {
-        if let WebProxyMessage::Output(WebProxyOut::ToNetwork(id, msg_node)) = msg {
-            Some(
-                OverlayIn::NetworkWrapperToNetwork(
-                    id,
-                    NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
-                )
-                .into(),
-            )
+    fn link_proxy_router(msg: WebProxyOut) -> Option<RouterIn> {
+        if let WebProxyOut::ToNetwork(id, msg_node) = msg {
+            Some(RouterIn::NetworkWrapperToNetwork(
+                id,
+                NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
+            ))
         } else {
             None
         }
-    }
-}
-
-#[platform_async_trait()]
-impl SubsystemHandler<WebProxyMessage> for Translate {
-    async fn messages(&mut self, msgs: Vec<WebProxyMessage>) -> Vec<WebProxyMessage> {
-        let msgs_in = msgs
-            .into_iter()
-            .filter_map(|msg| match msg {
-                WebProxyMessage::Input(msg_in) => Some(msg_in),
-                _ => None,
-            })
-            .collect();
-        self.messages
-            .process_messages(msgs_in)
-            .into_iter()
-            .map(|o| o.into())
-            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use flarch::{data_storage::DataStorageTemp, start_logging_filter_level, tasks::wait_ms};
+    use flarch::{data_storage::DataStorageTemp, start_logging_filter_level, tasks::{spawn_local, wait_ms}};
 
     use crate::nodeconfig::NodeConfig;
 
@@ -187,7 +125,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get() -> Result<(), WebProxyError> {
-        start_logging_filter_level(vec![], log::LevelFilter::Debug);
+        start_logging_filter_level(vec![], log::LevelFilter::Info);
         let cl_ds = Box::new(DataStorageTemp::new());
         let cl_in = NodeConfig::new().info;
         let cl_id = cl_in.get_id();
@@ -200,15 +138,13 @@ mod tests {
 
         let mut cl =
             WebProxy::start(cl_ds, cl_id, cl_rnd.clone(), WebProxyConfig::default()).await?;
-        let (mut cl_tap, _) = cl_rnd.get_tap().await?;
+        let (mut cl_tap, _) = cl_rnd.get_tap_in().await?;
         let _wp = WebProxy::start(wp_ds, wp_id, wp_rnd.clone(), WebProxyConfig::default()).await?;
-        let (mut wp_tap, _) = wp_rnd.get_tap().await?;
+        let (mut wp_tap, _) = wp_rnd.get_tap_in().await?;
 
         let list = vec![cl_in, wp_in];
-        cl_rnd.emit_msg(OverlayMessage::Output(OverlayOut::NodeInfosConnected(
-            list.clone(),
-        )))?;
-        wp_rnd.emit_msg(OverlayMessage::Output(OverlayOut::NodeInfosConnected(list)))?;
+        cl_rnd.emit_msg_out(RouterOut::NodeInfosConnected(list.clone()))?;
+        wp_rnd.emit_msg_out(RouterOut::NodeInfosConnected(list))?;
 
         let (tx, mut rx) = channel(1);
         spawn_local(async move {
@@ -225,25 +161,17 @@ mod tests {
                 return Ok(());
             }
 
-            if let Ok(OverlayMessage::Input(OverlayIn::NetworkWrapperToNetwork(dst, msg))) =
-                cl_tap.try_recv()
-            {
+            if let Ok(RouterIn::NetworkWrapperToNetwork(dst, msg)) = cl_tap.try_recv() {
                 log::debug!("Sending to WP: {msg:?}");
                 wp_rnd
-                    .emit_msg(OverlayMessage::Output(OverlayOut::NetworkWrapperFromNetwork(
-                        dst, msg,
-                    )))
+                    .emit_msg_out(RouterOut::NetworkWrapperFromNetwork(dst, msg))
                     .expect("sending to wp");
             }
 
-            if let Ok(OverlayMessage::Input(OverlayIn::NetworkWrapperToNetwork(dst, msg))) =
-                wp_tap.try_recv()
-            {
+            if let Ok(RouterIn::NetworkWrapperToNetwork(dst, msg)) = wp_tap.try_recv() {
                 log::debug!("Sending to CL: {msg:?}");
                 cl_rnd
-                    .emit_msg(OverlayMessage::Output(OverlayOut::NetworkWrapperFromNetwork(
-                        dst, msg,
-                    )))
+                    .emit_msg_out(RouterOut::NetworkWrapperFromNetwork(dst, msg))
                     .expect("sending to wp");
             }
 
