@@ -219,7 +219,7 @@ impl DHTStorage {
     async fn send_wait<T>(
         &mut self,
         msg_in: DHTStorageIn,
-        check: &(dyn Fn(DHTStorageOut) -> Option<T> + Send + Sync),
+        check: &(dyn Fn(DHTStorageOut) -> Option<T> + Sync),
     ) -> Result<T, StorageError> {
         // using the internal broker directly to avoid one conversion.
         let dur = Duration::from_millis(self.config.timeout);
@@ -282,7 +282,7 @@ impl DHTStorage {
 #[derive(Default, Debug)]
 struct BadgeSig {
     badges: HashMap<Version<BadgeID>, Condition>,
-    signatures: HashMap<KeyPairID, Option<(Box<dyn Verifier>, Signature)>>,
+    signatures: HashMap<KeyPairID, Option<(Verifier, Signature)>>,
 }
 
 #[cfg(test)]

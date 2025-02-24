@@ -83,7 +83,7 @@ pub struct HistoryStep {
     rules: Rules,
     // It is OK to have the verifiers here, because their IDs are in the hash of the FloID.
     // So an attacker cannot change the verifiers to create a wrong signature.
-    verifiers: Vec<Box<dyn Verifier>>,
+    verifiers: Vec<Verifier>,
     // All signatures to prove evolution to the next version.
     signatures: HashMap<KeyPairID, Signature>,
 }
@@ -295,11 +295,11 @@ impl<T: Serialize + DeserializeOwned + Clone> FloWrapper<T> {
         cond: Condition,
         rules: Rules,
         badges: Vec<Box<dyn Badge>>,
-        signers: &[&dyn Signer],
+        signers: &[&mut Signer],
     ) -> Result<u32, SignerError> {
         let update = self.edit(edit);
         let mut u_s = self.start_sign(cond, rules, badges, update)?;
-        for &signer in signers {
+        for signer in signers {
             u_s.sign(signer)?;
         }
         self.apply_update(u_s)
@@ -325,7 +325,7 @@ impl<T: Serialize + DeserializeOwned + Clone> UpdateSign<T> {
         }
     }
 
-    pub fn sign(&mut self, signer: &dyn Signer) -> Result<(), SignerError> {
+    pub fn sign(&mut self, signer: &Signer) -> Result<(), SignerError> {
         self.signatures.sign(signer)
     }
 }

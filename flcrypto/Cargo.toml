@@ -19,7 +19,6 @@ serde = { version = "1", features = ["derive"] }
 serde_with = { version = "3", features = ["hex", "json", "base64"] }
 sha2 = "0.10"
 thiserror = "2"
-typetag = "0.2"
 
 [dev-dependencies]
 flcrypto = { path=".", features = ["testing"]}

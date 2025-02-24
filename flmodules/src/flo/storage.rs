@@ -14,7 +14,7 @@ pub struct CryptoStorage {
     #[serde(skip)]
     ds: Option<Box<dyn DataStorage + Send>>,
     realm_id: RealmID,
-    pub signers: Vec<Box<dyn Signer>>,
+    pub signers: Vec<Signer>,
     pub aces: Vec<FloACE>,
 }
 
@@ -29,15 +29,15 @@ impl CryptoStorage {
         }
     }
 
-    pub fn get_signer(&mut self) -> Box<dyn Signer> {
+    pub fn get_signer(&mut self) -> Signer {
         if let Some(signer) = self.signers.first() {
             return (*signer).clone();
         }
         self.add_signer()
     }
 
-    pub fn add_signer(&mut self) -> Box<dyn Signer> {
-        self.signers.push(SignerEd25519::new_box());
+    pub fn add_signer(&mut self) -> Signer {
+        self.signers.push(SignerEd25519::new());
         self.store();
         self.get_signer()
     }
@@ -51,7 +51,7 @@ impl CryptoStorage {
 
     pub fn add_ace(&mut self) -> FloACE {
         let signer = self.get_signer();
-        let cond = Condition::Verifier((*signer).verifier().get_id());
+        let cond = Condition::Verifier(signer.verifier().get_id());
         let ace = ACE::new(Some(cond.clone()), HashMap::new(), vec![]);
         self.aces.push(
             FloACE::from_type(self.realm_id.clone(), Rules::Update(cond), ace)

@@ -271,7 +271,7 @@ async fn run_test() -> Result<(), Box<dyn Error>> {
         root_wallet.get_badge_condition(),
         realm.rules().clone(),
         vec![],
-        &[&*root_nodes[0].wallet.get_signer()],
+        &[&mut root_nodes[0].wallet.get_signer()],
     )?;
     root_nodes[0].dht_storage.store_flo(realm.flo().clone())?;
 
@@ -296,7 +296,7 @@ async fn run_test() -> Result<(), Box<dyn Error>> {
         root_wallet.get_badge_condition(),
         realm.rules().clone(),
         vec![],
-        &[&*root_nodes[0].wallet.get_signer()],
+        &[&mut root_nodes[0].wallet.get_signer()],
     )?;
     node_4.dht_storage.store_flo(homepage.clone().into())?;
     node_4.dht_storage.store_flo(realm.clone().into())?;
@@ -340,7 +340,7 @@ async fn test_realm_view() -> Result<(), Box<dyn Error>> {
     .await?;
 
     let root_http = rv_root.create_http("fledger", INDEX_HTML.to_string(), None, None)?;
-    let signers = vec![&*(root_nodes[0].wallet.signer.as_deref().unwrap())];
+    let signers = vec![root_nodes[0].wallet.signer.clone().unwrap()];
     rv_root.set_realm_http(root_http.flo_id(), &signers).await?;
     let root_tag = rv_root.create_tag("fledger", None, None)?;
     rv_root.set_realm_tag(root_tag.flo_id(), &signers).await?;

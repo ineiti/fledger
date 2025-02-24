@@ -14,7 +14,7 @@ use super::flo::FloWrapper;
 pub struct AceID(U256);
 
 /// A Verifier is a public key which can verify a signature from a private key.
-pub type FloVerifier = FloWrapper<Box<dyn Verifier>>;
+pub type FloVerifier = FloWrapper<Verifier>;
 
 /// A badge wraps a Condition with a fixed ID.
 pub type FloBadge = FloWrapper<BadgeCond>;
