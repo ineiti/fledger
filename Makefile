@@ -2,7 +2,7 @@ CARGOS := cli/{fledger,flsignal} flarch flbrowser flcrypto flmacro \
 			flmodules flnode test/signal-fledger \
 			examples/ping-pong/{shared,libc,wasm}
 MAKE_TESTS := examples/ping-pong test/{fledger-nodejs,signal-fledger,webrtc-libc-wasm}
-CRATES := flmacro flarch flmodules flnode
+CRATES := flcrypto flmacro flarch flmodules flnode
 SHELL := /bin/bash
 PKILL = @/bin/ps aux | grep "$1" | egrep -v "(grep|vscode|rust-analyzer)" | awk '{print $$2}' | xargs -r kill
 
