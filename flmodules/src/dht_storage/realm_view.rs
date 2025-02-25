@@ -5,14 +5,16 @@ use crate::{
     },
     flo::{
         blob::{BlobID, FloBlobPage, FloBlobTag},
-        crypto::Rules,
         flo::{FloError, FloID, FloWrapper},
         realm::{FloRealm, GlobalID, Realm, RealmID},
     },
 };
 use bytes::Bytes;
 use flarch::broker::BrokerError;
-use flcrypto::signer::{Signer, SignerError};
+use flcrypto::{
+    access::Condition,
+    signer::{Signer, SignerError},
+};
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
@@ -46,20 +48,20 @@ pub enum RVError {
 }
 
 impl RealmView {
-    pub async fn new(mut dht_storage: DHTStorage) -> Result<Self, RVError> {
+    pub async fn new(mut dht_storage: DHTStorage) -> anyhow::Result<Self> {
         if let Some(id) = dht_storage.get_realm_ids().await?.first() {
             Self::new_from_id(dht_storage, id.clone()).await
         } else {
-            Err(RVError::NoRealm)
+            Err(RVError::NoRealm.into())
         }
     }
 
-    pub async fn new_from_id(mut dht_storage: DHTStorage, id: RealmID) -> Result<Self, RVError> {
+    pub async fn new_from_id(mut dht_storage: DHTStorage, id: RealmID) -> anyhow::Result<Self> {
         let realm = Self::get_realm(&mut dht_storage, &id).await?;
         Self::new_from_realm(dht_storage, realm).await
     }
 
-    pub async fn new_from_realm(dht_storage: DHTStorage, realm: FloRealm) -> Result<Self, RVError> {
+    pub async fn new_from_realm(dht_storage: DHTStorage, realm: FloRealm) -> anyhow::Result<Self> {
         let mut rv = Self {
             realm,
             pages: vec![],
@@ -74,16 +76,18 @@ impl RealmView {
     pub async fn new_create_realm(
         dht_storage: DHTStorage,
         name: &str,
-        rules: Rules,
-    ) -> Result<Self, RVError> {
+        cond: Condition,
+        signers: &[&Signer],
+    ) -> anyhow::Result<Self> {
         Self::new_create_realm_config(
             dht_storage,
             name,
-            rules,
+            cond,
             RealmConfig {
                 max_space: 1e6 as u64,
                 max_flo_size: 1e4 as u32,
             },
+            signers,
         )
         .await
     }
@@ -91,10 +95,11 @@ impl RealmView {
     pub async fn new_create_realm_config(
         mut dht_storage: DHTStorage,
         name: &str,
-        rules: Rules,
+        cond: Condition,
         config: RealmConfig,
-    ) -> Result<Self, RVError> {
-        let realm = FloRealm::new(name, rules, config)?;
+        signers: &[&Signer],
+    ) -> anyhow::Result<Self> {
+        let realm = FloRealm::new(name, cond, config, signers)?;
         dht_storage.store_flo(realm.clone().into())?;
         Self::new_from_realm(dht_storage, realm).await
     }
@@ -104,9 +109,10 @@ impl RealmView {
         path: &str,
         content: String,
         parent: Option<BlobID>,
-        rules: Option<Rules>,
-    ) -> Result<FloBlobPage, RVError> {
-        Self::create_http_cuckoo(self, path, content, parent, rules, Cuckoo::None)
+        cond: Condition,
+        signers: &[&Signer],
+    ) -> anyhow::Result<FloBlobPage> {
+        Self::create_http_cuckoo(self, path, content, parent, cond, Cuckoo::None, signers)
     }
 
     pub fn create_http_cuckoo(
@@ -114,44 +120,40 @@ impl RealmView {
         path: &str,
         content: String,
         parent: Option<BlobID>,
-        rules: Option<Rules>,
+        cond: Condition,
         cuckoo: Cuckoo,
-    ) -> Result<FloBlobPage, RVError> {
+        signers: &[&Signer],
+    ) -> anyhow::Result<FloBlobPage> {
         let fp = FloBlobPage::new_cuckoo(
             self.realm.realm_id(),
-            rules.unwrap_or_else(|| self.realm.rules().clone()),
+            cond,
             path,
             Bytes::from(content),
             parent,
             cuckoo,
+            signers,
         )?;
         self.dht_storage.store_flo(fp.clone().into())?;
         Ok(fp)
     }
 
-    pub async fn set_realm_http(
-        &mut self,
-        id: FloID,
-        signers: &[Signer],
-    ) -> Result<(), RVError> {
-        self.set_realm_service("http", id, signers).await
+    pub async fn set_realm_http(&mut self, id: FloID, signers: &[&Signer]) -> anyhow::Result<()> {
+        Ok(self.set_realm_service("http", id, signers).await?)
     }
 
     pub async fn set_realm_service(
         &mut self,
         name: &str,
         id: FloID,
-        signers: &[Signer],
-    ) -> Result<(), RVError> {
-        let update = self.realm.edit(|r| r.set_service(name, id));
-        let mut u_s = self
+        signers: &[&Signer],
+    ) -> anyhow::Result<()> {
+        let cond = self
             .dht_storage
-            .get_update_sign(&self.realm, update, None)
-            .await?;
-        for signer in signers {
-            u_s.sign(signer)?;
-        }
-        self.realm.apply_update(u_s)?;
+            .convert(self.realm.cond(), &self.realm.realm_id())
+            .await;
+        self.realm = self
+            .realm
+            .edit_data_signers(cond, |r| r.set_service(name, id), signers)?;
         Ok(self.dht_storage.store_flo(self.realm.clone().into())?)
     }
 
@@ -159,48 +161,48 @@ impl RealmView {
         &mut self,
         name: &str,
         parent: Option<BlobID>,
-        rules: Option<Rules>,
-    ) -> Result<FloBlobTag, RVError> {
-        Self::create_tag_cuckoo(self, name, parent, rules, Cuckoo::None)
+        cond: Condition,
+        signers: &[&Signer],
+    ) -> anyhow::Result<FloBlobTag> {
+        Ok(Self::create_tag_cuckoo(
+            self,
+            name,
+            parent,
+            cond,
+            Cuckoo::None,
+            signers,
+        )?)
     }
 
     pub fn create_tag_cuckoo(
         &mut self,
         name: &str,
         parent: Option<BlobID>,
-        rules: Option<Rules>,
+        cond: Condition,
         cuckoo: Cuckoo,
-    ) -> Result<FloBlobTag, RVError> {
-        let ft = FloBlobTag::new_cuckoo(
-            self.realm.realm_id(),
-            rules.unwrap_or_else(|| self.realm.rules().clone()),
-            name,
-            parent,
-            cuckoo,
-        )?;
+        signers: &[&Signer],
+    ) -> anyhow::Result<FloBlobTag> {
+        let ft =
+            FloBlobTag::new_cuckoo(self.realm.realm_id(), cond, name, parent, cuckoo, signers)?;
         self.dht_storage.store_flo(ft.clone().into())?;
         Ok(ft)
     }
-    pub async fn set_realm_tag(
-        &mut self,
-        id: FloID,
-        signers: &[Signer],
-    ) -> Result<(), RVError> {
+    pub async fn set_realm_tag(&mut self, id: FloID, signers: &[&Signer]) -> anyhow::Result<()> {
         self.set_realm_service("tag", id, signers).await
     }
 
-    pub async fn get_pages(&mut self, id: FloID) -> Result<Vec<FloBlobPage>, RVError> {
+    pub async fn get_pages(&mut self, id: FloID) -> anyhow::Result<Vec<FloBlobPage>> {
         self.read_parent_cuckoo(id).await
     }
 
-    pub async fn get_tags(&mut self, id: FloID) -> Result<Vec<FloBlobTag>, RVError> {
+    pub async fn get_tags(&mut self, id: FloID) -> anyhow::Result<Vec<FloBlobTag>> {
         self.read_parent_cuckoo(id).await
     }
 
     async fn read_parent_cuckoo<T: Serialize + DeserializeOwned + Clone>(
         &mut self,
         parent: FloID,
-    ) -> Result<Vec<FloWrapper<T>>, RVError> {
+    ) -> anyhow::Result<Vec<FloWrapper<T>>> {
         let mut res = vec![];
         for id in self
             .dht_storage
@@ -220,11 +222,11 @@ impl RealmView {
         Ok(res)
     }
 
-    async fn get_realm(dht_storage: &mut DHTStorage, id: &RealmID) -> Result<FloRealm, RVError> {
+    async fn get_realm(dht_storage: &mut DHTStorage, id: &RealmID) -> anyhow::Result<FloRealm> {
         Ok(dht_storage.get_flo::<Realm>(&id.into()).await?)
     }
 
-    async fn get_realm_page(&mut self) -> Result<(), RVError> {
+    async fn get_realm_page(&mut self) -> anyhow::Result<()> {
         if let Some(id) = self.realm.cache().get_services().get("http") {
             self.pages = self.get_pages(id.clone()).await?;
         }
@@ -232,7 +234,7 @@ impl RealmView {
         Ok(())
     }
 
-    async fn get_realm_tag(&mut self) -> Result<(), RVError> {
+    async fn get_realm_tag(&mut self) -> anyhow::Result<()> {
         if let Some(id) = self.realm.cache().get_services().get("tag") {
             self.tags = self.get_tags(id.clone()).await?;
         }

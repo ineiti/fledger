@@ -24,7 +24,7 @@ enum TestError {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), TestError> {
+async fn main() -> anyhow::Result<()> {
     start_logging_filter_level(vec!["signal", "fl"], log::LevelFilter::Info);
 
     let wss = WebSocketServer::new(8765).await?;
@@ -87,7 +87,7 @@ async fn main() -> Result<(), TestError> {
     Ok(())
 }
 
-async fn create_node() -> Result<Node, TestError> {
+async fn create_node() -> anyhow::Result<Node> {
     let storage = DataStorageTemp::new();
     let node_config = Node::get_config(storage.clone_box())?;
     let network = network_start(
@@ -95,7 +95,5 @@ async fn create_node() -> Result<Node, TestError> {
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )
     .await?;
-    Node::start(Box::new(storage), node_config, network.broker)
-        .await
-        .map_err(|e| e.into())
+    Ok(Node::start(Box::new(storage), node_config, network.broker).await?)
 }

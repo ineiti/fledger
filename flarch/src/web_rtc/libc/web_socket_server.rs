@@ -13,7 +13,7 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
 
-use crate::web_rtc::websocket::{WSError, WSSError, WSServerIn, WSServerOut};
+use crate::web_rtc::websocket::{WSError, WSServerIn, WSServerOut};
 use crate::{
     broker::{Broker, SubsystemHandler},
     web_rtc::websocket::BrokerWSServer,
@@ -25,7 +25,7 @@ pub struct WebSocketServer {
 }
 
 impl WebSocketServer {
-    pub async fn new(port: u16) -> Result<BrokerWSServer, WSSError> {
+    pub async fn new(port: u16) -> anyhow::Result<BrokerWSServer> {
         let server = TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
         let connections = Arc::new(Mutex::new(Vec::new()));
         let connections_cl = Arc::clone(&connections);
@@ -105,7 +105,7 @@ impl WSConnection {
         stream: TcpStream,
         broker: BrokerWSServer,
         id: usize,
-    ) -> Result<WSConnection, WSError> {
+    ) -> anyhow::Result<WSConnection> {
         let websocket = accept_async(stream)
             .await
             .map_err(|e| WSError::Underlying(e.to_string()))?;
@@ -140,7 +140,7 @@ impl WSConnection {
                             if let Some(out) = match msg_ws {
                                 Ok(msg) => match msg {
                                     Message::Text(s) => {
-                                        Some(WSServerOut::Message(id, s))
+                                        Some(WSServerOut::Message(id, s.to_string()))
                                     }
                                     Message::Close(_) => {
                                         Some(WSServerOut::Disconnection(id))
@@ -168,11 +168,12 @@ impl WSConnection {
         });
     }
 
-    async fn send(&mut self, msg: String) -> Result<(), WSError> {
-        self.websocket
-            .send(Message::Text(msg))
+    async fn send(&mut self, msg: String) -> anyhow::Result<()> {
+        Ok(self
+            .websocket
+            .send(Message::Text(msg.into()))
             .await
-            .map_err(|e| WSError::Underlying(e.to_string()))
+            .map_err(|e| WSError::Underlying(e.to_string()))?)
     }
 
     fn close(&mut self) {
@@ -192,7 +193,6 @@ mod tests {
     use crate::tasks::wait_ms;
     use crate::web_rtc::web_socket_client::WebSocketClient;
     use crate::web_rtc::websocket::{BrokerWSClient, WSClientIn, WSClientOut};
-    use std::error::Error;
     use std::sync::mpsc::Receiver;
 
     async fn send_client_server(
@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_server() -> Result<(), Box<dyn Error>> {
+    async fn test_server() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
         let mut server = WebSocketServer::new(8080).await.unwrap();
         let (server_tap, tap0) = server.get_tap_out_sync().await.unwrap();

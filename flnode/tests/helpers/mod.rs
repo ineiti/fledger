@@ -47,7 +47,7 @@ impl NetworkSimul {
         }
     }
 
-    pub async fn add_nodes(&mut self, modules: Modules, nbr: usize) -> Result<(), NetworkError> {
+    pub async fn add_nodes(&mut self, modules: Modules, nbr: usize) -> anyhow::Result<()> {
         for _ in 0..nbr {
             self.new_node(modules).await?;
         }
@@ -55,7 +55,7 @@ impl NetworkSimul {
         Ok(())
     }
 
-    pub async fn tick(&mut self) -> Result<(), NetworkError> {
+    pub async fn tick(&mut self) -> anyhow::Result<()> {
         for node in self.nodes.values_mut() {
             node.timer.settle_msg_out(TimerMessage::Second).await?;
         }
@@ -67,7 +67,7 @@ impl NetworkSimul {
     //     self.send_update_list();
     // }
 
-    pub async fn send_update_list(&mut self) -> Result<(), NetworkError> {
+    pub async fn send_update_list(&mut self) -> anyhow::Result<()> {
         let list: Vec<NodeInfo> = self.nodes.values().map(|node| node.node_info()).collect();
         for id in self.nodes.keys() {
             if let Some(broker) = self.node_brokers.get_mut(id) {
@@ -79,7 +79,7 @@ impl NetworkSimul {
         Ok(())
     }
 
-    async fn new_node(&mut self, modules: Modules) -> Result<(), NetworkError> {
+    async fn new_node(&mut self, modules: Modules) -> anyhow::Result<()> {
         let mut broker = Broker::new();
         let node_timer = NodeTimer::new(broker.clone(), self.nodes.len() as u32, modules).await?;
         let id = node_timer.node.node_config.info.get_id();
@@ -156,7 +156,7 @@ impl NodeTimer {
         broker_net: BrokerNetwork,
         start: u32,
         modules: Modules,
-    ) -> Result<Self, NodeError> {
+    ) -> anyhow::Result<Self> {
         let mut node_config = NodeConfig::new();
         // Make sure the public key starts with a hex nibble corresponding to its position in the test.
         // This simplifies a lot debugging when there are multiple nodes.

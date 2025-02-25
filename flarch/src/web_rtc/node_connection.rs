@@ -90,7 +90,7 @@ pub struct NodeConnection {
 impl NodeConnection {
     /// Create a new [`NodeConnection`] that will wait for a first message before
     /// setting up an outgoing connection.
-    pub async fn new(spawner: &WebRTCSpawner) -> Result<Broker<NCInput, NCOutput>, NCError> {
+    pub async fn new(spawner: &WebRTCSpawner) -> anyhow::Result<Broker<NCInput, NCOutput>> {
         let mut broker = Broker::new();
         broker
             .add_translator_link(

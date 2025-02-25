@@ -53,7 +53,7 @@ impl WebRTCConnectionSetup {
     pub async fn new(
         broker: Broker<WebRTCInput, WebRTCOutput>,
         config: ConnectionConfig,
-    ) -> Result<WebRTCConnectionSetup, SetupError> {
+    ) -> anyhow::Result<WebRTCConnectionSetup> {
         Ok(WebRTCConnectionSetup {
             rp_conn: Self::create_rp_conn(config.clone())?,
             rtc_data: Arc::new(Mutex::new(None)),
@@ -64,9 +64,7 @@ impl WebRTCConnectionSetup {
         })
     }
 
-    pub fn create_rp_conn(
-        connection_cfg: ConnectionConfig,
-    ) -> Result<RtcPeerConnection, SetupError> {
+    pub fn create_rp_conn(connection_cfg: ConnectionConfig) -> anyhow::Result<RtcPeerConnection> {
         // If no stun server is configured, only local IPs will be sent in the browser.
         // At least the node webrtc does the correct thing...
         let config = RtcConfiguration::new();
@@ -77,11 +75,11 @@ impl WebRTCConnectionSetup {
         let servers = serde_wasm_bindgen::to_value(&servers_obj)
             .map_err(|e| SetupError::SetupFail(e.to_string()))?;
         config.set_ice_servers(&servers);
-        RtcPeerConnection::new_with_configuration(&config)
-            .map_err(|e| SetupError::SetupFail(format!("PeerConnection error: {:?}", e)))
+        Ok(RtcPeerConnection::new_with_configuration(&config)
+            .map_err(|e| SetupError::SetupFail(format!("PeerConnection error: {:?}", e)))?)
     }
 
-    pub fn reset(&mut self) -> Result<(), SetupError> {
+    pub fn reset(&mut self) -> anyhow::Result<()> {
         if self.direction.is_none() {
             return Ok(());
         }
@@ -159,7 +157,7 @@ impl WebRTCConnectionSetup {
     }
 
     // Returns the offer string that needs to be sent to the `Follower` node.
-    pub async fn make_offer(&mut self) -> Result<String, SetupError> {
+    pub async fn make_offer(&mut self) -> anyhow::Result<String> {
         if self.direction.is_some() {
             self.reset()?;
         };
@@ -187,7 +185,7 @@ impl WebRTCConnectionSetup {
     }
 
     // Takes the offer string
-    pub async fn make_answer(&mut self, offer: String) -> Result<String, SetupError> {
+    pub async fn make_answer(&mut self, offer: String) -> anyhow::Result<String> {
         if self.direction.is_some() {
             self.reset()?;
         };
@@ -205,7 +203,7 @@ impl WebRTCConnectionSetup {
         let answer = match JsFuture::from(self.rp_conn.create_answer()).await {
             Ok(f) => f,
             Err(e) => {
-                return Err(SetupError::SetupFail(format!("{e:?}")));
+                return Err(SetupError::SetupFail(format!("{e:?}")).into());
             }
         };
         let answer_sdp = Reflect::get(&answer, &JsValue::from_str("sdp"))
@@ -223,7 +221,7 @@ impl WebRTCConnectionSetup {
     }
 
     // Takes the answer string and finalizes the first part of the connection.
-    pub async fn use_answer(&mut self, answer: String) -> Result<(), SetupError> {
+    pub async fn use_answer(&mut self, answer: String) -> anyhow::Result<()> {
         let dir = self
             .direction
             .clone()
@@ -245,7 +243,7 @@ impl WebRTCConnectionSetup {
     }
 
     // Sends the ICE string to the WebRTC.
-    pub async fn ice_put(&mut self, ice: String) -> Result<(), SetupError> {
+    pub async fn ice_put(&mut self, ice: String) -> anyhow::Result<()> {
         let ric_init = RtcIceCandidateInit::new(&ice);
         ric_init.set_sdp_mid(Some("0"));
         ric_init.set_sdp_m_line_index(Some(0u16));
@@ -266,15 +264,15 @@ impl WebRTCConnectionSetup {
                 err
             ))),
         }
-        .map_err(|js| SetupError::SetupFail(js.to_string()))
+        .map_err(|js| SetupError::SetupFail(js.to_string()).into())
     }
 
-    pub async fn send(&mut self, msg: String) -> Result<(), SetupError> {
+    pub async fn send(&mut self, msg: String) -> anyhow::Result<()> {
         self.queue.push(msg);
         self.send_queue().await
     }
 
-    pub async fn send_queue(&mut self) -> Result<(), SetupError> {
+    pub async fn send_queue(&mut self) -> anyhow::Result<()> {
         let state = self.get_state().await?;
         if let Some(state) = state.data_connection {
             if state == DataChannelState::Open {
@@ -355,7 +353,7 @@ impl WebRTCConnectionSetup {
         ondatachannel_callback.forget();
     }
 
-    pub async fn get_state(&self) -> Result<ConnectionStateMap, SetupError> {
+    pub async fn get_state(&self) -> anyhow::Result<ConnectionStateMap> {
         let stats = self.rp_conn.get_stats();
         let conn_stats: js_sys::Map = wasm_bindgen_futures::JsFuture::from(stats)
             .await
@@ -435,7 +433,7 @@ pub struct WebRTCConnection {
 impl WebRTCConnection {
     pub async fn new_box(
         config: ConnectionConfig,
-    ) -> Result<Broker<WebRTCInput, WebRTCOutput>, SetupError> {
+    ) -> anyhow::Result<Broker<WebRTCInput, WebRTCOutput>> {
         let broker = Broker::new();
         let rn = WebRTCConnection {
             setup: WebRTCConnectionSetup::new(broker.clone(), config).await?,
@@ -447,7 +445,7 @@ impl WebRTCConnection {
         Ok(broker)
     }
 
-    async fn setup(&mut self, pm: PeerMessage) -> Result<Option<PeerMessage>, SetupError> {
+    async fn setup(&mut self, pm: PeerMessage) -> anyhow::Result<Option<PeerMessage>> {
         Ok(match pm {
             PeerMessage::Init => Some(PeerMessage::Offer(self.setup.make_offer().await?)),
             PeerMessage::Offer(o) => Some(PeerMessage::Answer(self.setup.make_answer(o).await?)),
@@ -462,7 +460,7 @@ impl WebRTCConnection {
         })
     }
 
-    async fn msg_in(&mut self, msg: WebRTCInput) -> Result<Option<WebRTCOutput>, SetupError> {
+    async fn msg_in(&mut self, msg: WebRTCInput) -> anyhow::Result<Option<WebRTCOutput>> {
         match msg {
             WebRTCInput::Text(s) => self.setup.send(s).await?,
             WebRTCInput::Setup(s) => {

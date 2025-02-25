@@ -1,5 +1,5 @@
 use flarch::{
-    broker::{Broker, BrokerError, TranslateFrom, TranslateInto},
+    broker::{Broker, TranslateFrom, TranslateInto},
     data_storage::DataStorage,
     nodeids::U256,
     tasks::now,
@@ -36,7 +36,7 @@ impl Gossip {
         node_info: NodeInfo,
         rc: BrokerRandom,
         timer: &mut Timer,
-    ) -> Result<Self, BrokerError> {
+    ) -> anyhow::Result<Self> {
         let (messages, storage) = Messages::new(node_info.get_id(), storage);
         let mut broker = Broker::new();
         broker.add_handler(Box::new(messages)).await?;
@@ -58,7 +58,7 @@ impl Gossip {
 
     /// Adds a new event to the GossipMessage module.
     /// The new event will automatically be propagated to all connected nodes.
-    pub async fn add_event(&mut self, event: Event) -> Result<(), BrokerError> {
+    pub async fn add_event(&mut self, event: Event) -> anyhow::Result<()> {
         self.broker.emit_msg_in(GossipIn::AddEvent(event))?;
         Ok(())
     }
@@ -108,7 +108,6 @@ impl TranslateInto<RandomIn> for GossipOut {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
     use std::sync::mpsc;
 
     use crate::gossip_events::core::{Category, Event};
@@ -123,7 +122,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_translation() -> Result<(), Box<dyn Error>> {
+    async fn test_translation() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
 
         let node_info = NodeConfig::new().info;
@@ -167,7 +166,7 @@ mod tests {
         Ok(())
     }
 
-    fn assert_msg_reid(tap: &mpsc::Receiver<RandomIn>, id2: &NodeID) -> Result<(), Box<dyn Error>> {
+    fn assert_msg_reid(tap: &mpsc::Receiver<RandomIn>, id2: &NodeID) -> anyhow::Result<()> {
         for msg in tap.try_iter() {
             if let RandomIn::NetworkWrapperToNetwork(id, msg_mod) = msg {
                 assert_eq!(id2, &id);

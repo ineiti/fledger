@@ -244,7 +244,6 @@ mod tests {
     use crate::{nodeconfig::NodeConfig, random_connections::nodes::Nodes};
 
     use super::*;
-    use core::fmt::Error;
 
     fn _make_nodes(n: usize) -> Nodes {
         let mut nodes = Nodes::new();
@@ -257,7 +256,7 @@ mod tests {
 
     // Tests the nodes and the remove methods
     #[test]
-    fn test_update_list() -> Result<(), Error> {
+    fn test_update_list() -> anyhow::Result<()> {
         start_logging();
 
         let nodes = vec![NodeConfig::new().info];

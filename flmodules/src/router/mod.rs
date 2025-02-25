@@ -4,7 +4,7 @@ use flarch::web_rtc::{
     web_socket_client::WebSocketClient, WebRTCConn,
 };
 
-use crate::{network::NetworkSetupError, nodeconfig::NodeConfig};
+use crate::nodeconfig::NodeConfig;
 
 pub mod broker;
 pub mod messages;
@@ -17,14 +17,14 @@ pub mod messages;
 /// # Example
 ///
 /// ```bash
-/// async fn start_network() -> Result<(), NetworkSetupError>{
+/// async fn start_network() -> anyhow::Result<()>{
 ///   let net = network_broker_start();
 /// }
 /// ```
 pub async fn router_broker_start(
     node: NodeConfig,
     connection: ConnectionConfig,
-) -> Result<BrokerRouter, NetworkSetupError> {
+) -> anyhow::Result<BrokerRouter> {
     use crate::network::broker::Network;
 
     let ws = WebSocketClient::connect(&connection.signal()).await?;

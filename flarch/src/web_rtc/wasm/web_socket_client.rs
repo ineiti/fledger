@@ -17,7 +17,7 @@ pub struct WebSocketClient {
 impl WebSocketClient {
     pub async fn connect(
         url: &str,
-    ) -> Result<Broker<WSClientIn, WSClientOut>, WSClientError> {
+    ) -> anyhow::Result<Broker<WSClientIn, WSClientOut>> {
         let wsw = WebSocketClient {
             url: url.to_string(),
             ws: None,
@@ -30,7 +30,7 @@ impl WebSocketClient {
         Ok(broker)
     }
 
-    async fn connect_ws(&mut self) -> Result<(), WSClientError> {
+    async fn connect_ws(&mut self) -> anyhow::Result<()> {
         if self.ws.is_some() && now() / 1000 < self.last_connection + 10 {
             return Ok(());
         }

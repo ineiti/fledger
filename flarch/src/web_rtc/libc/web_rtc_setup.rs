@@ -15,7 +15,6 @@ use webrtc::{
     ice_transport::{
         ice_candidate::{RTCIceCandidate, RTCIceCandidateInit},
         ice_connection_state::RTCIceConnectionState,
-        ice_credential_type::RTCIceCredentialType,
         ice_server::RTCIceServer,
     },
     interceptor::registry::Registry,
@@ -47,7 +46,6 @@ fn get_ice_server(host: HostLogin) -> RTCIceServer {
     if let Some(login) = host.login {
         server.username = login.user;
         server.credential = login.pass;
-        server.credential_type = RTCIceCredentialType::Password;
     }
 
     server
@@ -67,7 +65,7 @@ pub struct WebRTCConnectionSetupLibc {
 impl WebRTCConnectionSetupLibc {
     pub async fn new_box(
         connection_cfg: ConnectionConfig,
-    ) -> Result<Broker<WebRTCInput, WebRTCOutput>, SetupError> {
+    ) -> anyhow::Result<Broker<WebRTCInput, WebRTCOutput>> {
         let mut web_rtc = Box::new(WebRTCConnectionSetupLibc {
             connection: Self::make_connection(connection_cfg.clone()).await?,
             rtc_data: Arc::new(Mutex::new(None)),
@@ -88,7 +86,7 @@ impl WebRTCConnectionSetupLibc {
 
     async fn make_connection(
         connection_cfg: ConnectionConfig,
-    ) -> Result<RTCPeerConnection, SetupError> {
+    ) -> anyhow::Result<RTCPeerConnection> {
         // Create a MediaEngine object to configure the supported codec
         let mut m = MediaEngine::default();
 
@@ -126,10 +124,10 @@ impl WebRTCConnectionSetupLibc {
             ..Default::default()
         };
 
-        api.new_peer_connection(config).await.map_err(to_error)
+        Ok(api.new_peer_connection(config).await.map_err(to_error)?)
     }
 
-    async fn setup_connection(&mut self) -> Result<(), SetupError> {
+    async fn setup_connection(&mut self) -> anyhow::Result<()> {
         let broker_cl = self.broker.clone();
         let resets = Arc::clone(&self.resets);
         resets.fetch_add(1, Ordering::Relaxed);
@@ -190,7 +188,7 @@ impl WebRTCConnectionSetupLibc {
     }
 
     /// Returns the offer string that needs to be sent to the `Follower` node.
-    async fn make_offer(&mut self) -> Result<String, SetupError> {
+    async fn make_offer(&mut self) -> anyhow::Result<String> {
         if self.direction.is_some() {
             self.reset().await?;
         }
@@ -218,7 +216,7 @@ impl WebRTCConnectionSetupLibc {
     }
 
     /// Takes the offer string
-    async fn make_answer(&mut self, offer: String) -> Result<String, SetupError> {
+    async fn make_answer(&mut self, offer: String) -> anyhow::Result<String> {
         if self.direction.is_some() {
             self.reset().await?;
         }
@@ -265,14 +263,14 @@ impl WebRTCConnectionSetupLibc {
     }
 
     /// Takes the answer string and finalizes the first part of the connection.
-    async fn use_answer(&mut self, answer: String) -> Result<(), SetupError> {
+    async fn use_answer(&mut self, answer: String) -> anyhow::Result<()> {
         match self.direction.as_ref() {
             Some(dir) => {
                 if dir == &Direction::Incoming {
-                    return Err(SetupError::SetupFail("direction mixup".into()));
+                    return Err(SetupError::SetupFail("direction mixup".into()).into());
                 }
             }
-            None => return Err(SetupError::SetupFail("should be connected".into())),
+            None => return Err(SetupError::SetupFail("should be connected".into()).into()),
         }
 
         self.connection
@@ -283,7 +281,7 @@ impl WebRTCConnectionSetupLibc {
     }
 
     /// Sends the ICE string to the WebRTC.
-    async fn ice_put(&mut self, ice: String) -> Result<(), SetupError> {
+    async fn ice_put(&mut self, ice: String) -> anyhow::Result<()> {
         self.connection
             .add_ice_candidate(RTCIceCandidateInit {
                 candidate: ice,
@@ -295,7 +293,7 @@ impl WebRTCConnectionSetupLibc {
     }
 
     /// Return some statistics of the connection
-    async fn get_state(&self) -> Result<ConnectionStateMap, SetupError> {
+    async fn get_state(&self) -> anyhow::Result<ConnectionStateMap> {
         let signaling = match self.connection.connection_state() {
             RTCPeerConnectionState::Failed
             | RTCPeerConnectionState::Closed
@@ -331,12 +329,12 @@ impl WebRTCConnectionSetupLibc {
         })
     }
 
-    async fn send(&mut self, msg: String) -> Result<(), SetupError> {
+    async fn send(&mut self, msg: String) -> anyhow::Result<()> {
         self.queue.push(msg);
         self.send_queue().await
     }
 
-    async fn send_queue(&mut self) -> Result<(), SetupError> {
+    async fn send_queue(&mut self) -> anyhow::Result<()> {
         let state_open = self.get_state().await?.data_connection == Some(DataChannelState::Open);
         if state_open || self.direction == Some(Direction::Incoming) {
             let rtc_data = self.rtc_data.lock().await;
@@ -353,7 +351,7 @@ impl WebRTCConnectionSetupLibc {
         Ok(())
     }
 
-    async fn setup(&mut self, pm: PeerMessage) -> Result<Option<PeerMessage>, SetupError> {
+    async fn setup(&mut self, pm: PeerMessage) -> anyhow::Result<Option<PeerMessage>> {
         Ok(match pm {
             PeerMessage::Init => Some(PeerMessage::Offer(self.make_offer().await?)),
             PeerMessage::Offer(o) => Some(PeerMessage::Answer(self.make_answer(o).await?)),
@@ -417,7 +415,7 @@ impl WebRTCConnectionSetupLibc {
         rtc_data.lock().await.replace(data_channel);
     }
 
-    async fn msg_in(&mut self, msg: WebRTCInput) -> Result<Option<WebRTCOutput>, SetupError> {
+    async fn msg_in(&mut self, msg: WebRTCInput) -> anyhow::Result<Option<WebRTCOutput>> {
         match msg {
             WebRTCInput::Text(s) => self.send(s).await?,
             WebRTCInput::Setup(s) => {
@@ -445,7 +443,7 @@ impl WebRTCConnectionSetupLibc {
         Ok(None)
     }
 
-    async fn reset(&mut self) -> Result<(), SetupError> {
+    async fn reset(&mut self) -> anyhow::Result<()> {
         if self.direction.is_none() {
             return Ok(());
         }

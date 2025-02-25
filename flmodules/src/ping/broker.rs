@@ -1,4 +1,4 @@
-use flarch::broker::{Broker, BrokerError, TranslateFrom, TranslateInto};
+use flarch::broker::{Broker, TranslateFrom, TranslateInto};
 use tokio::sync::watch;
 
 use crate::{
@@ -30,7 +30,7 @@ impl Ping {
         config: PingConfig,
         rc: BrokerRandom,
         timer: &mut Timer,
-    ) -> Result<Self, BrokerError> {
+    ) -> anyhow::Result<Self> {
         let (messages, storage) = Messages::new(config);
         let mut broker = Broker::new();
         broker.add_handler(Box::new(messages)).await?;

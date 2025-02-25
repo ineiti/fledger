@@ -177,7 +177,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     }
 
     /// Adds a new subsystem to send and/or receive messages.
-    pub async fn add_subsystem(&mut self, ss: Subsystem<I, O>) -> Result<usize, BrokerError> {
+    pub async fn add_subsystem(&mut self, ss: Subsystem<I, O>) -> anyhow::Result<usize> {
         let subsystem = {
             let mut subsystems = self.subsystems.lock().await;
             *subsystems += 1;
@@ -196,8 +196,9 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         mut broker: Broker<TI, TO>,
         tr_o_ti: Translate<O, TI>,
         tr_to_i: Translate<TO, I>,
-    ) -> Result<usize, BrokerError> {
+    ) -> anyhow::Result<usize> {
         broker.add_translator_o_ti(self.clone(), tr_to_i).await?;
+        // The following panics
         self.add_translator_o_ti(broker, tr_o_ti).await
     }
 
@@ -206,7 +207,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         mut broker: Broker<TI, TO>,
         tr_ti_i: Translate<TI, I>,
         tr_o_to: Translate<O, TO>,
-    ) -> Result<usize, BrokerError> {
+    ) -> anyhow::Result<usize> {
         broker.add_translator_i_ti(self.clone(), tr_ti_i).await?;
         self.add_translator_o_to(broker, tr_o_to).await
     }
@@ -215,7 +216,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         &mut self,
         broker: Broker<TI, TO>,
         i_ti: Translate<I, TI>,
-    ) -> Result<usize, BrokerError> {
+    ) -> anyhow::Result<usize> {
         self.add_translator(Box::new(Translator {
             broker,
             translate_fn_i_ti: Some(i_ti),
@@ -230,7 +231,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         &mut self,
         broker: Broker<TI, TO>,
         i_to: Translate<I, TO>,
-    ) -> Result<usize, BrokerError> {
+    ) -> anyhow::Result<usize> {
         self.add_translator(Box::new(Translator {
             broker,
             translate_fn_i_ti: None,
@@ -245,7 +246,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         &mut self,
         broker: Broker<TI, TO>,
         o_ti: Translate<O, TI>,
-    ) -> Result<usize, BrokerError> {
+    ) -> anyhow::Result<usize> {
         self.add_translator(Box::new(Translator {
             broker,
             translate_fn_i_ti: None,
@@ -260,7 +261,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         &mut self,
         broker: Broker<TI, TO>,
         o_to: Translate<O, TO>,
-    ) -> Result<usize, BrokerError> {
+    ) -> anyhow::Result<usize> {
         self.add_translator(Box::new(Translator {
             broker,
             translate_fn_i_ti: None,
@@ -272,7 +273,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     }
 
     /// Removes a subsystem from the list that will be applied to new messages.
-    pub async fn remove_subsystem(&mut self, ss: usize) -> Result<(), BrokerError> {
+    pub async fn remove_subsystem(&mut self, ss: usize) -> anyhow::Result<()> {
         self.intern_tx
             .send(InternMessage::Subsystem(SubsystemAction::Remove(ss)))
             .map_err(|_| BrokerError::SendQueue("remove_subsystem".into()))?;
@@ -281,7 +282,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
 
     /// Adds an async tap to the subsystems that can be used to listen to messages.
     /// The async tap is returned.
-    pub async fn get_tap_out(&mut self) -> Result<(UnboundedReceiver<O>, usize), BrokerError> {
+    pub async fn get_tap_out(&mut self) -> anyhow::Result<(UnboundedReceiver<O>, usize)> {
         let (tx, rx) = unbounded_channel();
         let pos = self.add_subsystem(Subsystem::TapOut(tx)).await?;
         Ok((rx, pos))
@@ -292,7 +293,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     /// waiting for a message!
     /// For this reason it is better to use the `get_tap` method.
     /// Returns the synchronous tap.
-    pub async fn get_tap_out_sync(&mut self) -> Result<(Receiver<O>, usize), BrokerError> {
+    pub async fn get_tap_out_sync(&mut self) -> anyhow::Result<(Receiver<O>, usize)> {
         let (tx, rx) = channel();
         let pos = self.add_subsystem(Subsystem::TapSyncOut(tx)).await?;
         Ok((rx, pos))
@@ -300,7 +301,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
 
     /// Adds an async tap to the subsystems that can be used to listen to messages.
     /// The async tap is returned.
-    pub async fn get_tap_in(&mut self) -> Result<(UnboundedReceiver<I>, usize), BrokerError> {
+    pub async fn get_tap_in(&mut self) -> anyhow::Result<(UnboundedReceiver<I>, usize)> {
         let (tx, rx) = unbounded_channel();
         let pos = self.add_subsystem(Subsystem::TapIn(tx)).await?;
         Ok((rx, pos))
@@ -311,7 +312,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     /// waiting for a message!
     /// For this reason it is better to use the `get_tap` method.
     /// Returns the synchronous tap.
-    pub async fn get_tap_in_sync(&mut self) -> Result<(Receiver<I>, usize), BrokerError> {
+    pub async fn get_tap_in_sync(&mut self) -> anyhow::Result<(Receiver<I>, usize)> {
         let (tx, rx) = channel();
         let pos = self.add_subsystem(Subsystem::TapSyncIn(tx)).await?;
         Ok((rx, pos))
@@ -319,39 +320,37 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
 
     /// Emit a message to a given destination of other listeners.
     /// The message will be processed asynchronously.
-    pub fn emit_msg_in_dest(&mut self, dst: Destination, msg: I) -> Result<(), BrokerError> {
-        self.intern_tx
+    pub fn emit_msg_in_dest(&mut self, dst: Destination, msg: I) -> anyhow::Result<()> {
+        Ok(self
+            .intern_tx
             .send(InternMessage::MessageIn(dst, msg))
-            .map_err(|_| BrokerError::SendQueue("emit_msg_dest".into()))
+            .map_err(|_| BrokerError::SendQueue("emit_msg_dest".into()))?)
     }
 
     /// Emit a message to other listeners.
     /// The message will be processed asynchronously.
-    pub fn emit_msg_in(&mut self, msg: I) -> Result<(), BrokerError> {
+    pub fn emit_msg_in(&mut self, msg: I) -> anyhow::Result<()> {
         self.emit_msg_in_dest(Destination::All, msg)
     }
 
     /// Emit a message to a given destination of other listeners.
     /// The message will be processed asynchronously.
-    pub fn emit_msg_out_dest(&mut self, dst: Destination, msg: O) -> Result<(), BrokerError> {
-        self.intern_tx
+    pub fn emit_msg_out_dest(&mut self, dst: Destination, msg: O) -> anyhow::Result<()> {
+        Ok(self
+            .intern_tx
             .send(InternMessage::MessageOut(dst, msg))
-            .map_err(|_| BrokerError::SendQueue("emit_msg_dest".into()))
+            .map_err(|_| BrokerError::SendQueue("emit_msg_dest".into()))?)
     }
 
     /// Emit a message to other listeners.
     /// The message will be processed asynchronously.
-    pub fn emit_msg_out(&mut self, msg: O) -> Result<(), BrokerError> {
+    pub fn emit_msg_out(&mut self, msg: O) -> anyhow::Result<()> {
         self.emit_msg_out_dest(Destination::All, msg)
     }
 
     /// Emit a message to a given destination of other listeners and wait for all involved
     /// brokers to settle.
-    pub async fn settle_msg_in_dest(
-        &mut self,
-        dst: Destination,
-        msg: I,
-    ) -> Result<(), BrokerError> {
+    pub async fn settle_msg_in_dest(&mut self, dst: Destination, msg: I) -> anyhow::Result<()> {
         self.intern_tx
             .send(InternMessage::MessageIn(dst, msg))
             .map_err(|_| BrokerError::SendQueue("settle_msg_dest".into()))?;
@@ -359,17 +358,13 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     }
 
     /// Emit a message to other listeners and wait for all involved brokers to settle.
-    pub async fn settle_msg_in(&mut self, msg: I) -> Result<(), BrokerError> {
+    pub async fn settle_msg_in(&mut self, msg: I) -> anyhow::Result<()> {
         self.settle_msg_in_dest(Destination::All, msg).await
     }
 
     /// Emit a message to a given destination of other listeners and wait for all involved
     /// brokers to settle.
-    pub async fn settle_msg_out_dest(
-        &mut self,
-        dst: Destination,
-        msg: O,
-    ) -> Result<(), BrokerError> {
+    pub async fn settle_msg_out_dest(&mut self, dst: Destination, msg: O) -> anyhow::Result<()> {
         self.intern_tx
             .send(InternMessage::MessageOut(dst, msg))
             .map_err(|_| BrokerError::SendQueue("settle_msg_dest".into()))?;
@@ -377,7 +372,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     }
 
     /// Emit a message to other listeners and wait for all involved brokers to settle.
-    pub async fn settle_msg_out(&mut self, msg: O) -> Result<(), BrokerError> {
+    pub async fn settle_msg_out(&mut self, msg: O) -> anyhow::Result<()> {
         self.settle_msg_out_dest(Destination::All, msg).await
     }
 
@@ -388,7 +383,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     pub async fn link_bi<TI: 'static + Message, TO: 'static + Message>(
         &mut self,
         other: Broker<TI, TO>,
-    ) -> Result<(), BrokerError>
+    ) -> anyhow::Result<()>
     where
         I: TranslateFrom<TO>,
         O: TranslateInto<TI>,
@@ -403,7 +398,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     pub async fn link_direct<TI: 'static + Message, TO: 'static + Message>(
         &mut self,
         other: Broker<TI, TO>,
-    ) -> Result<(), BrokerError>
+    ) -> anyhow::Result<()>
     where
         I: TranslateFrom<TI>,
         O: TranslateInto<TO>,
@@ -417,7 +412,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     /// It also calls all brokers that are signed up as forwarding targets.
     /// The caller argument is to be used when recursively settling, to avoid
     /// endless loops.
-    pub async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
+    pub async fn settle(&mut self, callers: Vec<BrokerID>) -> anyhow::Result<()> {
         let (tx, mut rx) = unbounded_channel();
         self.intern_tx
             .send(InternMessage::Settle(callers.clone(), tx))
@@ -439,14 +434,14 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     pub async fn add_handler(
         &mut self,
         handler: SubsystemHandlerBox<I, O>,
-    ) -> Result<usize, BrokerError> {
+    ) -> anyhow::Result<usize> {
         self.add_subsystem(Subsystem::Handler(handler)).await
     }
 
     pub async fn add_translator(
         &mut self,
         translate: SubsystemTranslatorBox<I, O>,
-    ) -> Result<usize, BrokerError> {
+    ) -> anyhow::Result<usize> {
         self.add_subsystem(Subsystem::Translator(translate)).await
     }
 }
@@ -523,7 +518,7 @@ impl<I: Message + 'static, O: Message + 'static> Intern<I, O> {
     // subscribed subsystem to the last.
     // This means that it's possible if a subscription and a message are pending at the same
     // time, that you won't get what you expect.
-    async fn process(&mut self) -> Result<usize, BrokerError> {
+    async fn process(&mut self) -> anyhow::Result<usize> {
         let mut msg_count: usize = 0;
         loop {
             msg_count += self.msg_queue_in.len() + self.msg_queue_out.len();
@@ -624,7 +619,7 @@ impl<I: Message + 'static, O: Message + 'static> Intern<I, O> {
     //
     // Every tap returning an error is considered closed and removed from
     // the list of subsystems.
-    async fn process_once(&mut self) -> Result<(), BrokerError> {
+    async fn process_once(&mut self) -> anyhow::Result<()> {
         self.process_translate_out_messages().await;
         self.process_translate_in_messages().await;
 
@@ -824,7 +819,7 @@ pub enum Subsystem<I, O> {
 }
 
 impl<I: Message, O: Message> Subsystem<I, O> {
-    async fn send_tap_out(&mut self, msgs: Vec<O>) -> Result<(), BrokerError> {
+    async fn send_tap_out(&mut self, msgs: Vec<O>) -> anyhow::Result<()> {
         Ok(match self {
             Self::TapSyncOut(s) => {
                 for msg in msgs {
@@ -842,7 +837,7 @@ impl<I: Message, O: Message> Subsystem<I, O> {
         })
     }
 
-    async fn send_tap_in(&mut self, msgs: Vec<I>) -> Result<(), BrokerError> {
+    async fn send_tap_in(&mut self, msgs: Vec<I>) -> anyhow::Result<()> {
         Ok(match self {
             Self::TapSyncIn(s) => {
                 for msg in msgs {
@@ -864,7 +859,7 @@ impl<I: Message, O: Message> Subsystem<I, O> {
         &mut self,
         index: usize,
         msgs: Vec<I>,
-    ) -> Result<Vec<(Destination, O)>, BrokerError> {
+    ) -> anyhow::Result<Vec<(Destination, O)>> {
         Ok(match self {
             Self::Handler(h) => {
                 let ret = h.messages(msgs).await;
@@ -884,7 +879,7 @@ impl<I: Message, O: Message> Subsystem<I, O> {
         matches!(self, Self::Handler(_))
     }
 
-    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
+    async fn settle(&mut self, callers: Vec<BrokerID>) -> anyhow::Result<()> {
         match self {
             Subsystem::Translator(tr) => tr.settle(callers).await,
             _ => Ok(()),
@@ -916,7 +911,7 @@ pub trait SubsystemHandler<I: Async, O: Async> {
 pub trait SubsystemTranslator<I: Async, O: Async> {
     async fn translate_input(&mut self, trail: Vec<BrokerID>, from_broker: I);
     async fn translate_output(&mut self, trail: Vec<BrokerID>, from_broker: O);
-    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError>;
+    async fn settle(&mut self, callers: Vec<BrokerID>) -> anyhow::Result<()>;
 }
 
 #[target_send()]
@@ -979,7 +974,7 @@ impl<I: Message, O: Message, TI: Message + 'static, TO: Message + 'static> Subsy
         .await;
     }
 
-    async fn settle(&mut self, callers: Vec<BrokerID>) -> Result<(), BrokerError> {
+    async fn settle(&mut self, callers: Vec<BrokerID>) -> anyhow::Result<()> {
         if !callers.contains(&self.broker.id) {
             self.broker.settle(callers).await?;
         }
@@ -1051,7 +1046,7 @@ mod tests {
 
     /// Test the Broker with two subsystems.
     #[tokio::test]
-    async fn test_broker_new() -> Result<(), BrokerError> {
+    async fn test_broker_new() -> anyhow::Result<()> {
         start_logging();
 
         let bm_a = BrokerTestIn::MsgA;
@@ -1135,7 +1130,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn link() -> Result<(), ConvertError> {
+    async fn link() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
 
         let mut broker_a: Broker<MessageAI, MessageAO> = Broker::new();
@@ -1155,14 +1150,14 @@ mod tests {
         if let Ok(msg) = tap_b_in.try_recv() {
             assert_eq!(MessageBI::Two, msg);
         } else {
-            return Err(ConvertError::Conversion("A to B".to_string()));
+            return Err(ConvertError::Conversion("A to B".to_string()).into());
         }
 
         broker_b.settle_msg_out(MessageBO::Un).await?;
         if let Ok(msg) = tap_a_in.try_recv() {
             assert_eq!(MessageAI::One, msg);
         } else {
-            return Err(ConvertError::Conversion("B to A".to_string()));
+            return Err(ConvertError::Conversion("B to A".to_string()).into());
         }
 
         broker_a.settle_msg_out(MessageAO::Trois).await?;
@@ -1214,7 +1209,7 @@ mod tests {
     }
 
     // #[tokio::test]
-    // async fn test_broker() -> Result<(), BrokerError> {
+    // async fn test_broker() -> anyhow::Result<()> {
     //     start_logging_filter_level(vec![], log::LevelFilter::Info);
 
     //     let mut bio = Broker::<MessageAI, MessageAO>::new();

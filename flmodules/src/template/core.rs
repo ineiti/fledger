@@ -43,7 +43,7 @@ pub enum TemplateStorageSave {
 }
 
 impl TemplateStorageSave {
-    pub fn from_str(data: &str) -> Result<TemplateStorage, serde_yaml::Error> {
+    pub fn from_str(data: &str) -> anyhow::Result<TemplateStorage> {
         return Ok(serde_yaml::from_str::<TemplateStorageSave>(data)?.to_latest());
     }
 
@@ -68,8 +68,10 @@ pub struct TemplateStorage {
 }
 
 impl TemplateStorage {
-    pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
-        serde_yaml::to_string::<TemplateStorageSave>(&TemplateStorageSave::V1(self.clone()))
+    pub fn to_yaml(&self) -> anyhow::Result<String> {
+        Ok(serde_yaml::to_string::<TemplateStorageSave>(
+            &TemplateStorageSave::V1(self.clone()),
+        )?)
     }
 }
 
@@ -83,12 +85,10 @@ impl Default for TemplateStorage {
 /// work the way you want them to.
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use super::*;
 
     #[test]
-    fn test_increase() -> Result<(), Box<dyn Error>> {
+    fn test_increase() -> anyhow::Result<()> {
         let mut tc = TemplateCore::new(TemplateStorage::default(), TemplateConfig::default());
         tc.increase(1);
         assert_eq!(1, tc.storage.counter);
@@ -99,7 +99,7 @@ mod tests {
         tc.config.multiplier = 2;
         tc.increase(1);
         assert_eq!(5, tc.storage.counter);
-        
+
         Ok(())
     }
 }

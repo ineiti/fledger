@@ -7,7 +7,7 @@ use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStr
 
 use crate::broker::{Broker, SubsystemHandler};
 use crate::tasks::wait_ms;
-use crate::web_rtc::websocket::{BrokerWSClient, WSClientIn, WSClientOut, WSError, WSSError};
+use crate::web_rtc::websocket::{BrokerWSClient, WSClientIn, WSClientOut, WSError};
 
 pub struct WebSocketClient {
     url: String,
@@ -16,16 +16,14 @@ pub struct WebSocketClient {
 }
 
 impl WebSocketClient {
-    pub async fn connect(url: &str) -> Result<BrokerWSClient, WSSError> {
+    pub async fn connect(url: &str) -> anyhow::Result<BrokerWSClient> {
         let wsb = WebSocketClient {
             url: url.to_string(),
             write: None,
             broker: Broker::new(),
         };
         let mut broker = wsb.broker.clone();
-        broker
-            .add_handler(Box::new(wsb))
-            .await?;
+        broker.add_handler(Box::new(wsb)).await?;
         broker.emit_msg_in(WSClientIn::Connect)?;
         Ok(broker)
     }
@@ -58,7 +56,7 @@ impl WebSocketClient {
         });
     }
 
-    async fn connect_ws(&mut self) -> Result<(), WSSError> {
+    async fn connect_ws(&mut self) -> anyhow::Result<()> {
         if let Some(mut write) = self.write.take() {
             log::debug!("Reconnecting to websocket at {}", self.url);
             write.close().await?;

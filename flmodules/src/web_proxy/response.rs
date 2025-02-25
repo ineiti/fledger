@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::Utf8Error};
+use std::collections::HashMap;
 
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
@@ -27,8 +27,8 @@ impl Response {
         self.header.clone()
     }
 
-    pub async fn text(&mut self) -> Result<String, Utf8Error> {
-        std::str::from_utf8(&self.bytes().await).map(|s| s.into())
+    pub async fn text(&mut self) -> anyhow::Result<String> {
+        Ok(std::str::from_utf8(&self.bytes().await).map(|s| s.into())?)
     }
 
     pub async fn bytes(&mut self) -> Bytes {
@@ -48,7 +48,7 @@ impl Response {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ResponseMessage {
     Header(ResponseHeader),
-    Body(#[serde_as(as = "Hex")]Bytes),
+    Body(#[serde_as(as = "Hex")] Bytes),
     Error(String),
     Done,
 }
@@ -63,9 +63,7 @@ impl From<&reqwest::Response> for ResponseHeader {
     fn from(value: &reqwest::Response) -> Self {
         let mut headers = HashMap::new();
         for (k, v) in value.headers() {
-            let values = headers
-                .entry(k.to_string())
-                .or_insert(vec![]);
+            let values = headers.entry(k.to_string()).or_insert(vec![]);
             values.push(v.to_str().expect("converting header value").into());
         }
         Self {
@@ -109,7 +107,7 @@ mod test {
     // }
 
     // #[tokio::test]
-    // async fn test_new() -> Result<(), Box<dyn std::error::Error>> {
+    // async fn test_new() -> anyhow::Result<()> {
     //     let (tx, rx) = channel(10);
     //     tx.send(ResponseMessage::Body(Bytes::from("123"))).await?;
     //     let err = Response::new(rx).await;
@@ -124,7 +122,7 @@ mod test {
     // }
 
     // #[tokio::test]
-    // async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
+    // async fn test_stream() -> anyhow::Result<()> {
     //     let (tx, rx) = channel(10);
     //     tx.send(ResponseMessage::Header(ResponseHeader::new_code(200)))
     //         .await?;

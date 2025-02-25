@@ -25,7 +25,7 @@ enum MainError {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), MainError> {
+async fn main() -> anyhow::Result<()> {
     start_logging_filter(vec!["fl"]);
 
     log::info!("Starting signalling server");
@@ -61,7 +61,7 @@ async fn start_signal_server() {
         .expect("Failed to start signalling server");
 }
 
-async fn spawn_node() -> Result<(NodeConfig, BrokerNetwork), MainError> {
+async fn spawn_node() -> anyhow::Result<(NodeConfig, BrokerNetwork)> {
     let nc = NodeConfig::new();
 
     log::info!("Starting node {}: {}", nc.info.get_id(), nc.info.name);
@@ -87,7 +87,7 @@ mod tests {
 
     // #[tokio::test]
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
-    async fn test_two_nodes() -> Result<(), MainError> {
+    async fn test_two_nodes() -> anyhow::Result<()> {
         start_logging_filter(vec!["fl"]);
 
         log::info!("Starting signalling server");

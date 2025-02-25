@@ -1,6 +1,6 @@
 [package]
 name = "flbrowser"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Linus Gasser <ineiti@gasser.blue>"]
 edition = "2021"
 description = "Web interface for fledger"

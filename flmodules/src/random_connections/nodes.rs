@@ -132,8 +132,6 @@ impl Nodes {
 
 #[cfg(test)]
 mod tests {
-    use core::fmt::Error;
-
     use flarch::start_logging;
 
     use super::*;
@@ -165,7 +163,7 @@ mod tests {
 
     // Tests the nodes and the remove methods
     #[test]
-    fn test_nodes_remove() -> Result<(), Error> {
+    fn test_nodes_remove() -> anyhow::Result<()> {
         start_logging();
 
         let mut nodes = make_nodes(5);

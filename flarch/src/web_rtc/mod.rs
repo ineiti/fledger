@@ -20,13 +20,13 @@ use std::collections::HashMap;
 use flmacro::platform_async_trait;
 
 use crate::{
-    broker::{BrokerError, Broker, SubsystemHandler},
+    broker::{Broker, SubsystemHandler},
     nodeids::NodeID,
 };
 
 use self::{
     messages::WebRTCSpawner,
-    node_connection::{NCError, NCInput, NCOutput, NodeConnection},
+    node_connection::{NCInput, NCOutput, NodeConnection},
 };
 
 pub mod connection;
@@ -71,9 +71,7 @@ pub struct WebRTCConn {
 impl WebRTCConn {
     /// Creates a new [`Broker<WebRTCConnMessage>`] that will accept incoming connections and set up
     /// new outgoing connections.
-    pub async fn new(
-        web_rtc: WebRTCSpawner,
-    ) -> Result<BrokerWebRTCConn, BrokerError> {
+    pub async fn new(web_rtc: WebRTCSpawner) -> anyhow::Result<BrokerWebRTCConn> {
         let mut br = Broker::new();
         br.add_handler(Box::new(Self {
             web_rtc,
@@ -85,7 +83,7 @@ impl WebRTCConn {
     }
 
     /// Ensures that a given connection exists.
-    async fn ensure_connection(&mut self, id: NodeID) -> Result<(), NCError> {
+    async fn ensure_connection(&mut self, id: NodeID) -> anyhow::Result<()> {
         if !self.connections.contains_key(&id) {
             let mut nc = NodeConnection::new(&self.web_rtc).await?;
             self.connections.insert(id.clone(), nc.clone());

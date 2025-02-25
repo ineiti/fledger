@@ -6,7 +6,10 @@ use flarch::{
 use thiserror::Error;
 use tokio::sync::{mpsc::channel, watch};
 
-use crate::router::{broker::BrokerRouter, messages::{NetworkWrapper, RouterIn, RouterOut}};
+use crate::router::{
+    broker::BrokerRouter,
+    messages::{NetworkWrapper, RouterIn, RouterOut},
+};
 use flarch::{
     broker::{Broker, BrokerError},
     nodeids::{NodeID, U256},
@@ -45,7 +48,7 @@ impl WebProxy {
         our_id: NodeID,
         router: BrokerRouter,
         config: WebProxyConfig,
-    ) -> Result<Self, WebProxyError> {
+    ) -> anyhow::Result<Self> {
         let mut web_proxy = Broker::new();
         let (messages, storage) = Messages::new(ds, config, our_id, web_proxy.clone());
 
@@ -65,14 +68,14 @@ impl WebProxy {
     /// If the remote proxy doesn't answer within 5 seconds, a timeout error is
     /// returned.
     /// TODO: add GET headers and body, move timeout to configuration
-    pub async fn get(&mut self, url: &str) -> Result<Response, WebProxyError> {
+    pub async fn get(&mut self, url: &str) -> anyhow::Result<Response> {
         log::debug!("Getting {url}");
         let our_rnd = U256::rnd();
         let (tx, rx) = channel(128);
         self.web_proxy
             .emit_msg_in(WebProxyIn::RequestGet(our_rnd, url.to_string(), tx))?;
         let (mut tap, id) = self.web_proxy.get_tap_out().await?;
-        timeout(Duration::from_secs(5), async move {
+        Ok(timeout(Duration::from_secs(5), async move {
             while let Some(msg) = tap.recv().await {
                 if let WebProxyOut::ResponseGet(proxy, rnd, header) = msg {
                     if rnd == our_rnd {
@@ -83,10 +86,10 @@ impl WebProxy {
             }
             // TODO: is this really called sometime?
             self.web_proxy.remove_subsystem(id).await?;
-            return Err(WebProxyError::ResponseTimeout);
+            return Err(anyhow::anyhow!(WebProxyError::ResponseTimeout));
         })
         .await
-        .map_err(|_| WebProxyError::ResponseTimeout)?
+        .map_err(|_| WebProxyError::ResponseTimeout)??)
     }
 
     pub fn get_counters(&mut self) -> Counters {
@@ -117,14 +120,18 @@ impl WebProxy {
 
 #[cfg(test)]
 mod tests {
-    use flarch::{data_storage::DataStorageTemp, start_logging_filter_level, tasks::{spawn_local, wait_ms}};
+    use flarch::{
+        data_storage::DataStorageTemp,
+        start_logging_filter_level,
+        tasks::{spawn_local, wait_ms},
+    };
 
     use crate::nodeconfig::NodeConfig;
 
     use super::*;
 
     #[tokio::test]
-    async fn test_get() -> Result<(), WebProxyError> {
+    async fn test_get() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
         let cl_ds = Box::new(DataStorageTemp::new());
         let cl_in = NodeConfig::new().info;

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 use async_recursion::async_recursion;
 use flarch::{
@@ -6,8 +6,8 @@ use flarch::{
     data_storage::DataStorage,
 };
 use flcrypto::{
-    access::{Badge, BadgeID, BadgeSignature, CalcSignature, Condition, Version},
-    signer::{Signature, SignerError, Verifier, KeyPairID},
+    access::{Condition, ConditionLink},
+    signer::{SignerError, Verifier},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
@@ -16,8 +16,8 @@ use tokio::{sync::watch, time::timeout};
 use crate::{
     dht_router::broker::BrokerDHTRouter,
     flo::{
-        crypto::{BadgeCond, Rules, ACE},
-        flo::{Flo, FloError, FloID, FloWrapper, UpdateSign},
+        crypto::BadgeCond,
+        flo::{Flo, FloError, FloID, FloWrapper, UpdateCondSign},
         realm::{GlobalID, RealmID},
     },
     timer::Timer,
@@ -37,8 +37,8 @@ pub enum DHTStorageIn {
     ReadFlo(GlobalID),
     ReadCuckooIDs(GlobalID),
     GetRealms,
-    /// Ask all neighbors for their realms and Flos
-    SyncNeighbors,
+    /// Ask all neighbors for their realms and Flos.
+    SyncFromNeighbors,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -65,6 +65,8 @@ pub struct DHTStorage {
     config: DHTConfig,
     _our_id: NodeID,
 }
+
+unsafe impl Send for DHTStorage {}
 
 #[derive(Error, Debug)]
 pub enum StorageError {
@@ -93,7 +95,7 @@ impl DHTStorage {
         config: DHTConfig,
         dht_router: BrokerDHTRouter,
         timer: &mut Timer,
-    ) -> Result<Self, StorageError> {
+    ) -> anyhow::Result<Self> {
         let (messages, stats) = Messages::new(ds, config.clone(), our_id.clone());
         let mut intern = Broker::new();
         intern.add_handler(Box::new(messages)).await?;
@@ -123,7 +125,7 @@ impl DHTStorage {
         timer
             .tick_minute(
                 intern.clone(),
-                InternIn::Storage(DHTStorageIn::SyncNeighbors),
+                InternIn::Storage(DHTStorageIn::SyncFromNeighbors),
             )
             .await?;
 
@@ -136,26 +138,33 @@ impl DHTStorage {
         })
     }
 
-    pub fn store_flo(&mut self, flo: Flo) -> Result<(), BrokerError> {
-        self.broker.emit_msg_in(DHTStorageIn::StoreFlo(flo))
+    pub fn store_flo(&mut self, flo: Flo) -> anyhow::Result<()> {
+        Ok(self.broker.emit_msg_in(DHTStorageIn::StoreFlo(flo))?)
     }
 
-    pub fn propagate(&mut self) -> Result<(), StorageError> {
+    pub fn propagate(&mut self) -> anyhow::Result<()> {
         Ok(self.intern.emit_msg_in(InternIn::BroadcastSync)?)
     }
 
-    pub async fn get_realm_ids(&mut self) -> Result<Vec<RealmID>, StorageError> {
-        self.send_wait(DHTStorageIn::GetRealms, &|msg| match msg {
-            DHTStorageOut::RealmIDs(realms) => Some(realms),
-            _ => None,
-        })
-        .await
+    pub async fn get_realm_ids(&mut self) -> anyhow::Result<Vec<RealmID>> {
+        Ok(self
+            .send_wait(DHTStorageIn::GetRealms, &|msg| match msg {
+                DHTStorageOut::RealmIDs(realms) => Some(realms),
+                _ => None,
+            })
+            .await?)
     }
 
     pub async fn get_flo<T: Serialize + DeserializeOwned + Clone>(
         &mut self,
         id: &GlobalID,
-    ) -> Result<FloWrapper<T>, StorageError> {
+    ) -> anyhow::Result<FloWrapper<T>> {
+        // log::info!(
+        //     "Getting {}: {}/{}",
+        //     std::any::type_name::<T>(),
+        //     id.realm_id(),
+        //     id.flo_id()
+        // );
         Ok(self
             .send_wait(DHTStorageIn::ReadFlo(id.clone()), &|msg| match msg {
                 DHTStorageOut::FloValue((flo, _)) => (flo.global_id() == *id).then_some(flo),
@@ -165,7 +174,7 @@ impl DHTStorage {
             .try_into()?)
     }
 
-    pub async fn get_cuckoos(&mut self, id: &GlobalID) -> Result<Vec<FloID>, StorageError> {
+    pub async fn get_cuckoos(&mut self, id: &GlobalID) -> anyhow::Result<Vec<FloID>> {
         Ok(self
             .send_wait(DHTStorageIn::ReadCuckooIDs(id.clone()), &|msg| match msg {
                 DHTStorageOut::CuckooIDs(rid, ids) => (&rid == id).then_some(ids),
@@ -174,53 +183,64 @@ impl DHTStorage {
             .await?)
     }
 
-    pub fn sync(&mut self) -> Result<(), BrokerError> {
-        self.broker.emit_msg_in(DHTStorageIn::SyncNeighbors)
+    pub fn sync(&mut self) -> anyhow::Result<()> {
+        Ok(self.broker.emit_msg_in(DHTStorageIn::SyncFromNeighbors)?)
     }
 
-    pub async fn get_badge_signature<T: Serialize + DeserializeOwned + Clone>(
-        &mut self,
-        fw: &FloWrapper<T>,
-        update: &T,
-    ) -> Result<BadgeSignature, StorageError> {
-        let cond = match fw.rules() {
-            Rules::ACE(version) => self
-                .get_flo::<ACE>(&GlobalID::new(fw.realm_id(), (*version.get_id()).into()))
-                .await?
-                .cache()
-                .update()
-                .ok_or(StorageError::UpdateRuleMissing),
-            Rules::Update(condition) => Ok(condition.clone()),
-            Rules::None => Err(StorageError::UpdateRuleMissing),
-        }?;
-        let msg = fw.hash_update(update).bytes();
-        let badges = self
-            .recurse_condition(&fw.realm_id(), BadgeSig::default(), &cond)
-            .await?;
-        let cs =
-            CalcSignature::from_cond_badges(&cond, badges.badges, badges.signatures, msg.clone())?;
-        Ok(BadgeSignature::from_calc_signature(cs, cond, msg))
+    #[async_recursion(?Send)]
+    pub async fn convert(&mut self, cl: &ConditionLink, rid: &RealmID) -> Condition {
+        match cl {
+            ConditionLink::Verifier(ver) => self
+                .get_flo::<Verifier>(&rid.global_id((*Flo::calc_flo_id(&*ver)).into()))
+                .await
+                .map(|v| Condition::Verifier(v.cache().clone()))
+                .unwrap_or(Condition::NotAvailable),
+            ConditionLink::Badge(version) => {
+                if let Ok(b) = self
+                    .get_flo::<BadgeCond>(&rid.global_id((*version.get_id()).into()))
+                    .await
+                {
+                    let bl = b.badge_link();
+                    Condition::Badge(
+                        version.clone(),
+                        flcrypto::access::Badge {
+                            id: bl.id,
+                            version: bl.version,
+                            condition: Box::new(self.convert(&bl.condition, rid).await),
+                        },
+                    )
+                } else {
+                    Condition::NotAvailable
+                }
+            }
+            ConditionLink::NofT(thr, vec) => {
+                let mut conds = vec![];
+                for cond in vec {
+                    conds.push(self.convert(cond, rid).await)
+                }
+                Condition::NofT(*thr, conds)
+            }
+            ConditionLink::Pass => Condition::Pass,
+            ConditionLink::Fail => Condition::Fail,
+        }
     }
 
-    pub async fn get_update_sign<T: Serialize + DeserializeOwned + Clone>(
+    pub async fn start_sign_cond<T: Serialize + DeserializeOwned + Clone>(
         &mut self,
         fw: &FloWrapper<T>,
-        update: T,
-        rules: Option<Rules>,
-    ) -> Result<UpdateSign<T>, StorageError> {
-        let bs = self.get_badge_signature(fw, &update).await?;
-        Ok(UpdateSign::new(
-            update,
-            rules.unwrap_or_else(|| fw.rules().clone()),
-            bs,
-        ))
+        cl: &ConditionLink,
+    ) -> anyhow::Result<UpdateCondSign> {
+        let rid = fw.realm_id();
+        let cond_old = self.convert(fw.cond(), &rid).await;
+        let cond_new = self.convert(cl, &rid).await;
+        fw.start_sign_cond(cond_old, cond_new)
     }
 
     async fn send_wait<T>(
         &mut self,
         msg_in: DHTStorageIn,
         check: &(dyn Fn(DHTStorageOut) -> Option<T> + Sync),
-    ) -> Result<T, StorageError> {
+    ) -> anyhow::Result<T> {
         // using the internal broker directly to avoid one conversion.
         let dur = Duration::from_millis(self.config.timeout);
         let (mut tap, tap_id) = self.intern.get_tap_out().await?;
@@ -242,61 +262,58 @@ impl DHTStorage {
         Ok(res??)
     }
 
-    #[async_recursion(?Send)]
-    async fn recurse_condition(
-        &mut self,
-        realm_id: &RealmID,
-        mut bad_sig: BadgeSig,
-        condition: &Condition,
-    ) -> Result<BadgeSig, StorageError> {
-        match condition {
-            Condition::Verifier(vid) => {
-                bad_sig.signatures.insert(vid.clone(), None);
-            }
-            Condition::Badge(version) => {
-                if bad_sig.badges.contains_key(version) {
-                    log::warn!("Loop in condition");
-                } else {
-                    let cond = self
-                        .get_flo::<BadgeCond>(&GlobalID::new(
-                            realm_id.clone(),
-                            (*version.get_id()).into(),
-                        ))
-                        .await?;
-                    bad_sig
-                        .badges
-                        .insert(version.clone(), cond.badge_cond().clone());
-                }
-            }
-            Condition::NofT(_, vec) => {
-                for v in vec {
-                    bad_sig = self.recurse_condition(realm_id, bad_sig, v).await?;
-                }
-            }
-            Condition::Pass => (),
-        }
-        Ok(bad_sig)
-    }
+    // #[async_recursion(?Send)]
+    // async fn recurse_condition(
+    //     &mut self,
+    //     realm_id: &RealmID,
+    //     mut bad_sig: BadgeSig,
+    //     condition: &ConditionLink,
+    // ) -> anyhow::Result<BadgeSig> {
+    //     match condition {
+    //         ConditionLink::Verifier(_) => {}
+    //         ConditionLink::Badge(version) => {
+    //             if bad_sig.badges.contains_key(version) {
+    //                 log::warn!("Loop in condition");
+    //             } else {
+    //                 let cond = self
+    //                     .get_flo::<BadgeCond>(&GlobalID::new(
+    //                         realm_id.clone(),
+    //                         (*version.get_id()).into(),
+    //                     ))
+    //                     .await?;
+    //                 bad_sig
+    //                     .badges
+    //                     .insert(version.clone(), cond.badge_cond().clone());
+    //             }
+    //         }
+    //         ConditionLink::NofT(_, vec) => {
+    //             for v in vec {
+    //                 bad_sig = self.recurse_condition(realm_id, bad_sig, v).await?;
+    //             }
+    //         }
+    //         ConditionLink::Pass => (),
+    //     }
+    //     Ok(bad_sig)
+    // }
 }
 
-#[derive(Default, Debug)]
-struct BadgeSig {
-    badges: HashMap<Version<BadgeID>, Condition>,
-    signatures: HashMap<KeyPairID, Option<(Verifier, Signature)>>,
-}
+// #[derive(Default, Debug)]
+// struct BadgeSig {
+//     badges: HashMap<VersionSpec<BadgeID>, ConditionLink>,
+//     signatures: ConditionSignature,
+// }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::error::Error;
 
     use crate::{
         dht_router::{broker::DHTRouter, kademlia::Config},
         dht_storage::core::{Cuckoo, RealmConfig},
         flo::realm::{FloRealm, Realm},
         testing::{
-            flo::{FloTesting, Wallet},
             network_simul::NetworkSimul,
+            wallet::{FloTesting, Wallet},
         },
         timer::{Timer, TimerMessage},
     };
@@ -311,7 +328,7 @@ mod tests {
     }
 
     impl SimulStorage {
-        async fn new() -> Result<Self, Box<dyn Error>> {
+        async fn new() -> anyhow::Result<Self> {
             let mut wallet = Wallet::new();
             Ok(Self {
                 simul: NetworkSimul::new().await?,
@@ -319,17 +336,18 @@ mod tests {
                 nodes: vec![],
                 realm: FloRealm::new(
                     "root",
-                    wallet.get_badge_rules(),
+                    wallet.get_badge_cond(),
                     RealmConfig {
                         max_space: 1e6 as u64,
                         max_flo_size: 1e4 as u32,
                     },
+                    &[&wallet.get_signer()],
                 )?,
                 _wallet: wallet,
             })
         }
 
-        async fn node(&mut self) -> Result<DHTStorage, Box<dyn Error>> {
+        async fn node(&mut self) -> anyhow::Result<DHTStorage> {
             let n = self.simul.new_node().await?;
             let id = n.config.info.get_id();
             let dht_router =
@@ -355,7 +373,7 @@ mod tests {
             self.simul.settle().await.expect("Settling simul broker");
         }
 
-        async fn sync_all(&mut self) -> Result<(), Box<dyn Error>> {
+        async fn sync_all(&mut self) -> anyhow::Result<()> {
             for n in &mut self.nodes {
                 n.sync()?;
             }
@@ -365,7 +383,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_storage_propagation() -> Result<(), Box<dyn Error>> {
+    async fn test_storage_propagation() -> anyhow::Result<()> {
         start_logging_filter_level(vec!["flmodules"], log::LevelFilter::Info);
 
         let mut router = SimulStorage::new().await?;
@@ -403,7 +421,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cuckoo_propagation() -> Result<(), Box<dyn Error>> {
+    async fn test_cuckoo_propagation() -> anyhow::Result<()> {
         start_logging_filter_level(vec!["flmodules::dht_storage"], log::LevelFilter::Info);
 
         let mut router = SimulStorage::new().await?;
@@ -416,11 +434,17 @@ mod tests {
         ds_0.store_flo(router.realm.clone().into())?;
         router.sync_all().await?;
 
-        let t0 = FloTesting::new_cuckoo(router.realm.realm_id(), "test0", Cuckoo::Duration(100000));
+        let t0 = FloTesting::new_cuckoo(
+            router.realm.realm_id(),
+            "test0",
+            Cuckoo::Duration(100000),
+            &router._wallet.get_signer(),
+        );
         let t1 = FloTesting::new_cuckoo(
             router.realm.realm_id(),
             "test1",
             Cuckoo::Parent(t0.flo_id()),
+            &router._wallet.get_signer(),
         );
 
         ds_0.store_flo(t0.flo().clone())?;

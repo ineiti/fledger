@@ -50,14 +50,11 @@
 use bimap::BiMap;
 use serde::{Deserialize, Serialize};
 use serde_with::{hex::Hex, serde_as};
-use std::{
-    collections::HashMap,
-    fmt::{Error, Formatter},
-};
+use std::{collections::HashMap, fmt::Formatter};
 
 use crate::{nodeconfig::NodeInfo, timer::Timer};
 use flarch::{
-    broker::{Broker, BrokerError, SubsystemHandler, TranslateFrom, TranslateInto},
+    broker::{Broker, SubsystemHandler, TranslateFrom, TranslateInto},
     nodeids::{NodeID, U256},
     platform_async_trait,
     web_rtc::{
@@ -111,10 +108,7 @@ impl SignalServer {
     /// Creates a new [`SignalServer`].
     /// `ttl_minutes` is the minimum time an idle node will be
     /// kept in the list.
-    pub async fn new(
-        ws_server: BrokerWSServer,
-        ttl_minutes: u64,
-    ) -> Result<BrokerSignal, BrokerError> {
+    pub async fn new(ws_server: BrokerWSServer, ttl_minutes: u64) -> anyhow::Result<BrokerSignal> {
         let mut broker = Broker::new();
         broker
             .add_handler(Box::new(SignalServer {
@@ -374,7 +368,7 @@ pub struct NodeStat {
 }
 
 impl std::fmt::Debug for SignalIn {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             SignalIn::WSServer(_) => write!(f, "WebSocket"),
             SignalIn::Timer => write!(f, "Timer"),

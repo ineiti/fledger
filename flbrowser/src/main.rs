@@ -83,7 +83,7 @@ pub fn main() {
                     }
                     Button::DownloadData => {
                         let data = web.node.gossip.as_ref().unwrap().storage.borrow().get().unwrap();
-                        downloadFile("gossip_event.toml".into(), data.into());
+                        downloadFile("gossip_event.yaml".into(), data.into());
                     }
                     Button::WebProxy => {
                         let proxy_div = proxy_div.clone();
@@ -140,7 +140,7 @@ pub fn main() {
     });
 }
 
-fn update_table(web: &FledgerWeb, state: &FledgerState) -> Result<(), JsValue> {
+fn update_table(web: &FledgerWeb, state: &FledgerState) -> anyhow::Result<()> {
     let stats_table = state.get_node_table();
     let el_fetching = web.document.get_element_by_id("fetching").unwrap();
     let el_table_stats = web.document.get_element_by_id("table_stats").unwrap();

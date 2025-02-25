@@ -32,7 +32,7 @@ pub enum RouterInternal {
 }
 
 impl NetworkWrapper {
-    pub fn wrap_yaml<T: Serialize>(module: &str, msg: &T) -> Result<Self, serde_yaml::Error> {
+    pub fn wrap_yaml<T: Serialize>(module: &str, msg: &T) -> anyhow::Result<Self> {
         Ok(Self {
             module: module.into(),
             msg: serde_yaml::to_string(msg)?,

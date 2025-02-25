@@ -1,13 +1,8 @@
-use std::collections::HashMap;
-
 use flarch::data_storage::DataStorage;
-use flcrypto::{access::Condition, signer::Signer, signer_ed25519::SignerEd25519};
+use flcrypto::{signer::Signer, signer_ed25519::SignerEd25519};
 use serde::{Deserialize, Serialize};
 
-use super::{
-    crypto::{FloACE, Rules, ACE},
-    realm::RealmID,
-};
+use super::realm::RealmID;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct CryptoStorage {
@@ -15,7 +10,6 @@ pub struct CryptoStorage {
     ds: Option<Box<dyn DataStorage + Send>>,
     realm_id: RealmID,
     pub signers: Vec<Signer>,
-    pub aces: Vec<FloACE>,
 }
 
 const STORAGE_NAME: &str = "CryptoStorage";
@@ -40,24 +34,6 @@ impl CryptoStorage {
         self.signers.push(SignerEd25519::new());
         self.store();
         self.get_signer()
-    }
-
-    pub fn get_ace(&mut self) -> FloACE {
-        if let Some(fa) = self.aces.first() {
-            return fa.clone();
-        }
-        self.add_ace()
-    }
-
-    pub fn add_ace(&mut self) -> FloACE {
-        let signer = self.get_signer();
-        let cond = Condition::Verifier(signer.verifier().get_id());
-        let ace = ACE::new(Some(cond.clone()), HashMap::new(), vec![]);
-        self.aces.push(
-            FloACE::from_type(self.realm_id.clone(), Rules::Update(cond), ace)
-                .expect("Creating ACE"),
-        );
-        self.get_ace()
     }
 
     pub fn store(&mut self) {

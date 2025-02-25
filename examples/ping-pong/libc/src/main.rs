@@ -1,7 +1,6 @@
 use clap::{Parser, ValueEnum};
 
 use flarch::{start_logging_filter, web_rtc::connection::ConnectionConfig};
-use flmodules::network::NetworkSetupError;
 use flmodules::nodeconfig::NodeConfig;
 
 use shared::{
@@ -25,7 +24,7 @@ enum Code {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), NetworkSetupError> {
+async fn main() -> anyhow::Result<()> {
     start_logging_filter(vec!["fl", "libc"]);
     let args = Args::parse();
 

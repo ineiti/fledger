@@ -20,7 +20,7 @@ use crate::{
 };
 
 use super::{
-    broker::{DHTStorageIn, DHTStorageOut, StorageError, MODULE_NAME},
+    broker::{DHTStorageIn, DHTStorageOut, MODULE_NAME},
     core::*,
 };
 
@@ -29,6 +29,7 @@ use super::{
 pub enum InternIn {
     Routing(DHTRouterOut),
     Storage(DHTStorageIn),
+    /// Ask all neighbors to sync with us.
     BroadcastSync,
 }
 
@@ -78,8 +79,8 @@ pub enum MessageBroadcast {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Sync {
     RequestRealmIDs,
-    RequestFloMetas(RealmID),
     AvailableRealmIDs(Vec<RealmID>),
+    RequestFloMetas(RealmID),
     AvailableFlos(RealmID, Vec<FloMeta>),
     RequestFlos(RealmID, Vec<FloID>),
     Flos(Vec<FloCuckoo>),
@@ -153,6 +154,7 @@ impl Messages {
                 Some(df) => DHTStorageOut::FloValue(df.clone()).into(),
                 None => MessageNodeClosest::ReadFlo(id.realm_id().clone())
                     .to_intern_out(id.flo_id().clone().into())
+                    // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
                     .expect("Creating ReadFlo message"),
             }],
             DHTStorageIn::ReadCuckooIDs(id) => {
@@ -169,7 +171,7 @@ impl Messages {
                 );
                 out
             }
-            DHTStorageIn::SyncNeighbors => self
+            DHTStorageIn::SyncFromNeighbors => self
                 .nodes
                 .iter()
                 .flat_map(|n| {
@@ -202,13 +204,23 @@ impl Messages {
                 return self.store_flo(flo);
             }
             MessageNodeClosest::ReadFlo(rid) => {
+                // log::info!(
+                //     "{} got request for {}/{} from {}",
+                //     self.our_id,
+                //     key,
+                //     rid,
+                //     origin
+                // );
+                // log::info!("{}", self.realms.get(&rid).is_some());
                 if let Some(fc) = self
                     .realms
                     .get(&rid)
                     .and_then(|realm| realm.get_flo_cuckoo(&fid))
                 {
+                    // log::info!("sends flo {:?}", fc.0);
                     return MessageNodeDirect::FloValue(fc)
                         .to_intern_out(origin)
+                        // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
                         .map_or(vec![], |msg| vec![msg]);
                 }
             }
@@ -235,9 +247,13 @@ impl Messages {
 
     fn msg_dest(&mut self, origin: NodeID, msg: MessageNodeDirect) -> Vec<InternOut> {
         match msg {
-            MessageNodeDirect::FloValue(flo) => {
-                self.store_flo(flo.0.clone());
-                Some(DHTStorageOut::FloValue(flo).into())
+            MessageNodeDirect::FloValue(fc) => {
+                // log::info!("{} stores {:?}", self.our_id, flo.0);
+                self.store_flo(fc.0.clone());
+                self.realms
+                    .get_mut(&fc.0.realm_id())
+                    .map(|realm| realm.store_cuckoo_ids(&fc.0.flo_id(), fc.1.clone()));
+                Some(DHTStorageOut::FloValue(fc).into())
             }
             MessageNodeDirect::UnknownFlo(key) => Some(DHTStorageOut::ValueMissing(key).into()),
             MessageNodeDirect::Update(sync) => return self.msg_sync(origin, sync),
@@ -262,21 +278,38 @@ impl Messages {
     }
 
     fn msg_sync(&mut self, origin: NodeID, msg: Sync) -> Vec<InternOut> {
-        // log::debug!("{} syncs {:?}", self.our_id, msg);
+        // log::trace!("{} syncs {:?}", self.our_id, msg);
+        // if let Sync::RequestFloMetas(rid) = &msg {
+        //     log::trace!(
+        //         "{} receives ReqFloMet from {} and will reply: {}",
+        //         self.our_id,
+        //         origin,
+        //         self.realms
+        //             .get(rid)
+        //             .map(|realm| realm
+        //                 .get_flo_metas()
+        //                 .iter()
+        //                 .map(|fm| format!("{}", fm.id))
+        //                 .sorted()
+        //                 .collect::<Vec<_>>()
+        //                 .join(" - "))
+        //             .unwrap_or("".to_string())
+        //     );
+        // }
         match msg {
             Sync::RequestRealmIDs => vec![Sync::AvailableRealmIDs(
                 self.realms.keys().cloned().collect(),
             )],
-            Sync::RequestFloMetas(realm_id) => self
-                .realms
-                .get(&realm_id)
-                .map(|realm| realm.get_flo_metas())
-                .map_or(vec![], |fm| vec![Sync::AvailableFlos(realm_id, fm)]),
             Sync::AvailableRealmIDs(realm_ids) => realm_ids
                 .into_iter()
                 .filter(|rid| !self.realms.contains_key(&rid) && self.config.accepts_realm(&rid))
                 .map(|rid| Sync::RequestFlos(rid.clone(), vec![(*rid).into()]))
                 .collect(),
+            Sync::RequestFloMetas(realm_id) => self
+                .realms
+                .get(&realm_id)
+                .map(|realm| realm.get_flo_metas())
+                .map_or(vec![], |fm| vec![Sync::AvailableFlos(realm_id, fm)]),
             Sync::AvailableFlos(realm_id, flo_metas) => self
                 .realms
                 .get(&realm_id)
@@ -318,6 +351,8 @@ impl Messages {
     fn store_flo(&mut self, flo: Flo) -> Vec<InternOut> {
         let mut res = vec![];
         if self.upsert_flo(flo.clone()) {
+            // log::info!("{}: store_flo", self.our_id);
+            // TODO: this should not be sent in all cases...
             res.extend(vec![MessageNodeClosest::StoreFlo(flo.clone())
                 .to_intern_out(flo.flo_id().into())
                 .expect("Storing new DHT")]);
@@ -334,10 +369,29 @@ impl Messages {
     // Either its realm is already known, or it is a new realm.
     // When 'true' is returned, then the flo has been stored.
     fn upsert_flo(&mut self, flo: Flo) -> bool {
-        // log::trace!("{} store_flo {flo:?}", self.our_id);
+        // log::trace!(
+        //     "{} store_flo {}({}/{}) {}",
+        //     self.our_id,
+        //     flo.flo_type(),
+        //     flo.flo_id(),
+        //     flo.realm_id(),
+        //     flo.version()
+        // );
+        // log::info!(
+        //     "{} has realm: {}",
+        //     self.our_id,
+        //     self.realms.get(&flo.realm_id()).is_some()
+        // );
+        // log::info!(
+        //     "Can create FloRealm of {}/{:?}: {:?}",
+        //     flo.flo_type(),
+        //     flo.data(),
+        //     TryInto::<FloRealm>::try_into(flo.clone())
+        // );
         let modification = self
             .realms
             .get_mut(&flo.realm_id())
+            // .inspect(|rs| log::info!("{} has realm", self.our_id))
             .map(|dsc| dsc.upsert_flo(flo.clone()))
             .unwrap_or_else(|| {
                 TryInto::<FloRealm>::try_into(flo)
@@ -352,14 +406,20 @@ impl Messages {
         modification
     }
 
-    fn create_realm(&mut self, realm: FloRealm) -> Result<(), CoreError> {
-        log::debug!("{} creating realm {}", self.our_id, realm.realm_id());
+    fn create_realm(&mut self, realm: FloRealm) -> anyhow::Result<()> {
         if !self.config.accepts_realm(&realm.realm_id()) {
-            return Err(CoreError::RealmNotAccepted);
+            return Err(CoreError::RealmNotAccepted.into());
         }
+        // log::debug!(
+        //     "{} creating realm {}/{}",
+        //     self.our_id,
+        //     realm.realm_id(),
+        //     realm.version()
+        // );
         let id = realm.flo().realm_id();
         let dsc = RealmStorage::new(self.config.clone(), self.our_id, realm)?;
-        self.realms.insert(id, dsc);
+        self.realms.insert(id.clone(), dsc);
+        // log::info!("Realm {}: {}", id, self.realms.get(&id).is_some());
         Ok(())
     }
 
@@ -420,9 +480,9 @@ impl MessageNodeDirect {
 }
 
 impl TryInto<DHTRouterIn> for MessageBroadcast {
-    type Error = StorageError;
+    type Error = anyhow::Error;
 
-    fn try_into(self) -> Result<DHTRouterIn, Self::Error> {
+    fn try_into(self) -> anyhow::Result<DHTRouterIn> {
         Ok(DHTRouterIn::MessageBroadcast(NetworkWrapper::wrap_yaml(
             MODULE_NAME,
             &self,
@@ -453,15 +513,14 @@ impl Sync {
 #[cfg(test)]
 mod tests {
     use flarch::data_storage::DataStorageTemp;
+    use flcrypto::access::Condition;
 
-    use crate::testing::flo::Wallet;
+    use crate::{flo::realm::Realm, testing::wallet::Wallet};
 
     use super::*;
 
-    use std::error::Error;
-
     #[test]
-    fn test_choice() -> Result<(), Box<dyn Error>> {
+    fn test_choice() -> anyhow::Result<()> {
         let our_id = NodeID::rnd();
         let mut dht = Messages::new(
             Box::new(DataStorageTemp::new()),
@@ -479,6 +538,36 @@ mod tests {
             *out.get(0).unwrap(),
             InternOut::Storage(DHTStorageOut::FloValue((realm.flo().clone(), vec![])))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn serialize() -> anyhow::Result<()> {
+        let fr = FloRealm::from_type(
+            RealmID::rnd(),
+            Condition::Pass,
+            Realm::new(
+                "root".into(),
+                RealmConfig {
+                    max_space: 1000,
+                    max_flo_size: 1000,
+                },
+            ),
+            &[],
+        )?;
+
+        let out = NetworkWrapper::wrap_yaml(
+            MODULE_NAME,
+            &MessageNodeDirect::FloValue((fr.flo().clone(), vec![])),
+        )
+        .unwrap();
+
+        if let MessageNodeDirect::FloValue(flo) = out.unwrap_yaml(MODULE_NAME).unwrap() {
+            let fr2 = TryInto::<FloRealm>::try_into(flo.0)?;
+            assert_eq!(fr, fr2);
+        } else {
+            return Err(anyhow::anyhow!("Didn't find message"));
+        }
         Ok(())
     }
 }

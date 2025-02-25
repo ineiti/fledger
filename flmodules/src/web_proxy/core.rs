@@ -104,7 +104,7 @@ pub enum WebProxyStorageSave {
 }
 
 impl WebProxyStorageSave {
-    pub fn from_str(data: &str) -> Result<WebProxyStorage, serde_yaml::Error> {
+    pub fn from_str(data: &str) -> anyhow::Result<WebProxyStorage> {
         return Ok(serde_yaml::from_str::<WebProxyStorageSave>(data)?.to_latest());
     }
 
@@ -140,8 +140,10 @@ pub struct WebProxyStorage {
 }
 
 impl WebProxyStorage {
-    pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
-        serde_yaml::to_string::<WebProxyStorageSave>(&WebProxyStorageSave::V1(self.clone()))
+    pub fn to_yaml(&self) -> anyhow::Result<String> {
+        Ok(serde_yaml::to_string::<WebProxyStorageSave>(
+            &WebProxyStorageSave::V1(self.clone()),
+        )?)
     }
 }
 

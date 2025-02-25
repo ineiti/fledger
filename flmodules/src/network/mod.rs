@@ -53,7 +53,7 @@
 //!
 //! ```bash
 //! // The server waits for connections by the clients and prints the messages received.
-//! async fn server() -> Result<(), BrokerError> {
+//! async fn server() -> anyhow::Result<()> {
 //!     // Create a random node-configuration. It uses serde for easy serialization.
 //!     let nc = flmodules::network::config::NodeConfig::new();
 //!     // Connect to the signalling server and wait for connection requests.
@@ -75,7 +75,7 @@
 //!
 //! ```bash
 //! // A client sends a single message to a server and then disconnects.
-//! async fn client(server_id: &str) -> Result<(), BrokerError> {
+//! async fn client(server_id: &str) -> anyhow::Result<()> {
 //!     // Create a random node-configuration. It uses serde for easy serialization.
 //!     let nc = flmodules::network::config::NodeConfig::new();
 //!     // Connect to the signalling server and wait for connection requests.
@@ -204,14 +204,14 @@ pub enum NetworkSetupError {
 /// # Example
 ///
 /// ```bash
-/// async fn start_network() -> Result<(), NetworkSetupError>{
+/// async fn start_network() -> anyhow::Result<()>{
 ///   let net = network_broker_start();
 /// }
 /// ```
 pub async fn network_start(
     node: NodeConfig,
     connection: ConnectionConfig,
-) -> Result<Network, NetworkSetupError> {
+) -> anyhow::Result<Network> {
     use crate::network::broker::Network;
 
     let ws = WebSocketClient::connect(&connection.signal()).await?;
@@ -228,7 +228,7 @@ pub async fn network_start(
 pub async fn network_webrtc_start(
     node: NodeConfig,
     connection: ConnectionConfig,
-) -> Result<broker::NetworkWebRTC, NetworkSetupError> {
+) -> anyhow::Result<broker::NetworkWebRTC> {
     let net = network_start(node, connection).await?;
     Ok(broker::NetworkWebRTC::start(net.broker).await?)
 }

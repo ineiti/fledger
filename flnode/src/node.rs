@@ -96,7 +96,7 @@ impl Node {
         storage: Box<dyn DataStorage + Send>,
         node_config: NodeConfig,
         broker_net: BrokerNetwork,
-    ) -> Result<Self, NodeError> {
+    ) -> anyhow::Result<Self> {
         info!(
             "Starting node: {} = {}",
             node_config.info.name,
@@ -192,7 +192,7 @@ impl Node {
     }
 
     /// Requests a list of all connected nodes
-    pub async fn request_list(&mut self) -> Result<(), NodeError> {
+    pub async fn request_list(&mut self) -> anyhow::Result<()> {
         self.broker_net
             .emit_msg_in(NetworkIn::WSUpdateListRequest)?;
         Ok(())
@@ -200,31 +200,31 @@ impl Node {
 
     /// Returns all NodeInfos that are stored locally. All ids that do not have a
     /// corresponding NodeInfo in the local storage are dropped.
-    pub fn nodes_info(&self, ids: Vec<NodeID>) -> Result<Vec<NodeInfo>, NodeError> {
+    pub fn nodes_info(&self, ids: Vec<NodeID>) -> anyhow::Result<Vec<NodeInfo>> {
         let mut nodeinfos = self.nodes_info_all()?;
         Ok(ids.iter().filter_map(|id| nodeinfos.remove(&id)).collect())
     }
 
     /// Gets the current list of connected nodes - these are the nodes that this node is
     /// currently connected to, and can be shorter than the list of all nodes in the system.
-    pub fn nodes_connected(&self) -> Result<Vec<NodeInfo>, NodeError> {
+    pub fn nodes_connected(&self) -> anyhow::Result<Vec<NodeInfo>> {
         if let Some(r) = self.random.as_ref() {
             return self.nodes_info(r.storage.borrow().connected.get_nodes().0);
         }
-        Err(NodeError::Missing("Random".into()))
+        Err(NodeError::Missing("Random".into()).into())
     }
 
     /// Returns all currently online nodes in the whole system. Every node will only connect
     /// to a subset of these nodes, which can be get with `nodes_connected`.
-    pub fn nodes_online(&self) -> Result<Vec<NodeInfo>, NodeError> {
+    pub fn nodes_online(&self) -> anyhow::Result<Vec<NodeInfo>> {
         if let Some(r) = self.random.as_ref() {
             return self.nodes_info(r.storage.borrow().known.0.clone());
         }
-        Err(NodeError::Missing("Random".into()))
+        Err(NodeError::Missing("Random".into()).into())
     }
 
     /// Returns a list of known nodes from the local storage
-    pub fn nodes_info_all(&self) -> Result<HashMap<NodeID, NodeInfo>, NodeError> {
+    pub fn nodes_info_all(&self) -> anyhow::Result<HashMap<NodeID, NodeInfo>> {
         if let Some(g) = self.gossip.as_ref() {
             let events = g.events(Category::NodeInfo);
 
@@ -240,12 +240,12 @@ impl Node {
             }
             Ok(nodeinfos)
         } else {
-            Err(NodeError::Missing("Gossip".into()))
+            Err(NodeError::Missing("Gossip".into()).into())
         }
     }
 
     /// Adds a new chat message that will be broadcasted to the system.
-    pub async fn add_chat_message(&mut self, msg: String) -> Result<(), NodeError> {
+    pub async fn add_chat_message(&mut self, msg: String) -> anyhow::Result<()> {
         if let Some(g) = self.gossip.as_mut() {
             let event = core::Event {
                 category: core::Category::TextMessage,
@@ -256,14 +256,14 @@ impl Node {
             g.add_event(event).await?;
             Ok(())
         } else {
-            Err(NodeError::Missing("Gossip".into()))
+            Err(NodeError::Missing("Gossip".into()).into())
         }
     }
 
     /// Static method
 
     /// Fetches the config
-    pub fn get_config(storage: Box<dyn DataStorage>) -> Result<NodeConfig, NodeError> {
+    pub fn get_config(storage: Box<dyn DataStorage>) -> anyhow::Result<NodeConfig> {
         let config_str = match storage.get(STORAGE_CONFIG) {
             Ok(s) => s,
             Err(_) => {
@@ -287,7 +287,7 @@ impl Node {
     }
 
     /// Updates the config of the node
-    pub fn set_config(mut storage: Box<dyn DataStorage>, config: &str) -> Result<(), NodeError> {
+    pub fn set_config(mut storage: Box<dyn DataStorage>, config: &str) -> anyhow::Result<()> {
         storage.set(STORAGE_CONFIG, config)?;
         Ok(())
     }
@@ -304,7 +304,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_storage() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_storage() -> anyhow::Result<()> {
         start_logging();
 
         let storage = DataStorageTemp::new();
@@ -336,7 +336,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_store_node() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_store_node() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
 
         let mut node = Node::start(

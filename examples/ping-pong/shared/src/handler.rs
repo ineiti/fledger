@@ -1,5 +1,5 @@
 use flarch::{
-    broker::{Broker, BrokerError, SubsystemHandler},
+    broker::{Broker, SubsystemHandler},
     nodeids::{NodeID, U256},
     platform_async_trait,
 };
@@ -31,7 +31,7 @@ impl PingPong {
     pub async fn new(
         id: U256,
         net: BrokerNetwork,
-    ) -> Result<Broker<PingPongIn, PingPongOut>, BrokerError> {
+    ) -> anyhow::Result<Broker<PingPongIn, PingPongOut>> {
         let mut pp_broker = Broker::new();
         // Interpret network messages and wrap relevant messages to ourselves.
         pp_broker
@@ -123,7 +123,7 @@ mod test {
     use std::time::Duration;
 
     use flarch::{broker::Destination, start_logging};
-    use flmodules::network::{broker::NetworkOut, NetworkSetupError};
+    use flmodules::network::broker::NetworkOut;
     use flmodules::nodeconfig::NodeConfig;
     use flmodules::testing::network_simul::{NetworkSimul, RouterNode};
 
@@ -138,7 +138,7 @@ mod test {
     // left: FromNetwork(c52bea62dddd2f42-659253603d78279c-ea7f42654af68f7a-b5c8b6ad272a30ed, Ping)
     // right: Tick
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-    async fn test_ping() -> Result<(), NetworkSetupError> {
+    async fn test_ping() -> anyhow::Result<()> {
         start_logging();
 
         let nc_src = NodeConfig::new();
@@ -193,7 +193,7 @@ mod test {
     // Test a simulation of two nodes with the NetworkBrokerSimul
     // and run for 3 rounds.
     #[tokio::test]
-    async fn test_network() -> Result<(), NetworkSetupError> {
+    async fn test_network() -> anyhow::Result<()> {
         start_logging();
 
         let mut simul = NetworkSimul::new().await?;

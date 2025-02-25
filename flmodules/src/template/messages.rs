@@ -133,14 +133,12 @@ impl SubsystemHandler<TemplateIn, TemplateOut> for Messages {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use flarch::data_storage::DataStorageTemp;
 
     use super::*;
 
     #[test]
-    fn test_messages() -> Result<(), Box<dyn Error>> {
+    fn test_messages() -> anyhow::Result<()> {
         let ids = NodeIDs::new(2);
         let id0 = *ids.0.get(0).unwrap();
         let id1 = *ids.0.get(1).unwrap();

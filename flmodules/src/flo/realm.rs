@@ -1,15 +1,13 @@
 use std::collections::HashMap;
 
 use flarch::nodeids::U256;
+use flcrypto::{access::Condition, signer::Signer};
 use flmacro::AsU256;
 use serde::{Deserialize, Serialize};
 
 use crate::dht_storage::core::RealmConfig;
 
-use super::{
-    crypto::Rules,
-    flo::{Flo, FloError, FloID, FloWrapper},
-};
+use super::flo::{Flo, FloID, FloWrapper};
 
 pub type FloRealm = FloWrapper<Realm>;
 
@@ -53,8 +51,19 @@ impl Realm {
 }
 
 impl FloRealm {
-    pub fn new(name: &str, rules: Rules, config: RealmConfig) -> Result<Self, FloError> {
-        Flo::new_realm(rules, &Realm::new(name.into(), config))?.try_into()
+    pub fn new(
+        name: &str,
+        cond: Condition,
+        config: RealmConfig,
+        signers: &[&Signer],
+    ) -> anyhow::Result<Self> {
+        Flo::new_realm(cond, &Realm::new(name.into(), config), signers)?.try_into()
+    }
+}
+
+impl RealmID {
+    pub fn global_id(&self, fid: FloID) -> GlobalID {
+        GlobalID::new(self.clone(), fid)
     }
 }
 
@@ -62,13 +71,6 @@ impl GlobalID {
     pub fn new(realm: RealmID, flo: FloID) -> Self {
         Self(realm, flo)
     }
-
-    // pub fn node_id(&self) -> NodeID {
-    //     NodeID::hash_domain_parts(
-    //         "re.fledg.flmodules.flo.global_id",
-    //         &[self.0.as_ref(), self.1.as_ref()],
-    //     )
-    // }
 
     pub fn realm_id(&self) -> &RealmID {
         &self.0
@@ -88,5 +90,48 @@ impl From<&RealmID> for GlobalID {
 impl Default for RealmID {
     fn default() -> Self {
         RealmID::zero()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use flarch::start_logging_filter_level;
+    use flcrypto::{signer::SignerTrait, signer_ed25519::SignerEd25519, tofrombytes::ToFromBytes};
+
+    use super::*;
+
+    #[test]
+    fn serialize() -> anyhow::Result<()> {
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+
+        let realm = Realm::new(
+            "root".into(),
+            RealmConfig {
+                max_space: 1000,
+                max_flo_size: 1000,
+            },
+        );
+        let signer = SignerEd25519::new();
+        let cond = Condition::Verifier(signer.verifier());
+        let fr = FloRealm::from_type(RealmID::rnd(), cond.clone(), realm, &[&signer])?;
+        let fr2 = fr.edit_data_signers(
+            cond,
+            |realm| realm.set_service("http", FloID::rnd()),
+            &[&signer],
+        )?;
+
+        let realm_vec = rmp_serde::to_vec(fr2.cache())?;
+        let realm_copy = rmp_serde::from_slice::<Realm>(&realm_vec)?;
+        assert_eq!(fr2.cache(), &realm_copy);
+
+        let realm_vec = fr2.cache().to_rmp_bytes();
+        let realm_copy = Realm::from_rmp_bytes("name", &realm_vec)?;
+        assert_eq!(fr2.cache(), &realm_copy);
+
+        let flo2_str = serde_yaml::to_string(&fr2.flo())?;
+        let fr2_flo: Flo = serde_yaml::from_str(&flo2_str)?;
+        let fr3 = TryInto::<FloRealm>::try_into(fr2_flo)?;
+        assert_eq!(fr2, fr3);
+        Ok(())
     }
 }

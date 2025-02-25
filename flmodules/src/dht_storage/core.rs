@@ -58,8 +58,10 @@ pub type FloCuckoo = (Flo, Vec<FloID>);
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 pub struct FloConfig {
-    // Linking a Flo to a foreign flo - how long and to whom it links.
+    /// Linking a Flo to a foreign flo - how long and to whom it links.
     pub cuckoo: Cuckoo,
+    /// Force the ID of the flow to be calculated using this hash.
+    pub force_id: Option<U256>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -111,7 +113,7 @@ pub enum CoreError {
 }
 
 impl RealmStorage {
-    pub fn new(dht_config: DHTConfig, root: NodeID, realm: FloRealm) -> Result<Self, CoreError> {
+    pub fn new(dht_config: DHTConfig, root: NodeID, realm: FloRealm) -> anyhow::Result<Self> {
         let realm_config = realm.cache().get_config();
         let realm_id = realm.flo().realm_id();
         let mut s = Self {
@@ -136,7 +138,7 @@ impl RealmStorage {
     pub fn get_cuckoo_ids(&self, key: &FloID) -> Option<Vec<FloID>> {
         self.flos
             .get(key)
-            .map(|dbs| dbs.cuckoos.iter().cloned().collect())
+            .map(|fs| fs.cuckoos.iter().cloned().collect())
     }
 
     pub fn get_flo_metas(&self) -> Vec<FloMeta> {
@@ -150,6 +152,11 @@ impl RealmStorage {
             .collect()
     }
 
+    pub fn store_cuckoo_ids(&mut self, parent: &FloID, cuckoos: Vec<FloID>) {
+        for cuckoo in cuckoos {
+            self.store_cuckoo_id(parent, cuckoo);
+        }
+    }
     pub fn store_cuckoo_id(&mut self, parent: &FloID, cuckoo: FloID) {
         self.flos
             .get_mut(parent)
@@ -174,7 +181,7 @@ impl RealmStorage {
 
     pub fn upsert_flo(&mut self, flo: Flo) -> bool {
         if flo.size() as u64 * 3 > self.realm_config.max_space {
-            log::debug!(
+            log::warn!(
                 "Cannot store flo of size {} > max_space({}) / 3",
                 flo.size(),
                 self.realm_config.max_space
@@ -203,14 +210,6 @@ impl RealmStorage {
         }
         updated
     }
-
-    // pub fn upsert_flo_cuckoo(&mut self, fc: FloCuckoo) -> bool {
-    //     let fid = fc.0.flo_id();
-    //     let updated = self.upsert_flo(fc.0);
-    //     fc.1.into_iter()
-    //         .for_each(|id| self.store_cuckoo_id(&fid, id));
-    //     updated
-    // }
 
     fn put(&mut self, flo: Flo) {
         let id = flo.flo_id();
@@ -247,11 +246,11 @@ impl RealmStorage {
             .distances
             .iter()
             .filter_map(|(dist, flos)| {
-                if flos.contains(not_delete) {
-                    flos.len() > 1
-                } else {
-                    flos.len() > 0
-                }
+                (flos
+                    .iter()
+                    .filter(|&id| id != not_delete && **id != *self.realm_id)
+                    .count()
+                    > 0)
                 .then(|| dist)
             })
             .sorted()
@@ -263,7 +262,7 @@ impl RealmStorage {
                 .get(furthest)
                 .and_then(|ids| {
                     ids.iter()
-                        .filter(|&id| id != not_delete)
+                        .filter(|&id| id != not_delete && **id != *self.realm_id)
                         .collect::<Vec<&FloID>>()
                         .first()
                         .cloned()
@@ -334,44 +333,47 @@ impl FloConfig {
 /// work the way you want them to.
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, str::FromStr};
+    use std::str::FromStr;
 
     use flarch::start_logging_filter_level;
     use flcrypto::access::Condition;
 
-    use crate::flo::{
-        blob::{Blob, FloBlob},
-        crypto::Rules,
-    };
+    use crate::flo::blob::{Blob, FloBlob};
 
     use super::*;
 
-    // use crate::flo::testing::{new_ace, new_dht_flo_depth};
-    // use flcrypto::access::Version;
-
     #[test]
-    fn test_cuckoo() -> Result<(), Box<dyn Error>> {
+    fn test_cuckoo() -> anyhow::Result<()> {
         let root = U256::from_str("00").unwrap();
         let fr = FloRealm::new(
             "root",
-            crate::flo::crypto::Rules::None,
+            Condition::Fail,
             RealmConfig {
                 max_space: 1000000,
                 max_flo_size: 1000,
             },
+            &[],
         )?;
         let rid = fr.realm_id();
         let mut storage = RealmStorage::new(DHTConfig::default(), root.into(), fr.clone())?;
 
         let data = &("".to_string());
-        let fp = Flo::new(rid.clone(), Rules::None, data, FloConfig::default())?;
-        let fp_cuckoo = Flo::new(
+        let fp = Flo::new_signer(
             rid.clone(),
-            Rules::None,
+            Condition::Fail,
+            data,
+            FloConfig::default(),
+            &[],
+        )?;
+        let fp_cuckoo = Flo::new_signer(
+            rid.clone(),
+            Condition::Fail,
             data,
             FloConfig {
                 cuckoo: Cuckoo::Parent(fp.flo_id()),
+                force_id: None,
             },
+            &[],
         )?;
         storage.put(fp.clone().into());
         storage.put(fp_cuckoo.into());
@@ -382,8 +384,14 @@ mod tests {
 
     fn get_flo_depth(root: &NodeID, rid: &RealmID, depth: usize) -> Flo {
         loop {
-            let flo =
-                Flo::new(rid.clone(), Rules::None, &U256::rnd(), FloConfig::default()).unwrap();
+            let flo = Flo::new_signer(
+                rid.clone(),
+                Condition::Fail,
+                &U256::zero(),
+                FloConfig::default(),
+                &[],
+            )
+            .unwrap();
             let nd = KNode::get_depth(root, *flo.flo_id());
             if nd == depth {
                 return flo;
@@ -391,25 +399,49 @@ mod tests {
         }
     }
 
+    fn get_realm_depth(root: &NodeID, depth: usize) -> FloRealm {
+        loop {
+            let fr = FloRealm::new(
+                "root".into(),
+                Condition::Fail,
+                RealmConfig {
+                    max_space: 1000,
+                    max_flo_size: 1000,
+                },
+                &[],
+            )
+            .unwrap();
+            let nd = KNode::get_depth(root, *fr.flo_id());
+            if nd == depth {
+                return fr;
+            }
+        }
+    }
+
     #[test]
-    fn test_furthest() -> Result<(), Box<dyn Error>> {
-        start_logging_filter_level(vec![], log::LevelFilter::Info);
-        let root = U256::from_str("00").unwrap();
-        let realm = FloRealm::new(
-            "name",
-            Rules::None,
-            RealmConfig {
-                max_space: 1e6 as u64,
-                max_flo_size: 1e6 as u32,
-            },
-        )?;
+    fn test_furthest() -> anyhow::Result<()> {
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        let root = U256::from_str("00")?;
+        let realm = get_realm_depth(&root, 0);
         let rid = realm.realm_id();
-        let mut storage = RealmStorage::new(DHTConfig::default(), root, realm)?;
+        let mut storage = RealmStorage::new(DHTConfig::default(), root, realm.clone())?;
+        assert_eq!(1, storage.distances.len());
+        log::info!(
+            "{} / {} / {:?}",
+            realm.flo_id(),
+            storage.realm_id,
+            storage.distances
+        );
+        assert_eq!(1, storage.distances[&0].len());
+
         let _flos1: Vec<Flo> = (1..=3)
             .map(|i| get_flo_depth(&root, &rid, i))
             .inspect(|flo| storage.put(flo.clone()))
             .collect();
 
+        // The FloRealm is stored at distance 0.
+        // This is the worst case, as the FloRealm would be evicted as the farthest Flo,
+        // if the logic in remove_furthest is wrong.
         assert_eq!(4, storage.distances.len());
         assert_eq!(4, storage.flos.len());
         let size = storage.size;
@@ -420,7 +452,6 @@ mod tests {
             .collect();
 
         assert_eq!(4, storage.distances.len());
-        assert_eq!(1, storage.distances.get(&0).unwrap().len());
         assert_eq!(2, storage.distances.get(&1).unwrap().len());
         assert_eq!(2, storage.distances.get(&2).unwrap().len());
         assert_eq!(2, storage.distances.get(&3).unwrap().len());
@@ -430,8 +461,7 @@ mod tests {
 
         storage.remove_furthest(&root.into());
         assert_eq!(4, storage.distances.len());
-        assert_eq!(0, storage.distances.get(&0).unwrap().len());
-        assert_eq!(2, storage.distances.get(&1).unwrap().len());
+        assert_eq!(1, storage.distances.get(&1).unwrap().len());
         assert_eq!(2, storage.distances.get(&2).unwrap().len());
         assert_eq!(2, storage.distances.get(&3).unwrap().len());
         assert_eq!(6, storage.flos.len());
@@ -440,18 +470,17 @@ mod tests {
 
         storage.remove_furthest(&root.into());
         assert_eq!(4, storage.distances.len());
-        assert_eq!(0, storage.distances.get(&0).unwrap().len());
-        assert_eq!(1, storage.distances.get(&1).unwrap().len());
+        assert_eq!(0, storage.distances.get(&1).unwrap().len());
         assert_eq!(2, storage.distances.get(&2).unwrap().len());
         assert_eq!(2, storage.distances.get(&3).unwrap().len());
         assert_eq!(5, storage.flos.len());
         assert!(storage.size < size);
+        let size = storage.size;
 
         storage.remove_furthest(&root.into());
         assert_eq!(4, storage.distances.len());
-        assert_eq!(0, storage.distances.get(&0).unwrap().len());
         assert_eq!(0, storage.distances.get(&1).unwrap().len());
-        assert_eq!(2, storage.distances.get(&2).unwrap().len());
+        assert_eq!(1, storage.distances.get(&2).unwrap().len());
         assert_eq!(2, storage.distances.get(&3).unwrap().len());
         assert_eq!(4, storage.flos.len());
         assert!(storage.size < size);
@@ -460,26 +489,23 @@ mod tests {
     }
 
     #[test]
-    fn test_update() -> Result<(), Box<dyn Error>> {
+    fn test_update() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
 
         let root = U256::from_str("00").unwrap();
         let realm = FloRealm::new(
             "name",
-            Rules::None,
+            Condition::Fail,
             RealmConfig {
                 max_space: 1e6 as u64,
                 max_flo_size: 1e6 as u32,
             },
+            &[],
         )?;
         let rid = realm.realm_id();
         let mut storage = RealmStorage::new(DHTConfig::default(), root, realm)?;
 
-        let mut fw = FloBlob::from_type(
-            rid.clone(),
-            Rules::Update(Condition::Pass),
-            Blob::new("test"),
-        )?;
+        let fw = FloBlob::from_type(rid.clone(), Condition::Pass, Blob::new("test"), &[])?;
         storage.put(fw.flo().clone());
 
         let fid = fw.flo_id();
@@ -491,15 +517,10 @@ mod tests {
                 cuckoos: 0,
             }])
         );
-        fw.edit_sign_update(
-            |b| b.set_path("path"),
-            Condition::Pass,
-            Rules::Update(Condition::Pass),
-            vec![],
-            &[],
-        )?;
 
-        assert!(storage.upsert_flo(fw.into()));
+        let fw2 = fw.edit_data_signers(Condition::Pass, |b| b.set_path("path"), &[])?;
+
+        assert!(storage.upsert_flo(fw2.into()));
         assert_eq!(
             None,
             storage.sync_available(&vec![FloMeta {

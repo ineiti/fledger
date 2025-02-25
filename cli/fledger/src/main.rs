@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use clap::{Parser, Subcommand};
 
 use flarch::{
@@ -7,10 +5,10 @@ use flarch::{
     tasks::wait_ms,
     web_rtc::connection::{ConnectionConfig, HostLogin, Login},
 };
-use flcrypto::access::Condition;
+use flcrypto::{access::Condition, signer::SignerTrait};
 use flmodules::{
     dht_storage::core::RealmConfig,
-    flo::{crypto::Rules, realm::FloRealm},
+    flo::realm::FloRealm,
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
@@ -93,7 +91,7 @@ enum RealmCommands {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let mut logger = env_logger::Builder::new();
@@ -143,18 +141,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     max_flo_size,
                 } => {
                     log::info!("{name} / {max_space:?} / {max_flo_size:?}");
+                    let signer = node.crypto_storage.get_signer();
                     let fr = FloRealm::new(
                         name,
-                        Rules::Update(Condition::Verifier(
-                            node.crypto_storage
-                                .get_signer()
-                                .verifier()
-                                .get_id(),
-                        )),
+                        Condition::Verifier(signer.verifier()),
                         RealmConfig {
                             max_space: max_space.unwrap_or(1000000),
                             max_flo_size: max_flo_size.unwrap_or(10000),
                         },
+                        &[&signer],
                     )?;
 
                     log::info!("Connecting to other nodes");
@@ -176,7 +171,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn list_realms(mut node: Node, args: Args) -> Result<(), Box<dyn Error>> {
+async fn list_realms(mut node: Node, args: Args) -> anyhow::Result<()> {
     let mut ds = node.dht_storage.as_mut().expect("Need DHT-Storage").clone();
     log::info!("Waiting for update of data");
     loop_node(&mut node, Some(&args), Some(20)).await?;
@@ -204,7 +199,7 @@ async fn loop_node(
     node: &mut Node,
     args: Option<&Args>,
     max_count: Option<u32>,
-) -> Result<(), Box<dyn Error>> {
+) -> anyhow::Result<()> {
     let mut i: u32 = 0;
     node.broker_net
         .emit_msg_in(NetworkIn::WSUpdateListRequest)?;
@@ -226,7 +221,7 @@ async fn loop_node(
 }
 
 impl Args {
-    async fn log(&self, i: u32, node: &mut Node) -> Result<(), Box<dyn Error>> {
+    async fn log(&self, i: u32, node: &mut Node) -> anyhow::Result<()> {
         if i % self.log_freq == self.log_freq - 1 {
             if self.log_random {
                 log::info!(

@@ -110,7 +110,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_storage() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_storage() -> anyhow::Result<()> {
         let mut ds = DataStorageTemp::new();
         ds.set("two", "three")?;
 

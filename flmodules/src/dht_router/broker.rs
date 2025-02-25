@@ -1,7 +1,4 @@
-use flarch::{
-    broker::{Broker, BrokerError},
-    nodeids::U256,
-};
+use flarch::{broker::Broker, nodeids::U256};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
@@ -13,7 +10,7 @@ use flarch::nodeids::NodeID;
 
 use super::{
     kademlia::Config,
-    messages::{Messages, InternIn, InternOut, Stats},
+    messages::{InternIn, InternOut, Messages, Stats},
 };
 
 pub(super) const MODULE_NAME: &str = "DHTRouter";
@@ -59,7 +56,7 @@ impl DHTRouter {
         router: BrokerRouter,
         tick: &mut Timer,
         config: Config,
-    ) -> Result<Self, BrokerError> {
+    ) -> anyhow::Result<Self> {
         let (messages, stats) = Messages::new(our_id, config);
         let mut intern = Broker::new();
         intern.add_handler(Box::new(messages)).await?;
@@ -93,7 +90,7 @@ impl DHTRouter {
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, str::FromStr};
+    use std::str::FromStr;
 
     use flarch::{start_logging_filter_level, tasks::wait_ms};
 
@@ -106,7 +103,7 @@ mod tests {
     const LOG_LVL: log::LevelFilter = log::LevelFilter::Info;
 
     #[tokio::test]
-    async fn test_routing() -> Result<(), Box<dyn Error>> {
+    async fn test_routing() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], LOG_LVL);
 
         let mut tick = Timer::simul();
@@ -136,7 +133,7 @@ mod tests {
         }
 
         log::info!("After for");
-        
+
         for mut net in router_nets {
             net.settle_msg_out(RouterOut::NodeInfoAvailable(node_infos.clone()))
                 .await?;
@@ -192,7 +189,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_nodes() -> Result<(), Box<dyn Error>> {
+    async fn test_update_nodes() -> anyhow::Result<()> {
         start_logging_filter_level(vec!["flmodules"], log::LevelFilter::Info);
 
         let mut tick = Timer::simul();
@@ -220,6 +217,8 @@ mod tests {
         }
         wait_ms(1000).await;
 
+        // TODO implement rest of test - I have no idea what was here :(
+        
         Ok(())
     }
 }

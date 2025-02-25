@@ -79,7 +79,7 @@ pub enum WebRTCOutput {
 /// or an outgoing connection.
 pub type WebRTCSpawner = Box<
     dyn Fn() -> Box<
-            dyn Future<Output = Result<Broker<WebRTCInput, WebRTCOutput>, SetupError>>
+            dyn Future<Output = anyhow::Result<Broker<WebRTCInput, WebRTCOutput>>>
                 + Unpin
                 + Send,
         > + Send
@@ -89,7 +89,7 @@ pub type WebRTCSpawner = Box<
 /// The spawner will create a new [`Broker<WebRTCInput, WebRTCOutput>`] ready to handle either an incoing
 /// or an outgoing connection.
 pub type WebRTCSpawner =
-    Box<dyn Fn() -> Box<dyn Future<Output = Result<Broker<WebRTCInput, WebRTCOutput>, SetupError>> + Unpin>>;
+    Box<dyn Fn() -> Box<dyn Future<Output = anyhow::Result<Broker<WebRTCInput, WebRTCOutput>>> + Unpin>>;
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 /// How the current connection is being setup.

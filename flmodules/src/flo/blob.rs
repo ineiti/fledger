@@ -2,16 +2,13 @@ use std::collections::HashMap;
 
 use bytes::Bytes;
 use flarch::nodeids::U256;
+use flcrypto::{access::Condition, signer::Signer};
 use flmacro::AsU256;
 use serde::{Deserialize, Serialize};
 
 use crate::dht_storage::core::Cuckoo;
 
-use super::{
-    crypto::Rules,
-    flo::{FloError, FloWrapper},
-    realm::RealmID,
-};
+use super::{flo::FloWrapper, realm::RealmID};
 
 #[derive(AsU256, Serialize, Deserialize, Clone)]
 pub struct BlobID(U256);
@@ -39,28 +36,30 @@ pub type FloBlobTag = FloWrapper<BlobTag>;
 impl FloBlobPage {
     pub fn new(
         realm: RealmID,
-        rules: Rules,
+        cond: Condition,
         path: &str,
         index: Bytes,
         parent: Option<BlobID>,
-    ) -> Result<Self, FloError> {
-        Self::new_cuckoo(realm, rules, path, index, parent, Cuckoo::None)
+        signers: &[&Signer],
+    ) -> anyhow::Result<Self> {
+        Self::new_cuckoo(realm, cond, path, index, parent, Cuckoo::None, signers)
     }
 
     pub fn new_cuckoo(
         realm: RealmID,
-        rules: Rules,
+        cond: Condition,
         path: &str,
         index: Bytes,
         parent: Option<BlobID>,
         cuckoo: Cuckoo,
-    ) -> Result<Self, FloError> {
+        signers: &[&Signer],
+    ) -> anyhow::Result<Self> {
         let links = parent
             .map(|p| [("parent".to_string(), vec![p])].into_iter().collect())
             .unwrap_or(HashMap::new());
         Self::from_type_cuckoo(
             realm,
-            rules,
+            cond,
             cuckoo,
             BlobPage(Blob {
                 blob_type: "re.fledg.page".into(),
@@ -68,6 +67,7 @@ impl FloBlobPage {
                 datas: [("index.html".to_string(), index)].into(),
                 values: [("path".to_string(), path.into())].into(),
             }),
+            signers,
         )
     }
 }
@@ -75,26 +75,28 @@ impl FloBlobPage {
 impl FloBlobTag {
     pub fn new(
         realm: RealmID,
-        rules: Rules,
+        cond: Condition,
         name: &str,
         parent: Option<BlobID>,
-    ) -> Result<Self, FloError> {
-        Self::new_cuckoo(realm, rules, name, parent, Cuckoo::None)
+        signers: &[&Signer],
+    ) -> anyhow::Result<Self> {
+        Self::new_cuckoo(realm, cond, name, parent, Cuckoo::None, signers)
     }
 
     pub fn new_cuckoo(
         realm: RealmID,
-        rules: Rules,
+        cond: Condition,
         name: &str,
         parent: Option<BlobID>,
         cuckoo: Cuckoo,
-    ) -> Result<Self, FloError> {
+        signers: &[&Signer],
+    ) -> anyhow::Result<Self> {
         let links = parent
             .map(|p| [("parent".to_string(), vec![p])].into_iter().collect())
             .unwrap_or(HashMap::new());
         Self::from_type_cuckoo(
             realm,
-            rules,
+            cond,
             cuckoo,
             BlobTag(Blob {
                 blob_type: "re.fledg.tag".into(),
@@ -102,6 +104,7 @@ impl FloBlobTag {
                 datas: HashMap::new(),
                 values: [("name".to_string(), name.into())].into(),
             }),
+            signers,
         )
     }
 }
@@ -115,12 +118,21 @@ impl Blob {
             datas: HashMap::new(),
         }
     }
+
     pub fn set_parents(&mut self, parents: Vec<BlobID>) {
         self.links.insert("parent".into(), parents);
     }
 
     pub fn set_path(&mut self, path: &str) {
         self.values.insert("path".into(), path.to_string());
+    }
+
+    pub fn get_parents(&mut self) -> Option<&Vec<BlobID>> {
+        self.links.get("parent")
+    }
+
+    pub fn get_path(&mut self) -> Option<&String> {
+        self.values.get("path")
     }
 }
 
@@ -200,47 +212,48 @@ impl BlobTag {
 
 #[cfg(test)]
 mod test {
-    use std::error::Error;
-
     use flcrypto::access::Condition;
 
-    use crate::{flo::crypto::FloBadge, testing::flo::Wallet};
+    use crate::{flo::crypto::FloBadge, testing::wallet::Wallet};
 
     use super::*;
 
     #[test]
-    fn test_update() -> Result<(), Box<dyn Error>> {
+    fn test_update() -> anyhow::Result<()> {
         let mut wallet = Wallet::new();
-        let badge = FloBadge::from_type(RealmID::rnd(), Rules::None, wallet.get_badge())?;
-        let mut flb = FloBlobPage::new(
+        FloBadge::from_type(
             RealmID::rnd(),
-            Rules::Update(Condition::Verifier(wallet.get_verifier().get_id())),
+            Condition::Fail,
+            wallet.get_badge(),
+            &[],
+        )?;
+        let flb = FloBlobPage::new(
+            RealmID::rnd(),
+            Condition::Verifier(wallet.get_verifier()),
             "",
             Bytes::from(""),
             None,
+            &[&wallet.get_signer()],
         )?;
-        flb.edit_sign_update(
+
+        let flb2 = flb.edit_data_signers(
+            Condition::Verifier(wallet.get_verifier()),
             |bp| bp.0.set_parents(vec![BlobID::rnd()]),
-            Condition::Verifier(wallet.get_verifier().get_id()),
-            flb.rules().clone(),
-            vec![Box::new(badge.clone())],
             &[&mut wallet.get_signer()],
         )?;
 
-        assert_eq!(1, flb.version());
+        assert_eq!(1, flb2.version());
 
-        flb.edit_sign_update(
+        let flb3 = flb2.edit_data_signers(
+            Condition::Verifier(wallet.get_verifier()),
             |bp| {
                 bp.0.datas
                     .insert("index.html".into(), "<html><h1>Root</h1></html>".into());
             },
-            Condition::Verifier(wallet.get_verifier().get_id()),
-            flb.rules().clone(),
-            vec![Box::new(badge.clone())],
             &[&mut wallet.get_signer()],
         )?;
 
-        assert_eq!(2, flb.version());
+        assert_eq!(2, flb3.version());
 
         Ok(())
     }

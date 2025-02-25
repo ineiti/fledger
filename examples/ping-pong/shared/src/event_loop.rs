@@ -3,7 +3,7 @@ use tokio::select;
 use tokio_stream::StreamExt;
 
 use flarch::{
-    broker::{BrokerError, Broker},
+    broker::Broker,
     nodeids::NodeID,
     tasks::{spawn_local, Interval},
 };
@@ -19,7 +19,7 @@ use crate::common::{PPMessageNode, PingPongIn, PingPongOut};
 pub async fn start(
     id: NodeID,
     net: BrokerNetwork,
-) -> Result<Broker<PingPongIn, PingPongOut>, BrokerError> {
+) -> anyhow::Result<Broker<PingPongIn, PingPongOut>> {
     let ret = Broker::new();
 
     let ret_clone = ret.clone();
@@ -38,7 +38,7 @@ async fn event_loop(
     id: NodeID,
     mut net: BrokerNetwork,
     mut ret: Broker<PingPongIn, PingPongOut>,
-) -> Result<(), BrokerError> {
+) -> anyhow::Result<()> {
     let (mut tap, _) = net.get_tap_out().await?;
     let mut nodes: Vec<NodeInfo> = vec![];
     let mut interval_sec = Interval::new_interval(Duration::from_secs(1));
@@ -54,11 +54,7 @@ async fn event_loop(
 }
 
 /// Requests a new list and sends a ping to all other nodes.
-fn update_list(
-    id: NodeID,
-    net: &mut BrokerNetwork,
-    nodes: &Vec<NodeInfo>,
-) -> Result<(), BrokerError> {
+fn update_list(id: NodeID, net: &mut BrokerNetwork, nodes: &Vec<NodeInfo>) -> anyhow::Result<()> {
     net.emit_msg_in(NetworkIn::WSUpdateListRequest)?;
     for node in nodes.iter() {
         if node.get_id() != id {
@@ -76,7 +72,7 @@ fn new_msg(
     net: &mut BrokerNetwork,
     ret: &mut Broker<PingPongIn, PingPongOut>,
     msg: Option<NetworkOut>,
-) -> Result<Option<Vec<NodeInfo>>, BrokerError> {
+) -> anyhow::Result<Option<Vec<NodeInfo>>> {
     if let Some(msg_tap) = msg {
         match msg_tap {
             NetworkOut::MessageFromNode(from, msg_net) => {

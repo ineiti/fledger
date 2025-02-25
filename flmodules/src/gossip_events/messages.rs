@@ -98,7 +98,7 @@ impl Messages {
     pub fn process_messages(
         &mut self,
         msgs: Vec<GossipIn>,
-    ) -> Result<Vec<GossipOut>, serde_yaml::Error> {
+    ) -> anyhow::Result<Vec<GossipOut>> {
         let mut out = vec![];
         for msg in msgs {
             out.extend(self.process_message(msg));
