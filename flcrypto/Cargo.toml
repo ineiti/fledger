@@ -2,6 +2,13 @@
 name = "flcrypto"
 version = "0.9.0"
 edition = "2021"
+authors = ["Linus Gasser <linus@gasser.blue>"]
+description = "Cryptographic package for different algorithms"
+repository = "https://github.com/ineiti/fledger"
+license = "MIT OR Apache-2.0"
+homepage = "https://fledg.re"
+readme = "README.md"
+keywords = ["cryptography", "fledger"]
 
 [features]
 testing = []
