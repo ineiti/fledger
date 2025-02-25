@@ -47,13 +47,16 @@ cargo_unused:
 		(cd $$(dirname $$cargo) && cargo +nightly udeps -q ); \
 	done
 
+publish_dry:
+	DRY=--dry-run make publish
+
 publish:
 	for crate in ${CRATES}; do \
 		CRATE_VERSION=$$(cargo search $$crate | grep "^$$crate " | sed -e "s/.*= \"\(.*\)\".*/\1/"); \
 		CARGO_VERSION=$$(grep "^version" $$crate/Cargo.toml | head -n 1 | sed -e "s/.*\"\(.*\)\".*/\1/"); \
 		if [[ "$$CRATE_VERSION" != "$$CARGO_VERSION" ]]; then \
 			echo "Publishing crate $$crate"; \
-			cargo publish --token $$CARGO_REGISTRY_TOKEN --manifest-path $$crate/Cargo.toml; \
+			cargo publish $$DRY --token $$CARGO_REGISTRY_TOKEN --manifest-path $$crate/Cargo.toml; \
 		fi; \
 	done
 
