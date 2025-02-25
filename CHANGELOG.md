@@ -6,6 +6,15 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
+## [0.9.1] - 2025-02-25
+This is for `flnode`, `flmodules`, `flmacro`
+
+### Fixed
+- correct loading of old configurations
+
+### Changed
+- using `VersionedSerde` for node configurations now
+
 ## [0.9.0] - 2025-02-24
 
 This release is mostly for the start of the student project.

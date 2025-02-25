@@ -897,7 +897,7 @@ dependencies = [
 
 [[package]]
 name = "flmacro"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -906,7 +906,7 @@ dependencies = [
 
 [[package]]
 name = "flmodules"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "async-recursion",
  "async-stream",
@@ -944,7 +944,7 @@ dependencies = [
 
 [[package]]
 name = "flnode"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "async-trait",
  "chrono",
