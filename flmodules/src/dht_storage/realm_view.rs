@@ -132,7 +132,7 @@ impl RealmView {
     pub async fn set_realm_http(
         &mut self,
         id: FloID,
-        signers: &[&dyn Signer],
+        signers: &[Signer],
     ) -> Result<(), RVError> {
         self.set_realm_service("http", id, signers).await
     }
@@ -141,14 +141,14 @@ impl RealmView {
         &mut self,
         name: &str,
         id: FloID,
-        signers: &[&dyn Signer],
+        signers: &[Signer],
     ) -> Result<(), RVError> {
         let update = self.realm.edit(|r| r.set_service(name, id));
         let mut u_s = self
             .dht_storage
             .get_update_sign(&self.realm, update, None)
             .await?;
-        for &signer in signers {
+        for signer in signers {
             u_s.sign(signer)?;
         }
         self.realm.apply_update(u_s)?;
@@ -184,7 +184,7 @@ impl RealmView {
     pub async fn set_realm_tag(
         &mut self,
         id: FloID,
-        signers: &[&dyn Signer],
+        signers: &[Signer],
     ) -> Result<(), RVError> {
         self.set_realm_service("tag", id, signers).await
     }

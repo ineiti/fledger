@@ -314,20 +314,16 @@ pub fn target_send(_attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     if let Ok(input_type) = syn::parse::<ItemType>(input.clone()) {
-        #[cfg(all(target_family = "unix", not(feature = "node")))]
-        {
-            let mut type_as_string = quote! {#input_type}.to_string();
-            type_as_string.insert_str(type_as_string.len() - 3, " + Send".into());
-            let modified_type: syn::ItemType =
-                syn::parse_str(&type_as_string).expect("Failed to parse modified type");
+        let mut type_as_string = quote! {#input_type}.to_string();
+        type_as_string.insert_str(type_as_string.len() - 3, " + Send".into());
+        let modified_type: syn::ItemType =
+            syn::parse_str(&type_as_string).expect("Failed to parse modified type");
 
-            return quote! {
-                #modified_type
-            }
-            .into();
-        }
-        #[cfg(all(any(target_family = "unix"), feature = "node"))]
         return quote! {
+            #[cfg(target_family = "unix")]
+            #modified_type
+
+            #[cfg(target_family = "wasm")]
             #input_type
         }
         .into();

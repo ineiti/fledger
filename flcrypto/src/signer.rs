@@ -1,8 +1,10 @@
 use bytes::Bytes;
-use flarch::{broker::asy::Async, nodeids::U256};
+use flarch::nodeids::U256;
 use flmacro::AsU256;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use crate::signer_ed25519::{SignerEd25519, VerifierEd25519};
 
 pub type Signature = Bytes;
 
@@ -19,34 +21,46 @@ pub enum SignerError {
 #[derive(AsU256, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct KeyPairID(U256);
 
-#[typetag::serde(tag = "type")]
-pub trait Signer: std::fmt::Debug {
-    fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError>;
-
-    fn verifier(&self) -> Box<dyn Verifier>;
-
-    fn get_id(&self) -> KeyPairID;
-
-    fn clone(&self) -> Box<dyn Signer>;
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum Signer {
+    Ed25519(SignerEd25519),
 }
 
-#[typetag::serde(tag = "type")]
-pub trait Verifier: std::fmt::Debug + Async {
-    fn verify(&self, msg: &Bytes, sig: &Bytes) -> Result<(), SignerError>;
+impl Signer {
+    pub fn sign(&self, msg: &Bytes) -> Result<Signature, SignerError> {
+        match self {
+            Signer::Ed25519(sig) => sig.sign(msg),
+        }
+    }
 
-    fn get_id(&self) -> KeyPairID;
+    pub fn verifier(&self) -> Verifier {
+        match self {
+            Signer::Ed25519(sig) => sig.verifier(),
+        }
+    }
 
-    fn clone_self(&self) -> Box<dyn Verifier>;
-}
-
-impl Clone for Box<dyn Verifier> {
-    fn clone(&self) -> Self {
-        self.clone_self()
+    pub fn get_id(&self) -> KeyPairID {
+        match self {
+            Signer::Ed25519(sig) => sig.get_id(),
+        }
     }
 }
 
-impl PartialEq for Box<dyn Verifier>{
-    fn eq(&self, other: &Self) -> bool {
-        self.get_id() == other.get_id()
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum Verifier {
+    Ed25519(VerifierEd25519),
+}
+
+impl Verifier {
+    pub fn verify(&self, msg: &Bytes, sig: &Bytes) -> Result<(), SignerError> {
+        match self {
+            Verifier::Ed25519(ver) => ver.verify(msg, sig),
+        }
+    }
+
+    pub fn get_id(&self) -> KeyPairID {
+        match self {
+            Verifier::Ed25519(ver) => ver.get_id(),
+        }
     }
 }

@@ -224,7 +224,7 @@ mod test {
             Condition::Verifier(wallet.get_verifier().get_id()),
             flb.rules().clone(),
             vec![Box::new(badge.clone())],
-            &[&*wallet.get_signer()],
+            &[&mut wallet.get_signer()],
         )?;
 
         assert_eq!(1, flb.version());
@@ -237,7 +237,7 @@ mod test {
             Condition::Verifier(wallet.get_verifier().get_id()),
             flb.rules().clone(),
             vec![Box::new(badge.clone())],
-            &[&*wallet.get_signer()],
+            &[&mut wallet.get_signer()],
         )?;
 
         assert_eq!(2, flb.version());

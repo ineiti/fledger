@@ -92,7 +92,7 @@ pub struct CalcSignature {
     msg: U256,
     condition_hash: Vec<U256>,
     badges: HashMap<Version<BadgeID>, Condition>,
-    signatures: HashMap<KeyPairID, Option<(Box<dyn Verifier>, Signature)>>,
+    signatures: HashMap<KeyPairID, Option<(Verifier, Signature)>>,
 }
 
 impl CalcSignature {
@@ -108,7 +108,7 @@ impl CalcSignature {
     pub fn from_cond_badges(
         cond: &Condition,
         badges: HashMap<Version<BadgeID>, Condition>,
-        signatures: HashMap<KeyPairID, Option<(Box<dyn Verifier>, Signature)>>,
+        signatures: HashMap<KeyPairID, Option<(Verifier, Signature)>>,
         msg: Bytes,
     ) -> Result<Self, SignerError> {
         let mut cs = Self::new();
@@ -228,7 +228,7 @@ impl BadgeSignature {
         }
     }
 
-    pub fn sign(&mut self, signer: &dyn Signer) -> Result<(), SignerError> {
+    pub fn sign(&mut self, signer: &Signer) -> Result<(), SignerError> {
         let verifier = signer.verifier();
         let signature = signer.sign(&self.cs.msg.bytes())?;
         self.cs
@@ -316,8 +316,8 @@ mod test {
     }
 
     struct SVID {
-        signer: Box<dyn Signer>,
-        _verifier: Box<dyn Verifier>,
+        signer: Signer,
+        _verifier: Verifier,
         condition: Condition,
         id: KeyPairID,
         // badge: Box<dyn Badge>,
@@ -325,7 +325,7 @@ mod test {
 
     impl SVID {
         fn new() -> Self {
-            let signer = SignerEd25519::new_box();
+            let signer = SignerEd25519::new();
             let condition = Condition::Verifier(signer.verifier().get_id());
             Self {
                 _verifier: signer.verifier(),
@@ -340,7 +340,7 @@ mod test {
             self.condition.clone()
         }
 
-        // fn signer(&self) -> Box<dyn Signer> {
+        // fn signer(&self) -> Signer {
         //     self.signer.clone()
         // }
     }
@@ -396,9 +396,9 @@ mod test {
         assert_ne!(sig_prep0.cs.msg, sig_prep1.cs.msg);
 
         // Wrong and correct signer
-        sig_prep0.sign(&*svid1.signer)?;
+        sig_prep0.sign(&svid1.signer)?;
         assert!(!sig_prep0.is_final()?);
-        sig_prep0.sign(&*svid0.signer)?;
+        sig_prep0.sign(&svid0.signer)?;
         assert!(sig_prep0.is_final()?);
 
         // Wrong message
@@ -418,14 +418,14 @@ mod test {
         );
 
         // Signature from different message
-        sig_prep0_bad.sign(&*svid0.signer)?;
+        sig_prep0_bad.sign(&svid0.signer)?;
         assert!(sig_prep0_bad.is_final()?);
         let mut sig_clone = sig_prep0.clone();
         sig_clone.cs.signatures = sig_prep0_bad.cs.signatures.clone();
         assert!(!sig_clone.is_final()?);
 
         // Signature from different signer
-        sig_prep1.sign(&*svid1.signer)?;
+        sig_prep1.sign(&svid1.signer)?;
         assert!(sig_prep1.is_final()?);
         let mut sig_clone = sig_prep0.clone();
         sig_clone.cs.signatures = sig_prep1.cs.signatures.clone();
@@ -466,42 +466,42 @@ mod test {
 
         // Wrong signer vs. correct signer
         assert!(!sig_prep0.is_final()?);
-        sig_prep0.sign(&*svid2.signer)?;
+        sig_prep0.sign(&svid2.signer)?;
         assert!(!sig_prep0.is_final()?);
-        sig_prep0.sign(&*svid0.signer)?;
+        sig_prep0.sign(&svid0.signer)?;
         assert!(sig_prep0.is_final()?);
 
         // Too many signers (is accepted)
-        sig_prep0.sign(&*svid1.signer)?;
+        sig_prep0.sign(&svid1.signer)?;
         assert!(sig_prep0.is_final()?);
 
         // Second signer
         let mut sig_prep0 = badge0.start_signature_no_badge(&msg)?;
-        sig_prep0.sign(&*svid1.signer)?;
+        sig_prep0.sign(&svid1.signer)?;
         assert!(sig_prep0.is_final()?);
 
         // Too few signers vs. enough signers
-        sig_prep1.sign(&*svid0.signer)?;
+        sig_prep1.sign(&svid0.signer)?;
         assert!(!sig_prep1.is_final()?);
-        sig_prep1.sign(&*svid1.signer)?;
+        sig_prep1.sign(&svid1.signer)?;
         assert!(sig_prep1.is_final()?);
 
         // Different signers
-        sig_prep2.sign(&*svid0.signer)?;
-        sig_prep2.sign(&*svid1.signer)?;
+        sig_prep2.sign(&svid0.signer)?;
+        sig_prep2.sign(&svid1.signer)?;
         assert!(sig_prep2.is_final()?);
         for (_, sig) in &mut sig_prep2.cs.signatures {
             *sig = None;
         }
         assert!(!sig_prep2.is_final()?);
-        sig_prep2.sign(&*svid0.signer)?;
-        sig_prep2.sign(&*svid2.signer)?;
+        sig_prep2.sign(&svid0.signer)?;
+        sig_prep2.sign(&svid2.signer)?;
         assert!(sig_prep2.is_final()?);
         for (_, sig) in &mut sig_prep2.cs.signatures {
             *sig = None;
         }
-        sig_prep2.sign(&*svid1.signer)?;
-        sig_prep2.sign(&*svid2.signer)?;
+        sig_prep2.sign(&svid1.signer)?;
+        sig_prep2.sign(&svid2.signer)?;
         assert!(sig_prep2.is_final()?);
 
         Ok(())

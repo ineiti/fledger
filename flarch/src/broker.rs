@@ -48,12 +48,12 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use crate::{nodeids::U256, tasks::spawn_local};
 use flmacro::{platform_async_trait, target_send};
 
-#[cfg(any(target_family = "wasm", feature = "node"))]
+#[cfg(target_family = "wasm")]
 pub mod asy {
     pub trait Async {}
     impl<T> Async for T {}
 }
-#[cfg(all(target_family = "unix", not(feature="node")))]
+#[cfg(target_family = "unix")]
 pub mod asy {
     pub trait Async: Sync + Send {}
     impl<T: Sync + Send> Async for T {}

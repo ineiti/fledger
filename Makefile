@@ -1,7 +1,7 @@
 CARGOS := cli/{fledger,flsignal} flarch flbrowser flcrypto flmacro \
 			flmodules flnode test/signal-fledger \
-			examples/ping-pong/{shared,libc}
-MAKE_TESTS := 
+			examples/ping-pong/{shared,libc,wasm}
+MAKE_TESTS := examples/ping-pong test/{fledger-nodejs,signal-fledger,webrtc-libc-wasm}
 CRATES := flmacro flarch flmodules flnode
 SHELL := /bin/bash
 PKILL = @/bin/ps aux | grep "$1" | egrep -v "(grep|vscode|rust-analyzer)" | awk '{print $$2}' | xargs -r kill
@@ -91,7 +91,7 @@ serve_two: kill build_cli
 		cargo run --bin fledger -- --config fledger/flnode2 --log-dht-storage -vv -s ws://localhost:8765 & ) )
 
 serve_local: kill build_local_web serve_two
-	cd flbrowser && trunk serve --features local &
+	cd flbrowser && RUST_BACKTRACE=1 trunk serve --features local &
 	sleep 2
 	open http://localhost:8080
 

@@ -148,7 +148,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Rules::Update(Condition::Verifier(
                             node.crypto_storage
                                 .get_signer()
-                                .as_ref()
                                 .verifier()
                                 .get_id(),
                         )),

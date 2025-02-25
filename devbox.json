@@ -19,13 +19,12 @@
     "openssh":   "latest",
     "trunk":     "latest",
     "wasm-pack": "latest",
-    "nodejs":    "18",
-    "vscode":    "latest"
+    "nodejs":    "18"
   },
   "shell": {
     "init_hook": [
-      "if [ -z \"$(echo $RUSTUP_HOME/toolchains/stable*)\" ]; then rustup default stable; fi",
-      "if [ -z \"$(echo $RUSTUP_HOME/toolchains/stable*/lib/rustlib/wasm32-unknown-unknown)\" ]; then rustup target add wasm32-unknown-unknown; fi",
+      "if [ -z \"$( find $RUSTUP_HOME | grep toolchains/stable )\" ]; then rustup default stable; fi",
+      "if [ -z \"$( find $RUSTUP_HOME | grep rustlib/wasm32-unknown-unknown )\" ]; then rustup target add wasm32-unknown-unknown; fi",
       "alias ls='ls --color'"
     ],
     "scripts": {

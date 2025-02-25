@@ -38,8 +38,8 @@ pub enum WalletError {
 #[derive(Default)]
 pub struct Wallet {
     realm_id: RealmID,
-    pub signer: Option<Box<dyn Signer>>,
-    pub verifier: Option<Box<dyn Verifier>>,
+    pub signer: Option<Signer>,
+    pub verifier: Option<Verifier>,
     pub verifier_flo: Option<FloVerifier>,
     pub badge_condition: Option<Condition>,
     pub badge_rules: Option<Rules>,
@@ -59,11 +59,11 @@ impl Wallet {
         Self::default()
     }
 
-    pub fn get_signer(&mut self) -> Box<dyn Signer> {
-        self.signer.get_or_insert(SignerEd25519::new_box()).clone()
+    pub fn get_signer(&mut self) -> Signer {
+        self.signer.get_or_insert(SignerEd25519::new()).clone()
     }
 
-    pub fn get_verifier(&mut self) -> Box<dyn Verifier> {
+    pub fn get_verifier(&mut self) -> Verifier {
         let signer = self.get_signer();
         self.verifier.get_or_insert(signer.verifier()).clone()
     }
@@ -190,7 +190,7 @@ impl Clone for Wallet {
     fn clone(&self) -> Self {
         Self {
             realm_id: self.realm_id.clone(),
-            signer: self.signer.as_deref().map(|s| s.clone()),
+            signer: self.signer.clone(),
             verifier: self.verifier.clone(),
             verifier_flo: self.verifier_flo.clone(),
             badge_condition: self.badge_condition.clone(),
