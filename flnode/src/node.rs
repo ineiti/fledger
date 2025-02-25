@@ -271,7 +271,7 @@ impl Node {
                 "".to_string()
             }
         };
-        let mut config = NodeConfig::decode(&config_str)?;
+        let mut config = NodeConfig::decode(&config_str);
         #[cfg(target_family = "wasm")]
         let enable_webproxy_request = false;
         // Only unix based clients can send http GET requests.

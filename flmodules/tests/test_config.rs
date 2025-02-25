@@ -48,7 +48,7 @@ struct ConfigV1 {
 fn test_config() -> Result<(), Box<dyn std::error::Error>> {
     // Simulate the storage of an old configuration.
     let v1 = ConfigV1 { name: "123".into() };
-    let cv1 = ConfigVersion::V1(v1);
+    let cv1 = ConfigVersion::ConfigV1(v1);
     let c: Config = cv1.clone().into();
     let cv1_str = serde_yaml::to_string(&cv1)?;
 

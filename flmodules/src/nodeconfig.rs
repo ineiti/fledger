@@ -4,14 +4,13 @@
 //! All node-configurations can be serialized with serde and offer nice hex
 //! based serializations when using text-based serializations like `yaml` or `json`.
 
+use bitflags::bitflags;
 use ed25519_compact::{KeyPair, Noise, PublicKey, Seed, Signature};
 use flarch::nodeids::{NodeID, U256};
+use flmacro::VersionedSerde;
 use serde_derive::{Deserialize, Serialize};
-use serde_with::{hex::Hex, serde_as};
-use std::{
-    convert::TryFrom,
-    fmt::{Debug, Error, Formatter},
-};
+use serde_with::{base64::Base64, hex::Hex, serde_as};
+use std::fmt::{Debug, Error, Formatter};
 use thiserror::Error;
 
 use crate::Modules;
@@ -27,15 +26,13 @@ pub enum ConfigError {
     NoInfo,
     /// Serde error
     #[error(transparent)]
-    DecodeToml1(#[from] toml::de::Error),
-    /// Serde error
-    #[error(transparent)]
-    DecodeToml2(#[from] toml::ser::Error),
+    DecodeYaml(#[from] serde_yaml::Error),
 }
 
 /// NodeInfo is the public information of the node.
 #[serde_as]
-#[derive(Deserialize, Serialize, Clone, Hash)]
+#[derive(VersionedSerde, Clone, Hash)]
+#[versions = "[NodeInfoV1,NodeInfoV2]"]
 pub struct NodeInfo {
     /// Name of the node, up to 256 bytes
     pub name: String,
@@ -49,19 +46,6 @@ pub struct NodeInfo {
     pub modules: Modules,
     #[serde(skip)]
     id: Option<NodeID>,
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-enum NodeInfoSave {
-    NodeInfoV2(NodeInfo),
-}
-
-impl NodeInfoSave {
-    fn to_latest(self) -> NodeInfo {
-        match self {
-            NodeInfoSave::NodeInfoV2(ni) => ni,
-        }
-    }
 }
 
 impl NodeInfo {
@@ -112,65 +96,12 @@ impl NodeInfo {
 
     /// Decodes a given string as yaml and returns the corresponding `NodeInfo`.
     pub fn decode(data: &str) -> Result<Self, ConfigError> {
-        if let Ok(info) = serde_yaml::from_str::<NodeInfoSave>(data) {
-            return Ok(info.to_latest());
-        }
-        NodeInfoV1::from_str(data)
-            .ok_or(ConfigError::NoInfo)
-            .map(|i| i.into())
+        Ok(serde_yaml::from_str(data)?)
     }
 
     /// Encodes this NodeInfo as yaml string.
     pub fn encode(&self) -> String {
-        serde_yaml::to_string(&NodeInfoSave::NodeInfoV2(self.clone())).unwrap()
-    }
-}
-
-/// NodeInfo is the public information of the node.
-#[derive(Deserialize, Serialize, Clone)]
-pub struct NodeInfoV1 {
-    /// Name of the node, up to 256 bytes
-    pub info: String,
-    /// What client this node runs on - "libc" or the navigator id
-    pub client: String,
-    /// the public key of the node
-    pub pubkey: Vec<u8>,
-}
-
-impl NodeInfoV1 {
-    fn from_str(data: &str) -> Option<Self> {
-        if let Ok(info) = serde_json::from_str::<NodeInfoV1>(data) {
-            return Some(info);
-        }
-        if let Ok(info) = toml::from_str::<NodeInfoV1>(data) {
-            return Some(info);
-        }
-        None
-    }
-}
-
-impl From<NodeInfoV1> for NodeInfo {
-    fn from(ni: NodeInfoV1) -> Self {
-        NodeInfo {
-            name: ni.info,
-            client: ni.client,
-            pubkey: ni.pubkey,
-            modules: Modules::empty(),
-            id: None,
-        }
-    }
-}
-
-impl TryFrom<NodeInfoToml> for NodeInfo {
-    type Error = ConfigError;
-    fn try_from(nit: NodeInfoToml) -> Result<Self, ConfigError> {
-        Ok(NodeInfo {
-            name: nit.info,
-            client: nit.client,
-            pubkey: nit.pubkey.ok_or(ConfigError::PublicKeyMissing)?,
-            modules: Modules::empty(),
-            id: None,
-        })
+        serde_yaml::to_string(&self).unwrap()
     }
 }
 
@@ -194,9 +125,67 @@ impl PartialEq for NodeInfo {
 
 impl Eq for NodeInfo {}
 
+impl From<NodeInfoV2> for NodeInfo {
+    fn from(old: NodeInfoV2) -> Self {
+        Self {
+            name: old.name,
+            client: old.client,
+            pubkey: old.pubkey,
+            modules: old.modules.into(),
+            id: None,
+        }
+    }
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize, Clone)]
+struct NodeInfoV2 {
+    /// Name of the node, up to 256 bytes
+    pub name: String,
+    /// What client this node runs on - "Node" or the navigator id
+    pub client: String,
+    /// the public key of the node
+    #[serde_as(as = "Base64")]
+    pub pubkey: Vec<u8>,
+    // capabilities of this node
+    #[serde(default = "ModulesV2::all")]
+    pub modules: ModulesV2,
+    #[serde(skip)]
+    _id: Option<NodeID>,
+}
+
+impl Into<Modules> for ModulesV2 {
+    fn into(self) -> Modules {
+        Modules::from_bits(self.bits()).unwrap_or(Modules::all())
+    }
+}
+
+bitflags! {
+    #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Hash)]
+    pub struct ModulesV2: u32 {
+        const ENABLE_STAT = 0x1;
+        const ENABLE_RAND = 0x2;
+        const ENABLE_GOSSIP = 0x4;
+        const ENABLE_PING = 0x8;
+        const ENABLE_WEBPROXY = 0x10;
+        const ENABLE_WEBPROXY_REQUESTS = 0x20;
+    }
+}
+
+impl From<NodeInfoV1> for NodeInfoV2 {
+    fn from(_: NodeInfoV1) -> Self {
+        panic!("Old configuration not supported anymore")
+    }
+}
+
+// This is not used anymore, so it's empty.
+#[derive(Serialize, Deserialize, Clone)]
+struct NodeInfoV1 {}
+
 /// NodeConfig is stored on the node itself and contains the private key.
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(VersionedSerde, Debug, PartialEq)]
+#[versions = "[NodeConfigV1]"]
 pub struct NodeConfig {
     /// info about this node
     pub info: NodeInfo,
@@ -232,16 +221,15 @@ impl NodeConfig {
 
     /// Returns a yaml representation of the config.
     pub fn encode(&self) -> String {
-        serde_yaml::to_string(&NodeConfigSave::NodeConfigV1(self.clone())).unwrap()
+        serde_yaml::to_string(&self).unwrap()
     }
 
     /// Returns the configuration or an error. Correctly handles
     /// old toml-configurations.
-    pub fn decode(data: &str) -> Result<Self, ConfigError> {
-        if let Ok(nc) = serde_yaml::from_str::<NodeConfigSave>(data) {
-            return Ok(nc.to_latest());
-        }
-        Self::from_toml(data)
+    pub fn decode(data: &str) -> Self {
+        serde_yaml::from_str(data)
+            .ok()
+            .unwrap_or_else(|| Self::new())
     }
 
     /// Returns the signature on the given hash with the private
@@ -250,33 +238,6 @@ impl NodeConfig {
     pub fn sign(&self, hash: [u8; 32]) -> Vec<u8> {
         let keypair = KeyPair::from_slice(&self.keypair).unwrap();
         keypair.sk.sign(&hash, Some(Noise::default())).to_vec()
-    }
-
-    /// This is for compatibility with old nodes.
-    fn from_toml(data: &str) -> Result<Self, ConfigError> {
-        let t: Toml = if !data.is_empty() {
-            toml::from_str(data)?
-        } else {
-            return Ok(NodeConfig::new());
-        };
-
-        let nct = t.v1.unwrap();
-        let keypair = match nct.keypair {
-            Some(kp) => kp,
-            None => KeyPair::generate().as_ref().into(),
-        };
-        let kp = KeyPair::from_slice(&keypair).unwrap();
-        let our_node = match nct.our_node {
-            Some(mut on) => {
-                on.pubkey.replace(kp.pk.as_ref().to_vec());
-                NodeInfo::try_from(on)?
-            }
-            None => NodeInfo::new(kp.pk),
-        };
-        Ok(NodeConfig {
-            info: our_node,
-            keypair,
-        })
     }
 }
 
@@ -289,78 +250,57 @@ impl Clone for NodeConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-enum NodeConfigSave {
-    NodeConfigV1(NodeConfig),
+#[serde_as]
+#[derive(Serialize, Deserialize, Clone)]
+struct NodeConfigV1 {
+    /// info about this node
+    info: NodeInfoV2,
+    /// the cryptographic keypair as a vector of bytes
+    #[serde_as(as = "Base64")]
+    keypair: Vec<u8>,
 }
 
-impl NodeConfigSave {
-    fn to_latest(self) -> NodeConfig {
-        match self {
-            NodeConfigSave::NodeConfigV1(nc) => nc,
+impl From<NodeConfigV1> for NodeConfig {
+    fn from(old: NodeConfigV1) -> Self {
+        Self {
+            info: old.info.into(),
+            keypair: old.keypair,
         }
     }
-}
-
-/// Toml representation of the NodeConfig
-#[derive(Debug, Deserialize, Serialize)]
-struct NodeConfigToml {
-    pub keypair: Option<Vec<u8>>,
-    pub our_node: Option<NodeInfoToml>,
-}
-
-impl From<&NodeConfig> for NodeConfigToml {
-    fn from(nc: &NodeConfig) -> Self {
-        NodeConfigToml {
-            our_node: Some((&nc.info).into()),
-            keypair: Some(nc.keypair.clone()),
-        }
-    }
-}
-
-/// Toml representation of the NodeInfo
-#[derive(Debug, Deserialize, Serialize)]
-struct NodeInfoToml {
-    pub id: Option<U256>,
-    pub info: String,
-    pub client: String,
-    pub pubkey: Option<Vec<u8>>,
-}
-
-impl From<&NodeInfo> for NodeInfoToml {
-    fn from(ni: &NodeInfo) -> Self {
-        NodeInfoToml {
-            id: None,
-            info: ni.name.clone(),
-            client: ni.client.clone(),
-            pubkey: Some(ni.pubkey.clone()),
-        }
-    }
-}
-
-/// What is stored on the node. If the configuration is too different,
-/// a new version has to be added.
-#[derive(Debug, Deserialize, Serialize)]
-struct Toml {
-    v1: Option<NodeConfigToml>,
 }
 
 #[cfg(test)]
 mod tests {
-    use flarch::start_logging;
+    use flarch::start_logging_filter_level;
 
     use super::*;
 
     #[test]
     fn save_load() -> Result<(), ConfigError> {
-        start_logging();
+        start_logging_filter_level(vec![], log::LevelFilter::Debug);
 
         let nc = NodeConfig::new();
         let nc_str = nc.encode();
         log::debug!("NodeConfig is: {nc_str}");
-        let nc_clone = NodeConfig::decode(&nc_str)?;
+        let nc_clone = NodeConfig::decode(&nc_str);
         assert_eq!(nc.keypair, nc_clone.keypair);
         assert_eq!(nc.info.pubkey, nc_clone.info.pubkey);
+
+        let i = nc.info.clone();
+        let ncv1 = NodeConfigVersion::NodeConfigV1(NodeConfigV1 {
+            info: NodeInfoV2 {
+                name: i.name,
+                client: i.client,
+                pubkey: i.pubkey,
+                modules: ModulesV2::all(),
+                _id: i.id,
+            },
+            keypair: nc.keypair.clone(),
+        });
+        let ncv1_str = serde_yaml::to_string(&ncv1)?;
+        let ncv2 = NodeConfig::decode(&ncv1_str);
+        println!("{ncv1_str}");
+        assert_eq!(ncv2, nc);
         Ok(())
     }
 }

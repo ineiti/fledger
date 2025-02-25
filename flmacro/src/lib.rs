@@ -184,11 +184,11 @@ pub fn versioned_serde(input: TokenStream) -> TokenStream {
     let mut conversions = vec![];
     for (idx, version) in versions.iter().enumerate() {
         let version_number = idx + 1;
-        let variant_name = format_ident!("V{}", version_number);
+        let variant_name = format_ident!("{struct_name}V{}", version_number);
         variants.push(quote! {
             #variant_name(#version)
         });
-        let next_variant_name = format_ident!("V{}", version_number + 1);
+        let next_variant_name = format_ident!("{struct_name}V{}", version_number + 1);
         conversions.push(quote! {
             #enum_name::#variant_name(#variant_name) => #enum_name::#next_variant_name(#variant_name.into()).into()
         });
@@ -216,7 +216,7 @@ pub fn versioned_serde(input: TokenStream) -> TokenStream {
         quote! {}
     };
 
-    let latest_enum = format_ident!("V{}", versions.len() + 1);
+    let latest_enum = format_ident!("{struct_name}V{}", versions.len() + 1);
     variants.push(quote! {
         #latest_enum(#latest_version_name)
     });
@@ -288,7 +288,7 @@ pub fn versioned_serde(input: TokenStream) -> TokenStream {
             }
         }
     }
-    .into()
+    .into() 
 }
 
 #[proc_macro_attribute]
