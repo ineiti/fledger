@@ -10,7 +10,7 @@ use crate::dht_storage::core::Cuckoo;
 
 use super::{flo::FloWrapper, realm::RealmID};
 
-#[derive(AsU256, Serialize, Deserialize, Clone)]
+#[derive(AsU256, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct BlobID(U256);
 
 pub type FloBlob = FloWrapper<Blob>;
@@ -70,6 +70,19 @@ impl FloBlobPage {
             signers,
         )
     }
+
+    pub fn get_index(&self) -> String {
+        self.cache()
+            .0
+            .datas
+            .get("index.html")
+            .map(|b| String::from_utf8(b.to_vec()).unwrap_or_default())
+            .unwrap_or("".into())
+    }
+
+    pub fn blob_id(&self) -> BlobID {
+        (*self.flo_id()).into()
+    }
 }
 
 impl FloBlobTag {
@@ -106,6 +119,10 @@ impl FloBlobTag {
             }),
             signers,
         )
+    }
+
+    pub fn blob_id(&self) -> BlobID {
+        (*self.flo_id()).into()
     }
 }
 
@@ -221,12 +238,7 @@ mod test {
     #[test]
     fn test_update() -> anyhow::Result<()> {
         let mut wallet = Wallet::new();
-        FloBadge::from_type(
-            RealmID::rnd(),
-            Condition::Fail,
-            wallet.get_badge(),
-            &[],
-        )?;
+        FloBadge::from_type(RealmID::rnd(), Condition::Fail, wallet.get_badge(), &[])?;
         let flb = FloBlobPage::new(
             RealmID::rnd(),
             Condition::Verifier(wallet.get_verifier()),

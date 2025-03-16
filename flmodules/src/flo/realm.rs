@@ -11,7 +11,7 @@ use super::flo::{Flo, FloID, FloWrapper};
 
 pub type FloRealm = FloWrapper<Realm>;
 
-#[derive(AsU256, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(AsU256, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RealmID(U256);
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -35,6 +35,10 @@ impl Realm {
             config,
             services: HashMap::new(),
         }
+    }
+
+    pub fn get_name(&self) -> String {
+        self.name.clone()
     }
 
     pub fn get_config(&self) -> RealmConfig {

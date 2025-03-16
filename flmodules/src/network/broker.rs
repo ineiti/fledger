@@ -36,6 +36,8 @@ use crate::{
     nodeconfig::{NodeConfig, NodeInfo},
 };
 
+use super::signal::FledgerConfig;
+
 pub type BrokerNetwork = Broker<NetworkIn, NetworkOut>;
 
 #[allow(clippy::large_enum_variant)]
@@ -84,6 +86,8 @@ pub enum NetworkOut {
     /// This is used in the From and Into methods
     WebSocket(WSClientIn),
     WebRTC(WebRTCConnInput),
+    /// Configuration from the signalling server
+    SystemConfig(FledgerConfig),
 }
 
 #[derive(Error, Debug)]
@@ -222,6 +226,9 @@ impl Messages {
                         NCInput::Setup(pi.get_direction(&own_id), pi.message),
                     ))],
                 ])
+            }
+            WSSignalMessageToNode::SystemConfig(fledger_config) => {
+                vec![NetworkOut::SystemConfig(fledger_config)]
             }
         }
     }
@@ -490,6 +497,7 @@ impl fmt::Display for NetworkOut {
             NetworkOut::Disconnected(_) => write!(f, "Disconnected()"),
             NetworkOut::WebSocket(_) => write!(f, "WebSocket"),
             NetworkOut::WebRTC(_) => write!(f, "WebRTC"),
+            NetworkOut::SystemConfig(_) => write!(f, "SystemConfig"),
         }
     }
 }

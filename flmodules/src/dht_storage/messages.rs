@@ -86,9 +86,17 @@ pub enum Sync {
     Flos(Vec<FloCuckoo>),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
+pub struct RealmStats {
+    pub size: usize,
+    pub flos: usize,
+    pub distribution: Vec<usize>,
+    pub config: RealmConfig,
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct Stats {
-    pub realm_sizes: HashMap<RealmID, usize>,
+    pub realm_stats: HashMap<RealmID, RealmStats>,
 }
 
 /// The message handling part, but only for DHTStorage messages.
@@ -111,17 +119,16 @@ impl Messages {
         let str = ds.get(MODULE_NAME).unwrap_or("".into());
         let realms = serde_yaml::from_str(&str).unwrap_or(HashMap::new());
         let (tx, rx) = watch::channel(Stats::default());
-        (
-            Self {
-                realms,
-                config,
-                our_id: our_node,
-                nodes: vec![],
-                ds,
-                tx: Some(tx),
-            },
-            rx,
-        )
+        let mut msgs = Self {
+            realms,
+            config,
+            our_id: our_node,
+            nodes: vec![],
+            ds,
+            tx: Some(tx),
+        };
+        msgs.store();
+        (msgs, rx)
     }
 
     fn msg_in_routing(&mut self, msg: DHTRouterOut) -> Vec<InternOut> {
@@ -142,6 +149,12 @@ impl Messages {
             DHTRouterOut::MessageBroadcast(origin, msg) => msg
                 .unwrap_yaml(MODULE_NAME)
                 .map(|mn| self.msg_broadcast(origin, mn)),
+            DHTRouterOut::SystemRealm(realm_id) => {
+                if !self.config.realms.contains(&realm_id) {
+                    self.config.realms.push(realm_id);
+                }
+                None
+            }
         }
         .unwrap_or(vec![])
     }
@@ -458,7 +471,21 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
 impl Stats {
     fn from_realms(realms: &HashMap<RealmID, RealmStorage>) -> Self {
         Self {
-            realm_sizes: realms.iter().map(|(k, v)| (k.clone(), v.size())).collect(),
+            realm_stats: realms
+                .iter()
+                .map(|(id, realm)| (id.clone(), RealmStats::from_realm(realm)))
+                .collect(),
+        }
+    }
+}
+
+impl RealmStats {
+    fn from_realm(realm: &RealmStorage) -> Self {
+        Self {
+            size: realm.size(),
+            flos: realm.flo_count(),
+            distribution: realm.flo_distribution(),
+            config: realm.realm_config().clone(),
         }
     }
 }

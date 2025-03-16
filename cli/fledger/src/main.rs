@@ -7,8 +7,8 @@ use flarch::{
 };
 use flcrypto::{access::Condition, signer::SignerTrait};
 use flmodules::{
-    dht_storage::core::RealmConfig,
-    flo::realm::FloRealm,
+    dht_storage::{broker::DHTStorage, core::RealmConfig, realm_view::RealmView},
+    flo::crypto::FloVerifier,
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
@@ -90,6 +90,12 @@ enum RealmCommands {
     },
 }
 
+struct Fledger {
+    node: Node,
+    ds: DHTStorage,
+    args: Args,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
@@ -127,106 +133,144 @@ async fn main() -> anyhow::Result<()> {
         ),
     )
     .await?;
-    let mut node = Node::start(Box::new(storage), node_config, network.broker).await?;
-    let nc = &node.node_config.info;
-    log::info!("Started node {}: {}", nc.get_id(), nc.name);
+    let node = Node::start(Box::new(storage), node_config, network.broker).await?;
+    Ok(Fledger {
+        ds: node.dht_storage.as_ref().unwrap().clone(),
+        node,
+        args,
+    }
+    .run()
+    .await?)
+}
 
-    match &args.command {
-        Some(cmd) => match cmd {
-            Commands::Realm { command } => match command {
-                RealmCommands::List => list_realms(node, args).await?,
-                RealmCommands::Create {
-                    name,
-                    max_space,
-                    max_flo_size,
-                } => {
-                    log::info!("{name} / {max_space:?} / {max_flo_size:?}");
-                    let signer = node.crypto_storage.get_signer();
-                    let fr = FloRealm::new(
+impl Fledger {
+    async fn run(&mut self) -> anyhow::Result<()> {
+        let nc = &self.node.node_config.info;
+        log::info!("Started node {}: {}", nc.get_id(), nc.name);
+
+        match &self.args.command {
+            Some(cmd) => match cmd {
+                Commands::Realm { command } => match command {
+                    RealmCommands::List => self.list_realms().await?,
+                    RealmCommands::Create {
                         name,
-                        Condition::Verifier(signer.verifier()),
-                        RealmConfig {
-                            max_space: max_space.unwrap_or(1000000),
-                            max_flo_size: max_flo_size.unwrap_or(10000),
-                        },
-                        &[&signer],
-                    )?;
-
-                    log::info!("Connecting to other nodes");
-                    loop_node(&mut node, Some(&args), Some(2)).await?;
-
-                    let mut ds = node.dht_storage.as_mut().expect("Need DHT-Storage").clone();
-                    ds.store_flo(fr.into())?;
-                    ds.propagate()?;
-
-                    list_realms(node, args).await?;
-                }
+                        max_space,
+                        max_flo_size,
+                    } => {
+                        self.realm_create(name.clone(), *max_space, *max_flo_size)
+                            .await?
+                    }
+                },
+                Commands::Crypto {} => todo!(),
+                Commands::Stats {} => todo!(),
             },
-            Commands::Crypto {} => todo!(),
-            Commands::Stats {} => todo!(),
-        },
-        None => loop_node(&mut node, Some(&args), None).await?,
-    }
-
-    Ok(())
-}
-
-async fn list_realms(mut node: Node, args: Args) -> anyhow::Result<()> {
-    let mut ds = node.dht_storage.as_mut().expect("Need DHT-Storage").clone();
-    log::info!("Waiting for update of data");
-    loop_node(&mut node, Some(&args), Some(20)).await?;
-    log::info!("Requesting sync of DHT-storage and waiting for answers");
-    ds.sync()?;
-    ds.propagate()?;
-    loop_node(&mut node, Some(&args), Some(2)).await?;
-    let rids = ds.get_realm_ids().await?;
-    if rids.len() == 0 {
-        log::info!("No realms found.");
-        return Ok(());
-    }
-    log::info!(
-        "Realm-IDs are: {}",
-        rids.iter()
-            .map(|rid| format!("{rid}"))
-            .collect::<Vec<_>>()
-            .join(" :: ")
-    );
-
-    Ok(())
-}
-
-async fn loop_node(
-    node: &mut Node,
-    args: Option<&Args>,
-    max_count: Option<u32>,
-) -> anyhow::Result<()> {
-    let mut i: u32 = 0;
-    node.broker_net
-        .emit_msg_in(NetworkIn::WSUpdateListRequest)?;
-    loop {
-        i += 1;
-
-        wait_ms(1000).await;
-
-        if let Some(a) = args.as_ref() {
-            a.log(i, node).await?;
+            None => self.loop_node(None).await?,
         }
 
-        if let Some(c) = max_count.as_ref() {
-            if c < &i {
-                return Ok(());
+        Ok(())
+    }
+
+    async fn realm_create(
+        &mut self,
+        name: String,
+        max_space: Option<u64>,
+        max_flo_size: Option<u32>,
+    ) -> anyhow::Result<()> {
+        log::info!("Waiting for connection to other nodes");
+        self.loop_node(Some(2)).await?;
+
+        let config = RealmConfig {
+            max_space: max_space.unwrap_or(1000000),
+            max_flo_size: max_flo_size.unwrap_or(10000),
+        };
+        log::info!(
+            "Creating realm with name '{name}' / total space: {} / flo size: {}",
+            config.max_space,
+            config.max_flo_size
+        );
+        let signer = self.node.crypto_storage.get_signer();
+        let signers = &[&signer];
+        let cond = Condition::Verifier(signer.verifier());
+        let mut rv = RealmView::new_create_realm_config(
+            self.ds.clone(),
+            &name,
+            cond.clone(),
+            config,
+            signers,
+        )
+        .await?;
+        self.ds
+            .store_flo(FloVerifier::new(rv.realm.realm_id(), signer.verifier()).into())?;
+        let root_http = rv.create_http(
+            "fledger",
+            INDEX_HTML.to_string(),
+            None,
+            cond.clone(),
+            signers,
+        )?;
+        rv.set_realm_http(root_http.blob_id(), signers).await?;
+        let root_tag = rv.create_tag("fledger", None, cond.clone(), signers)?;
+        rv.set_realm_tag(root_tag.blob_id(), signers).await?;
+
+        log::info!("Waiting for propagation");
+        self.ds.propagate()?;
+        self.loop_node(Some(2)).await?;
+
+        self.list_realms().await?;
+
+        Ok(())
+    }
+
+    async fn list_realms(&mut self) -> anyhow::Result<()> {
+        log::info!("Waiting for update of data");
+        self.loop_node(Some(20)).await?;
+        log::info!("Requesting sync of DHT-storage and waiting for answers");
+        self.ds.sync()?;
+        self.ds.propagate()?;
+        self.loop_node(Some(2)).await?;
+        let rids = self.ds.get_realm_ids().await?;
+        if rids.len() == 0 {
+            log::info!("No realms found.");
+            return Ok(());
+        }
+        log::info!(
+            "Realm-IDs are: {}",
+            rids.iter()
+                .map(|rid| format!("{rid}"))
+                .collect::<Vec<_>>()
+                .join(" :: ")
+        );
+
+        Ok(())
+    }
+
+    async fn loop_node(&mut self, max_count: Option<u32>) -> anyhow::Result<()> {
+        let mut i: u32 = 0;
+        self.node
+            .broker_net
+            .emit_msg_in(NetworkIn::WSUpdateListRequest)?;
+        loop {
+            i += 1;
+
+            wait_ms(1000).await;
+
+            self.log(i).await?;
+
+            if let Some(c) = max_count.as_ref() {
+                if c < &i {
+                    return Ok(());
+                }
             }
         }
     }
-}
 
-impl Args {
-    async fn log(&self, i: u32, node: &mut Node) -> anyhow::Result<()> {
-        if i % self.log_freq == self.log_freq - 1 {
-            if self.log_random {
+    async fn log(&mut self, i: u32) -> anyhow::Result<()> {
+        if i % self.args.log_freq == self.args.log_freq - 1 {
+            if self.args.log_random {
                 log::info!(
                     "Nodes are: {}",
-                    node.nodes_online()?
+                    self.node
+                        .nodes_online()?
                         .iter()
                         .map(|n| format!("{}/{}", n.name, n.get_id()))
                         .collect::<Vec<_>>()
@@ -234,20 +278,20 @@ impl Args {
                 );
             }
 
-            if self.log_countdown {
-                let ping = &node.ping.as_ref().unwrap().storage.borrow();
+            if self.args.log_countdown {
+                let ping = &self.node.ping.as_ref().unwrap().storage.borrow();
                 log::info!("Nodes countdowns are: {:?}", ping.stats);
             }
 
-            if self.log_gossip {
+            if self.args.log_gossip {
                 log::debug!(
                     "Chat messages are: {:?}",
-                    node.gossip.as_ref().unwrap().chat_events()
+                    self.node.gossip.as_ref().unwrap().chat_events()
                 );
             }
 
-            if self.log_dht_storage {
-                if let Some(ds) = node.dht_storage.as_mut() {
+            if self.args.log_dht_storage {
+                if let Some(ds) = self.node.dht_storage.as_mut() {
                     let rids = ds.get_realm_ids().await?;
                     if rids.len() == 0 {
                         log::info!("No realms found.");
@@ -267,3 +311,17 @@ impl Args {
         Ok(())
     }
 }
+
+const INDEX_HTML: &str = r##"
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Fledger</title>
+  </head>
+<body>
+<h1>Fledger</h1>
+
+Fast, Fun, Fair Ledger, or Fledger puts the <strong>FUN</strong> back in blockchain!
+</body>
+</html>
+    "##;

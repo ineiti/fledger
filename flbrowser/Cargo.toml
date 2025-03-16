@@ -21,6 +21,7 @@ flnode = {path = "../flnode", version = "0.9"}
 
 chrono = "0.4"
 anyhow = "1"
+itertools = "0.14"
 js-sys = "0.3"
 regex = "1"
 log = "0.4"
@@ -40,6 +41,7 @@ features = [
   'HtmlElement',
   'HtmlDivElement',
   'HtmlInputElement',
+  'HtmlOListElement',
   'HtmlTextAreaElement',
   'Node',
   'Window',

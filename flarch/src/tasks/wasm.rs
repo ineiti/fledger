@@ -111,14 +111,14 @@ pub async fn wait(dur: Duration) {
             tx_opt.take().map(|tx| {
                 tx.send(())
                     .err()
-                    .map(|e| log::error!("Couldn't send in wait_ms: {e:?}"))
+                    .map(|e| log::trace!("Couldn't send in wait_ms: {e:?}"))
             });
         },
         dur,
     );
     rx.await
         .err()
-        .map(|e| log::error!("While waiting on signal: {e:?}"));
+        .map(|e| log::trace!("While waiting on signal: {e:?}"));
 }
 
 // wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);

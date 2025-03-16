@@ -86,6 +86,9 @@ impl RouterNetwork {
                     NetworkOut::NodeListFromWS(vec) => Some(RouterInternal::Available(vec).into()),
                     NetworkOut::Connected(id) => Some(RouterInternal::Connected(id).into()),
                     NetworkOut::Disconnected(id) => Some(RouterInternal::Disconnected(id).into()),
+                    NetworkOut::SystemConfig(conf) => {
+                        Some(RouterInternal::SystemConfig(conf).into())
+                    }
                     _ => None,
                 }),
             )
@@ -148,13 +151,14 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
                             out.push(RouterOut::NetworkWrapperFromNetwork(id, module_message))
                         });
                     }
+                    RouterInternal::SystemConfig(conf) => out.push(RouterOut::SystemConfig(conf)),
                 }
             }
         }
 
         // If something changed, output all relevant messages.
-        out.extend(if ret {
-            vec![
+        if ret {
+            out.extend(vec![
                 RouterOut::NodeInfoAvailable(self.nodes_available.clone()),
                 RouterOut::NodeIDsConnected(self.nodes_connected.clone().into()),
                 RouterOut::NodeInfosConnected(
@@ -164,10 +168,8 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
                         .cloned()
                         .collect(),
                 ),
-            ]
-        } else {
-            vec![]
-        });
+            ]);
+        }
 
         out
     }

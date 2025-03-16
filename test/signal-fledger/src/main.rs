@@ -7,7 +7,11 @@ use flarch::{
         connection::ConnectionConfig, web_socket_server::WebSocketServer, websocket::WSSError,
     },
 };
-use flmodules::network::{network_start, signal::SignalServer, NetworkSetupError};
+use flmodules::network::{
+    network_start,
+    signal::{SignalConfig, SignalServer},
+    NetworkSetupError,
+};
 use flnode::node::{Node, NodeError};
 use thiserror::Error;
 
@@ -28,7 +32,14 @@ async fn main() -> anyhow::Result<()> {
     start_logging_filter_level(vec!["signal", "fl"], log::LevelFilter::Info);
 
     let wss = WebSocketServer::new(8765).await?;
-    let mut signal_server = SignalServer::new(wss, 2).await?;
+    let mut signal_server = SignalServer::new(
+        wss,
+        SignalConfig {
+            ttl_minutes: 2,
+            system_realm: None,
+        },
+    )
+    .await?;
     let (msgs_signal, _) = signal_server.get_tap_out_sync().await?;
     log::info!("Started listening on port 8765");
 

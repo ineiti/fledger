@@ -10,6 +10,7 @@ MAKE_TESTS := examples/ping-pong test/{fledger-nodejs,signal-fledger,webrtc-libc
 CRATES := flcrypto flmacro flarch flmodules flnode
 SHELL := /bin/bash
 PKILL = @/bin/ps aux | grep "$1" | egrep -v "(grep|vscode|rust-analyzer)" | awk '{print $$2}' | xargs -r kill
+PUBLISH = --token $$CARGO_REGISTRY_TOKEN
 
 cargo_check:
 	for c in ${CARGO_LOCKS}; do \
@@ -52,16 +53,16 @@ cargo_unused:
 		(cd $$(dirname $$cargo) && cargo +nightly udeps -q --all-targets ); \
 	done
 
-publish_dry:
-	DRY=--dry-run make publish
+publish_dry: PUBLISH = --dry-run
+publish_dry: publish
 
 publish:
 	for crate in ${CRATES}; do \
 		CRATE_VERSION=$$(cargo search $$crate | grep "^$$crate " | sed -e "s/.*= \"\(.*\)\".*/\1/"); \
 		CARGO_VERSION=$$(grep "^version" $$crate/Cargo.toml | head -n 1 | sed -e "s/.*\"\(.*\)\".*/\1/"); \
 		if [[ "$$CRATE_VERSION" != "$$CARGO_VERSION" ]]; then \
-			echo "Publishing crate $$crate"; \
-			cargo publish $$DRY --token $$CARGO_REGISTRY_TOKEN --manifest-path $$crate/Cargo.toml; \
+			echo "Publishing crate $$crate with arg ${PUBLISH}"; \
+			cargo publish ${PUBLISH} --manifest-path $$crate/Cargo.toml; \
 		fi; \
 	done
 

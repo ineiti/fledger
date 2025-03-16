@@ -12,44 +12,34 @@ This file is in place of github issues, as currently I'm mostly developing on my
 
 Implement [DHT_STORAGE.md](./DHT_STORAGE.md).
 
-### DHT_storage
+### Signalling server
 
-Working version with flos stored in the nearest nodes and automatic synchronisation
-with other nodes.
+Pass system realm to nodes.
+
+### DHT_storage
 
 TODO:
 - add own Flos to DHTConfig.owned
 - verify Flos when they enter the system
+
+### Testing
+
+# TODO
+
+## Features
+
+DHT_Storage:
 - when new FloMetas enter the system, check which are the most probable to be kept:
   - choose the closest (with the highest depth) not-yet-stored Flos for synching
 - Add a timeout to FloCuckoos when they are purged from the system
 - Add a timeout for Flos to purge them from the system
 
-### Testing
-
-### Crypto
-
-Have working `Signer`s, `Verifier`s, `Badge`s, and `Condition`s.
-
-### Flo
-
-Uses real signatures and verifications now
-
-### DHT_router
-
--- seems to be more or less OK, at least if it's usable by DHT_storage --
-
-1. KBucket.active is only be populated once a node has been confirmed.
+DHT_Router:
+- KBucket.active is only be populated once a node has been confirmed.
   - Needs more testing if nodes fail and how they will be replaced
-
-TODO:
-- should it also store one kademlia per realm?
+- possible extension to allow for indpendant realms:
   - active nodes are stored in a global vec
   - each realm-kademlia looks in these nodes first to populate the buckets
-
-# TODO
-
-## Features
 
 ## Bugs
 
@@ -79,21 +69,27 @@ Added fledger to blog: https://ineiti.ch/projects/fledger/
 # Some things done
 
 ### Done
-
+- Flo
+  - Uses real signatures and verifications now
+- DHT_storage
+  - Working version with flos stored in the nearest nodes and automatic synchronisation
+    with other nodes.
+- Crypto
+  - Have working `Signer`s, `Verifier`s, `Badge`s, and `Condition`s.
+- DHT_router
+  - usable with enough functionalities
 - Store yaml files as .yaml instead of .toml
-Flos:
-- Make different updates for data change and for rules change
-- Clean up the mess - it's still too much stuff calling criss-cross each other
-- Removed Rules and ACE
-Test in `flmodules/test/webpage.rs`:
-- complete, including cuckoos, limited memory.
-Make the following tests work again:
-- `make cargo_test`
-- `examples/ping-pong`
-- `test/webrtc-libc-wasm`
+- Flos:
+  - Make different updates for data change and for rules change
+  - Clean up the mess - it's still too much stuff calling criss-cross each other
+  - Removed Rules and ACE
+- Test in `flmodules/test/webpage.rs`:
+  - complete, including cuckoos, limited memory.
+- Make the following tests work again:
+  - `make cargo_test`
+  - `examples/ping-pong`
+  - `test/webrtc-libc-wasm`
 - Where are the Verifiers stored? In the DHT, like others
-- There must be something shady going on with regard
-  to the verifierIDs which definitely don't match the FloID.
 - Store all necessary data for verification in the Flo itself
 - flnode/src/node.rs changes:
   - instead of calling `update`, use the `template` version with a tap and a watcher

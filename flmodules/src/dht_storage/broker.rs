@@ -1,9 +1,8 @@
-use std::time::Duration;
-
 use async_recursion::async_recursion;
 use flarch::{
     broker::{Broker, BrokerError},
     data_storage::DataStorage,
+    tasks::wait_ms,
 };
 use flcrypto::{
     access::{Condition, ConditionLink},
@@ -11,7 +10,10 @@ use flcrypto::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
-use tokio::{sync::watch, time::timeout};
+use tokio::{
+    select,
+    sync::{mpsc::UnboundedReceiver, watch},
+};
 
 use crate::{
     dht_router::broker::BrokerDHTRouter,
@@ -56,7 +58,7 @@ pub enum DHTStorageOut {
 ///
 /// The [DHTStorage] holds the [Translate] and offers convenience methods
 /// to interact with [Translate] and [DHTStorageMessage].
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DHTStorage {
     /// Represents the underlying broker.
     pub broker: Broker<DHTStorageIn, DHTStorageOut>,
@@ -66,7 +68,7 @@ pub struct DHTStorage {
     _our_id: NodeID,
 }
 
-unsafe impl Send for DHTStorage {}
+// unsafe impl Send for DHTStorage {}
 
 #[derive(Error, Debug)]
 pub enum StorageError {
@@ -241,67 +243,30 @@ impl DHTStorage {
         msg_in: DHTStorageIn,
         check: &(dyn Fn(DHTStorageOut) -> Option<T> + Sync),
     ) -> anyhow::Result<T> {
-        // using the internal broker directly to avoid one conversion.
-        let dur = Duration::from_millis(self.config.timeout);
         let (mut tap, tap_id) = self.intern.get_tap_out().await?;
         self.intern.emit_msg_in(InternIn::Storage(msg_in))?;
-        let res = timeout(dur, async move {
-            while let Some(msg_int) = tap.recv().await {
-                if let InternOut::Storage(msg_out) = msg_int {
-                    if let Some(res) = check(msg_out) {
-                        return Ok(res);
-                    }
-                }
-            }
-            Err(BrokerError::Translation)
-        })
-        .await
-        .map_err(|_| StorageError::TimeoutError);
-        // Need to remove subsystem before checking error.
+        let res = select! {
+            _ = wait_ms(self.config.timeout) => Err(StorageError::TimeoutError.into()),
+            res = Self::wait_tap(&mut tap, check) => res
+        };
         self.intern.remove_subsystem(tap_id).await?;
-        Ok(res??)
+        res
     }
 
-    // #[async_recursion(?Send)]
-    // async fn recurse_condition(
-    //     &mut self,
-    //     realm_id: &RealmID,
-    //     mut bad_sig: BadgeSig,
-    //     condition: &ConditionLink,
-    // ) -> anyhow::Result<BadgeSig> {
-    //     match condition {
-    //         ConditionLink::Verifier(_) => {}
-    //         ConditionLink::Badge(version) => {
-    //             if bad_sig.badges.contains_key(version) {
-    //                 log::warn!("Loop in condition");
-    //             } else {
-    //                 let cond = self
-    //                     .get_flo::<BadgeCond>(&GlobalID::new(
-    //                         realm_id.clone(),
-    //                         (*version.get_id()).into(),
-    //                     ))
-    //                     .await?;
-    //                 bad_sig
-    //                     .badges
-    //                     .insert(version.clone(), cond.badge_cond().clone());
-    //             }
-    //         }
-    //         ConditionLink::NofT(_, vec) => {
-    //             for v in vec {
-    //                 bad_sig = self.recurse_condition(realm_id, bad_sig, v).await?;
-    //             }
-    //         }
-    //         ConditionLink::Pass => (),
-    //     }
-    //     Ok(bad_sig)
-    // }
+    async fn wait_tap<T>(
+        tap: &mut UnboundedReceiver<InternOut>,
+        check: &(dyn Fn(DHTStorageOut) -> Option<T> + Sync),
+    ) -> anyhow::Result<T> {
+        while let Some(msg_int) = tap.recv().await {
+            if let InternOut::Storage(msg_out) = msg_int {
+                if let Some(res) = check(msg_out) {
+                    return Ok(res);
+                }
+            }
+        }
+        Err(anyhow::anyhow!("Channel closed while waiting"))
+    }
 }
-
-// #[derive(Default, Debug)]
-// struct BadgeSig {
-//     badges: HashMap<VersionSpec<BadgeID>, ConditionLink>,
-//     signatures: ConditionSignature,
-// }
 
 #[cfg(test)]
 mod tests {

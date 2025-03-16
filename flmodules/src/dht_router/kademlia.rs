@@ -28,7 +28,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            k: 5,
+            k: 2,
             ping_interval: 10,
             ping_timeout: 20,
         }
@@ -136,6 +136,16 @@ impl Kademlia {
             .flat_map(|b| &b.active)
             .chain(&self.root_bucket.active)
             .map(|kn| kn.id)
+            .collect()
+    }
+
+    /// Returns all the active nodes of the kademlia system.
+    pub fn bucket_nodes(&self) -> Vec<Vec<NodeID>> {
+        self.buckets
+            .iter()
+            .map(|b| &b.active)
+            .chain(vec![&self.root_bucket.active])
+            .map(|kns| kns.iter().map(|kn| kn.id).collect::<Vec<_>>())
             .collect()
     }
 
@@ -549,23 +559,23 @@ mod test {
             }
         }
     }
-    
+
     pub fn rnd_nodes_depth(root: &NodeID, depth: usize, nbr: usize) -> Vec<NodeID> {
         (0..nbr).map(|_| rnd_node_depth(root, depth)).collect()
     }
-    
+
     pub fn distance_str(root: &NodeID, node_str: &str) -> usize {
         let node = U256::from_str(node_str).expect("NodeID init");
         KNode::get_depth(root, node)
     }
-    
+
     pub fn kademlia_add_nodes(kademlia: &mut Kademlia, depth: usize, nbr: usize) {
         kademlia.add_nodes_active(rnd_nodes_depth(&kademlia.root, depth, nbr));
     }
-    
+
     pub fn kademlia_add_nodes_cache(kademlia: &mut Kademlia, depth: usize, nbr: usize) {
         kademlia.add_nodes(rnd_nodes_depth(&kademlia.root, depth, nbr));
-    }    
+    }
 
     #[test]
     fn test_get_depth() {

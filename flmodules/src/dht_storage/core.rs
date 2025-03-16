@@ -129,6 +129,22 @@ impl RealmStorage {
         Ok(s)
     }
 
+    pub fn flo_distribution(&self) -> Vec<usize> {
+        self.distances
+            .iter()
+            .sorted_by_key(|(k, _)| **k)
+            .map(|(_, v)| v.len())
+            .collect::<Vec<_>>()
+    }
+
+    pub fn flo_count(&self) -> usize {
+        self.flos.len()
+    }
+
+    pub fn realm_config(&self) -> &RealmConfig {
+        &self.realm_config
+    }
+
     pub fn get_flo_cuckoo(&self, id: &FloID) -> Option<FloCuckoo> {
         self.flos
             .get(id)

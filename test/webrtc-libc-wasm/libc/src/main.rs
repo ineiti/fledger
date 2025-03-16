@@ -9,7 +9,7 @@ use flarch::{
 use flmodules::network::{
     broker::{BrokerNetwork, NetworkIn, NetworkOut},
     network_start,
-    signal::SignalServer,
+    signal::{SignalConfig, SignalServer},
     NetworkSetupError,
 };
 use flmodules::nodeconfig::NodeConfig;
@@ -56,9 +56,15 @@ async fn start_signal_server() {
         .await
         .expect("Failed to start signalling server");
     log::debug!("Starting signalling server");
-    SignalServer::new(wss, 1)
-        .await
-        .expect("Failed to start signalling server");
+    SignalServer::new(
+        wss,
+        SignalConfig {
+            ttl_minutes: 1,
+            system_realm: None,
+        },
+    )
+    .await
+    .expect("Failed to start signalling server");
 }
 
 async fn spawn_node() -> anyhow::Result<(NodeConfig, BrokerNetwork)> {

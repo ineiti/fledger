@@ -51,7 +51,8 @@ pub(super) enum InternOut {
 
 #[derive(Clone, Debug, Default)]
 pub struct Stats {
-    pub nodes: Vec<NodeID>,
+    pub all_nodes: Vec<NodeID>,
+    pub bucket_nodes: Vec<Vec<NodeID>>,
     pub active: usize,
 }
 
@@ -185,13 +186,14 @@ impl Messages {
     fn update_stats(&mut self) {
         self.tx.clone().map(|tx| {
             tx.send(Stats {
-                nodes: self
+                all_nodes: self
                     .core
                     .active_nodes()
                     .iter()
                     .chain(self.core.cache_nodes().iter())
                     .cloned()
                     .collect::<Vec<_>>(),
+                bucket_nodes: self.core.bucket_nodes(),
                 active: self.core.active_nodes().len(),
             })
             .is_err()
@@ -228,6 +230,10 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
                     RouterOut::NetworkWrapperFromNetwork(from, network_wrapper) => {
                         self.process_node_message(from, network_wrapper)
                     }
+                    RouterOut::SystemConfig(conf) => conf
+                        .system_realm
+                        .map(|rid| vec![InternOut::DHTRouter(DHTRouterOut::SystemRealm(rid))])
+                        .unwrap_or(vec![]),
                     _ => vec![],
                 },
             })

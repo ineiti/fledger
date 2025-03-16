@@ -1,10 +1,10 @@
 use flcrypto::{
     access::{BadgeLink, ConditionLink},
-    signer::Verifier,
+    signer::{Verifier, VerifierTrait},
 };
 use serde::{Deserialize, Serialize};
 
-use super::flo::FloWrapper;
+use super::{flo::FloWrapper, realm::RealmID};
 
 /// A Verifier is a public key which can verify a signature from a private key.
 pub type FloVerifier = FloWrapper<Verifier>;
@@ -32,5 +32,12 @@ impl FloBadge {
             version: self.version(),
             condition: self.cache().0.clone(),
         }
+    }
+}
+
+impl FloVerifier {
+    pub fn new(rid: RealmID, verifier: Verifier) -> Self {
+        let force_id = *verifier.get_id();
+        FloVerifier::from_force_id(rid, verifier, force_id).unwrap()
     }
 }

@@ -1,6 +1,11 @@
+use std::str::FromStr;
+
 use clap::Parser;
 use flarch::web_rtc::web_socket_server::WebSocketServer;
-use flmodules::network::signal::{SignalOut, SignalServer};
+use flmodules::{
+    flo::realm::RealmID,
+    network::signal::{SignalConfig, SignalOut, SignalServer},
+};
 
 /// Fledger signalling server
 #[derive(Parser, Debug)]
@@ -9,6 +14,10 @@ struct Args {
     /// Verbosity
     #[clap(flatten)]
     verbosity: clap_verbosity_flag::Verbosity,
+
+    /// System realm - if this is set, no other realms are allowed by default.
+    #[arg(long)]
+    system_realm: Option<String>,
 }
 
 #[tokio::main]
@@ -21,7 +30,15 @@ async fn main() -> anyhow::Result<()> {
     logger.try_init().expect("Failed to initialize logger");
 
     let wss = WebSocketServer::new(8765).await?;
-    let mut signal_server = SignalServer::new(wss, 2).await?;
+    let system_realm = args.system_realm.and_then(|sr| RealmID::from_str(&sr).ok());
+    let mut signal_server = SignalServer::new(
+        wss,
+        SignalConfig {
+            ttl_minutes: 2,
+            system_realm,
+        },
+    )
+    .await?;
     let (msgs, _) = signal_server.get_tap_out_sync().await?;
 
     log::info!("Started listening on port 8765");

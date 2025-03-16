@@ -170,7 +170,7 @@ impl Simul {
                 node._dht_routing
                     .stats
                     .borrow()
-                    .nodes
+                    .all_nodes
                     .iter()
                     .map(|n| format!("{}", n))
                     .sorted()
@@ -386,10 +386,12 @@ async fn page_full() -> anyhow::Result<()> {
     )?;
     let signers_val = vec![root_nodes[0].wallet.get_signer()];
     let signers = signers_val.iter().collect::<Vec<_>>();
-    rv_root.set_realm_http(root_http.flo_id(), &signers).await?;
+    rv_root
+        .set_realm_http(root_http.blob_id(), &signers)
+        .await?;
     let root_tag =
         rv_root.create_tag("fledger", None, wallet_root.get_badge_cond(), root_signers)?;
-    rv_root.set_realm_tag(root_tag.flo_id(), &signers).await?;
+    rv_root.set_realm_tag(root_tag.blob_id(), &signers).await?;
 
     log::info!("Setting up noise nodes and fetching realm, page, and tag");
     let noise_nodes = simul.new_nodes(nbr_noise).await?;
@@ -399,8 +401,10 @@ async fn page_full() -> anyhow::Result<()> {
     simul.sync_check(&root_http).await?;
 
     let mut rv_noise = RealmView::new(noise_nodes[0].dht_storage.clone()).await?;
-    assert!(rv_noise.pages.len() > 0);
-    assert!(rv_noise.tags.len() > 0);
+    assert!(rv_noise.pages.as_ref().unwrap().storage.len() > 0);
+    assert!(rv_noise.tags.as_ref().unwrap().storage.len() > 0);
+    assert_eq!(root_http.blob_id(), rv_noise.pages.as_ref().unwrap().root);
+    assert_eq!(root_tag.blob_id(), rv_noise.tags.as_ref().unwrap().root);
 
     let cuckoo_nbr: usize = 3;
     for nbr in 0..cuckoo_nbr {
@@ -410,14 +414,14 @@ async fn page_full() -> anyhow::Result<()> {
             "<html><h1>Cuckoo".to_string(),
             None,
             wallet_root.get_badge_cond(),
-            Cuckoo::Parent(rv_noise.pages[0].flo_id()),
+            Cuckoo::Parent(root_http.flo_id()),
             root_signers,
         )?;
         let cuckoo_tag = rv_noise.create_tag_cuckoo(
             &format!("cuckoo_{nbr}"),
             None,
             wallet_root.get_badge_cond(),
-            Cuckoo::Parent(rv_noise.tags[0].flo_id()),
+            Cuckoo::Parent(root_tag.flo_id()),
             root_signers,
         )?;
         log::trace!("IDs: {} - {}", cuckoo_page.flo_id(), cuckoo_tag.flo_id());
@@ -430,15 +434,11 @@ async fn page_full() -> anyhow::Result<()> {
     let new_node = simul.new_node().await?;
     simul.log_connections();
     simul.sync_check(&rv_root.realm).await?;
-    simul
-        .sync_check_cuckoos(&rv_noise.pages.first().unwrap(), cuckoo_nbr)
-        .await?;
-    simul
-        .sync_check_cuckoos(&rv_noise.tags.first().unwrap(), cuckoo_nbr)
-        .await?;
+    simul.sync_check_cuckoos(&root_http, cuckoo_nbr).await?;
+    simul.sync_check_cuckoos(&root_tag, cuckoo_nbr).await?;
     let rv_new = RealmView::new(new_node.dht_storage.clone()).await?;
-    assert_eq!(cuckoo_nbr + 1, rv_new.pages.len());
-    assert_eq!(cuckoo_nbr + 1, rv_new.tags.len());
+    assert_eq!(cuckoo_nbr + 1, rv_new.pages.as_ref().unwrap().storage.len());
+    assert_eq!(cuckoo_nbr + 1, rv_new.tags.as_ref().unwrap().storage.len());
 
     Ok(())
 }

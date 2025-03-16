@@ -717,7 +717,7 @@ impl<I: Message + 'static, O: Message + 'static> Intern<I, O> {
         for (i, ss) in self.subsystems.iter_mut() {
             if let Err(e) = ss.send_tap_out(msgs.clone()).await {
                 log::warn!(
-                    "{}: Couldn't send to tap-out: {e:?}::{} - perhaps you should use 'remove_subsystem'?",
+                    "{}: Couldn't send {msgs:?} to tap-out: {e:?}::{} - perhaps you should use 'remove_subsystem'?",
                     type_str,
                     i
                 );

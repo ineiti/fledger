@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
 use crate::{
-    router::{broker::BrokerRouter, messages::NetworkWrapper},
-    timer::Timer,
+    flo::realm::RealmID, router::{broker::BrokerRouter, messages::NetworkWrapper}, timer::Timer
 };
 use flarch::nodeids::NodeID;
 
@@ -36,6 +35,9 @@ pub enum DHTRouterOut {
     // MessageDest(origin, last_hop, msg)
     MessageDest(NodeID, NodeID, NetworkWrapper),
     NodeList(Vec<NodeID>),
+    /// If the system is configured with a unique realm, pass it here
+    /// to the DHT_Storage.
+    SystemRealm(RealmID),
 }
 
 pub type BrokerDHTRouter = Broker<DHTRouterIn, DHTRouterOut>;

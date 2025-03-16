@@ -1,7 +1,7 @@
 use flarch::nodeids::{NodeID, NodeIDs, U256};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::nodeconfig::NodeInfo;
+use crate::{network::signal::FledgerConfig, nodeconfig::NodeInfo};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NetworkWrapper {
@@ -21,6 +21,7 @@ pub enum RouterOut {
     NodeIDsConnected(NodeIDs),
     NodeInfosConnected(Vec<NodeInfo>),
     NetworkWrapperFromNetwork(NodeID, NetworkWrapper),
+    SystemConfig(FledgerConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -29,6 +30,7 @@ pub enum RouterInternal {
     Disconnected(U256),
     Available(Vec<NodeInfo>),
     MessageFromNode(U256, String),
+    SystemConfig(FledgerConfig),
 }
 
 impl NetworkWrapper {
@@ -49,7 +51,7 @@ impl NetworkWrapper {
     }
 }
 
-impl From<RouterInternal> for RouterIn{
+impl From<RouterInternal> for RouterIn {
     fn from(value: RouterInternal) -> Self {
         RouterIn::Internal(value)
     }
