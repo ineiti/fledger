@@ -62,7 +62,7 @@
                     </div> -->
                     <div class="stat-item">
                         <span class="stat-label">Connections:</span>
-                        <span class="stat-value"><span id="nodes_connected"></span> / <span
+                        <span class="stat-value"><span id="dht_connections"></span> / <span
                                 id="nodes_online"></span></span>
                     </div>
                     <!-- <div class="stat-item">
@@ -91,11 +91,11 @@
                             <span class="stat-label">DHT Storage Buckets:</span>
                             <span class="stat-value" id="dht-storage-buckets">0 - 0</span>
                         </div> -->
-                        <!-- <div class="stat-item">
+                        <div class="stat-item">
                             <span class="stat-label">Random Connections:</span>
                             <span class="stat-value"><span id="nodes_connected"></span> / <span
-                                    id="nodes_online"></span></span>
-                        </div> -->
+                                    id="nodes_online_random"></span></span>
+                        </div>
                         <div class="stat-item">
                             <span class="stat-label">Version:</span>
                             <span class="stat-value" id="version">0 - 0</span>
@@ -144,9 +144,9 @@
                     </div>
 
                     <section id="home_page">
-                        <h2>Fledger Homepage</h2>
+                        <h2>Fledger Pages</h2>
                         <div class="homepage-container" id="dht_page">
-                            <p>Loading homepage content...</p>
+                            <p>Loading available pages...</p>
                         </div>
                     </section>
                 </div>
@@ -156,34 +156,14 @@
                     <section class="chat-container">
                         <div class="chat-main">
                             <div class="message-area" id="messages">
-                                <!-- <div class="message-item received">
-                                    <div class="message-sender">User_28A4F</div>
-                                    <div class="message-content">Hello! Is anyone testing the new proxy system?</div>
-                                    <div class="message-time">10:24</div>
-                                </div>
-                                <div class="message-item sent">
-                                    <div class="message-sender">You</div>
-                                    <div class="message-content">Yes, I'm currently testing it. Works pretty well so
-                                        far!</div>
-                                    <div class="message-time">10:26</div>
-                                </div>
-                                <div class="message-item received">
-                                    <div class="message-sender">Node_19B7C</div>
-                                    <div class="message-content">I'm having some latency issues. Anyone else?</div>
-                                    <div class="message-time">10:29</div>
-                                </div>
-                                <div class="system-message">
-                                    <div class="message-content">Peer_A5D3E has joined the chat</div>
-                                    <div class="message-time">10:31</div>
-                                </div> -->
                             </div>
                             <div class="your-id" style="padding: 0.5rem; text-align: center;">
-                                Your ID: <input type="text" id="username-display" value="User_76F2D" readonly
-                                    style="border: none; background: transparent; font-family: monospace;">
+                                Your ID: <span id="username_display"
+                                    style="border: none; background: transparent; font-family: monospace;"></span>
                             </div>
                             <div class="message-input">
                                 <textarea type="text" id="your_message" placeholder="Type your message..."></textarea>
-                                <button id="send-message-btn"><i class="fas fa-paper-plane"></i></button>
+                                <button id="send_message"><i class="fas fa-paper-plane"></i></button>
                             </div>
                         </div>
                     </section>
@@ -223,10 +203,11 @@
                         <div class="url-input-container">
                             <div class="url-input-wrap">
                                 <i class="fas fa-search"></i>
-                                <input type="url" id="proxy_url" placeholder="Enter URL to browse via proxy" />
+                                <input type="url" id="proxy_url" placeholder="Enter URL to browse via proxy" 
+                                value="https://bearblog.dev/discover/"/>
                                 <!-- Removed proxy-indicators -->
                             </div>
-                            <button id="browse-btn">Browse</button>
+                            <button class="browse-btn" id="proxy_request">Browse</button>
                         </div>
                         <!-- Updated proxy display with border and an example page -->
                         <div id="proxy_div" style="border:1px solid var(--border-color); padding:1rem;">
@@ -600,7 +581,7 @@
         }
     </style>
 
-    <!-- Add Ace Editor CDN and initialization -->
+    <!-- Add Ace Editor CDN and initialization
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
     <script>
         // Initialize Ace Editor for HTML content
@@ -619,6 +600,6 @@
   <p>Welcome to Fledger.</p>
 </body>
 </html>`, -1);
-    </script>
+    </script> -->
 
 </html>

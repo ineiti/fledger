@@ -22,12 +22,13 @@ use wasm_bindgen::{
     JsCast,
 };
 use web_sys::{
-    window, Document, Event, HtmlDivElement, HtmlElement, HtmlInputElement, HtmlOListElement, HtmlTextAreaElement
+    window, Document, Event, HtmlDivElement, HtmlElement, HtmlInputElement, HtmlOListElement,
+    HtmlTextAreaElement,
 };
 
 use flarch::{
     data_storage::DataStorageLocal,
-    nodeids::U256,
+    nodeids::{NodeID, U256},
     tasks::{spawn_local_nosend, wait_ms},
     web_rtc::connection::{ConnectionConfig, HostLogin, Login},
 };
@@ -65,7 +66,7 @@ pub fn main() {
 
         // Create a listening channel that fires whenever the user clicks on the `send_msg` button
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Button>();
-        web.link_btn(tx.clone(), Button::SendMsg, "send_msg");
+        web.link_btn(tx.clone(), Button::SendMsg, "send_message");
         web.link_btn(tx.clone(), Button::DownloadData, "get_data");
         web.link_btn(tx, Button::WebProxy, "proxy_request");
 
@@ -73,7 +74,7 @@ pub fn main() {
         let your_message: HtmlTextAreaElement = web.get_element("your_message");
         let proxy_div: HtmlDivElement = web.get_element("proxy_div");
         let status_steps: HtmlOListElement = web.get_element("status-steps");
-        let loading_info: HtmlDivElement = web.get_element("loading_info");
+        let _loading_info: HtmlDivElement = web.get_element("loading_info");
         let home_page: HtmlElement = web.get_element("home_page");
         home_page.set_hidden(true);
         let proxy_url: HtmlInputElement = web.get_element("proxy_url");
@@ -147,7 +148,7 @@ pub fn main() {
 
             if let Some(state) = web.tick().await {
                 if state.page_tags.len() > 0 && status.0.len() == 3 {
-                    loading_info.set_hidden(true);
+                    // loading_info.set_hidden(true);
                     home_page.set_hidden(false);
                 }
                 if state.nodes_connected >= 2 && status.0.len() == 2 {
@@ -157,17 +158,17 @@ pub fn main() {
                     status.0.push(LI("Connecting to other nodes".into(), None));
                 }
                 web.set_html_id("node_info", state.get_node_name());
+                web.set_html_id("username_display", state.get_node_name());
                 web.set_html_id("version", state.get_version());
                 web.set_html_id("messages", state.get_msgs());
                 web.set_html_id("nodes_online", format!("{}", state.nodes_online));
+                web.set_html_id("nodes_online_random", format!("{}", state.nodes_online));
                 web.set_html_id("nodes_connected", format!("{}", state.nodes_connected));
                 web.set_html_id("msgs_system", format!("{}", state.msgs_system));
                 web.set_html_id("msgs_local", format!("{}", state.msgs_local));
                 // web.set_html_id("dht_stats", state.get_dht_stats());
                 web.set_html_id("dht_page", state.get_dht_pages());
-                // dht-connections - how many nodes we're connected to through DHT
-                // nodes-total - nodes available in total
-                // message-count
+                web.set_html_id("dht_connections", state.dht_router.active.to_string());
                 // dht-pages-own - our pages
                 // dht-pages-total - all pages
                 // dht-storage-local
@@ -216,10 +217,15 @@ impl FledgerWeb {
                 .err()
                 .map(|e| log::error!("Couldn't send message: {e:?}"));
         }) as Box<dyn FnMut(_)>));
-        self.document.get_element_by_id(id).map(|el| {
-            el.add_event_listener_with_callback("click", &cb.as_ref().unchecked_ref())
-                .expect("Should be able to add event listener")
-        });
+        self.document.get_element_by_id(id).map_or_else(
+            || {
+                log::warn!("Couldn't find button with id: {id}");
+            },
+            |el| {
+                el.add_event_listener_with_callback("click", &cb.as_ref().unchecked_ref())
+                    .expect("Should be able to add event listener");
+            },
+        );
     }
 
     fn set_html_id(&self, id: &str, inner_html: String) {
@@ -244,6 +250,9 @@ impl FledgerWeb {
 
     pub async fn tick(&mut self) -> Option<FledgerState> {
         let mut fs = None;
+        if let Err(e) = self.node.dht_storage.as_mut().unwrap().sync() {
+            log::warn!("While synching to other nodes: {e:?}");
+        }
         match FledgerState::new(&self.node, self.page_fetcher.page_tags_rx.borrow().clone()) {
             Ok(f) => fs = Some(f),
             Err(e) => log::error!("Couldn't create state: {:?}", e),
@@ -347,19 +356,23 @@ impl FledgerState {
         let msgs = node.gossip.as_ref().unwrap().chat_events();
         let nodes_info = node.nodes_info_all()?;
         Ok(Self {
-            info,
             nodes_online: node.nodes_online()?.len(),
             nodes_connected: node.nodes_connected()?.len(),
-            msgs_system: 0,
+            msgs_system: msgs.len(),
             msgs_local: msgs.len(),
             mana: 0,
-            msgs: FledgerMessages::new(msgs, &nodes_info.clone().into_values().collect()),
+            msgs: FledgerMessages::new(
+                info.get_id(),
+                msgs,
+                &nodes_info.clone().into_values().collect(),
+            ),
             nodes_info,
             page_tags,
             dht_router: node.dht_router.as_ref().unwrap().stats.borrow().clone(),
             dht_storage: node.dht_storage.as_ref().unwrap().stats.borrow().clone(),
             states: node.stat.as_ref().unwrap().borrow().clone(),
             pings: node.ping.as_ref().unwrap().storage.borrow().clone(),
+            info,
         })
     }
 
@@ -496,6 +509,7 @@ pub struct FledgerMessage {
     from: String,
     date: String,
     text: String,
+    our_message: bool,
 }
 
 #[derive(Clone)]
@@ -504,7 +518,11 @@ pub struct FledgerMessages {
 }
 
 impl FledgerMessages {
-    fn new(mut tm_msgs: Vec<flmodules::gossip_events::core::Event>, nodes: &Vec<NodeInfo>) -> Self {
+    fn new(
+        our_id: NodeID,
+        mut tm_msgs: Vec<flmodules::gossip_events::core::Event>,
+        nodes: &Vec<NodeInfo>,
+    ) -> Self {
         tm_msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
         let mut msgs = vec![];
         for msg in tm_msgs {
@@ -521,6 +539,7 @@ impl FledgerMessages {
                 format!("{}", msg.src)
             };
             msgs.push(FledgerMessage {
+                our_message: our_id == msg.src,
                 from,
                 text: msg.msg.clone(),
                 date,
@@ -528,25 +547,36 @@ impl FledgerMessages {
         }
         FledgerMessages { msgs }
     }
-}
 
-impl FledgerMessages {
     pub fn get_messages(&self) -> String {
         if self.msgs.is_empty() {
             return String::from("No messages");
         }
+        self.msgs
+            .iter()
+            .map(|fm| fm.to_string())
+            .collect::<Vec<String>>()
+            .join("")
+    }
+}
+
+impl FledgerMessage {
+    pub fn to_string(&self) -> String {
         format!(
-            "<ul><li>{}</li></ul>",
-            self.msgs
-                .iter()
-                .map(|fm| format!(
-                    "{} wrote on {}:<br><pre>{}</pre>",
-                    fm.from.clone(),
-                    fm.date.clone(),
-                    fm.text.clone()
-                ))
-                .collect::<Vec<String>>()
-                .join("</li><li>")
+            r#"{}
+                <div class="message-sender">{}</div>
+                <div class="message-content">{}</div>
+                <div class="message-time">{}</div>
+            </div>
+            "#,
+            if self.our_message {
+                format!(r#"<div class="message-item sent">"#)
+            } else {
+                format!(r#"<div class="message-item received">"#)
+            },
+            self.from,
+            self.text,
+            self.date
         )
     }
 }

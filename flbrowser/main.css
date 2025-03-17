@@ -427,7 +427,7 @@ section h2 {
 .status-steps li {
     font-size: 0.9rem;
     color: var(--text-secondary);
-    padding: 0.25rem 0;
+    margin: 0.25rem 0 0 1rem;
 }
 
 /* Homepage container */
@@ -997,7 +997,7 @@ i.fab {
     color: var(--error-color);
 }
 
-#browse-btn {
+.browse-btn {
     width: 100%;
     padding: 0.75rem;
     background-color: var(--primary-color);
@@ -1009,7 +1009,7 @@ i.fab {
     transition: background-color 0.2s;
 }
 
-#browse-btn:hover {
+.browse-btn:hover {
     background-color: #2980b9;
 }
 
