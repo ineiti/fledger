@@ -58,10 +58,14 @@ publish_dry: publish
 
 publish:
 	for crate in ${CRATES}; do \
+		if grep -q '"\*"' $$crate/Cargo.toml; then \
+			echo "Remove wildcard version from $$crate"; \
+			exit 1; \
+		fi; \
 		CRATE_VERSION=$$(cargo search $$crate | grep "^$$crate " | sed -e "s/.*= \"\(.*\)\".*/\1/"); \
 		CARGO_VERSION=$$(grep "^version" $$crate/Cargo.toml | head -n 1 | sed -e "s/.*\"\(.*\)\".*/\1/"); \
 		if [[ "$$CRATE_VERSION" != "$$CARGO_VERSION" ]]; then \
-			echo "Publishing crate $$crate with arg ${PUBLISH}"; \
+			echo "Publishing crate $$crate"; \
 			cargo publish ${PUBLISH} --manifest-path $$crate/Cargo.toml; \
 		fi; \
 	done

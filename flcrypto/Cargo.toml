@@ -19,7 +19,7 @@ flmacro = { path = "../flmacro", version = "0.9" }
 
 anyhow = {version = "1", features = ["backtrace"]}
 async-recursion = "1"
-base64 = "*"
+base64 = "0.22"
 bytes = { version = "1", features = ["serde"] }
 ed25519-dalek = { version="2", features = ["serde", "rand_core"] }
 enum_dispatch = "0.3"
