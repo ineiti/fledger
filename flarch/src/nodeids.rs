@@ -19,7 +19,7 @@ pub enum ParseError {
 
 /// Nicely formatted 256 bit structure
 #[serde_as]
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default, PartialOrd, Ord)]
 pub struct U256(#[serde_as(as = "Hex")] [u8; 32]);
 
 impl fmt::Display for U256 {
@@ -86,7 +86,10 @@ impl U256 {
         Self(hasher.finalize().into())
     }
 
-    pub fn hash_domain_hashmap<K: Serialize, V: Serialize>(domain: &str, hm: &HashMap<K, V>) -> Self {
+    pub fn hash_domain_hashmap<K: Serialize, V: Serialize>(
+        domain: &str,
+        hm: &HashMap<K, V>,
+    ) -> Self {
         let mut parts = vec![];
         for (k, v) in hm {
             parts.push(rmp_serde::to_vec(k).unwrap());
@@ -119,7 +122,7 @@ impl U256 {
 }
 
 impl FromStr for U256 {
-    type Err = ParseError;
+    type Err = anyhow::Error;
 
     /// Convert a hexadecimal string to a U256.
     /// If less than 64 characters are given, the U256 is filled from
@@ -127,14 +130,14 @@ impl FromStr for U256 {
     /// So
     ///   `U256.from_str("1234") == U256.from_str("123400")`
     /// something
-    fn from_str(s: &str) -> Result<U256, ParseError> {
+    fn from_str(s: &str) -> anyhow::Result<U256> {
         if s.len() > 64 {
-            return Err(ParseError::HexTooLong);
+            return Err(ParseError::HexTooLong.into());
         }
         let v: Vec<u8> = (0..s.len())
             .step_by(2)
-            .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
-            .collect::<Result<Vec<u8>, ParseIntError>>()?;
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| e.into()))
+            .collect::<anyhow::Result<Vec<u8>>>()?;
         let mut u = U256 { 0: [0u8; 32] };
         v.iter().enumerate().for_each(|(i, b)| u.0[i] = *b);
         Ok(u)
@@ -293,8 +296,6 @@ mod tests {
 
     use super::*;
 
-    use std::error::Error;
-
     #[test]
     fn test_new_nodes() {
         let mut nodes = NodeIDs::new(4);
@@ -305,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize() -> Result<(), Box<dyn Error>> {
+    fn test_serialize() -> anyhow::Result<()> {
         start_logging();
 
         let id = U256::rnd();

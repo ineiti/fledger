@@ -36,9 +36,9 @@ impl DataStorageFile {
     fn name(&self, key: &str) -> PathBuf {
         let mut name = self.dir.clone();
         name.push(if self.base.is_empty() {
-            format!("fledger_{}.toml", key)
+            format!("fledger_{}.yaml", key)
         } else {
-            format!("{}_{}.toml", self.base, key)
+            format!("{}_{}.yaml", self.base, key)
         });
         name
     }
@@ -86,17 +86,18 @@ impl DataStorage for DataStorageFile {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
+    use crate::nodeids::U256;
 
     use super::*;
 
     #[test]
-    fn write_read() -> Result<(), Box<dyn Error>> {
-        let mut storage = DataStorageFile::new("/tmp/test".into(), "one".into());
+    fn write_read() -> anyhow::Result<()> {
+        let tempdir = format!("/tmp/{}", U256::rnd());
+        let mut storage = DataStorageFile::new(tempdir.clone(), "one".into());
         storage.set("two", "three")?;
         assert_eq!("three", storage.get("two")?);
 
-        let storage = DataStorageFile::new("/tmp/test".into(), "one".into());
+        let storage = DataStorageFile::new(tempdir, "one".into());
         assert_eq!("three", storage.get("two")?);
         Ok(())
     }

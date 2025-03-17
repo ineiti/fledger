@@ -81,11 +81,11 @@ impl EventsStorage {
             .collect()
     }
 
-    pub fn get(&self) -> Result<String, serde_yaml::Error> {
-        serde_yaml::to_string(&EventsStorageSave::V4(self.clone()))
+    pub fn get(&self) -> anyhow::Result<String> {
+        Ok(serde_yaml::to_string(&EventsStorageSave::V4(self.clone()))?)
     }
 
-    pub fn set(&mut self, data: &str) -> Result<(), serde_yaml::Error> {
+    pub fn set(&mut self, data: &str) -> anyhow::Result<()> {
         self.storage = EventsStorageSave::from_str(data)?.storage;
         Ok(())
     }
@@ -100,11 +100,11 @@ enum EventsStorageSave {
 }
 
 impl EventsStorageSave {
-    fn from_str(data: &str) -> Result<EventsStorage, serde_yaml::Error> {
+    fn from_str(data: &str) -> anyhow::Result<EventsStorage> {
         if let Ok(es) = serde_yaml::from_str::<EventsStorageSave>(data) {
             return Ok(es.to_latest());
         }
-        serde_yaml::from_str::<EventsStorageV1>(data).map(|es| es.to_latest())
+        Ok(serde_yaml::from_str::<EventsStorageV1>(data).map(|es| es.to_latest())?)
     }
 
     fn to_latest(self) -> EventsStorage {
@@ -384,8 +384,6 @@ pub struct EventV2 {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use flarch::tasks::now;
 
     use super::*;
@@ -458,7 +456,7 @@ mod tests {
     }
 
     #[test]
-    fn test_storage() -> Result<(), Box<dyn Error>> {
+    fn test_storage() -> anyhow::Result<()> {
         let esv1 = EventsStorageV1::test();
         let esv1_str = serde_yaml::to_string(&esv1)?;
         let mut es = EventsStorage::default();

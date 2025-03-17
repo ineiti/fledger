@@ -1,5 +1,5 @@
 use flarch::{
-    broker::{Broker, BrokerError, Translate},
+    broker::{Broker, Translate},
     nodeids::{NodeID, NodeIDs, U256},
 };
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ impl RandomBroker {
         id: U256,
         broker_net: BrokerNetwork,
         timer: &mut Timer,
-    ) -> Result<Self, BrokerError> {
+    ) -> anyhow::Result<Self> {
         let (messages, storage) = Messages::new(id);
         let mut broker = Broker::new();
         broker.add_handler(Box::new(messages)).await?;

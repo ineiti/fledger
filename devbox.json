@@ -13,13 +13,14 @@
     "darwin.apple_sdk.frameworks.Security": {
       "platforms": ["x86_64-darwin", "aarch64-darwin"]
     },
-    "git":       "latest",
-    "less":      "latest",
-    "vim":       "latest",
-    "openssh":   "latest",
-    "trunk":     "latest",
-    "wasm-pack": "latest",
-    "nodejs":    "18"
+    "git":         "latest",
+    "less":        "latest",
+    "vim":         "latest",
+    "openssh":     "latest",
+    "trunk":       "latest",
+    "wasm-pack":   "latest",
+    "nodejs":      "18",
+    "cargo-udeps": "latest"
   },
   "shell": {
     "init_hook": [
@@ -38,7 +39,7 @@
         "Code --user-data-dir .vscode ."
       ],
       "clean": [
-  "make clean"
+        "make clean"
       ]
     }
   },

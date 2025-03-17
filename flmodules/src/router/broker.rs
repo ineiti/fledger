@@ -1,5 +1,5 @@
 use flarch::{
-    broker::{Broker, BrokerError, SubsystemHandler},
+    broker::{Broker, SubsystemHandler},
     nodeids::U256,
     platform_async_trait,
 };
@@ -16,7 +16,7 @@ pub type BrokerRouter = Broker<RouterIn, RouterOut>;
 pub struct RouterRandom {}
 
 impl RouterRandom {
-    pub async fn start(mut random: BrokerRandom) -> Result<BrokerRouter, BrokerError> {
+    pub async fn start(mut random: BrokerRandom) -> anyhow::Result<BrokerRouter> {
         let b = Broker::new();
         // Translate RandomOut to FromRouter, and ToRouter to RandomIn.
         // A module connected to the Broker<RouterMessage> will get translations of the
@@ -64,7 +64,7 @@ pub struct RouterNetwork {
 }
 
 impl RouterNetwork {
-    pub async fn start(mut network: BrokerNetwork) -> Result<BrokerRouter, BrokerError> {
+    pub async fn start(mut network: BrokerNetwork) -> anyhow::Result<BrokerRouter> {
         let mut b = Broker::new();
         // Subsystem for handling Connected and Disconnected messages from the Network broker.
         b.add_handler(Box::new(RouterNetwork {
@@ -86,6 +86,9 @@ impl RouterNetwork {
                     NetworkOut::NodeListFromWS(vec) => Some(RouterInternal::Available(vec).into()),
                     NetworkOut::Connected(id) => Some(RouterInternal::Connected(id).into()),
                     NetworkOut::Disconnected(id) => Some(RouterInternal::Disconnected(id).into()),
+                    NetworkOut::SystemConfig(conf) => {
+                        Some(RouterInternal::SystemConfig(conf).into())
+                    }
                     _ => None,
                 }),
             )
@@ -148,13 +151,14 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
                             out.push(RouterOut::NetworkWrapperFromNetwork(id, module_message))
                         });
                     }
+                    RouterInternal::SystemConfig(conf) => out.push(RouterOut::SystemConfig(conf)),
                 }
             }
         }
 
         // If something changed, output all relevant messages.
-        out.extend(if ret {
-            vec![
+        if ret {
+            out.extend(vec![
                 RouterOut::NodeInfoAvailable(self.nodes_available.clone()),
                 RouterOut::NodeIDsConnected(self.nodes_connected.clone().into()),
                 RouterOut::NodeInfosConnected(
@@ -164,10 +168,8 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
                         .cloned()
                         .collect(),
                 ),
-            ]
-        } else {
-            vec![]
-        });
+            ]);
+        }
 
         out
     }
@@ -175,8 +177,6 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
 
 #[cfg(test)]
 mod test {
-    use std::error::Error;
-
     use flarch::{nodeids::NodeID, start_logging_filter_level};
 
     use crate::nodeconfig::NodeConfig;
@@ -200,7 +200,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_direct_dis_connect() -> Result<(), BrokerError> {
+    async fn test_direct_dis_connect() -> anyhow::Result<()> {
         let mut od = RouterNetwork {
             nodes_available: vec![],
             nodes_connected: vec![],
@@ -269,7 +269,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_io() -> Result<(), Box<dyn Error>> {
+    async fn test_io() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
 
         let mut net = Broker::new();

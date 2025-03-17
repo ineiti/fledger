@@ -1,7 +1,7 @@
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
-use flarch::broker::{Broker, BrokerError, Message};
+use flarch::broker::{Broker, Message};
 use flarch::tasks::{spawn_local, Interval};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,7 +20,7 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub async fn start() -> Result<Timer, BrokerError> {
+    pub async fn start() -> anyhow::Result<Timer> {
         let broker = Broker::new();
         let mut broker_cl = broker.clone();
         spawn_local(async move {
@@ -56,7 +56,7 @@ impl Timer {
         broker: Broker<I, O>,
         msg: I,
         tick: TimerMessage,
-    ) -> Result<(), BrokerError> {
+    ) -> anyhow::Result<()> {
         self.broker
             .add_translator_o_ti(
                 broker,
@@ -71,7 +71,7 @@ impl Timer {
         &mut self,
         broker: Broker<I, O>,
         msg: I,
-    ) -> Result<(), BrokerError> {
+    ) -> anyhow::Result<()> {
         self.tick(broker, msg, TimerMessage::Second).await
     }
 
@@ -79,7 +79,7 @@ impl Timer {
         &mut self,
         broker: Broker<I, O>,
         msg: I,
-    ) -> Result<(), BrokerError> {
+    ) -> anyhow::Result<()> {
         self.tick(broker, msg, TimerMessage::Minute).await
     }
 }

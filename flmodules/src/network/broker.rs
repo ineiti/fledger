@@ -36,6 +36,8 @@ use crate::{
     nodeconfig::{NodeConfig, NodeInfo},
 };
 
+use super::signal::FledgerConfig;
+
 pub type BrokerNetwork = Broker<NetworkIn, NetworkOut>;
 
 #[allow(clippy::large_enum_variant)]
@@ -84,6 +86,8 @@ pub enum NetworkOut {
     /// This is used in the From and Into methods
     WebSocket(WSClientIn),
     WebRTC(WebRTCConnInput),
+    /// Configuration from the signalling server
+    SystemConfig(FledgerConfig),
 }
 
 #[derive(Error, Debug)]
@@ -127,7 +131,7 @@ impl Network {
         node_config: NodeConfig,
         ws: BrokerWSClient,
         web_rtc: BrokerWebRTCConn,
-    ) -> Result<Self, NetworkError> {
+    ) -> anyhow::Result<Self> {
         let mut broker = Broker::new();
         let (messages, connections) = Messages::start(node_config);
         broker.add_handler(Box::new(messages)).await?;
@@ -223,10 +227,13 @@ impl Messages {
                     ))],
                 ])
             }
+            WSSignalMessageToNode::SystemConfig(fledger_config) => {
+                vec![NetworkOut::SystemConfig(fledger_config)]
+            }
         }
     }
 
-    async fn msg_call(&mut self, msg: NetworkIn) -> Result<Vec<NetworkOut>, NetworkError> {
+    async fn msg_call(&mut self, msg: NetworkIn) -> anyhow::Result<Vec<NetworkOut>> {
         match msg {
             NetworkIn::MessageToNode(id, msg_str) => {
                 log::trace!(
@@ -373,14 +380,14 @@ impl NetworkWebRTC {
     /// Takes a [`Network`] and returns the wrapped [`Network`].
     /// It waits for the [`Network`] to be completely set up.
     /// For this reason the [`Network`] must not have been used before.
-    pub async fn start(mut broker_net: BrokerNetwork) -> Result<Self, NetworkError> {
+    pub async fn start(mut broker_net: BrokerNetwork) -> anyhow::Result<Self> {
         let (mut tap, _) = broker_net.get_tap_out().await?;
         let mut timeout = Interval::new_interval(Duration::from_secs(10));
         timeout.next().await;
         loop {
             tokio::select! {
                 _ = timeout.next() => {
-                    return Err(NetworkError::SignallingServer);
+                    return Err(NetworkError::SignallingServer.into());
                 }
                 msg = tap.recv() => {
                     if matches!(msg, Some(NetworkOut::NodeListFromWS(_))){
@@ -407,19 +414,19 @@ impl NetworkWebRTC {
     /// Send a message to the [`Network`] asynchronously.
     /// The message is of type [`NetworkIn`], as this is what the user can
     /// send to the [`Network`].
-    pub fn send(&mut self, msg: NetworkIn) -> Result<(), BrokerError> {
+    pub fn send(&mut self, msg: NetworkIn) -> anyhow::Result<()> {
         self.broker_net.emit_msg_in(msg)
     }
 
     /// Tries to send a text-message to a remote node.
     /// The [`Network`] will start a connection with the node if there is none available.
     /// If the remote node is not available, no error is returned.
-    pub fn send_msg(&mut self, dst: NodeID, msg: String) -> Result<(), BrokerError> {
+    pub fn send_msg(&mut self, dst: NodeID, msg: String) -> anyhow::Result<()> {
         self.send(NetworkIn::MessageToNode(dst, msg))
     }
 
     /// Requests an updated list of all connected nodes to the signalling server.
-    pub fn send_list_request(&mut self) -> Result<(), BrokerError> {
+    pub fn send_list_request(&mut self) -> anyhow::Result<()> {
         self.send(NetworkIn::WSUpdateListRequest)
     }
 }
@@ -430,7 +437,7 @@ impl From<WSSignalMessageFromNode> for NetworkOut {
     }
 }
 
-impl<T> From<WSSignalMessageFromNode> for Result<Vec<NetworkOut>, T> {
+impl From<WSSignalMessageFromNode> for anyhow::Result<Vec<NetworkOut>> {
     fn from(msg: WSSignalMessageFromNode) -> Self {
         Ok(vec![msg.into()])
     }
@@ -490,6 +497,7 @@ impl fmt::Display for NetworkOut {
             NetworkOut::Disconnected(_) => write!(f, "Disconnected()"),
             NetworkOut::WebSocket(_) => write!(f, "WebSocket"),
             NetworkOut::WebRTC(_) => write!(f, "WebRTC"),
+            NetworkOut::SystemConfig(_) => write!(f, "SystemConfig"),
         }
     }
 }
@@ -530,7 +538,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_serialize() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_serialize() -> anyhow::Result<()> {
         start_logging();
 
         let cha = U256::rnd();

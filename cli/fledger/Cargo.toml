@@ -1,6 +1,6 @@
 [package]
 name = "fledger"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "The fledger server as a CLI"
@@ -17,10 +17,11 @@ flmodules = { path = "../../flmodules", version = "0.9" }
 flnode = { path = "../../flnode", version = "0.9" }
 flcrypto = { path = "../../flcrypto", version = "0.9" }
 
+anyhow = {version = "1", features = ["backtrace"]}
 clap = "4"
-clap-verbosity-flag = "2"
+clap-verbosity-flag = "3"
 env_logger = "0.11"
 log = "0.4"
-thiserror = "1"
+thiserror = "2"
 tokio = "1"
-webrtc-util = "0.9"
+webrtc-util = "0.10"

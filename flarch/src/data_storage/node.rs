@@ -28,9 +28,9 @@ impl DataStorageNode {
     
     fn name(&self, key: &str) -> String {
         if self.base.is_empty() {
-            format!("fledger_{}.toml", key)
+            format!("fledger_{}.yaml", key)
         } else {
-            format!("{}_{}.toml", self.base, key)
+            format!("{}_{}.yaml", self.base, key)
         }
     }
 }

@@ -51,7 +51,8 @@ pub(super) enum InternOut {
 
 #[derive(Clone, Debug, Default)]
 pub struct Stats {
-    pub nodes: Vec<NodeID>,
+    pub all_nodes: Vec<NodeID>,
+    pub bucket_nodes: Vec<Vec<NodeID>>,
     pub active: usize,
 }
 
@@ -123,7 +124,10 @@ impl Messages {
         if let Some(&next_hop) = self.core.route_closest(&key, None).first() {
             vec![ModuleMessage::Closest(self.core.root, key, msg.clone()).wrapper_network(next_hop)]
         } else {
-            log::warn!("Couldn't send new request because no closer nodes found!");
+            // log::trace!(
+            //     "{}: key {key} is already at its closest node",
+            //     self.core.root
+            // );
             vec![]
         }
     }
@@ -132,7 +136,10 @@ impl Messages {
         if let Some(&next_hop) = self.core.route_closest(&dst, None).first() {
             vec![ModuleMessage::Direct(self.core.root, dst, msg.clone()).wrapper_network(next_hop)]
         } else {
-            log::warn!("Couldn't send new request because direct node not found!");
+            // log::trace!(
+            //     "{}: couldn't send new request because no hop to {dst} available",
+            //     self.core.root
+            // );
             vec![]
         }
     }
@@ -179,17 +186,18 @@ impl Messages {
     fn update_stats(&mut self) {
         self.tx.clone().map(|tx| {
             tx.send(Stats {
-                nodes: self
+                all_nodes: self
                     .core
                     .active_nodes()
                     .iter()
                     .chain(self.core.cache_nodes().iter())
                     .cloned()
                     .collect::<Vec<_>>(),
+                bucket_nodes: self.core.bucket_nodes(),
                 active: self.core.active_nodes().len(),
             })
-                .is_err()
-                .then(|| self.tx = None)
+            .is_err()
+            .then(|| self.tx = None)
         });
     }
 }
@@ -222,6 +230,10 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
                     RouterOut::NetworkWrapperFromNetwork(from, network_wrapper) => {
                         self.process_node_message(from, network_wrapper)
                     }
+                    RouterOut::SystemConfig(conf) => conf
+                        .system_realm
+                        .map(|rid| vec![InternOut::DHTRouter(DHTRouterOut::SystemRealm(rid))])
+                        .unwrap_or(vec![]),
                     _ => vec![],
                 },
             })
@@ -265,7 +277,7 @@ impl TranslateInto<TimerMessage> for InternOut {
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, str::FromStr};
+    use std::str::FromStr;
 
     use flarch::{nodeids::U256, start_logging_filter_level};
 
@@ -274,7 +286,7 @@ mod tests {
     const LOG_LVL: log::LevelFilter = log::LevelFilter::Info;
 
     #[tokio::test]
-    async fn test_depth() -> Result<(), Box<dyn Error>> {
+    async fn test_depth() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], LOG_LVL);
 
         let root = U256::from_str("00").unwrap();

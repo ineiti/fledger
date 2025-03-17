@@ -29,7 +29,7 @@ pub async fn main() {
         .map(|e| log::error!("While running main: {e:?}"));
 }
 
-async fn runit() -> Result<(), Box<dyn std::error::Error>> {
+async fn runit() -> anyhow::Result<()> {
     let storage = DataStorageNode::new("fledger".into());
     let node_config = Node::get_config(storage.clone())?;
 

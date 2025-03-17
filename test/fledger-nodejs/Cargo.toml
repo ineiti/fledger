@@ -1,6 +1,6 @@
 [package]
 name = "fledger-node"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "The fledger server as a CLI using node, to test wasm"
@@ -22,7 +22,7 @@ flarch = {path="../../flarch", features = ["node"], version = "0.9"}
 flmodules = {path="../../flmodules", version = "0.9"}
 flnode = {path = "../../flnode", version = "0.9"}
 
-thiserror = "1"
+thiserror = "2"
 env_logger = "0.11"
 log = "0.4"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }

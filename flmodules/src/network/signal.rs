@@ -50,14 +50,11 @@
 use bimap::BiMap;
 use serde::{Deserialize, Serialize};
 use serde_with::{hex::Hex, serde_as};
-use std::{
-    collections::HashMap,
-    fmt::{Error, Formatter},
-};
+use std::{collections::HashMap, fmt::Formatter};
 
-use crate::{nodeconfig::NodeInfo, timer::Timer};
+use crate::{flo::realm::RealmID, nodeconfig::NodeInfo, timer::Timer};
 use flarch::{
-    broker::{Broker, BrokerError, SubsystemHandler, TranslateFrom, TranslateInto},
+    broker::{Broker, SubsystemHandler, TranslateFrom, TranslateInto},
     nodeids::{NodeID, U256},
     platform_async_trait,
     web_rtc::{
@@ -67,6 +64,16 @@ use flarch::{
 };
 
 pub type BrokerSignal = Broker<SignalIn, SignalOut>;
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub struct FledgerConfig {
+    pub system_realm: Option<RealmID>,
+}
+
+pub struct SignalConfig {
+    pub ttl_minutes: u16,
+    pub system_realm: Option<RealmID>,
+}
 
 #[derive(Clone)]
 /// Messages for the signalling server
@@ -100,8 +107,8 @@ pub enum SignalOut {
 pub struct SignalServer {
     connection_ids: BiMap<U256, usize>,
     info: HashMap<U256, NodeInfo>,
-    ttl: HashMap<usize, u64>,
-    ttl_minutes: u64,
+    ttl: HashMap<usize, u16>,
+    ttl_minutes: u16,
 }
 
 /// Our current version - will change if the API is incompatible.
@@ -113,8 +120,8 @@ impl SignalServer {
     /// kept in the list.
     pub async fn new(
         ws_server: BrokerWSServer,
-        ttl_minutes: u64,
-    ) -> Result<BrokerSignal, BrokerError> {
+        config: SignalConfig,
+    ) -> anyhow::Result<BrokerSignal> {
         let mut broker = Broker::new();
         broker
             .add_handler(Box::new(SignalServer {
@@ -123,7 +130,7 @@ impl SignalServer {
                 ttl: HashMap::new(),
                 // Add 2 to the ttl_minutes to make sure that nodes are kept at least
                 // 1 minute in the list.
-                ttl_minutes: ttl_minutes + 2,
+                ttl_minutes: config.ttl_minutes + 2,
             }))
             .await?;
         broker.link_bi(ws_server).await?;
@@ -166,7 +173,7 @@ impl SignalServer {
         for (index, ttl) in self.ttl.iter_mut() {
             *ttl -= 1;
             if *ttl == 0 {
-                log::debug!("Removing idle node {index}");
+                log::info!("Removing idle node {index}");
                 to_remove.push(*index);
             }
         }
@@ -256,9 +263,11 @@ impl SignalServer {
     }
 
     fn remove_node(&mut self, index: usize) {
+        log::info!("Removing node {index} from {:?}", self.info);
         if let Some((id, _)) = self.connection_ids.remove_by_right(&index) {
             self.info.remove(&id);
         }
+        log::info!("Info is now: {:?}", self.info);
         self.ttl.remove(&index);
     }
 }
@@ -304,6 +313,8 @@ pub enum WSSignalMessageToNode {
     ListIDsReply(Vec<NodeInfo>),
     /// Information for setting up a WebRTC connection
     PeerSetup(PeerInfo),
+    /// General configuration for the system
+    SystemConfig(FledgerConfig),
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -327,6 +338,7 @@ impl std::fmt::Display for WSSignalMessageToNode {
             WSSignalMessageToNode::Challenge(_, _) => write!(f, "Challenge"),
             WSSignalMessageToNode::ListIDsReply(_) => write!(f, "ListIDsReply"),
             WSSignalMessageToNode::PeerSetup(_) => write!(f, "PeerSetup"),
+            WSSignalMessageToNode::SystemConfig(_) => write!(f, "SystemConfig"),
         }
     }
 }
@@ -374,7 +386,7 @@ pub struct NodeStat {
 }
 
 impl std::fmt::Debug for SignalIn {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             SignalIn::WSServer(_) => write!(f, "WebSocket"),
             SignalIn::Timer => write!(f, "Timer"),

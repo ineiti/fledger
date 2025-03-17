@@ -89,7 +89,7 @@ and retrieve always the latest version:
 
 ```rust
 #[test]
-fn test_config() -> Result<(), Box<dyn std::error::Error>> {
+fn test_config() -> anyhow::Result<()> {
     // Simulate the storage of an old configuration.
     let v1 = ConfigV1 { name: "123".into() };
     let cv1 = ConfigVersion::V1(v1);
@@ -186,3 +186,20 @@ Specifically the handling of the `type` is very ugly, as it converts the type to
 adds conditionally `+ Send` three characters from the end, and parses the resulting string.
 
 Kids, don't do this at home...
+
+## test_async_stack
+
+When using `#[tokio::test]` the stack is sometimes too small, for example in the 
+`flmacro::test::webpage` test.
+This is where the `test_async_stack` macro comes in, which sets a bigger stack size
+and also adds more threads.
+You can use it like this:
+
+```rust
+#[test_async_stack(stack_size = 10 * 1024 * 1024, worker_threads = 8)]
+async fn page_full() -> anyhow::Result<()> {
+    Ok(())
+}
+```
+
+If the chose values work for you, they can be omitted.

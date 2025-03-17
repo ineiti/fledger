@@ -1,12 +1,15 @@
 use flarch::{
-    broker::{BrokerError, Broker, SubsystemHandler, Translate},
+    broker::{Broker, SubsystemHandler, Translate},
     nodeids::{NodeID, U256},
     platform_async_trait,
 };
 
 use crate::{
     nodeconfig::{NodeConfig, NodeInfo},
-    router::{broker::BrokerRouter, messages::{RouterIn, RouterOut}},
+    router::{
+        broker::BrokerRouter,
+        messages::{RouterIn, RouterOut},
+    },
 };
 
 pub struct RouterSimul {
@@ -14,7 +17,7 @@ pub struct RouterSimul {
 }
 
 impl RouterSimul {
-    pub async fn new() -> Result<Self, BrokerError> {
+    pub async fn new() -> anyhow::Result<Self> {
         let mut nsh_broker = Broker::new();
         nsh_broker
             .add_handler(Box::new(NSHub { nodes: vec![] }))
@@ -22,16 +25,14 @@ impl RouterSimul {
         Ok(Self { nsh_broker })
     }
 
-    pub async fn new_node(
-        &mut self,
-    ) -> Result<(NodeConfig, BrokerRouter), BrokerError> {
+    pub async fn new_node(&mut self) -> anyhow::Result<(NodeConfig, BrokerRouter)> {
         self.new_node_id(None).await
     }
 
     pub async fn new_node_id(
         &mut self,
         id_opt: Option<NodeID>,
-    ) -> Result<(NodeConfig, BrokerRouter), BrokerError> {
+    ) -> anyhow::Result<(NodeConfig, BrokerRouter)> {
         let (id, nc) = if let Some(id) = id_opt {
             (id, NodeConfig::new_id(id))
         } else {

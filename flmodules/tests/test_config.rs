@@ -45,7 +45,7 @@ struct ConfigV1 {
 }
 
 #[test]
-fn test_config() -> Result<(), Box<dyn std::error::Error>> {
+fn test_config() -> anyhow::Result<()> {
     // Simulate the storage of an old configuration.
     let v1 = ConfigV1 { name: "123".into() };
     let cv1 = ConfigVersion::ConfigV1(v1);
@@ -71,7 +71,7 @@ struct NewStruct {
 }
 
 #[test]
-fn test_new_struct() -> Result<(), Box<dyn std::error::Error>> {
+fn test_new_struct() -> anyhow::Result<()> {
     let ns = NewStruct {
         field: "123".into(),
     };

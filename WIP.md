@@ -2,11 +2,6 @@
 
 This file is in place of github issues, as currently I'm mostly developing on my own.
 
-## Removing Broker and replace it with BrokerIO
-
-- update documentation
-  - `flmoduls::network`
-
 ## Current high-level goal
 
 - Store a webpage in fledger
@@ -17,68 +12,34 @@ This file is in place of github issues, as currently I'm mostly developing on my
 
 Implement [DHT_STORAGE.md](./DHT_STORAGE.md).
 
+### Signalling server
+
+Pass system realm to nodes.
+
 ### DHT_storage
 
-1. Link it correctly to DHT_router
-  - implement and test the `DHTStorage(In|Out)` messages for interaction with local modules
-  - Implement and test the `MessageNodeDirect` messages to automatically update the FLOs stored
-2. Store up to 1MB of data
-3. Delete oldest/farthest data
-4. Re-arranged everything to fit it better - probably should create a diagram to make sure it
-still makes sense...
-5. Implement the case when not all Flos are stored in all nodes, searching in other nodes, synching
-   cuckoo-IDs, remove furthest (shallowest) flos if memory is full
-
 TODO:
+- add own Flos to DHTConfig.owned
 - verify Flos when they enter the system
+
+### Testing
+
+# TODO
+
+## Features
+
+DHT_Storage:
 - when new FloMetas enter the system, check which are the most probable to be kept:
   - choose the closest (with the highest depth) not-yet-stored Flos for synching
 - Add a timeout to FloCuckoos when they are purged from the system
 - Add a timeout for Flos to purge them from the system
 
-### Testing
-
-Test in `flmodules/test/webpage.rs`:
-- complete, including cuckoos, limited memory.
-Make the following tests work again:
-- `make cargo_test`
-- `examples/ping-pong`
-- `test/webrtc-libc-wasm`
-
-
-### Crypto
-
-Have working `Identities` (`Identity`), and `Condition`s.
-
-TODO:
-- finish access::test_badge
-
-### Flo
-
-Uses real signatures and verifications now
-
-TODO:
-- Clean up the mess - it's still too much stuff calling criss-cross each other.
-- Where are the Verifiers stored? 
-- There must be something shady going on with regard
-  to the verifierIDs which definitely don't match the FloID.
-- Store all necessary data for verification in the Flo itself
-
-### DHT_router
-
--- seems to be more or less OK, at least if it's usable by DHT_storage --
-
-1. KBucket.active is only be populated once a node has been confirmed.
+DHT_Router:
+- KBucket.active is only be populated once a node has been confirmed.
   - Needs more testing if nodes fail and how they will be replaced
-
-TODO:
-- should it also store one kademlia per realm?
-  - active nodes are stored in their own vec
+- possible extension to allow for indpendant realms:
+  - active nodes are stored in a global vec
   - each realm-kademlia looks in these nodes first to populate the buckets
-
-# TODO
-
-## Features
 
 ## Bugs
 
@@ -89,15 +50,8 @@ TODO:
 
 ## Cleanups / improvements
 
-- flnode/src/node.rs changes:
-  - instead of calling `update`, use the `template` version with a tap and a watcher
-  - add the timer as an argument to the brokers which need it and remove the `add_timer` method
-- rewrite the flmodules/src/\*/broker.rs :
-  - move dht_storage way of broker.rs/message.rs to other brokers, too
-- yaml files are stored as .toml
-  - make sure old files can be read as .toml
-  - save new files as .yaml
-  - delete old .toml files
+- remove all the logging comments
+- update documentation `flmoduls::network`
 - serde_yaml is deprecated
   - use serde_yaml_ng with singleton_map_recursive
 - use matchbox from https://github.com/johanhelsing/matchbox
@@ -106,8 +60,7 @@ TODO:
     only `Destination::All` is ever used
   - Replace `process` with `async-task`
     Not sure what is up with that. `process` is a method from `Broker`, while `async-task` is a crate
-  - Add `process_msg` with a `Destination::Settle<Vec<BrokerID>>`
-    Again, two years later, no idea...
+    Probably instead of calling `Broker.process` use an `async-task` to call pending messages
 
 ## Reaching out
 
@@ -116,6 +69,33 @@ Added fledger to blog: https://ineiti.ch/projects/fledger/
 # Some things done
 
 ### Done
+- Flo
+  - Uses real signatures and verifications now
+- DHT_storage
+  - Working version with flos stored in the nearest nodes and automatic synchronisation
+    with other nodes.
+- Crypto
+  - Have working `Signer`s, `Verifier`s, `Badge`s, and `Condition`s.
+- DHT_router
+  - usable with enough functionalities
+- Store yaml files as .yaml instead of .toml
+- Flos:
+  - Make different updates for data change and for rules change
+  - Clean up the mess - it's still too much stuff calling criss-cross each other
+  - Removed Rules and ACE
+- Test in `flmodules/test/webpage.rs`:
+  - complete, including cuckoos, limited memory.
+- Make the following tests work again:
+  - `make cargo_test`
+  - `examples/ping-pong`
+  - `test/webrtc-libc-wasm`
+- Where are the Verifiers stored? In the DHT, like others
+- Store all necessary data for verification in the Flo itself
+- flnode/src/node.rs changes:
+  - instead of calling `update`, use the `template` version with a tap and a watcher
+  - add the timer as an argument to the brokers which need it and remove the `add_timer` method
+- rewrite the flmodules/src/\*/broker.rs :
+  - move dht_storage way of broker.rs/message.rs to other brokers, too
 - Look at all TODOs
 - make all tests pass again
 - also compile for wasm

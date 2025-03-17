@@ -3,6 +3,7 @@ use std::any::Any;
 // Define a custom attribute macro for platform-specific async_trait
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
+use syn::punctuated::Punctuated;
 use syn::*;
 
 #[proc_macro_attribute]
@@ -96,9 +97,9 @@ pub fn as_u256_derive(input: TokenStream) -> TokenStream {
         }
 
         impl std::str::FromStr for #name {
-            type Err = flarch::nodeids::ParseError;
+            type Err = anyhow::Error;
 
-            fn from_str(s: &str) -> Result<#name, flarch::nodeids::ParseError> {
+            fn from_str(s: &str) -> anyhow::Result<#name> {
                 Ok(Self(U256::from_str(s)?))
             }
         }
@@ -288,7 +289,7 @@ pub fn versioned_serde(input: TokenStream) -> TokenStream {
             }
         }
     }
-    .into() 
+    .into()
 }
 
 #[proc_macro_attribute]
@@ -334,4 +335,85 @@ pub fn target_send(_attr: TokenStream, input: TokenStream) -> TokenStream {
         format!("Unsupported type {:?}", input.type_id()),
     );
     TokenStream::from(error.to_compile_error())
+}
+
+use syn::{parse_macro_input, ItemFn, Lit, Meta};
+
+#[proc_macro_attribute]
+pub fn test_async_stack(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attrs = if !attr.is_empty() {
+        parse_macro_input!(attr with Punctuated::<Meta, Token![,]>::parse_terminated)
+    } else {
+        Punctuated::new()
+    };
+    let input = parse_macro_input!(item as ItemFn);
+
+    // Ensure the function is async
+    if input.sig.asyncness.is_none() {
+        return syn::Error::new_spanned(
+            input.sig.fn_token,
+            "test_async_stack can only be applied to async functions",
+        )
+        .to_compile_error()
+        .into();
+    }
+
+    // Default values
+    let mut stack_size: usize = 10 * 1024 * 1024; // 10 MiB
+    let mut worker_threads: usize = 8;
+
+    // Parse attributes
+    for meta in attrs {
+        if let Meta::NameValue(nv) = meta {
+            if nv.path.is_ident("stack_size") {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Int(lit_int),
+                    ..
+                }) = nv.value
+                {
+                    stack_size = lit_int.base10_parse().unwrap_or(stack_size);
+                }
+            } else if nv.path.is_ident("worker_threads") {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Int(lit_int),
+                    ..
+                }) = nv.value
+                {
+                    worker_threads = lit_int.base10_parse().unwrap_or(worker_threads);
+                }
+            }
+        }
+    }
+
+    // Get the original function's parts
+    let vis = input.vis;
+    let sig = input.sig;
+    let body = input.block;
+    let attrs = input.attrs;
+    let ident = sig.ident;
+
+    // Generate the new test function with inlined run_big_stack functionality
+    let output = quote! {
+        #[test]
+        #(#attrs)*
+        #vis fn #ident() -> anyhow::Result<()> {
+            std::thread::Builder::new()
+                .stack_size(#stack_size)
+                .spawn(move || {
+                    tokio::runtime::Builder::new_multi_thread()
+                        .worker_threads(#worker_threads)
+                        .enable_all()
+                        .build()
+                        .unwrap()
+                        .block_on(async {
+                            async #body.await
+                        })
+                })
+                .unwrap()
+                .join()
+                .unwrap()
+        }
+    };
+
+    output.into()
 }

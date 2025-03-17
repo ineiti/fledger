@@ -1,5 +1,5 @@
 use flarch::{
-    broker::{Broker, BrokerError, SubsystemHandler},
+    broker::{Broker, SubsystemHandler},
     nodeids::{NodeID, U256},
     platform_async_trait,
 };
@@ -23,7 +23,7 @@ pub struct NetworkSimul {
 }
 
 impl NetworkSimul {
-    pub async fn new() -> Result<Self, BrokerError> {
+    pub async fn new() -> anyhow::Result<Self> {
         let nsh_broker = NSHub::new().await?;
         Ok(Self {
             nsh_broker,
@@ -31,7 +31,7 @@ impl NetworkSimul {
         })
     }
 
-    pub async fn new_node_broker(&mut self) -> Result<(NodeConfig, BrokerNetwork), BrokerError> {
+    pub async fn new_node_broker(&mut self) -> anyhow::Result<(NodeConfig, BrokerNetwork)> {
         let nc = NodeConfig::new();
         let nc_id = nc.info.get_id();
         let nm_broker = Broker::new();
@@ -52,7 +52,7 @@ impl NetworkSimul {
         Ok((nc, nm_broker))
     }
 
-    pub async fn new_node(&mut self) -> Result<RouterNode, BrokerError> {
+    pub async fn new_node(&mut self) -> anyhow::Result<RouterNode> {
         let (config, net) = self.new_node_broker().await?;
         let node = RouterNode {
             config,
@@ -64,7 +64,7 @@ impl NetworkSimul {
         Ok(node)
     }
 
-    pub async fn settle(&mut self) -> Result<(), BrokerError> {
+    pub async fn settle(&mut self) -> anyhow::Result<()> {
         self.nsh_broker.settle(vec![]).await
     }
 
@@ -72,7 +72,7 @@ impl NetworkSimul {
         self.nodes.iter().map(|n| n.config.info.get_id()).collect()
     }
 
-    pub async fn send_node_info(&mut self) -> Result<(), BrokerError> {
+    pub async fn send_node_info(&mut self) -> anyhow::Result<()> {
         let infos: Vec<NodeInfo> = self.nodes.iter().map(|n| n.config.info.clone()).collect();
         for node in &mut self.nodes {
             let our_id = node.config.info.get_id();
@@ -107,7 +107,7 @@ struct NSHub {
 }
 
 impl NSHub {
-    async fn new() -> Result<Broker<NSHubIn, NSHubOut>, BrokerError> {
+    async fn new() -> anyhow::Result<Broker<NSHubIn, NSHubOut>> {
         let mut b = Broker::new();
         b.add_handler(Box::new(Self { nodes: vec![] })).await?;
         Ok(b)

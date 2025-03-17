@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "ping"
-version = "0.1.0"
+version = "0.9.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -9,6 +9,7 @@ version = "0.1.0"
 flarch = {path = "../../flarch", version = "0.9"}
 flmodules = {path = "../../flmodules", version = "0.9"}
 
+anyhow = {version = "1", features = ["backtrace"]}
 clap = {version = "4", features = ["derive"]}
 log = "0.4"
 tokio = "1"

@@ -6,14 +6,19 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
-## [0.9.1] - 2025-02-25
-This is for `flnode`, `flmodules`, `flmacro`
+## [0.9.1] - Pending
+
+### Added
+
+### Changed
+- flarch::Broker - replaced `Broker` with `BrokerIO` everywhere
+- flmodules::* - unified the use of `broker.rs` / `message.rs` / `core.rs` in all modules
+- flcrypto / flmodules::flo - simplified usage of Flos wrt signing
+- using `VersionedSerde` for node configurations now
+- config files are now stored as `.yaml` instead of `.toml`
 
 ### Fixed
 - correct loading of old configurations
-
-### Changed
-- using `VersionedSerde` for node configurations now
 
 ## [0.9.0] - 2025-02-24
 

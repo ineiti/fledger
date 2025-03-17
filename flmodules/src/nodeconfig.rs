@@ -10,7 +10,7 @@ use flarch::nodeids::{NodeID, U256};
 use flmacro::VersionedSerde;
 use serde_derive::{Deserialize, Serialize};
 use serde_with::{base64::Base64, hex::Hex, serde_as};
-use std::fmt::{Debug, Error, Formatter};
+use std::fmt::{Debug, Formatter};
 use thiserror::Error;
 
 use crate::Modules;
@@ -106,7 +106,7 @@ impl NodeInfo {
 }
 
 impl Debug for NodeInfo {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let pubkey: String = self.pubkey.iter().map(|b| format!("{:02x}", b)).collect();
 
         write!(

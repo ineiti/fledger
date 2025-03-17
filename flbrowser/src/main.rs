@@ -1,11 +1,15 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use flmodules::{
+    dht_router, dht_storage,
+    flo::realm::RealmID,
     nodeconfig::NodeInfo,
     ping::core::{PingStat, PingStorage},
     Modules,
 };
+use itertools::Itertools;
 use js_sys::JsString;
+use realm_pages::{PageFetcher, PageTags};
 use regex::Regex;
 use std::{
     collections::HashMap,
@@ -15,9 +19,11 @@ use std::{
 use tokio::sync::mpsc::UnboundedSender;
 use wasm_bindgen::{
     prelude::{wasm_bindgen, Closure},
-    JsCast, JsValue,
+    JsCast,
 };
-use web_sys::{window, Document, Event, HtmlDivElement, HtmlInputElement, HtmlTextAreaElement};
+use web_sys::{
+    window, Document, Event, HtmlDivElement, HtmlElement, HtmlInputElement, HtmlOListElement, HtmlTextAreaElement
+};
 
 use flarch::{
     data_storage::DataStorageLocal,
@@ -28,6 +34,8 @@ use flarch::{
 use flmodules::network::broker::NetworkConnectionState;
 use flmodules::network::network_start;
 use flnode::{node::Node, version::VERSION_STRING};
+
+mod realm_pages;
 
 #[cfg(not(feature = "local"))]
 const URL: &str = "wss://signal.fledg.re";
@@ -64,8 +72,14 @@ pub fn main() {
         // Link to some elements
         let your_message: HtmlTextAreaElement = web.get_element("your_message");
         let proxy_div: HtmlDivElement = web.get_element("proxy_div");
+        let status_steps: HtmlOListElement = web.get_element("status-steps");
+        let loading_info: HtmlDivElement = web.get_element("loading_info");
+        let home_page: HtmlElement = web.get_element("home_page");
+        home_page.set_hidden(true);
         let proxy_url: HtmlInputElement = web.get_element("proxy_url");
         let webproxy = web.node.webproxy.as_mut().unwrap().clone();
+
+        let mut status = UL(vec![LI("Connecting to signalling server".into(), None)]);
 
         loop {
             if let Ok(btn) = rx.try_recv() {
@@ -82,8 +96,16 @@ pub fn main() {
                         }
                     }
                     Button::DownloadData => {
-                        let data = web.node.gossip.as_ref().unwrap().storage.borrow().get().unwrap();
-                        downloadFile("gossip_event.toml".into(), data.into());
+                        let data = web
+                            .node
+                            .gossip
+                            .as_ref()
+                            .unwrap()
+                            .storage
+                            .borrow()
+                            .get()
+                            .unwrap();
+                        downloadFile("gossip_event.yaml".into(), data.into());
                     }
                     Button::WebProxy => {
                         let proxy_div = proxy_div.clone();
@@ -91,8 +113,7 @@ pub fn main() {
                         let mut webproxy = webproxy.clone();
                         let nodes = web.node.nodes_connected();
                         spawn_local_nosend(async move {
-                            let fetching =
-                                format!("Fetching url from proxy: {}", proxy_url);
+                            let fetching = format!("Fetching url from proxy: {}", proxy_url);
                             proxy_div.set_inner_html(&fetching);
                             match webproxy.get(&proxy_url).await {
                                 Ok(mut response) => {
@@ -122,38 +143,44 @@ pub fn main() {
                     }
                 }
             }
+            status_steps.set_inner_html(&status.to_string());
+
             if let Some(state) = web.tick().await {
-                update_table(&web, &state)
-                    .err()
-                    .map(|_| log::error!("While updating table"));
+                if state.page_tags.len() > 0 && status.0.len() == 3 {
+                    loading_info.set_hidden(true);
+                    home_page.set_hidden(false);
+                }
+                if state.nodes_connected >= 2 && status.0.len() == 2 {
+                    status.0.push(LI("Updating pages".into(), None));
+                }
+                if status.0.len() == 1 {
+                    status.0.push(LI("Connecting to other nodes".into(), None));
+                }
                 web.set_html_id("node_info", state.get_node_name());
                 web.set_html_id("version", state.get_version());
                 web.set_html_id("messages", state.get_msgs());
                 web.set_html_id("nodes_online", format!("{}", state.nodes_online));
                 web.set_html_id("nodes_connected", format!("{}", state.nodes_connected));
-                web.set_html_id("mana", format!("{}", state.mana));
                 web.set_html_id("msgs_system", format!("{}", state.msgs_system));
                 web.set_html_id("msgs_local", format!("{}", state.msgs_local));
+                // web.set_html_id("dht_stats", state.get_dht_stats());
+                web.set_html_id("dht_page", state.get_dht_pages());
+                // dht-connections - how many nodes we're connected to through DHT
+                // nodes-total - nodes available in total
+                // message-count
+                // dht-pages-own - our pages
+                // dht-pages-total - all pages
+                // dht-storage-local
+                // dht-storage-max
+                // dht-router-connections - bucket list of how many connections this node has
+                // dht-storage-buckets - how many flos are in each bucket
+                // total-data - estimation of how much data is stored in the system
+                // nodes-browser / nodes/cli - browser- and cli-nodes
+                // realms-number - number of realms
             }
             wait_ms(1000).await;
         }
     });
-}
-
-fn update_table(web: &FledgerWeb, state: &FledgerState) -> Result<(), JsValue> {
-    let stats_table = state.get_node_table();
-    let el_fetching = web.document.get_element_by_id("fetching").unwrap();
-    let el_table_stats = web.document.get_element_by_id("table_stats").unwrap();
-    el_table_stats.class_list().remove_1("hidden")?;
-    el_fetching.class_list().remove_1("hidden")?;
-    if stats_table == "" {
-        el_table_stats.class_list().add_1("hidden")?;
-    } else {
-        el_fetching.class_list().add_1("hidden")?;
-        web.set_html_id("node_stats", stats_table);
-    }
-
-    Ok(())
 }
 
 /// FledgerWeb is a nearly generic handler for the FledgerNode.
@@ -161,6 +188,7 @@ pub struct FledgerWeb {
     node: Node,
     document: Document,
     counter: u32,
+    page_fetcher: PageFetcher,
 }
 
 impl FledgerWeb {
@@ -173,8 +201,10 @@ impl FledgerWeb {
 
         // Get a link to the document
         let window = web_sys::window().expect("no global `window` exists");
+        let node = Self::node_start().await?;
         Ok(Self {
-            node: Self::node_start().await?,
+            page_fetcher: PageFetcher::new(node.dht_storage.as_ref().unwrap().clone()).await,
+            node,
             document: window.document().expect("should have a document on window"),
             counter: 0u32,
         })
@@ -186,18 +216,21 @@ impl FledgerWeb {
                 .err()
                 .map(|e| log::error!("Couldn't send message: {e:?}"));
         }) as Box<dyn FnMut(_)>));
-        self.document
-            .get_element_by_id(id)
-            .unwrap()
-            .add_event_listener_with_callback("click", &cb.as_ref().unchecked_ref())
-            .expect("Should be able to add event listener");
+        self.document.get_element_by_id(id).map(|el| {
+            el.add_event_listener_with_callback("click", &cb.as_ref().unchecked_ref())
+                .expect("Should be able to add event listener")
+        });
     }
 
     fn set_html_id(&self, id: &str, inner_html: String) {
-        self.document
+        if self
+            .document
             .get_element_by_id(id)
-            .unwrap()
-            .set_inner_html(&inner_html);
+            .map(|el| el.set_inner_html(&inner_html))
+            .is_none()
+        {
+            log::info!("Couldn't set inner html for id: {}", id);
+        }
     }
 
     fn get_element<ET: JsCast>(&self, id: &str) -> ET {
@@ -205,12 +238,13 @@ impl FledgerWeb {
             .get_element_by_id(id)
             .unwrap()
             .dyn_into::<ET>()
+            .map_err(|e| log::error!("Couldn't get element {id}: {e:?}"))
             .unwrap()
     }
 
     pub async fn tick(&mut self) -> Option<FledgerState> {
         let mut fs = None;
-        match FledgerState::new(&self.node) {
+        match FledgerState::new(&self.node, self.page_fetcher.page_tags_rx.borrow().clone()) {
             Ok(f) => fs = Some(f),
             Err(e) => log::error!("Couldn't create state: {:?}", e),
         }
@@ -267,6 +301,9 @@ pub struct FledgerState {
     states: HashMap<U256, NetworkConnectionState>,
     pings: PingStorage,
     msgs: FledgerMessages,
+    dht_storage: dht_storage::messages::Stats,
+    dht_router: dht_router::messages::Stats,
+    page_tags: HashMap<RealmID, PageTags>,
     pub msgs_system: usize,
     pub msgs_local: usize,
     pub mana: u32,
@@ -274,7 +311,58 @@ pub struct FledgerState {
     pub nodes_connected: usize,
 }
 
+#[derive(Clone)]
+struct UL(Vec<LI>);
+
+#[derive(Clone)]
+struct LI(String, Option<UL>);
+
+impl UL {
+    fn to_string(&self) -> String {
+        format!(
+            "<ul>{}</ul>",
+            self.0
+                .clone()
+                .into_iter()
+                .map(|hl| hl.to_string())
+                .collect::<Vec<_>>()
+                .join("")
+        )
+    }
+}
+
+impl LI {
+    fn to_string(self) -> String {
+        format!(
+            "<li>{}{}</li>",
+            self.0,
+            self.1.map(|ul| ul.to_string()).unwrap_or("".to_string())
+        )
+    }
+}
+
 impl FledgerState {
+    fn new(node: &Node, page_tags: HashMap<RealmID, PageTags>) -> Result<Self> {
+        let info = node.node_config.info.clone();
+        let msgs = node.gossip.as_ref().unwrap().chat_events();
+        let nodes_info = node.nodes_info_all()?;
+        Ok(Self {
+            info,
+            nodes_online: node.nodes_online()?.len(),
+            nodes_connected: node.nodes_connected()?.len(),
+            msgs_system: 0,
+            msgs_local: msgs.len(),
+            mana: 0,
+            msgs: FledgerMessages::new(msgs, &nodes_info.clone().into_values().collect()),
+            nodes_info,
+            page_tags,
+            dht_router: node.dht_router.as_ref().unwrap().stats.borrow().clone(),
+            dht_storage: node.dht_storage.as_ref().unwrap().stats.borrow().clone(),
+            states: node.stat.as_ref().unwrap().borrow().clone(),
+            pings: node.ping.as_ref().unwrap().storage.borrow().clone(),
+        })
+    }
+
     pub fn get_node_name(&self) -> String {
         self.info.name.clone()
     }
@@ -293,31 +381,64 @@ impl FledgerState {
     pub fn get_msgs(&self) -> String {
         self.msgs.get_messages()
     }
-}
 
-struct NodeDesc {
-    info: String,
-    ping: PingStat,
-    stat: String,
-}
+    pub fn get_dht_stats(&self) -> String {
+        let mut out = UL(vec![LI(
+            format!(
+                "Other nodes available: {}",
+                self.dht_router
+                    .bucket_nodes
+                    .iter()
+                    .map(|b| format!("{}", b.len()))
+                    .collect::<Vec<_>>()
+                    .join(" - ")
+            ),
+            None,
+        )]);
+        for (rid, stats) in &self.dht_storage.realm_stats {
+            let buckets = stats
+                .distribution
+                .iter()
+                .map(|s| format!("{s}"))
+                .collect::<Vec<_>>()
+                .join(" - ");
+            out.0.push(LI(
+                format!("Realm {rid}:"),
+                Some(UL(vec![
+                    LI(
+                        format!("Memory usage: {} of {}", stats.size, stats.config.max_space),
+                        None,
+                    ),
+                    LI(format!("Number of Flos (blobs): {}", stats.flos), None),
+                    LI(format!("Bucket distribution of Flos: {}", buckets), None),
+                ])),
+            ))
+        }
+        out.to_string()
+    }
 
-impl FledgerState {
-    fn new(node: &Node) -> Result<Self> {
-        let info = node.node_config.info.clone();
-        let msgs = node.gossip.as_ref().unwrap().chat_events();
-        let nodes_info = node.nodes_info_all()?;
-        Ok(Self {
-            info,
-            nodes_online: node.nodes_online()?.len(),
-            nodes_connected: node.nodes_connected()?.len(),
-            msgs_system: 0,
-            msgs_local: msgs.len(),
-            mana: 0,
-            msgs: FledgerMessages::new(msgs, &nodes_info.clone().into_values().collect()),
-            nodes_info,
-            states: node.stat.as_ref().unwrap().borrow().clone(),
-            pings: node.ping.as_ref().unwrap().storage.borrow().clone(),
-        })
+    pub fn get_dht_pages(&self) -> String {
+        let mut out = UL(vec![]);
+        for (rid, rv) in self.page_tags.iter().sorted_by_key(|(id, _)| *id) {
+            let index = rv.pages.as_ref().map(|fp| {
+                UL(vec![LI(
+                    format!(
+                        "id: {} - {}",
+                        fp.root.clone(),
+                        fp.storage
+                            .get(&fp.root)
+                            .map(|blob| blob.get_index())
+                            .unwrap_or("empty page".into())
+                    ),
+                    None,
+                )])
+            });
+            out.0.push(LI(
+                format!("Realm: {} / {}", rv.realm.cache().get_name(), rid),
+                index,
+            ));
+        }
+        out.to_string()
     }
 
     fn get_nodes(&self) -> Vec<NodeDesc> {
@@ -364,6 +485,12 @@ impl FledgerState {
     }
 }
 
+struct NodeDesc {
+    info: String,
+    ping: PingStat,
+    stat: String,
+}
+
 #[derive(Clone)]
 pub struct FledgerMessage {
     from: String,
@@ -377,10 +504,7 @@ pub struct FledgerMessages {
 }
 
 impl FledgerMessages {
-    fn new(
-        mut tm_msgs: Vec<flmodules::gossip_events::core::Event>,
-        nodes: &Vec<NodeInfo>,
-    ) -> Self {
+    fn new(mut tm_msgs: Vec<flmodules::gossip_events::core::Event>, nodes: &Vec<NodeInfo>) -> Self {
         tm_msgs.sort_by(|a, b| b.created.partial_cmp(&a.created).unwrap());
         let mut msgs = vec![];
         for msg in tm_msgs {

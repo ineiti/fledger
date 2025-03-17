@@ -4,7 +4,7 @@ use flmodules::{gossip_events::core, Modules};
 mod helpers;
 use helpers::*;
 
-async fn gossip(nbr_nodes: usize) -> Result<(), NetworkError> {
+async fn gossip(nbr_nodes: usize) -> anyhow::Result<()> {
     start_logging_filter_level(vec![], log::LevelFilter::Info);
 
     let mut net = NetworkSimul::new();
@@ -80,14 +80,14 @@ mod tests {
     use super::*;
     
     #[tokio::test]
-    async fn gossip_2() -> Result<(), NetworkError> {
+    async fn gossip_2() -> anyhow::Result<()> {
         gossip(2).await?;
         Ok(())
     }
 
     // 30 nodes have trouble correctly shutting down, so we keep it to 20 for now.
     #[tokio::test]
-    async fn gossip_20() -> Result<(), NetworkError> {
+    async fn gossip_20() -> anyhow::Result<()> {
         gossip(20).await?;
         Ok(())
     }

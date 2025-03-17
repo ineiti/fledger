@@ -1,12 +1,13 @@
 [package]
 edition = "2021"
 name = "shared"
-version = "0.9.0"
+version = "0.9.1"
 
 [dependencies]
 flmodules = {path = "../../../flmodules", version = "0.9"}
 flarch = {path = "../../../flarch", version = "0.9"}
 
+anyhow = {version = "1", features = ["backtrace"]}
 async-trait = "0.1"
 log = "0.4"
 serde = {version = "1", features = ["derive"]}

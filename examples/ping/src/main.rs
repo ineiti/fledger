@@ -4,7 +4,6 @@ use std::time::Duration;
 use tokio_stream::StreamExt;
 
 use flarch::{
-    broker::BrokerError,
     nodeids::U256,
     start_logging_filter,
     tasks::{wait_ms, Interval},
@@ -30,7 +29,7 @@ enum Action {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), BrokerError> {
+async fn main() -> anyhow::Result<()> {
     start_logging_filter(vec!["fl", "ping"]);
     let args = Args::parse();
 
@@ -42,7 +41,7 @@ async fn main() -> Result<(), BrokerError> {
     Ok(())
 }
 
-async fn ping() -> Result<(), BrokerError> {
+async fn ping() -> anyhow::Result<()> {
     // Create a random node-configuration. It uses serde for easy serialization.
     let nc = NodeConfig::new();
     log::info!("Our node-ID is {:?}", nc.info.get_id());
@@ -78,7 +77,7 @@ async fn ping() -> Result<(), BrokerError> {
     }
 }
 
-async fn server() -> Result<(), BrokerError> {
+async fn server() -> anyhow::Result<()> {
     // Create a random node-configuration. It uses serde for easy serialization.
     let nc = NodeConfig::new();
     // Connect to the signalling server and wait for connection requests.
@@ -97,7 +96,7 @@ async fn server() -> Result<(), BrokerError> {
     }
 }
 
-async fn client(server_id: &str) -> Result<(), BrokerError> {
+async fn client(server_id: &str) -> anyhow::Result<()> {
     // Create a random node-configuration. It uses serde for easy serialization.
     let nc = NodeConfig::new();
     // Connect to the signalling server and wait for connection requests.

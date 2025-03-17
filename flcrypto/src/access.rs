@@ -1,57 +1,90 @@
-use std::{collections::HashMap, iter};
+use std::{collections::HashMap, fmt::Display};
 
+use async_recursion::async_recursion;
 use bytes::Bytes;
 use flarch::nodeids::U256;
 use flmacro::AsU256;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    signer::{Signature, Signer, SignerError, Verifier},
-    tofrombytes::ToFromBytes,
-};
+use crate::{signer::{Signature, Signer, SignerError, SignerTrait, Verifier, VerifierTrait}, tofrombytes::ToFromBytes};
 
 use super::signer::KeyPairID;
 
 #[derive(AsU256, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct BadgeID(U256);
 
-/// A Condition is a boolean combination of verifiers and badges
+/// A ConditionLink is a boolean combination of verifiers and badges
 /// which can verify a given signature.
-/// A Condition can:
-/// - sign a given message
-/// - verify a given message
+/// The ConditionLink only holds the IDs of the Verifiers and the Badges,
+/// and is lightweight.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-pub enum Condition {
+pub enum ConditionLink {
+    /// A verifier is the only element of a Condition which can be directly
+    /// verified.
     Verifier(KeyPairID),
-    Badge(Version<BadgeID>),
-    NofT(u32, Vec<Condition>),
+    Badge(VersionSpec<BadgeID>),
+    NofT(u32, Vec<ConditionLink>),
     /// TODO: re-enable this enum only for "testing"
     /// The Pass condition is always true, but only available during testing.
+    Fail,
     Pass,
+}
+
+/// A Condition represents a full ConditinLink with all IDs replaced by
+/// their actual values.
+/// TODO: Avoid loops
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub enum Condition {
+    Verifier(Verifier),
+    /// The version is needed to verify it's the correct badge.
+    Badge(VersionSpec<BadgeID>, Badge),
+    NofT(u32, Vec<Condition>),
+    NotAvailable,
+    Fail,
+    Pass,
+}
+
+impl Display for Condition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.to_link().fmt(f)
+    }
+}
+
+impl Display for ConditionLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&match self {
+            ConditionLink::Verifier(verifier) => format!("Verifier({})", verifier),
+            ConditionLink::Badge(version_spec) => format!("Badge({:?})", version_spec),
+            ConditionLink::NofT(thr, conditionlinks) => format!("NofT({thr}, [{}])",
+        conditionlinks.iter().map(|cond| format!("{cond}")).collect::<Vec<_>>().join(",")),
+            ConditionLink::Fail => format!("Fail"),
+            ConditionLink::Pass => format!("Pass"),
+        })
+    }
 }
 
 /// A badge can be viewed as an identity or a root of trust.
 /// It defines one cryptographic actor which can be composed of
 /// many different verifiers and other badges.
-pub trait Badge {
-    fn badge_id(&self) -> BadgeID;
-
-    fn badge_cond(&self) -> Condition;
-
-    fn badge_version(&self) -> u32;
-
-    fn clone_self(&self) -> Box<dyn Badge>;
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct BadgeLink {
+    pub id: BadgeID,
+    pub version: u32,
+    pub condition: ConditionLink,
 }
 
-impl Clone for Box<dyn Badge> {
-    fn clone(&self) -> Self {
-        self.clone_self()
-    }
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct Badge {
+    pub id: BadgeID,
+    pub version: u32,
+    pub condition: Box<Condition>,
 }
 
 /// What versions of the ACE or badge are accepted.
+/// TODO: once the U256 becomes a trait that other IDs can inherit,
+/// make T depend on U256.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug, Eq, Hash)]
-pub enum Version<T: Serialize + Clone> {
+pub enum VersionSpec<T: Serialize + Clone + AsRef<[u8]>> {
     /// This is the default - everyone should use it and trust future versions.
     Minimal(T, u32),
     /// Paranoid version pinning. Also problematic because old versions might get
@@ -62,281 +95,317 @@ pub enum Version<T: Serialize + Clone> {
     Maximal(T, u32),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct BadgeSignature {
-    cs: CalcSignature,
-    msg_orig: Bytes,
-    condition: Condition,
+unsafe impl<T: Serialize + Clone + AsRef<[u8]>> Send for VersionSpec<T>{}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
+pub struct ConditionSignature {
+    pub condition: Condition,
+    pub signatures: HashMap<KeyPairID, Signature>,
 }
 
-impl<T: Serialize + Clone> Version<T> {
+impl<T: Serialize + Clone + AsRef<[u8]>> VersionSpec<T> {
     pub fn get_id(&self) -> T {
         match self {
-            Version::Minimal(id, _) => id.clone(),
-            Version::Exact(id, _) => id.clone(),
-            Version::Maximal(id, _) => id.clone(),
+            VersionSpec::Minimal(id, _) => id.clone(),
+            VersionSpec::Exact(id, _) => id.clone(),
+            VersionSpec::Maximal(id, _) => id.clone(),
         }
     }
 
     pub fn accepts(&self, version: u32) -> bool {
         match self {
-            Version::Minimal(_, v) => v <= &version,
-            Version::Exact(_, v) => v == &version,
-            Version::Maximal(_, v) => v >= &version,
+            VersionSpec::Minimal(_, v) => v <= &version,
+            VersionSpec::Exact(_, v) => v == &version,
+            VersionSpec::Maximal(_, v) => v >= &version,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct CalcSignature {
-    msg: U256,
-    condition_hash: Vec<U256>,
-    badges: HashMap<Version<BadgeID>, Condition>,
-    signatures: HashMap<KeyPairID, Option<(Verifier, Signature)>>,
+impl ConditionLink {
+    #[async_recursion(?Send)]
+    pub async fn to_condition<B, V>(&self, gb: &B, gv: &V) -> Condition
+    where
+        B: AsyncFn(VersionSpec<BadgeID>) -> Option<BadgeLink>,
+        V: AsyncFn(KeyPairID) -> Option<Verifier>,
+    {
+        match self {
+            ConditionLink::Verifier(ver) => gv(ver.clone())
+                .await
+                .map(|v| Condition::Verifier(v))
+                .unwrap_or(Condition::NotAvailable),
+            ConditionLink::Badge(version) => {
+                if let Some(b) = gb(version.clone()).await {
+                    Condition::Badge(
+                        version.clone(),
+                        Badge{
+                            id: b.id,
+                            version: b.version,
+                            condition: Box::new(b.condition.to_condition(gb, gv).await),    
+                        }
+                    )
+                } else {
+                    Condition::NotAvailable
+                }
+            }
+            ConditionLink::NofT(thr, vec) => {
+                let mut conds = vec![];
+                for cond in vec {
+                    conds.push(cond.to_condition(gb, gv).await)
+                }
+                Condition::NofT(*thr, conds)
+            }
+            ConditionLink::Pass => Condition::Pass,
+            ConditionLink::Fail => Condition::Fail,
+        }
+    }
 }
 
-impl CalcSignature {
-    fn new() -> Self {
-        CalcSignature {
-            msg: U256::zero(),
-            condition_hash: vec![],
-            badges: HashMap::new(),
+impl Condition {
+    pub fn hash(&self) -> U256 {
+        match self {
+            Condition::Verifier(verifier) => U256::hash_domain_parts(
+                "flcrypto::Condition::Verifier",
+                &[&verifier.get_id().bytes()],
+            ),
+            Condition::Badge(ver_spec, badge) => U256::hash_domain_parts(
+                "flcrypto::Condition::Badge",
+                &[&ver_spec.to_rmp_bytes(), &badge.to_rmp_bytes()],
+            ),
+            Condition::NofT(thr, conditions) => {
+                let mut parts: Vec<Bytes> = vec![Bytes::copy_from_slice(&thr.to_le_bytes())];
+                for cond in conditions {
+                    parts.push(cond.hash().bytes())
+                }
+                U256::hash_domain_parts(
+                    "flcrypto::Condition::NofT",
+                    &parts.iter().map(|b| b.as_ref()).collect::<Vec<_>>(),
+                )
+            }
+            Condition::NotAvailable => {
+                U256::hash_domain_parts("flcrypto::Condition::NotAvailable", &[])
+            }
+            Condition::Pass => U256::hash_domain_parts("flcrypto::Condition::Pass", &[]),
+            Condition::Fail => U256::hash_domain_parts("flcrypto::Condition::Fail", &[]),
+        }
+    }
+
+    pub fn equal_link(&self, cond_link: &ConditionLink) -> bool {
+        match cond_link {
+            ConditionLink::Verifier(key_pair_id) => {
+                matches!(self, Condition::Verifier(ver) if &ver.get_id() == key_pair_id)
+            }
+            ConditionLink::Badge(version_spec) => {
+                matches!(self, Condition::Badge(ver_spec, badge) 
+                if BadgeLink{ id: badge.id.clone(), version: badge.version, condition: badge.condition.to_link() }
+                    .fits_version(version_spec.clone()) && badge.condition.equal_link(cond_link) && version_spec == ver_spec)
+            }
+            ConditionLink::NofT(_, condition_links) => {
+                condition_links.iter().all(|cl| self.equal_link(cl))
+            },
+            ConditionLink::Pass => matches!(self, Condition::Pass),
+            ConditionLink::Fail => matches!(self, Condition::Fail),
+        }
+    }
+
+    pub fn to_link(&self) -> ConditionLink{
+        match self{
+            Condition::Verifier(verifier) => ConditionLink::Verifier(verifier.get_id()),
+            Condition::Badge(ver_spec, _) => ConditionLink::Badge(ver_spec.clone()),
+            Condition::NofT(thr, conditions) => ConditionLink::NofT(*thr, 
+            conditions.iter().map(|cond| cond.to_link()).collect::<Vec<_>>()),
+            Condition::NotAvailable => todo!(),
+            Condition::Pass => ConditionLink::Pass,
+            Condition::Fail => ConditionLink::Fail,
+        }
+    }
+}
+
+impl ConditionSignature {
+    pub fn new(condition: Condition) -> Self {
+        ConditionSignature {
+            condition,
             signatures: HashMap::new(),
         }
     }
 
-    pub fn from_cond_badges(
-        cond: &Condition,
-        badges: HashMap<Version<BadgeID>, Condition>,
-        signatures: HashMap<KeyPairID, Option<(Verifier, Signature)>>,
-        msg: Bytes,
-    ) -> Result<Self, SignerError> {
-        let mut cs = Self::new();
-        cs.badges = badges;
-        cs.signatures = signatures;
-        cs.build_hash_verify(cond, msg)?;
-        Ok(cs)
+    pub fn empty() -> Self {
+        ConditionSignature{
+            condition: Condition::NotAvailable,
+            signatures: HashMap::new(),
+        }
     }
 
-    fn calc_msg(&mut self, msg: Bytes) {
-        let parts = iter::once(msg)
-            .chain(self.condition_hash.iter().map(|u| u.bytes()))
-            .collect::<Vec<Bytes>>();
-        self.msg = U256::hash_domain_parts(
-            "ConditionHash",
-            &parts.iter().map(|b| b.as_ref()).collect::<Vec<_>>(),
-        );
+    pub fn sign_msg(&mut self, sig: &Signer, msg: &Bytes) -> anyhow::Result<()> {
+        self.sign_digest(sig, &self.digest(msg))
     }
 
-    pub fn build_hash_init(
-        cond: &Condition,
-        msg: Bytes,
-        get_badge: &GetBadge,
-    ) -> Result<CalcSignature, SignerError> {
-        let mut cs = CalcSignature::new();
-        cond.build_hash(&mut cs, get_badge, true)?;
-        cs.calc_msg(msg);
-        Ok(cs)
-    }
-
-    fn build_hash_verify(&mut self, cond: &Condition, msg: Bytes) -> Result<(), SignerError> {
-        self.condition_hash = vec![];
-        cond.build_hash(self, &|_| -> Option<Box<dyn Badge>> { None }, false)?;
-        self.calc_msg(msg);
+    pub fn sign_digest(&mut self, sig: &Signer, digest: &U256) -> anyhow::Result<()> {
+        if !self.has_verifier(&self.condition, &sig.get_id()) {
+            return Err(SignerError::NoSuchSigner.into());
+        }
+        self.signatures.insert(sig.get_id(), sig.sign(&digest.bytes())?);
         Ok(())
+    }
+
+    pub fn signers_msg(&mut self, signers: &[&Signer], msg: &Bytes) -> anyhow::Result<()> {
+        let digest = self.digest(msg);
+        for sig in signers{
+        self.sign_digest(sig, &digest)?
+        }
+        Ok(())
+    }
+
+    pub fn signers_digest(&mut self, signers: &[&Signer], digest: &U256) -> anyhow::Result<()> {
+        for sig in signers{
+            if !self.has_verifier(&self.condition, &sig.get_id()) {
+                return Err(SignerError::NoSuchSigner.into());
+            }
+            self.signatures.insert(sig.get_id(), sig.sign(&digest.bytes())?);
+        }
+        Ok(())
+    }
+
+    pub fn verify_digest(&self, digest: &U256) -> anyhow::Result<bool> {
+        self.verify_cond(&self.condition, &digest)
+    }
+
+    pub fn verify_msg(&self, msg: &Bytes) -> anyhow::Result<bool> {
+        self.verify_digest(&self.digest(msg))
+    }
+
+    fn digest(&self, msg: &Bytes) -> U256 {
+        U256::hash_domain_parts(
+            "flcrypto::ConditionSignature::sign",
+            &[self.condition.hash().as_ref(), msg],
+        )
+    }
+
+    fn has_verifier(&self, cond: &Condition, vid: &KeyPairID) -> bool {
+        match cond {
+            Condition::Verifier(verifier) => &verifier.get_id() == vid,
+            Condition::Badge(_, badge) => self.has_verifier(&badge.condition, vid),
+            Condition::NofT(_, conditions) => conditions.iter().any(|c| self.has_verifier(c, vid)),
+            Condition::NotAvailable => false,
+            Condition::Pass => true,
+            Condition::Fail => false,
+        }
+    }
+
+    pub fn verify_cond(&self, cond: &Condition, digest: &U256) -> anyhow::Result<bool> {
+        Ok(match cond {
+            Condition::Verifier(verifier) => {
+                // log::info!("Verifying {:?} with msg {msg:x} and sig {:?}", verifier.get_id(), self.signatures);
+                if let Some(sig) = self.signatures.get(&verifier.get_id()) {
+                    verifier.verify(&digest.bytes(), sig)?;
+                    true
+                } else {
+                    false
+                }
+            }
+            Condition::Badge(_, badge) => self.verify_cond(&badge.condition, digest)?,
+            Condition::NofT(t, vec) => {
+                let mut correct = 0;
+                for cond in vec {
+                    self.verify_cond(cond, digest)?.then(|| correct += 1);
+                }
+                correct >= *t
+            }
+            Condition::NotAvailable => false,
+            Condition::Pass => true,
+            Condition::Fail => false,
+        })
     }
 }
 
-impl<T: Serialize + Clone> Version<T> {
+impl<T: Serialize + Clone + AsRef<[u8]>> VersionSpec<T> {
     pub fn id(&self) -> T {
         match self {
-            Version::Minimal(id, _) => id.clone(),
-            Version::Exact(id, _) => id.clone(),
-            Version::Maximal(id, _) => id.clone(),
+            VersionSpec::Minimal(id, _) => id.clone(),
+            VersionSpec::Exact(id, _) => id.clone(),
+            VersionSpec::Maximal(id, _) => id.clone(),
         }
     }
 }
 
-pub type GetBadge = dyn Fn(&Version<BadgeID>) -> Option<Box<dyn Badge>>;
-
-impl Condition {
-    fn build_hash(
-        &self,
-        cs: &mut CalcSignature,
-        get_badge: &GetBadge,
-        init: bool,
-    ) -> Result<(), SignerError> {
-        cs.condition_hash.push(self.hash_this());
-        Ok(match self {
-            Condition::Verifier(verifier) => {
-                if init {
-                    cs.signatures.insert(verifier.clone(), None);
-                }
-            }
-            Condition::Badge(version) => {
-                if init {
-                    if cs.badges.contains_key(version) {
-                        log::warn!("Condition {self:?} contains loop");
-                        return Ok(());
-                    }
-                    get_badge(version)
-                        .ok_or(SignerError::BadgeMissing)?
-                        .badge_cond()
-                        .build_hash(cs, get_badge, init)?
-                } else {
-                    let cond = cs
-                        .badges
-                        .get(version)
-                        .ok_or(SignerError::BadgeMissing)?
-                        .clone();
-                    cond.build_hash(cs, get_badge, init)?
-                }
-            }
-            Condition::NofT(_, vec) => {
-                for cond in vec {
-                    cond.build_hash(cs, get_badge, init)?;
-                }
-            }
-            Condition::Pass => (),
-        })
-    }
-
-    fn hash_this(&self) -> U256 {
-        U256::hash_data(&self.to_bytes())
-    }
-}
-
-impl BadgeSignature {
-    pub fn from_cond(
-        condition: Condition,
-        msg_orig: Bytes,
-        get_badge: &GetBadge,
-    ) -> Result<Self, SignerError> {
-        let cs = CalcSignature::build_hash_init(&condition, msg_orig.clone(), get_badge)?;
-        Ok(Self {
-            cs,
-            msg_orig,
-            condition,
-        })
-    }
-
-    pub fn from_calc_signature(cs: CalcSignature, condition: Condition, msg_orig: Bytes) -> Self {
-        Self {
-            cs,
-            msg_orig,
-            condition,
-        }
-    }
-
-    pub fn sign(&mut self, signer: &Signer) -> Result<(), SignerError> {
-        let verifier = signer.verifier();
-        let signature = signer.sign(&self.cs.msg.bytes())?;
-        self.cs
-            .signatures
-            .entry(verifier.get_id())
-            .and_modify(|sig| *sig = Some((verifier, signature)));
-        Ok(())
-    }
-
-    pub fn is_final(&mut self) -> Result<bool, SignerError> {
-        let msg = self.cs.msg;
-        self.cs
-            .build_hash_verify(&self.condition, self.msg_orig.clone())?;
-        if self.cs.msg != msg {
-            return Err(SignerError::SigningMessageMismatch);
-        }
-        self.evaluate_cond(&self.condition)
-    }
-
-    fn evaluate_cond(&self, cond: &Condition) -> Result<bool, SignerError> {
-        Ok(match cond {
-            Condition::Verifier(verifier_id) => self
-                .cs
-                .signatures
-                .get(&verifier_id)
-                .and_then(|ver_sig| {
-                    ver_sig.as_ref().map(|(ver, sig)| {
-                        &ver.get_id() == verifier_id
-                            && ver.verify(&self.cs.msg.bytes(), &sig).is_ok()
-                    })
-                })
-                .unwrap_or(false),
-            Condition::Badge(version) => self
-                .cs
-                .badges
-                .get(version)
-                .and_then(|cond| self.evaluate_cond(cond).ok())
-                .unwrap_or(false),
-            Condition::NofT(t, vec) => {
-                vec.iter()
-                    .filter_map(|cond| {
-                        self.evaluate_cond(cond)
-                            .ok()
-                            .and_then(|res| res.then(|| ()))
-                    })
-                    .count() as u32
-                    >= *t
-            }
-            Condition::Pass => true,
-        })
-    }
-
-    pub fn finalize(&mut self) -> Result<HashMap<KeyPairID, Signature>, SignerError> {
-        if !self.is_final()? {
-            return Err(SignerError::SignatureMessageMismatch);
-        }
-        Ok(self
-            .cs
-            .signatures
-            .clone()
-            .into_iter()
-            .filter_map(|(k, v)| v.map(|v| (k, v.1)))
-            .collect())
+impl BadgeLink {
+    pub fn fits_version(&self, ver: VersionSpec<BadgeID>) -> bool {
+        ver.get_id() == self.id && ver.accepts(self.version)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::error::Error;
-
-    use flarch::start_logging_filter;
+    use flarch::{start_logging_filter, start_logging_filter_level};
 
     use crate::signer_ed25519::SignerEd25519;
 
     use super::*;
 
-    #[test]
-    fn test_list_paths_errors() -> Result<(), Box<dyn Error>> {
-        let msg = Bytes::from("");
-        let cond = Condition::Badge(Version::Exact(BadgeID::rnd(), 1));
-        assert!(CalcSignature::build_hash_init(&cond, msg.clone(), &|_| None).is_err());
-        let cond2 = Condition::NofT(1, vec![cond]);
-        assert!(CalcSignature::build_hash_init(&cond2, msg, &|_| None).is_err());
-        Ok(())
+    struct DHT {
+        svids: Vec<SVID>,
     }
 
+    impl DHT {
+        fn new() -> Self {
+            Self { svids: vec![] }
+        }
+
+        fn svid(&mut self) -> SVID {
+            let s = SVID::new();
+            self.svids.push(s.clone());
+            s
+        }
+
+        async fn get_cond(&self, cl: &ConditionLink) -> Condition {
+            cl.to_condition(
+                &|id: VersionSpec<BadgeID>| async move {
+                    self.svids
+                        .iter()
+                        .find(|s| s.badge.fits_version(id.clone()))
+                        .map(|s| s.badge.clone())
+                },
+                &|id: KeyPairID| async move {
+                    self.svids
+                        .iter()
+                        .find(|s| s.id == id)
+                        .map(|s| s.verifier.clone())
+                },
+            )
+            .await
+        }
+
+        async fn get_cond_sig(&self, cl: &ConditionLink) -> ConditionSignature {
+            ConditionSignature::new(self.get_cond(cl).await)
+        }
+    }
+
+    #[derive(Clone)]
     struct SVID {
         signer: Signer,
-        _verifier: Verifier,
-        condition: Condition,
+        verifier: Verifier,
+        condition: ConditionLink,
         id: KeyPairID,
-        // badge: Box<dyn Badge>,
+        badge: BadgeLink,
     }
 
     impl SVID {
         fn new() -> Self {
             let signer = SignerEd25519::new();
-            let condition = Condition::Verifier(signer.verifier().get_id());
+            let condition = ConditionLink::Verifier(signer.verifier().get_id());
             Self {
-                _verifier: signer.verifier(),
+                badge: BadgeLink {
+                    id: BadgeID::rnd(),
+                    version: 0,
+                    condition: ConditionLink::Verifier(signer.get_id()),
+                },
+                verifier: signer.verifier(),
                 id: signer.verifier().get_id(),
-                // badge: Box::new(BT(condition.clone(), 0)),
                 condition,
                 signer,
             }
         }
 
-        fn condition(&self) -> Condition {
+        fn condition(&self) -> ConditionLink {
             self.condition.clone()
         }
 
@@ -345,199 +414,118 @@ mod test {
         // }
     }
 
-    struct BT(Condition, u32);
-
-    impl Badge for BT {
-        fn badge_id(&self) -> BadgeID {
-            self.0.hash_this().into()
-        }
-
-        fn badge_cond(&self) -> Condition {
-            self.0.clone()
-        }
-
-        fn badge_version(&self) -> u32 {
-            self.1
-        }
-
-        fn clone_self(&self) -> Box<dyn Badge> {
-            Box::new(BT(self.0.clone(), self.1))
-        }
-    }
-
-    impl BT {
-        fn start_signature(
-            &self,
-            msg: &Bytes,
-            get_badge: &GetBadge,
-        ) -> Result<BadgeSignature, SignerError> {
-            BadgeSignature::from_cond(self.0.clone(), msg.clone(), get_badge)
-        }
-
-        fn start_signature_no_badge(&self, msg: &Bytes) -> Result<BadgeSignature, SignerError> {
-            self.start_signature(msg, &|_| None)
-        }
-    }
-
-    #[test]
-    fn test_verifiers() -> Result<(), Box<dyn Error>> {
+    #[tokio::test]
+    async fn test_sign() -> anyhow::Result<()> {
+        start_logging_filter_level(vec![], log::LevelFilter::Trace);
         let msg = Bytes::from("123");
         let msg_bad = Bytes::from("1234");
-        let svid0 = SVID::new();
-        let svid1 = SVID::new();
-        let badge0 = BT(Condition::Verifier(svid0.id), 0);
-        let badge1 = BT(Condition::Verifier(svid1.id), 0);
-        let mut sig_prep0 = badge0.start_signature_no_badge(&msg)?;
-        let mut sig_prep0_bad = badge0.start_signature_no_badge(&msg_bad)?;
-        let mut sig_prep1 = badge1.start_signature_no_badge(&msg)?;
+        let mut dht = DHT::new();
+        let svid0 = dht.svid();
+        let svid1 = dht.svid();
 
-        assert_eq!(sig_prep0.cs.msg, sig_prep0.cs.msg);
-        assert_ne!(sig_prep0.cs.msg, sig_prep0_bad.cs.msg);
-        assert_ne!(sig_prep0.cs.msg, sig_prep1.cs.msg);
+        let mut cond_sig0 = dht.get_cond_sig(&svid0.condition).await;
+        let cond_sig1 = dht.get_cond_sig(&svid1.condition).await;
 
         // Wrong and correct signer
-        sig_prep0.sign(&svid1.signer)?;
-        assert!(!sig_prep0.is_final()?);
-        sig_prep0.sign(&svid0.signer)?;
-        assert!(sig_prep0.is_final()?);
+        assert_eq!(
+            anyhow::anyhow!(SignerError::NoSuchSigner).to_string(),
+            cond_sig0.sign_msg(&svid1.signer, &msg).unwrap_err().to_string()
+        );
+        assert!(!cond_sig0.verify_msg(&msg)?);
+        cond_sig0.sign_msg(&svid0.signer, &msg)?;
+        assert!(cond_sig0.verify_msg(&msg)?);
+
+        // Condition swap
+        let mut cond_clone = cond_sig0.clone();
+        log::info!("{:?} - {:?}", cond_sig0.condition.hash(), cond_sig1.condition.hash());
+        cond_clone.condition = cond_sig1.condition;
+        assert!(!cond_clone.verify_msg(&msg)?);
 
         // Wrong message
-        let mut sig_clone = sig_prep0.clone();
-        sig_clone.msg_orig = msg_bad.clone();
         assert_eq!(
-            Err(SignerError::SigningMessageMismatch),
-            sig_clone.is_final()
+            anyhow::anyhow!(SignerError::SignatureMessageMismatch).to_string(),
+            cond_sig0.verify_msg(&msg_bad).unwrap_err().to_string()
         );
 
-        // Wrong Condition
-        let mut sig_clone = sig_prep0.clone();
-        sig_clone.condition = sig_prep1.condition.clone();
-        assert_eq!(
-            Err(SignerError::SigningMessageMismatch),
-            sig_clone.is_final()
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_noft() -> anyhow::Result<()> {
+        start_logging_filter(vec![]);
+        let msg = Bytes::from("123");
+        let mut dht = DHT::new();
+        let svid0 = dht.svid();
+        let svid1 = dht.svid();
+        let svid2 = dht.svid();
+        let cond_link0 = ConditionLink::NofT(1, vec![svid0.condition(), svid1.condition()]);
+        let cond_link1 = ConditionLink::NofT(2, vec![svid0.condition(), svid1.condition()]);
+        let cond_link2 = ConditionLink::NofT(
+            2,
+            vec![svid0.condition(), svid1.condition(), svid2.condition()],
         );
+        let mut cond_sig0 = dht.get_cond_sig(&cond_link0).await;
+        let mut cond_sig1 = dht.get_cond_sig(&cond_link1).await;
+        let mut cond_sig2 = dht.get_cond_sig(&cond_link2).await;
 
-        // Signature from different message
-        sig_prep0_bad.sign(&svid0.signer)?;
-        assert!(sig_prep0_bad.is_final()?);
-        let mut sig_clone = sig_prep0.clone();
-        sig_clone.cs.signatures = sig_prep0_bad.cs.signatures.clone();
-        assert!(!sig_clone.is_final()?);
+        assert_ne!(cond_sig0.digest(&msg), cond_sig1.digest(&msg));
+        assert_ne!(cond_sig0.digest(&msg), cond_sig2.digest(&msg));
+        assert_ne!(cond_sig1.digest(&msg), cond_sig2.digest(&msg));
 
-        // Signature from different signer
-        sig_prep1.sign(&svid1.signer)?;
-        assert!(sig_prep1.is_final()?);
-        let mut sig_clone = sig_prep0.clone();
-        sig_clone.cs.signatures = sig_prep1.cs.signatures.clone();
-        assert!(!sig_clone.is_final()?);
+        // Wrong signer vs. correct signer
+        assert!(!cond_sig0.verify_msg(&msg)?);
+        assert_eq!(
+            anyhow::anyhow!(SignerError::NoSuchSigner).to_string(),
+            cond_sig0.sign_msg(&svid2.signer, &msg).unwrap_err().to_string()
+        );
+        cond_sig0.sign_msg(&svid0.signer, &msg)?;
+        assert!(cond_sig0.verify_msg(&msg)?);
+
+        // Too many signers (is accepted)
+        cond_sig0.sign_msg(&svid1.signer, &msg)?;
+        assert!(cond_sig0.verify_msg(&msg)?);
+
+        // Second signer
+        cond_sig0.signatures = HashMap::new();
+        cond_sig0.sign_msg(&svid1.signer, &msg)?;
+        assert!(cond_sig0.verify_msg(&msg)?);
+
+        // Too few signers vs. enough signers
+        cond_sig1.sign_msg(&svid0.signer, &msg)?;
+        assert!(!cond_sig1.verify_msg(&msg)?);
+        cond_sig1.sign_msg(&svid1.signer, &msg)?;
+        assert!(cond_sig1.verify_msg(&msg)?);
+
+        // Different signers
+        cond_sig2.sign_msg(&svid0.signer, &msg)?;
+        cond_sig2.sign_msg(&svid1.signer, &msg)?;
+        assert!(cond_sig2.verify_msg(&msg)?);
+        cond_sig2.signatures = HashMap::new();
+        assert!(!cond_sig2.verify_msg(&msg)?);
+        cond_sig2.sign_msg(&svid0.signer, &msg)?;
+        cond_sig2.sign_msg(&svid2.signer, &msg)?;
+        assert!(cond_sig2.verify_msg(&msg)?);
+        cond_sig2.signatures = HashMap::new();
+        cond_sig2.sign_msg(&svid1.signer, &msg)?;
+        cond_sig2.sign_msg(&svid2.signer, &msg)?;
+        assert!(cond_sig2.verify_msg(&msg)?);
 
         Ok(())
     }
 
     #[test]
-    fn test_noft() -> Result<(), SignerError> {
-        start_logging_filter(vec![]);
-        let msg = Bytes::from("123");
-        let svid0 = SVID::new();
-        let svid1 = SVID::new();
-        let svid2 = SVID::new();
-        let badge0 = BT(
-            Condition::NofT(1, vec![svid0.condition(), svid1.condition()]),
-            0,
-        );
-        let badge1 = BT(
-            Condition::NofT(2, vec![svid0.condition(), svid1.condition()]),
-            0,
-        );
-        let badge2 = BT(
-            Condition::NofT(
-                2,
-                vec![svid0.condition(), svid1.condition(), svid2.condition()],
-            ),
-            0,
-        );
-        let mut sig_prep0 = badge0.start_signature_no_badge(&msg)?;
-        let mut sig_prep1 = badge1.start_signature_no_badge(&msg)?;
-        let mut sig_prep2 = badge2.start_signature_no_badge(&msg)?;
+    fn serialize_condsig() -> anyhow::Result<()>{
+        let signer = SignerEd25519::new();
+        let mut sig = ConditionSignature{
+            condition: Condition::Verifier(signer.verifier()),
+            signatures: HashMap::new(),
+        };
+        sig.sign_digest(&signer, &U256::rnd())?;
 
-        assert_ne!(sig_prep0.cs.msg, sig_prep1.cs.msg);
-        assert_ne!(sig_prep0.cs.msg, sig_prep2.cs.msg);
-        assert_ne!(sig_prep1.cs.msg, sig_prep2.cs.msg);
+        let sig_str = serde_yaml::to_string(&sig)?;
+        let sig2: ConditionSignature = serde_yaml::from_str(&sig_str)?;
 
-        // Wrong signer vs. correct signer
-        assert!(!sig_prep0.is_final()?);
-        sig_prep0.sign(&svid2.signer)?;
-        assert!(!sig_prep0.is_final()?);
-        sig_prep0.sign(&svid0.signer)?;
-        assert!(sig_prep0.is_final()?);
-
-        // Too many signers (is accepted)
-        sig_prep0.sign(&svid1.signer)?;
-        assert!(sig_prep0.is_final()?);
-
-        // Second signer
-        let mut sig_prep0 = badge0.start_signature_no_badge(&msg)?;
-        sig_prep0.sign(&svid1.signer)?;
-        assert!(sig_prep0.is_final()?);
-
-        // Too few signers vs. enough signers
-        sig_prep1.sign(&svid0.signer)?;
-        assert!(!sig_prep1.is_final()?);
-        sig_prep1.sign(&svid1.signer)?;
-        assert!(sig_prep1.is_final()?);
-
-        // Different signers
-        sig_prep2.sign(&svid0.signer)?;
-        sig_prep2.sign(&svid1.signer)?;
-        assert!(sig_prep2.is_final()?);
-        for (_, sig) in &mut sig_prep2.cs.signatures {
-            *sig = None;
-        }
-        assert!(!sig_prep2.is_final()?);
-        sig_prep2.sign(&svid0.signer)?;
-        sig_prep2.sign(&svid2.signer)?;
-        assert!(sig_prep2.is_final()?);
-        for (_, sig) in &mut sig_prep2.cs.signatures {
-            *sig = None;
-        }
-        sig_prep2.sign(&svid1.signer)?;
-        sig_prep2.sign(&svid2.signer)?;
-        assert!(sig_prep2.is_final()?);
-
+        assert_eq!(sig, sig2);
         Ok(())
     }
-
-    // #[derive(Default)]
-    // struct IDS {
-    //     ids: HashMap<Version<BadgeID>, Box<dyn Badge>>,
-    // }
-
-    // impl IDS {
-    //     fn get_badge(&self, idv: &Version<BadgeID>) -> Option<Box<dyn Badge>> {
-    //         self.ids.get(idv).cloned()
-    //     }
-
-    //     fn add_badge(&mut self, vers_bid: Version<BadgeID>, vers: u32) -> BT {
-    //         let bt = BT(Condition::Badge(vers_bid.clone()), vers);
-    //         self.ids.insert(vers_bid, bt.clone_self());
-    //         bt
-    //     }
-    // }
-
-    // #[test]
-    // fn test_badge() -> Result<(), Box<dyn Error>> {
-    //     let msg = Bytes::from("123");
-    //     let svid0 = SVID::new();
-    //     let svid1 = SVID::new();
-    //     let mut ids = IDS::default();
-    //     let badge0_0 = ids.add_badge(Version::Minimal(svid0.badge.badge_id(), 0), 0);
-    //     let badge0_1 = ids.add_badge(Version::Minimal(svid0.badge.badge_id(), 1), 1);
-    //     let badge1_0 = ids.add_badge(Version::Minimal(svid1.badge.badge_id(), 0), 0);
-
-    //     let mut sig_prep0 = badge0_0.start_signature(&msg, &|vb| ids.get_badge(vb))?;
-    //     let mut sig_prep1 = badge0_1.start_signature(&msg, &|vb| ids.get_badge(vb))?;
-    //     let mut sig_prep2 = badge1_0.start_signature(&msg, &|vb| ids.get_badge(vb))?;
-
-    //     Ok(())
-    // }
 }

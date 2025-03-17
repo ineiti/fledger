@@ -7,7 +7,11 @@ use flarch::{
         connection::ConnectionConfig, web_socket_server::WebSocketServer, websocket::WSSError,
     },
 };
-use flmodules::network::{network_start, signal::SignalServer, NetworkSetupError};
+use flmodules::network::{
+    network_start,
+    signal::{SignalConfig, SignalServer},
+    NetworkSetupError,
+};
 use flnode::node::{Node, NodeError};
 use thiserror::Error;
 
@@ -24,11 +28,18 @@ enum TestError {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), TestError> {
+async fn main() -> anyhow::Result<()> {
     start_logging_filter_level(vec!["signal", "fl"], log::LevelFilter::Info);
 
     let wss = WebSocketServer::new(8765).await?;
-    let mut signal_server = SignalServer::new(wss, 2).await?;
+    let mut signal_server = SignalServer::new(
+        wss,
+        SignalConfig {
+            ttl_minutes: 2,
+            system_realm: None,
+        },
+    )
+    .await?;
     let (msgs_signal, _) = signal_server.get_tap_out_sync().await?;
     log::info!("Started listening on port 8765");
 
@@ -87,7 +98,7 @@ async fn main() -> Result<(), TestError> {
     Ok(())
 }
 
-async fn create_node() -> Result<Node, TestError> {
+async fn create_node() -> anyhow::Result<Node> {
     let storage = DataStorageTemp::new();
     let node_config = Node::get_config(storage.clone_box())?;
     let network = network_start(
@@ -95,7 +106,5 @@ async fn create_node() -> Result<Node, TestError> {
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )
     .await?;
-    Node::start(Box::new(storage), node_config, network.broker)
-        .await
-        .map_err(|e| e.into())
+    Ok(Node::start(Box::new(storage), node_config, network.broker).await?)
 }

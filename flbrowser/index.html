@@ -1,215 +1,624 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-  <meta charset="utf-8">
-  <link data-trunk rel="scss" href="main.css">
-  <title>Fledger web3</title>
-  <link data-trunk href="bootstrap.min.css" rel="scss">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>Fledger - Decentralized Resource Sharing</title>
+    <link data-trunk rel="css" href="main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 
 <body>
-  <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
+    <header>
+        <h1>Fledger</h1>
+        <p class="tagline">Decentralized Resource Sharing in Your Browser</p>
+    </header>
 
-  <div class="main">
-    <h2><i id="node_info">Starting up</i></h2>
-
-    <p>Nodes connected/online: <span id="nodes_connected"></span> /
-      <span id="nodes_online"></span>
-    </p>
-
-    <ul class="nav nav-tabs" id="myTab" role="tablist">
-      <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="welcome-tab" data-bs-toggle="tab" data-bs-target="#welcome" type="button"
-          role="tab" aria-controls="welcome" aria-selected="true">Welcome</button>
-      </li>
-      <!-- <li class="nav-item" role="presentation">
-        <button class="nav-link" id="dht-storage-tab" data-bs-toggle="tab" data-bs-target="#dht-storage" type="button"
-          role="tab" aria-controls="dht-storage" aria-selected="true">DHT-Storage</button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="pages-tab" data-bs-toggle="tab" data-bs-target="#pages" type="button" role="tab"
-          aria-controls="pages" aria-selected="true">Manage Pages</button>
-      </li> -->
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="blackboard-tab" data-bs-toggle="tab" data-bs-target="#blackboard" type="button"
-          role="tab" aria-controls="blackboard" aria-selected="true">Blackboard</button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="proxy-tab" data-bs-toggle="tab" data-bs-target="#proxy" type="button" role="tab"
-          aria-controls="proxy" aria-selected="false">WebProxy</button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="status-tab" data-bs-toggle="tab" data-bs-target="#status" type="button" role="tab"
-          aria-controls="status" aria-selected="false">Status</button>
-      </li>
-    </ul>
-
-    <div class="tab-content" id="myTabContent">
-      <div class="tab-pane fade show active" id="welcome" role="tabpanel" aria-labelledby="welcome-tab">
-        <br>
-        <i class="fa" style="font-size:24px"> </i>
-        <h3>Fledger</h3>
-        <p>Welcome to the latest version of the Fledger Node.
-          Fledger is an experiment in a decentralized system running in your browser.
-          It's goal is to mix things like <a href="https://veilid.com/">Veilid</a>,
-          <a href="https://ipfs.tech/">IPFS</a>, and something like
-          <a href="https://github.com/facebookresearch/narwhal">Narwhal</a>.
-        </p>
-        <p>Try it out by clicking on the above tabs to join the Blackboard or the
-          WebProxy.
-        </p>
-        <h4>Uniqueness of Fledger</h4>
-        <p>Instead of having to install all of these things on your computer, handling all the
-          configuration and dependencies, you simply come here and participate in a decentralized
-          system.
-          This version of the system has the following applications:
-        </p>
-        <ul>
-          <li>Decentralized blackboard - write a message for everybody to see</li>
-          <li>Web proxy - route your web traffic through another node (not anonymous yet!)</li>
-        </ul>
-        <h4>Work In Progress</h4>
-        <p>The fledger system is extensible with modules, and we think hard to implement the
-          following modules:
-        </p>
-        <ul>
-          <li>Mixing Network - in a semester project with the <a href="https://dedis.epfl.ch">DEDIS lab</a> at EPFL</li>
-          <li>Storage - IPFS-like decentralized storage where you get storage by sharing your
-            own harddisk storage
-          </li>
-        </ul>
-        <p>These modules will allow to port applications like the following, and add new ones:</p>
-        <ul>
-          <li><a href="https://livequiz.fledg.re">LiveQuiz</a> so that the storage is on fledger</li>
-          <li><a href="https://jemifier.gasser.blue">Jemifier</a> and store the lists on fledger</li>
-          <li>Anonymous surfing</li>
-        </ul>
-        <p></p>
-      </div>
-
-      <div class="tab-pane fade" id="dht-storage" role="tabpanel" aria-labelledby="dht-storage-tab">
-        <br>
-        <h3>DHT-Storage</h3>
-        <p>A DHT storage allows you to store data in a Distributed Hash Table.
-          All your data is split up in packets and then distributed over the available nodes.
-          The nodes exchange regularly to update which data they store.
-          In the ideal case, once you store data in the system, it will be kept even if nodes
-          come and go.
-          While your node (your browser) is connected to the network, it will also store data from other
-          nodes, so that it can be retrieved by them.
-        </p>
-        <h4>Statistics</h4>
-        <p>Here are some statistices about your node:</p>
-        <ul>
-          <li>Realm 1015da7a:</li>
-          <ul>
-            <li>Number of Flos (blobs): 23</li>
-            <li>Bucket distribution of Flos: 4 - 2 - 3 - 1 - 0 - 0 - 0 - 2 - 1</li>
-            <li>Bucket distribution of other nodes available: 0 - 1 - 0 - 2 - 0 - 1</li>
-            <li>Memory: Total (1MB), Used: (553kB)</li>
-          </ul>
-        </ul>
-      </div>
-
-      <div class="tab-pane fade" id="pages" role="tabpanel" aria-labelledby="pages-tab">
-        <br>
-        <h3>Pages</h3>
-        <p>On the DHT-Storage, you can search for other pages and upload your own web-pages.
-          Once you upload a web-page, it will be stored on the other nodes for visitors to be
-          seen.
-        </p>
-        <p>Here are the currently available pages:</p>
-        <ul>
-          <li>Root: Link
-            <ul>
-              <li>Fledger: Link
-                <ul>
-                  <li>Documentation: Link</li>
-                  <li>Ideas: Link</li>
-                </ul>
-              </li>
-              <li>Unofficial Pages: Add-Page</li>
-              <li>Something: Link</li>
-              <li>Else: Link</li>
+    <!-- Navigation bar -->
+    <nav class="main-nav">
+        <div class="nav-container">
+            <ul class="module-tabs">
+                <li class="active"><a href="#" data-module="home" class="module-link"><i class="fas fa-home"></i>
+                        Home</a></li>
+                <!-- <li><a href="#" data-module="sharing" class="module-link"><i class="fas fa-share-alt"></i> Store
+                        webpage</a></li> -->
+                <li><a href="#" data-module="chat" class="module-link"><i class="fas fa-comments"></i> Global Chat</a>
+                </li>
+                <li><a href="#" data-module="proxy" class="module-link"><i class="fas fa-globe"></i> Web Proxy</a></li>
             </ul>
-          </li>
-        </ul>
-      </div>
-
-      <div class="tab-pane fade" id="blackboard" role="tabpanel" aria-labelledby="blackboard-tab">
-        <br>
-        <p>This is a decentralized chatting app, implemented like a global blackboard.
-          Instead of having a central server that stores all
-          messages, every visitor joining the system stores the last 20 messages. So even if the
-          central server goes down or censors messages, the clients can still communicate.
-        </p>
-        <br>
-        <h3>Your Message</h3>
-        <textarea class="form-control" id="your_message" rows="3"></textarea>
-        <button id="send_msg" type="button" class="btn btn-primary" style="float: right;">Send</button>
-
-        <br>
-        <h3>Messages</h3>
-        <div id="messages"></div>
-      </div>
-
-      <div class="tab-pane fade" id="proxy" role="tabpanel" aria-labelledby="proxy-tab">
-        <br>
-        <h3>WebProxy</h3>
-        <div style="display: flex; flex-flow: row;">
-          <!-- <input id="proxy_url" value="http://localhost:8080" /> -->
-          <input id="proxy_url" value="https://fledg.re/doc/index.html" />
-          <button id="proxy_request" type="button" class="btn btn-primary">Proxy
-            Request</button>
+            <div class="external-links">
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <a href="https://github.com/ineiti/fledger" target="_blank" class="external-link">
+                    <i class="fab fa-github"></i> GitHub
+                </a>
+                <a href="https://ineiti.ch" target="_blank" class="external-link">
+                    <i class="fas fa-blog"></i> Blog
+                </a>
+            </div>
         </div>
-        <div id="proxy_div">Enter a URL and click on "Proxy Request".
-          The request will be proxied through one of the nodes online.
+    </nav>
+
+    <main>
+        <div class="container">
+            <!-- Left column - Node Statistics -->
+            <div class="column stats-column" id="node-stats">
+                <h3>Node Statistics <button class="expand-btn"><i class="fas fa-chevron-down"></i></button></h3>
+                <div class="stats-content">
+                    <div class="stat-item">
+                        <span class="stat-label">Name:</span>
+                        <span class="stat-value" id="node_info"></span>
+                    </div>
+                    <!-- <div class="stat-item">
+                        <span class="stat-label">Status:</span>
+                        <span class="stat-value">
+                            <span class="status-pill status-connecting">connecting</span>
+                            <span class="status-pill status-updating">updating</span>
+                            <span class="status-pill status-connected">connected</span>
+                        </span>
+                    </div> -->
+                    <div class="stat-item">
+                        <span class="stat-label">Connections:</span>
+                        <span class="stat-value"><span id="nodes_connected"></span> / <span
+                                id="nodes_online"></span></span>
+                    </div>
+                    <!-- <div class="stat-item">
+                        <span class="stat-label">Local Pages:</span>
+                        <span class="stat-value" id="dht-pages-own">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Pages:</span>
+                        <span class="stat-value" id="dht-pages-total">0</span>
+                    </div> -->
+                    <div class="stat-item">
+                        <span class="stat-label">Messages:</span>
+                        <span class="stat-value"><span id="msgs_local"></span> / <span id="msgs_system"></span></span>
+                    </div>
+                    <div class="expanded-stats">
+                        <!-- <div class="stat-item">
+                            <span class="stat-label">Storage:</span>
+                            <span class="stat-value"><span id="dht-storage-local"></span>/<span
+                                    id="dht-storage-max"></span></span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">DHT Connections:</span>
+                            <span class="stat-value" id="dht-router-connections">0 - 0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">DHT Storage Buckets:</span>
+                            <span class="stat-value" id="dht-storage-buckets">0 - 0</span>
+                        </div> -->
+                        <!-- <div class="stat-item">
+                            <span class="stat-label">Random Connections:</span>
+                            <span class="stat-value"><span id="nodes_connected"></span> / <span
+                                    id="nodes_online"></span></span>
+                        </div> -->
+                        <div class="stat-item">
+                            <span class="stat-label">Version:</span>
+                            <span class="stat-value" id="version">0 - 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle column - Main Content -->
+            <div class="column main-column">
+                <!-- Home Module Content -->
+                <div id="home-module" class="module-content active">
+                    <div id="loading_info">
+                        <section class="about-section">
+                            <h2>About Fledger</h2>
+                            <p>Fledger is a decentralized resource sharing tool that runs directly in your browser. It
+                                enables secure,
+                                peer-to-peer communication without relying on central servers.</p>
+
+                            <p>The project consists of three main modules:</p>
+                            <ul>
+                                <li><strong>Public Messaging Board</strong> - Share messages on a decentralized public
+                                    board
+                                </li>
+                                <li><strong>WebTorrent Sharing</strong> - Share webpages in a torrent-like system</li>
+                                <li><strong>Proxy Viewing</strong> - Browse webpages through a decentralized proxy</li>
+                            </ul>
+
+                            <p>For more information, visit <a href="https://web.fledg.re/"
+                                    target="_blank">web.fledg.re</a>.
+                            </p>
+                        </section>
+
+                        <section class="status-section">
+                            <h2>Node Status</h2>
+                            <!-- <div id="node-status">
+                            <p class="status-message">Connecting to the network...</p>
+                        </div> -->
+                            <ol class="status-steps" id="status-steps">
+                                <li>Connecting to signalling server</li>
+                                <!-- <li>Attempting connection to the network</li>
+                            <li>Updating node information</li>
+                            <li>Connection successfully established</li> -->
+                            </ol>
+                        </section>
+                    </div>
+
+                    <section id="home_page">
+                        <h2>Fledger Homepage</h2>
+                        <div class="homepage-container" id="dht_page">
+                            <p>Loading homepage content...</p>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Chat Module Content -->
+                <div id="chat-module" class="module-content">
+                    <section class="chat-container">
+                        <div class="chat-main">
+                            <div class="message-area" id="messages">
+                                <!-- <div class="message-item received">
+                                    <div class="message-sender">User_28A4F</div>
+                                    <div class="message-content">Hello! Is anyone testing the new proxy system?</div>
+                                    <div class="message-time">10:24</div>
+                                </div>
+                                <div class="message-item sent">
+                                    <div class="message-sender">You</div>
+                                    <div class="message-content">Yes, I'm currently testing it. Works pretty well so
+                                        far!</div>
+                                    <div class="message-time">10:26</div>
+                                </div>
+                                <div class="message-item received">
+                                    <div class="message-sender">Node_19B7C</div>
+                                    <div class="message-content">I'm having some latency issues. Anyone else?</div>
+                                    <div class="message-time">10:29</div>
+                                </div>
+                                <div class="system-message">
+                                    <div class="message-content">Peer_A5D3E has joined the chat</div>
+                                    <div class="message-time">10:31</div>
+                                </div> -->
+                            </div>
+                            <div class="your-id" style="padding: 0.5rem; text-align: center;">
+                                Your ID: <input type="text" id="username-display" value="User_76F2D" readonly
+                                    style="border: none; background: transparent; font-family: monospace;">
+                            </div>
+                            <div class="message-input">
+                                <textarea type="text" id="your_message" placeholder="Type your message..."></textarea>
+                                <button id="send-message-btn"><i class="fas fa-paper-plane"></i></button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Web Sharing Module Content -->
+                <!-- <div id="sharing-module" class="module-content">
+                    <section class="module-header">
+                        <h2>Store Webpage</h2>
+                        <p>Edit and save HTML content for your webpage.</p>
+                    </section>
+                    <section class="editor-section">
+                        <div id="editor" style="height:300px; width:100%; border:1px solid #ccc;"></div>
+                        <input type="text" id="page-path" placeholder="Enter path"
+                            style="margin-top:1rem; padding:0.5rem; width:100%; border:1px solid #ccc; border-radius:4px;">
+                    </section>
+                    <section class="past-paths">
+                        <h3>Past Pages</h3>
+                        <ul id="past-paths">
+                            <li>
+                                <span>/example/path</span>
+                                <button class="edit-btn" title="Edit Page"><i class="fas fa-edit"></i></button>
+                                <button class="view-btn" title="View Page"><i class="fas fa-eye"></i></button>
+                            </li>
+                        </ul>
+                    </section>
+                </div> -->
+
+                <!-- Proxy Module Content -->
+                <div id="proxy-module" class="module-content">
+                    <section class="module-header">
+                        <h2>Web Proxy</h2>
+                        <p>Browse websites through a decentralized proxy network for enhanced privacy</p>
+                    </section>
+
+                    <section class="proxy-controls">
+                        <div class="url-input-container">
+                            <div class="url-input-wrap">
+                                <i class="fas fa-search"></i>
+                                <input type="url" id="proxy_url" placeholder="Enter URL to browse via proxy" />
+                                <!-- Removed proxy-indicators -->
+                            </div>
+                            <button id="browse-btn">Browse</button>
+                        </div>
+                        <!-- Updated proxy display with border and an example page -->
+                        <div id="proxy_div" style="border:1px solid var(--border-color); padding:1rem;">
+                        </div>
+                    </section>
+
+                    <!-- Removed entire Proxy Settings section -->
+
+                    <section class="proxy-history">
+                        <h3>Browsing History <button id="clear-history-btn">Clear</button></h3>
+                        <div class="history-items" id="proxy_history">
+                            <!-- <div class="history-item">
+                                <div class="history-time">12:05</div>
+                                <div class="history-title">Privacy Documentation</div>
+                                <div class="history-url">https://privacy.example.com/docs</div>
+                                <div class="history-actions">
+                                    <button class="action-btn small"><i class="fas fa-redo"></i></button>
+                                    <button class="action-btn small"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </div>
+                            <div class="history-item">
+                                <div class="history-time">11:42</div>
+                                <div class="history-title">Research Portal</div>
+                                <div class="history-url">https://research.example.org</div>
+                                <div class="history-actions">
+                                    <button class="action-btn small"><i class="fas fa-redo"></i></button>
+                                    <button class="action-btn small"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </div>
+                            <div class="history-item">
+                                <div class="history-time">10:18</div>
+                                <div class="history-title">Decentralized Web Forum</div>
+                                <div class="history-url">https://dweb.forum.example</div>
+                                <div class="history-actions">
+                                    <button class="action-btn small"><i class="fas fa-redo"></i></button>
+                                    <button class="action-btn small"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </div> -->
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Right column - Global Statistics -->
+            <div class="column stats-column" id="global-stats">
+                <h3>Global Statistics <button class="expand-btn"><i class="fas fa-chevron-down"></i></button></h3>
+                <div class="stats-content">
+                    <div class="stat-item">
+                        <span class="stat-label">Network Nodes:</span>
+                        <span class="stat-value" id="nodes_online"></span>
+                    </div>
+                    <!-- <div class="stat-item">
+                        <span class="stat-label">Browser / CLI Nodes:</span>
+                        <span class="stat-value"><span id="nodes-browser"></span><span id="nodes-cli"></span></span>
+                    </div> -->
+                    <div class="expanded-stats">
+                        <!-- <div class="stat-item">
+                            <span class="stat-label">Total Data (estimation):</span>
+                            <span class="stat-value" id="total-data"></span>
+                        </div> -->
+                        <div class="stat-item">
+                            <span class="stat-label">Number of realms:</span>
+                            <span class="stat-value" id="realms_number"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
+    </main>
 
-      <div class="tab-pane fade" id="status" role="tabpanel" aria-labelledby="profile-tab">
-        <br>
-        <p>The goal of Fledger is to have a full node running in the web browser.
-          Instead of having to invest in big hardware, fledger will be light enough
-          that you can participate using a browser.
-          You will mine Mana can be used to run smart contracts, store data, or use the
-          re-encryption service.</p>
-        <p>For more information, see the documentation:
-          <a href="https://fledg.re/doc/index.html" target="other">Fledger - the blockchain that could</a>
-        </p>
-        <p>Or find the code on github: <a href="https://github.com/ineiti/fledger">ineiti/fledger</a></p>
-        <ul>
-          <li>Total messages: <span id="msgs_system"></span></li>
-          <li>Local messages: <span id="msgs_local"></span></li>
-          <li>Mana: <span id="mana"></span></li>
-        </ul>
-        <div id="fetching">Fetching node list</div>
-        <table class="styled-table table" id="table_stats" class="hidden">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Ping Count</th>
-              <th>Last ping</th>
-              <th>Conn. Type</th>
-            </tr>
-          </thead>
-          <tbody id="node_stats">
-          </tbody>
-        </table>
-        <button id="get_data" type="button" class="btn btn-primary">Get Data</button>
-      </div>
-    </div>
+    <!-- New footer for mobile view -->
+    <footer id="mobile-footer" class="mobile-footer">
+        <!-- External links will be moved here in mobile view -->
+    </footer>
 
-    <br />
-    <div style="float: right;" id="version"></div>
-    <div style="float: left;">
-      <a href="https://github.com/ineiti/fledger">GitHub</a> - <a
-        href="https://social.epfl.ch/@ineiti">@ineiti@social.epfl.ch</a>
-    </div>
-  </div>
+    <script>
+        // Ensure DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', function () {
+            // Theme management
+            const themeToggle = document.getElementById('theme-toggle');
+            const themeIcon = themeToggle.querySelector('i');
 
-  <script data-trunk src="bootstrap.bundle.min.js"></script>
+            // Get system preferred theme only, no localStorage override
+            function getPreferredTheme() {
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+
+            // Apply theme without storing manually
+            function setTheme(theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                if (theme === 'dark') {
+                    themeIcon.classList.remove('fa-moon');
+                    themeIcon.classList.add('fa-sun');
+                } else {
+                    themeIcon.classList.remove('fa-sun');
+                    themeIcon.classList.add('fa-moon');
+                }
+            }
+
+            // Initialize theme from system preference
+            const initialTheme = getPreferredTheme();
+            setTheme(initialTheme);
+
+            // Theme toggle handler for manual override (won't be persisted)
+            themeToggle.addEventListener('click', () => {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                setTheme(newTheme);
+            });
+
+            // Always update theme when system preference changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+                setTheme(e.matches ? 'dark' : 'light');
+            });
+
+            // Toggle expanded statistics
+            document.querySelectorAll('.expand-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const statsContent = this.closest('.stats-column').querySelector('.expanded-stats');
+                    statsContent.classList.toggle('show');
+
+                    // Toggle icon
+                    const icon = this.querySelector('i');
+                    if (icon.classList.contains('fa-chevron-down')) {
+                        icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+                    } else {
+                        icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+                    }
+                });
+            });
+
+            /*
+                        // Placeholder for dynamic node status updates
+                        // In a real implementation, this would connect to your node system
+                        function updateNodeStatus() {
+                            // This is just a simulation for demonstration
+                            const statusMessages = [
+                                "Connected to 5 peers",
+                                "Syncing with network...",
+                                "Processed 42 messages",
+                                "Shared 3 resources",
+                                "Network fully operational"
+                            ];
+            
+                            const randomStatus = statusMessages[Math.floor(Math.random() * statusMessages.length)];
+                            const statusMessageElement = document.querySelector('.status-message');
+                            if (statusMessageElement) {
+                                statusMessageElement.textContent = randomStatus;
+                            }
+            
+                            // Update status pill visibility - for demonstration
+                            const currentStatus = ['connecting', 'updating', 'connected'][Math.floor(Math.random() * 3)];
+                            document.querySelectorAll('.status-pill').forEach(pill => {
+                                pill.classList.remove('active');
+                            });
+                            const statusPill = document.querySelector(`.status-pill.status-${currentStatus}`);
+                            if (statusPill) {
+                                statusPill.classList.add('active');
+                            }
+            
+                            // Update some stats for demonstration
+                            const dhtConnectionsElement = document.getElementById('dht-connections');
+                            if (dhtConnectionsElement) {
+                                dhtConnectionsElement.textContent = Math.floor(Math.random() * 20);
+                            }
+            
+                            const messageCountElement = document.getElementById('message-count');
+                            if (messageCountElement) {
+                                messageCountElement.textContent = Math.floor(Math.random() * 100);
+                            }
+            
+                            const totalNodesElement = document.getElementById('total-nodes');
+                            if (totalNodesElement) {
+                                totalNodesElement.textContent = Math.floor(Math.random() * 100 + 50);
+                            }
+                        }
+            
+                        // Update status every few seconds
+                        setInterval(updateNodeStatus, 3000);
+                        updateNodeStatus(); // Initial update
+            */
+            // Module tab switching functionality
+            document.querySelectorAll('.module-link').forEach(link => {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+
+                    // Get the module ID from data attribute
+                    const moduleId = this.getAttribute('data-module');
+
+                    // Remove active class from all tabs
+                    document.querySelectorAll('.module-tabs li').forEach(tab => {
+                        tab.classList.remove('active');
+                    });
+
+                    // Add active class to current tab
+                    this.closest('li').classList.add('active');
+
+                    // Hide all module content
+                    document.querySelectorAll('.module-content').forEach(content => {
+                        content.classList.remove('active');
+                    });
+
+                    // Show the selected module content
+                    document.getElementById(`${moduleId}-module`).classList.add('active');
+                });
+            });
+
+            /*
+            // Chat module functionality
+            const chatInput = document.getElementById('chat-input');
+            const sendButton = document.getElementById('send-message-btn');
+
+            function sendMessage() {
+                if (chatInput.value.trim() !== '') {
+                    const messageContainer = document.getElementById('message-container');
+                    const now = new Date();
+                    const timeString = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+                    const messageHTML = `
+                        <div class="message-item sent">
+                            <div class="message-sender">You</div>
+                            <div class="message-content">${chatInput.value}</div>
+                            <div class="message-time">${timeString}</div>
+                        </div>
+                    `;
+
+                    messageContainer.innerHTML += messageHTML;
+                    messageContainer.scrollTop = messageContainer.scrollHeight;
+                    chatInput.value = '';
+                }
+            }
+
+            if (sendButton) {
+                sendButton.addEventListener('click', sendMessage);
+            }
+
+            if (chatInput) {
+                chatInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        sendMessage();
+                    }
+                });
+            }
+*/
+
+            // Mobile layout adjustments
+            function handleMobileLayout() {
+                const container = document.querySelector('.container');
+                const nodeStats = document.getElementById('node-stats');
+                const globalStats = document.getElementById('global-stats');
+                const mainColumn = document.querySelector('.main-column');
+                const externalLinks = document.querySelector('.external-links');
+                const mobileFooter = document.getElementById('mobile-footer');
+
+                if (window.innerWidth <= 900) {
+                    // Simple approach: remove all elements and add them back in correct order
+                    // First, detach all elements from container without removing their event listeners
+                    if (nodeStats.parentElement) {
+                        nodeStats.parentElement.removeChild(nodeStats);
+                    }
+                    if (mainColumn.parentElement) {
+                        mainColumn.parentElement.removeChild(mainColumn);
+                    }
+                    if (globalStats.parentElement) {
+                        globalStats.parentElement.removeChild(globalStats);
+                    }
+
+                    // Now add them back in the desired order for mobile:
+                    // 1. Main column
+                    container.appendChild(mainColumn);
+                    // 2. Node stats
+                    container.appendChild(nodeStats);
+                    // 3. Global stats
+                    container.appendChild(globalStats);
+
+                    // Apply mobile-specific styling
+                    nodeStats.classList.add('mobile-stats');
+                    globalStats.classList.add('mobile-stats');
+
+                    // Move GitHub and blog links to footer for mobile view
+                    const githubLink = externalLinks.querySelector('a[href*="github"]');
+                    const blogLink = externalLinks.querySelector('a[href*="ineiti.ch"]');
+
+                    // Clear footer and add the links
+                    mobileFooter.innerHTML = '';
+                    if (githubLink) {
+                        const githubClone = githubLink.cloneNode(true);
+                        mobileFooter.appendChild(githubClone);
+                    }
+                    if (blogLink) {
+                        const blogClone = blogLink.cloneNode(true);
+                        mobileFooter.appendChild(blogClone);
+                    }
+
+                    // Show footer in mobile view
+                    mobileFooter.style.display = 'flex';
+
+                    // Hide original links in navbar
+                    if (githubLink) githubLink.style.display = 'none';
+                    if (blogLink) blogLink.style.display = 'none';
+                } else {
+                    // Desktop layout: nodeStats on left, mainColumn in middle, globalStats on right
+                    // Remove all elements first
+                    if (nodeStats.parentElement) {
+                        nodeStats.parentElement.removeChild(nodeStats);
+                    }
+                    if (mainColumn.parentElement) {
+                        mainColumn.parentElement.removeChild(mainColumn);
+                    }
+                    if (globalStats.parentElement) {
+                        globalStats.parentElement.removeChild(globalStats);
+                    }
+
+                    // Add back in desktop order
+                    container.appendChild(nodeStats);
+                    container.appendChild(mainColumn);
+                    container.appendChild(globalStats);
+
+                    // Remove mobile-specific styling
+                    nodeStats.classList.remove('mobile-stats');
+                    globalStats.classList.remove('mobile-stats');
+
+                    // Hide mobile footer
+                    mobileFooter.style.display = 'none';
+
+                    // Show original links in navbar
+                    const githubLink = externalLinks.querySelector('a[href*="github"]');
+                    const blogLink = externalLinks.querySelector('a[href*="ineiti.ch"]');
+                    if (githubLink) githubLink.style.display = '';
+                    if (blogLink) blogLink.style.display = '';
+                }
+            }
+
+            // Initialize mobile layout
+            handleMobileLayout();
+
+            // Update on resize
+            window.addEventListener('resize', handleMobileLayout);
+        });
+    </script>
+
+    <style>
+        /* Styling for mobile footer */
+        .mobile-footer {
+            display: none;
+            justify-content: center;
+            padding: 1rem;
+            background-color: var(--background-color);
+            border-top: 1px solid var(--border-color);
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            z-index: 10;
+        }
+
+        .mobile-footer a {
+            margin: 0 1rem;
+            color: var(--text-color);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        @media (max-width: 900px) {
+
+            /* Add some bottom padding to main content to account for fixed footer */
+            main {
+                padding-bottom: 4rem;
+            }
+        }
+    </style>
+
+    <!-- Add Ace Editor CDN and initialization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+    <script>
+        // Initialize Ace Editor for HTML content
+        var editor = ace.edit("editor");
+        editor.setTheme("ace/theme/monokai");
+        editor.session.setMode("ace/mode/html");
+        // Set default content with a simple "Hello Fledger" page
+        editor.setValue(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Hello Fledger</title>
+</head>
+<body>
+  <h1>Hello Fledger</h1>
+  <p>Welcome to Fledger.</p>
 </body>
+</html>`, -1);
+    </script>
 
 </html>

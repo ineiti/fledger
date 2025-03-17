@@ -1,6 +1,6 @@
 [package]
 name = "flbrowser"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Linus Gasser <ineiti@gasser.blue>"]
 edition = "2021"
 description = "Web interface for fledger"
@@ -21,6 +21,7 @@ flnode = {path = "../flnode", version = "0.9"}
 
 chrono = "0.4"
 anyhow = "1"
+itertools = "0.14"
 js-sys = "0.3"
 regex = "1"
 log = "0.4"
@@ -40,6 +41,7 @@ features = [
   'HtmlElement',
   'HtmlDivElement',
   'HtmlInputElement',
+  'HtmlOListElement',
   'HtmlTextAreaElement',
   'Node',
   'Window',

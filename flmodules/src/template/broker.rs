@@ -1,15 +1,11 @@
 use flarch::data_storage::DataStorage;
-use std::error::Error;
 use tokio::sync::watch;
 
 use crate::{
     random_connections::broker::{BrokerRandom, RandomIn, RandomOut},
     router::messages::NetworkWrapper,
 };
-use flarch::{
-    broker::{Broker, BrokerError},
-    nodeids::NodeID,
-};
+use flarch::{broker::Broker, nodeids::NodeID};
 
 use super::{
     core::{TemplateConfig, TemplateStorage},
@@ -41,7 +37,7 @@ impl Template {
         our_id: NodeID,
         rc: BrokerRandom,
         config: TemplateConfig,
-    ) -> Result<Self, Box<dyn Error>> {
+    ) -> anyhow::Result<Self> {
         let (messages, storage) = Messages::new(ds, config, our_id);
         let mut broker = Broker::new();
         broker.add_handler(Box::new(messages)).await?;
@@ -61,7 +57,7 @@ impl Template {
         })
     }
 
-    pub fn increase_self(&mut self, counter: u32) -> Result<(), BrokerError> {
+    pub fn increase_self(&mut self, counter: u32) -> anyhow::Result<()> {
         self.broker.emit_msg_in(TemplateIn::FromNetwork(
             self.our_id,
             ModuleMessage::Increase(counter),
@@ -98,7 +94,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_increase() -> Result<(), Box<dyn Error>> {
+    async fn test_increase() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], log::LevelFilter::Info);
 
         let ds = Box::new(DataStorageTemp::new());

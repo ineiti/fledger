@@ -28,7 +28,7 @@ enum StartError {
     Receive(#[from] RecvError),
 }
 
-async fn run_app() -> Result<(), StartError> {
+async fn run_app() -> anyhow::Result<()> {
     log::info!("Starting app");
 
     let nc = NodeConfig::new();

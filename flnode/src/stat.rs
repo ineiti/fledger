@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use flarch::{
-    broker::{Broker, BrokerError, SubsystemHandler},
+    broker::{Broker, SubsystemHandler},
     nodeids::U256,
     platform_async_trait,
 };
@@ -17,9 +17,7 @@ pub struct NetworkStats {
 }
 
 impl NetworkStats {
-    pub async fn start(
-        mut broker_net: BrokerNetwork,
-    ) -> Result<watch::Receiver<NetStats>, BrokerError> {
+    pub async fn start(mut broker_net: BrokerNetwork) -> anyhow::Result<watch::Receiver<NetStats>> {
         let stats = NetStats::default();
         let (tx, rx) = watch::channel(stats.clone());
         let mut broker = Broker::new();
