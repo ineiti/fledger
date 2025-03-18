@@ -30,7 +30,7 @@ use flarch::{
     data_storage::DataStorageLocal,
     nodeids::{NodeID, U256},
     tasks::{spawn_local_nosend, wait_ms},
-    web_rtc::connection::{ConnectionConfig, HostLogin, Login},
+    web_rtc::connection::{ConnectionConfig, HostLogin},
 };
 use flmodules::network::broker::NetworkConnectionState;
 use flmodules::network::network_start;
@@ -38,11 +38,26 @@ use flnode::{node::Node, version::VERSION_STRING};
 
 mod realm_pages;
 
+#[derive(Debug)]
+struct NetConf<'a> {
+    signal_server: &'a str,
+    stun_server: Option<&'a str>,
+    turn_server: Option<&'a str>,
+}
+
 #[cfg(not(feature = "local"))]
-const URL: &str = "wss://signal.fledg.re";
+const NETWORK_CONFIG: NetConf = NetConf {
+    signal_server: "wss://signal.fledg.re",
+    stun_server: Some("stun:stun.l.google.com:19302"),
+    turn_server: Some("something:something@turn:web.fledg.re:3478"),
+};
 
 #[cfg(feature = "local")]
-const URL: &str = "ws://localhost:8765";
+const NETWORK_CONFIG: NetConf = NetConf {
+    signal_server: "ws://localhost:8765",
+    stun_server: None,
+    turn_server: None,
+};
 
 #[derive(Debug, Clone)]
 enum Button {
@@ -198,7 +213,7 @@ impl FledgerWeb {
         FledgerWeb::set_data_storage();
 
         wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
-        log::info!("Starting new FledgerWeb on {URL}");
+        log::info!("Starting new FledgerWeb on {NETWORK_CONFIG:?}");
 
         // Get a link to the document
         let window = web_sys::window().expect("no global `window` exists");
@@ -269,15 +284,13 @@ impl FledgerWeb {
         let my_storage = DataStorageLocal::new("fledger");
         let mut node_config = Node::get_config(my_storage.clone())?;
         let config = ConnectionConfig::new(
-            Some(URL.into()),
-            None,
-            Some(HostLogin {
-                url: "turn:web.fledg.re:3478".into(),
-                login: Some(Login {
-                    user: "something".into(),
-                    pass: "something".into(),
-                }),
-            }),
+            NETWORK_CONFIG.signal_server.into(),
+            NETWORK_CONFIG
+                .stun_server
+                .and_then(|url| HostLogin::from_login_url(url).ok()),
+            NETWORK_CONFIG
+                .turn_server
+                .and_then(|url| HostLogin::from_login_url(url).ok()),
         );
         let network = network_start(node_config.clone(), config).await?;
         node_config.info.modules = Modules::all() - Modules::WEBPROXY_REQUESTS;

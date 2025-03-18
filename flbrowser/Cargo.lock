@@ -765,6 +765,7 @@ dependencies = [
  "js-sys",
  "log",
  "rand 0.8.5",
+ "regex",
  "rmp-serde",
  "serde",
  "serde-wasm-bindgen",

@@ -26,7 +26,7 @@ thiserror = "2"
 tokio = { version = "1", features = ["rt", "macros", "time", "sync"] }
 async-trait = "0.1"
 rand = { version = "0.8" }
-
+regex = "1"
 # serde_with version 2 doesn't work with old configs
 serde_with = { version = "3", features = ["json", "base64", "hex"] }
 # serde_yaml 0.9 uses tags in yaml, which fails here

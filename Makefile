@@ -100,8 +100,8 @@ build_local: build_local_web build_cli
 serve_two: kill build_cli
 	( cd cli && cargo run --bin flsignal -- -vv ) &
 	sleep 4
-	( cd cli && ( cargo run --bin fledger -- --config fledger/flnode --log-dht-storage -vv -s ws://localhost:8765 & \
-		cargo run --bin fledger -- --config fledger/flnode2 --log-dht-storage -vv -s ws://localhost:8765 & ) )
+	( cd cli && ( cargo run --bin fledger -- --config fledger/flnode --log-dht-storage -vvv -s ws://localhost:8765 --disable-turn-stun & \
+		cargo run --bin fledger -- --config fledger/flnode2 --log-dht-storage -vvv -s ws://localhost:8765 --disable-turn-stun & ) )
 
 serve_local: kill build_local_web serve_two
 	cd flbrowser && RUST_BACKTRACE=1 trunk serve --features local &

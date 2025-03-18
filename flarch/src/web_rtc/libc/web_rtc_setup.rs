@@ -29,7 +29,8 @@ use webrtc::{
 use crate::{
     broker::{Broker, SubsystemHandler},
     web_rtc::{
-        connection::{ConnectionConfig, HostLogin},
+        connection::{ConnectionConfig, IceServer},
+        
         messages::{
             ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError,
             SignalingState, WebRTCInput, WebRTCOutput, WebRTCSpawner,
@@ -38,14 +39,16 @@ use crate::{
     },
 };
 
-fn get_ice_server(host: HostLogin) -> RTCIceServer {
+fn get_ice_server(host: IceServer) -> RTCIceServer {
     let mut server = RTCIceServer {
-        urls: vec![host.url],
+        urls: vec![host.urls],
         ..Default::default()
     };
-    if let Some(login) = host.login {
-        server.username = login.user;
-        server.credential = login.pass;
+    if let Some(user) = host.username {
+        server.username = user;
+    }
+    if let Some(credential) = host.credential {
+        server.credential = credential;
     }
 
     server
@@ -115,10 +118,11 @@ impl WebRTCConnectionSetupLibc {
             .build();
 
         // Prepare the configuration
-        let mut ice_servers = vec![get_ice_server(connection_cfg.stun())];
-        if let Some(turn) = connection_cfg.turn() {
-            ice_servers.push(get_ice_server(turn));
-        }
+        let ice_servers = connection_cfg
+            .servers()
+            .into_iter()
+            .map(get_ice_server)
+            .collect::<Vec<_>>();
         let config = RTCConfiguration {
             ice_servers,
             ..Default::default()

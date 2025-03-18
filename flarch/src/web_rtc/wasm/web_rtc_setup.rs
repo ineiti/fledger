@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use js_sys::Reflect;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
@@ -14,7 +13,7 @@ use web_sys::{
 
 use crate::broker::{Broker, SubsystemHandler};
 use crate::web_rtc::{
-    connection::{ConnectionConfig, HostLogin},
+    connection::ConnectionConfig,
     messages::{
         ConnType, ConnectionStateMap, DataChannelState, IceConnectionState, IceGatheringState,
         PeerMessage, SetupError, SignalingState, WebRTCInput, WebRTCOutput, WebRTCSpawner,
@@ -30,23 +29,6 @@ pub struct WebRTCConnectionSetup {
     queue: Vec<String>,
     direction: Option<Direction>,
     config: ConnectionConfig,
-}
-
-#[derive(Serialize, Deserialize)]
-struct IceServer {
-    urls: String,
-    username: Option<String>,
-    credential: Option<String>,
-}
-
-fn get_ice_server(host: HostLogin) -> IceServer {
-    let username = host.login.clone().map(|l| l.user);
-    let credential = host.login.clone().map(|l| l.pass);
-    IceServer {
-        urls: host.url,
-        username,
-        credential,
-    }
 }
 
 impl WebRTCConnectionSetup {
@@ -68,11 +50,8 @@ impl WebRTCConnectionSetup {
         // If no stun server is configured, only local IPs will be sent in the browser.
         // At least the node webrtc does the correct thing...
         let config = RtcConfiguration::new();
-        let mut servers_obj = vec![get_ice_server(connection_cfg.stun())];
-        if let Some(turn) = connection_cfg.turn() {
-            servers_obj.push(get_ice_server(turn));
-        }
-        let servers = serde_wasm_bindgen::to_value(&servers_obj)
+
+        let servers = serde_wasm_bindgen::to_value(&connection_cfg.servers())
             .map_err(|e| SetupError::SetupFail(e.to_string()))?;
         config.set_ice_servers(&servers);
         Ok(RtcPeerConnection::new_with_configuration(&config)
