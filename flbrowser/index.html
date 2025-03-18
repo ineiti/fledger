@@ -46,7 +46,8 @@
         <div class="container">
             <!-- Left column - Node Statistics -->
             <div class="column stats-column" id="node-stats">
-                <h3>Node Statistics <button class="expand-btn"><i class="fas fa-chevron-down"></i></button></h3>
+                <h3>Node Statistics <button class="expand-btn" onclick="toggle_div('stats-left', this)"><i
+                            class="fas fa-chevron-left"></i></button></h3>
                 <div class="stats-content">
                     <div class="stat-item">
                         <span class="stat-label">Name:</span>
@@ -77,7 +78,7 @@
                         <span class="stat-label">Messages:</span>
                         <span class="stat-value"><span id="msgs_local"></span> / <span id="msgs_system"></span></span>
                     </div>
-                    <div class="expanded-stats">
+                    <div class="expanded-stats" id="stats-left">
                         <!-- <div class="stat-item">
                             <span class="stat-label">Storage:</span>
                             <span class="stat-value"><span id="dht-storage-local"></span>/<span
@@ -108,9 +109,11 @@
             <div class="column main-column">
                 <!-- Home Module Content -->
                 <div id="home-module" class="module-content active">
-                    <div id="loading_info">
+                    <h2>About Fledger <button class="expand-btn" id="loading-info-button" onclick="toggle_div('loading-info', this)"><i
+                                class="fas fa-chevron-down"></i></button>
+                    </h2>
+                    <div id="loading-info" class="show">
                         <section class="about-section">
-                            <h2>About Fledger</h2>
                             <p>Fledger is a decentralized resource sharing tool that runs directly in your browser. It
                                 enables secure,
                                 peer-to-peer communication without relying on central servers.</p>
@@ -131,14 +134,8 @@
 
                         <section class="status-section">
                             <h2>Node Status</h2>
-                            <!-- <div id="node-status">
-                            <p class="status-message">Connecting to the network...</p>
-                        </div> -->
                             <ol class="status-steps" id="status-steps">
                                 <li>Connecting to signalling server</li>
-                                <!-- <li>Attempting connection to the network</li>
-                            <li>Updating node information</li>
-                            <li>Connection successfully established</li> -->
                             </ol>
                         </section>
                     </div>
@@ -162,7 +159,8 @@
                                     style="border: none; background: transparent; font-family: monospace;"></span>
                             </div>
                             <div class="message-input">
-                                <textarea type="text" id="your_message" placeholder="Type your message..."></textarea>
+                                <textarea type="text" id="your_message" placeholder="Type your message..."
+                                    onkeydown="if(event.key === 'Enter' && (event.metaKey || event.ctrlKey)) document.getElementById('send_message').click();"></textarea>
                                 <button id="send_message"><i class="fas fa-paper-plane"></i></button>
                             </div>
                         </div>
@@ -203,9 +201,9 @@
                         <div class="url-input-container">
                             <div class="url-input-wrap">
                                 <i class="fas fa-search"></i>
-                                <input type="url" id="proxy_url" placeholder="Enter URL to browse via proxy" 
-                                value="https://bearblog.dev/discover/"/>
-                                <!-- Removed proxy-indicators -->
+                                <input type="url" id="proxy_url" placeholder="Enter URL to browse via proxy"
+                                    value="https://bearblog.dev/discover/"
+                                    onkeypress="if(event.key === 'Enter') document.getElementById('proxy_request').click();" />
                             </div>
                             <button class="browse-btn" id="proxy_request">Browse</button>
                         </div>
@@ -214,12 +212,10 @@
                         </div>
                     </section>
 
-                    <!-- Removed entire Proxy Settings section -->
-
                     <!-- <section class="proxy-history">
                         <h3>Browsing History <button id="clear-history-btn">Clear</button></h3>
-                        <div class="history-items" id="proxy_history"> -->
-                            <!-- <div class="history-item">
+                        <div class="history-items" id="proxy_history">
+                            <div class="history-item">
                                 <div class="history-time">12:05</div>
                                 <div class="history-title">Privacy Documentation</div>
                                 <div class="history-url">https://privacy.example.com/docs</div>
@@ -228,42 +224,27 @@
                                     <button class="action-btn small"><i class="fas fa-trash"></i></button>
                                 </div>
                             </div>
-                            <div class="history-item">
-                                <div class="history-time">11:42</div>
-                                <div class="history-title">Research Portal</div>
-                                <div class="history-url">https://research.example.org</div>
-                                <div class="history-actions">
-                                    <button class="action-btn small"><i class="fas fa-redo"></i></button>
-                                    <button class="action-btn small"><i class="fas fa-trash"></i></button>
-                                </div>
-                            </div>
-                            <div class="history-item">
-                                <div class="history-time">10:18</div>
-                                <div class="history-title">Decentralized Web Forum</div>
-                                <div class="history-url">https://dweb.forum.example</div>
-                                <div class="history-actions">
-                                    <button class="action-btn small"><i class="fas fa-redo"></i></button>
-                                    <button class="action-btn small"><i class="fas fa-trash"></i></button>
-                                </div>
-                            </div> -->
-                        <!-- </div>
+                        </div>
                     </section> -->
                 </div>
             </div>
 
             <!-- Right column - Global Statistics -->
             <div class="column stats-column" id="global-stats">
-                <h3>Global Statistics <button class="expand-btn"><i class="fas fa-chevron-down"></i></button></h3>
+                <h3>Global Statistics <button class="expand-btn" onclick="toggle_div('stats-right', this)"><i
+                            class="fas fa-chevron-left"></i></button></h3>
                 <div class="stats-content">
                     <div class="stat-item">
                         <span class="stat-label">Realm Space:</span>
-                        <span class="stat-value" id="nodes_online"></span>
+                        <span class="stat-value">
+                            <span id="dht_storage_local"></span> / <span id="dht_storage_limit"></span>
+                        </span>
                     </div>
                     <!-- <div class="stat-item">
                         <span class="stat-label">Browser / CLI Nodes:</span>
                         <span class="stat-value"><span id="nodes-browser"></span><span id="nodes-cli"></span></span>
                     </div> -->
-                    <div class="expanded-stats">
+                    <div class="expanded-stats" id="stats-right">
                         <!-- <div class="stat-item">
                             <span class="stat-label">Total Data (estimation):</span>
                             <span class="stat-value" id="total-data"></span>
@@ -271,6 +252,12 @@
                         <div class="stat-item">
                             <span class="stat-label">Number of realms:</span>
                             <span class="stat-value" id="realms_count"></span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Connected Node Stats:</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="connected_stats"></span>
                         </div>
                     </div>
                 </div>
@@ -284,6 +271,20 @@
     </footer>
 
     <script>
+        // Define toggle_div function globally
+        function toggle_div(id, caller) {
+            const statsContent = document.getElementById(id);
+            statsContent.classList.toggle('show');
+
+            // Toggle icon
+            const icon = caller.querySelector('i');
+            if (icon.classList.contains('fa-chevron-down')) {
+                icon.classList.replace('fa-chevron-down', 'fa-chevron-left');
+            } else {
+                icon.classList.replace('fa-chevron-left', 'fa-chevron-down');
+            }
+        }
+
         // Ensure DOM is fully loaded
         document.addEventListener('DOMContentLoaded', function () {
             // Theme management
@@ -323,71 +324,16 @@
                 setTheme(e.matches ? 'dark' : 'light');
             });
 
-            // Toggle expanded statistics
-            document.querySelectorAll('.expand-btn').forEach(btn => {
-                btn.addEventListener('click', function () {
-                    const statsContent = this.closest('.stats-column').querySelector('.expanded-stats');
-                    statsContent.classList.toggle('show');
-
-                    // Toggle icon
-                    const icon = this.querySelector('i');
-                    if (icon.classList.contains('fa-chevron-down')) {
-                        icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
-                    } else {
-                        icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
-                    }
-                });
-            });
-
             /*
-                        // Placeholder for dynamic node status updates
-                        // In a real implementation, this would connect to your node system
-                        function updateNodeStatus() {
-                            // This is just a simulation for demonstration
-                            const statusMessages = [
-                                "Connected to 5 peers",
-                                "Syncing with network...",
-                                "Processed 42 messages",
-                                "Shared 3 resources",
-                                "Network fully operational"
-                            ];
-            
-                            const randomStatus = statusMessages[Math.floor(Math.random() * statusMessages.length)];
-                            const statusMessageElement = document.querySelector('.status-message');
-                            if (statusMessageElement) {
-                                statusMessageElement.textContent = randomStatus;
-                            }
-            
-                            // Update status pill visibility - for demonstration
-                            const currentStatus = ['connecting', 'updating', 'connected'][Math.floor(Math.random() * 3)];
-                            document.querySelectorAll('.status-pill').forEach(pill => {
-                                pill.classList.remove('active');
-                            });
-                            const statusPill = document.querySelector(`.status-pill.status-${currentStatus}`);
-                            if (statusPill) {
-                                statusPill.classList.add('active');
-                            }
-            
-                            // Update some stats for demonstration
-                            const dhtConnectionsElement = document.getElementById('dht-connections');
-                            if (dhtConnectionsElement) {
-                                dhtConnectionsElement.textContent = Math.floor(Math.random() * 20);
-                            }
-            
-                            const messageCountElement = document.getElementById('message-count');
-                            if (messageCountElement) {
-                                messageCountElement.textContent = Math.floor(Math.random() * 100);
-                            }
-            
-                            const totalNodesElement = document.getElementById('total-nodes');
-                            if (totalNodesElement) {
-                                totalNodesElement.textContent = Math.floor(Math.random() * 100 + 50);
-                            }
-                        }
-            
-                        // Update status every few seconds
-                        setInterval(updateNodeStatus, 3000);
-                        updateNodeStatus(); // Initial update
+                    // Update status pill visibility - for demonstration
+                    const currentStatus = ['connecting', 'updating', 'connected'][Math.floor(Math.random() * 3)];
+                    document.querySelectorAll('.status-pill').forEach(pill => {
+                        pill.classList.remove('active');
+                    });
+                    const statusPill = document.querySelector(`.status-pill.status-${currentStatus}`);
+                    if (statusPill) {
+                        statusPill.classList.add('active');
+                    }
             */
             // Module tab switching functionality
             document.querySelectorAll('.module-link').forEach(link => {
@@ -419,13 +365,13 @@
             // Chat module functionality
             const chatInput = document.getElementById('chat-input');
             const sendButton = document.getElementById('send-message-btn');
-
+    
             function sendMessage() {
                 if (chatInput.value.trim() !== '') {
                     const messageContainer = document.getElementById('message-container');
                     const now = new Date();
                     const timeString = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
-
+    
                     const messageHTML = `
                         <div class="message-item sent">
                             <div class="message-sender">You</div>
@@ -433,17 +379,17 @@
                             <div class="message-time">${timeString}</div>
                         </div>
                     `;
-
+    
                     messageContainer.innerHTML += messageHTML;
                     messageContainer.scrollTop = messageContainer.scrollHeight;
                     chatInput.value = '';
                 }
             }
-
+    
             if (sendButton) {
                 sendButton.addEventListener('click', sendMessage);
             }
-
+    
             if (chatInput) {
                 chatInput.addEventListener('keypress', function (e) {
                     if (e.key === 'Enter') {
@@ -451,7 +397,7 @@
                     }
                 });
             }
-*/
+    */
 
             // Mobile layout adjustments
             function handleMobileLayout() {

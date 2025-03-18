@@ -22,8 +22,8 @@ use wasm_bindgen::{
     JsCast,
 };
 use web_sys::{
-    window, Document, Event, HtmlDivElement, HtmlElement, HtmlInputElement, HtmlOListElement,
-    HtmlTextAreaElement,
+    window, Document, Event, HtmlButtonElement, HtmlDivElement, HtmlElement, HtmlInputElement,
+    HtmlOListElement, HtmlTextAreaElement,
 };
 
 use flarch::{
@@ -89,7 +89,7 @@ pub fn main() {
         let your_message: HtmlTextAreaElement = web.get_element("your_message");
         let proxy_div: HtmlDivElement = web.get_element("proxy_div");
         let status_steps: HtmlOListElement = web.get_element("status-steps");
-        let _loading_info: HtmlDivElement = web.get_element("loading_info");
+        let loading_info_button: HtmlButtonElement = web.get_element("loading-info-button");
         let home_page: HtmlElement = web.get_element("home_page");
         home_page.set_hidden(true);
         let proxy_url: HtmlInputElement = web.get_element("proxy_url");
@@ -164,7 +164,9 @@ pub fn main() {
             if let Some(state) = web.tick().await {
                 if state.page_tags.len() > 0 && status.0.len() == 3 {
                     // loading_info.set_hidden(true);
+                    loading_info_button.click();
                     home_page.set_hidden(false);
+                    status.0.push(LI("Loading finished".into(), None));
                 }
                 if state.nodes_connected >= 2 && status.0.len() == 2 {
                     status.0.push(LI("Updating pages".into(), None));
@@ -184,7 +186,52 @@ pub fn main() {
                 // web.set_html_id("dht_stats", state.get_dht_stats());
                 web.set_html_id("dht_page", state.get_dht_pages());
                 web.set_html_id("dht_connections", state.dht_router.active.to_string());
-                web.set_html_id("realms_count", state.dht_storage.realm_stats.len().to_string());
+                web.set_html_id(
+                    "realms_count",
+                    state.dht_storage.realm_stats.len().to_string(),
+                );
+                web.set_html_id(
+                    "dht_storage_local",
+                    human_readable_size(
+                        state
+                            .dht_storage
+                            .realm_stats
+                            .iter()
+                            .map(|s| s.1.size)
+                            .sum::<usize>(),
+                    ),
+                );
+                web.set_html_id(
+                    "dht_storage_limit",
+                    human_readable_size(
+                        state
+                            .dht_storage
+                            .realm_stats
+                            .iter()
+                            .map(|s| s.1.config.max_space)
+                            .sum::<u64>() as usize,
+                    ),
+                );
+                web.set_html_id(
+                    "connected_stats",
+                    state
+                        .states
+                        .iter()
+                        .map(|s| {
+                            format!(
+                                "{} - {:?}",
+                                state
+                                    .nodes_info
+                                    .get(s.0)
+                                    .map(|ni| format!("{}", ni.name))
+                                    .unwrap_or(format!("{}", s.0)),
+                                s.1.s.type_local
+                            )
+                        })
+                        .sorted()
+                        .collect::<Vec<String>>()
+                        .join("<br>"),
+                );
                 // dht-pages-own - our pages
                 // dht-pages-total - all pages
                 // dht-storage-local
@@ -593,4 +640,12 @@ impl FledgerMessage {
             self.date
         )
     }
+}
+
+fn human_readable_size(size: usize) -> String {
+    let units = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    let size = size as f64;
+    let i = (size.ln() / 1024_f64.ln()).floor() as i32;
+    let size = size / 1024_f64.powi(i);
+    format!("{:.2} {}", size, units[i as usize])
 }

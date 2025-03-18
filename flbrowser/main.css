@@ -316,6 +316,14 @@ section h2 {
     text-align: right;
 }
 
+#loading-info {
+    display: none;
+}
+
+#loading-info.show {
+    display: block;
+}
+
 .expanded-stats {
     max-height: 0;
     overflow: hidden;
