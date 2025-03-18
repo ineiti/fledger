@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use flarch::{
     data_storage::{DataStorage, DataStorageFile},
     tasks::wait_ms,
-    web_rtc::connection::{ConnectionConfig, HostLogin, Login},
+    web_rtc::connection::{ConnectionConfig, HostLogin},
 };
 use flcrypto::{access::Condition, signer::SignerTrait};
 use flmodules::{
@@ -32,6 +32,19 @@ struct Args {
     /// Signalling server URL
     #[arg(short, long, default_value = "wss://signal.fledg.re")]
     signal_url: String,
+
+    /// Stun server - by default points to Google's
+    #[arg(long, default_value = "stun:stun.l.google.com:19302")]
+    stun_url: String,
+
+    /// Turn server - by default points to fledger's open Turn server.
+    /// username:password@turn:domain:port
+    #[arg(long, default_value = "something:something@turn:web.fledg.re:3478")]
+    turn_url: String,
+
+    /// Disables all stun and turn servers for local tests
+    #[arg(long, default_value = "false")]
+    disable_turn_stun: bool,
 
     /// Verbosity of the logger
     #[clap(flatten)]
@@ -117,22 +130,17 @@ async fn main() -> anyhow::Result<()> {
         VERSION_STRING
     );
 
-    log::debug!("Connecting to websocket at {}", args.signal_url);
-    let network = network_start(
-        node_config.clone(),
+    let cc = if args.disable_turn_stun {
+        ConnectionConfig::from_signal(&args.signal_url)
+    } else {
         ConnectionConfig::new(
-            Some(args.signal_url.clone()),
-            None,
-            Some(HostLogin {
-                url: "turn:web.fledg.re:3478".into(),
-                login: Some(Login {
-                    user: "something".into(),
-                    pass: "something".into(),
-                }),
-            }),
-        ),
-    )
-    .await?;
+            args.signal_url.clone().into(),
+            Some(HostLogin::from_url(&args.stun_url)),
+            Some(HostLogin::from_login_url(&args.turn_url)?),
+        )
+    };
+    log::debug!("Connecting to websocket at {:?}", cc);
+    let network = network_start(node_config.clone(), cc).await?;
     let node = Node::start(Box::new(storage), node_config, network.broker).await?;
     Ok(Fledger {
         ds: node.dht_storage.as_ref().unwrap().clone(),

@@ -6,7 +6,13 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
-## [0.9.1] - Pending
+## [0.9.3] - Pending
+
+### Changed
+
+- added configuration options to `cli/fledger` for local run only
+
+## [0.9.2] - Released
 
 ### Added
 
