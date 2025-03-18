@@ -287,7 +287,7 @@ impl FledgerWeb {
             NETWORK_CONFIG.signal_server.into(),
             NETWORK_CONFIG
                 .stun_server
-                .and_then(|url| HostLogin::from_login_url(url).ok()),
+                .and_then(|url| Some(HostLogin::from_url(url))),
             NETWORK_CONFIG
                 .turn_server
                 .and_then(|url| HostLogin::from_login_url(url).ok()),
