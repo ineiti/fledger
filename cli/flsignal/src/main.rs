@@ -31,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     let wss = WebSocketServer::new(8765).await?;
     let system_realm = args.system_realm.and_then(|sr| RealmID::from_str(&sr).ok());
+    log::info!("System realm config is: {:?}", system_realm);
     let mut signal_server = SignalServer::new(
         wss,
         SignalConfig {
@@ -43,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
 
     log::info!("Started listening on port 8765");
     for msg in msgs {
-        log::debug!("{:?}", msg);
+        log::trace!("{:?}", msg);
         if matches!(msg, SignalOut::Stopped) {
             log::error!("Server stopped working - exiting");
             return Ok(());

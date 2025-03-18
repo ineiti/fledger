@@ -184,6 +184,7 @@ pub fn main() {
                 // web.set_html_id("dht_stats", state.get_dht_stats());
                 web.set_html_id("dht_page", state.get_dht_pages());
                 web.set_html_id("dht_connections", state.dht_router.active.to_string());
+                web.set_html_id("realms_count", state.dht_storage.realm_stats.len().to_string());
                 // dht-pages-own - our pages
                 // dht-pages-total - all pages
                 // dht-storage-local
