@@ -445,7 +445,6 @@ section h2 {
     background-color: var(--stats-bg-color);
     border-radius: 4px;
     border: 1px solid var(--border-color);
-    display: flex;
     align-items: center;
     justify-content: center;
     color: var(--text-muted);

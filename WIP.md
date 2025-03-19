@@ -19,6 +19,7 @@ Pass system realm to nodes.
 ### DHT_storage
 
 TODO:
+- DHT_routing: check disconnection of nodes when no pings received - doesn't seem to disconnect
 - add own Flos to DHTConfig.owned
 - verify Flos when they enter the system
 

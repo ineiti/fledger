@@ -141,7 +141,7 @@
                     </div>
 
                     <section id="home_page">
-                        <h2>Fledger Pages</h2>
+                        <h2 id="dht_page_path">UNKNOWN PATH</h2>
                         <div class="homepage-container" id="dht_page">
                             <p>Loading available pages...</p>
                         </div>
@@ -202,7 +202,7 @@
                             <div class="url-input-wrap">
                                 <i class="fas fa-search"></i>
                                 <input type="url" id="proxy_url" placeholder="Enter URL to browse via proxy"
-                                    value="https://bearblog.dev/discover/"
+                                    value="https://news.ycombinator.com/"
                                     onkeypress="if(event.key === 'Enter') document.getElementById('proxy_request').click();" />
                             </div>
                             <button class="browse-btn" id="proxy_request">Browse</button>
@@ -358,6 +358,13 @@
 
                     // Show the selected module content
                     document.getElementById(`${moduleId}-module`).classList.add('active');
+
+                    console.log(moduleId);
+                    if (moduleId == "chat"){
+                        document.getElementById('your_message').focus();
+                        let msgs = document.getElementById('messages');
+                        msgs.scrollTop = msgs.scrollHeight
+                    }
                 });
             });
 
