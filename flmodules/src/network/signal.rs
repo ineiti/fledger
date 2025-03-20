@@ -70,6 +70,7 @@ pub struct FledgerConfig {
     pub system_realm: Option<RealmID>,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct SignalConfig {
     pub ttl_minutes: u16,
     pub system_realm: Option<RealmID>,
@@ -108,7 +109,7 @@ pub struct SignalServer {
     connection_ids: BiMap<U256, usize>,
     info: HashMap<U256, NodeInfo>,
     ttl: HashMap<usize, u16>,
-    ttl_minutes: u16,
+    config: SignalConfig,
 }
 
 /// Our current version - will change if the API is incompatible.
@@ -130,7 +131,7 @@ impl SignalServer {
                 ttl: HashMap::new(),
                 // Add 2 to the ttl_minutes to make sure that nodes are kept at least
                 // 1 minute in the list.
-                ttl_minutes: config.ttl_minutes + 2,
+                config,
             }))
             .await?;
         broker.link_bi(ws_server).await?;
@@ -156,7 +157,7 @@ impl SignalServer {
             WSServerOut::Message(index, msg_s) => {
                 self.ttl
                     .entry(index.clone())
-                    .and_modify(|ttl| *ttl = self.ttl_minutes);
+                    .and_modify(|ttl| *ttl = self.config.ttl_minutes);
                 if let Ok(msg_ws) = serde_json::from_str::<WSSignalMessageFromNode>(&msg_s) {
                     return self.msg_ws_process(index, msg_ws);
                 }
@@ -197,7 +198,7 @@ impl SignalServer {
         log::debug!("Sending challenge to new connection");
         let challenge = U256::rnd();
         self.connection_ids.insert(challenge, index);
-        self.ttl.insert(index, self.ttl_minutes);
+        self.ttl.insert(index, self.config.ttl_minutes);
         let challenge_msg =
             serde_json::to_string(&WSSignalMessageToNode::Challenge(SIGNAL_VERSION, challenge))
                 .unwrap();
@@ -224,7 +225,14 @@ impl SignalServer {
 
         log::info!("Registration of node-id {}: {}", id, msg.node_info.name);
         self.info.insert(id, msg.node_info);
-        vec![SignalOut::NewNode(id)]
+        let mut msgs = self.send_msg_node(
+            index,
+            WSSignalMessageToNode::SystemConfig(FledgerConfig {
+            system_realm: self.config.system_realm.clone(),
+            }),
+        );
+        msgs.push(SignalOut::NewNode(id));
+        msgs
     }
 
     fn ws_list_ids(&mut self, id: usize) -> Vec<SignalOut> {

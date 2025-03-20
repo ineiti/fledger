@@ -85,6 +85,20 @@ pub struct Node {
     pub dht_storage: Option<DHTStorage>,
 }
 
+impl std::fmt::Debug for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Node")
+            .field("node_config", &self.node_config)
+            .field("storage", &self.storage)
+            .field("broker_net", &self.broker_net)
+            .field("network_io", &self.network_io)
+            .field("timer", &self.timer)
+            .field("stat", &self.stat)
+            .field("dht_storage", &self.dht_storage)
+            .finish()
+    }
+}
+
 const STORAGE_CONFIG: &str = "nodeConfig";
 
 impl Node {
@@ -295,7 +309,9 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use flarch::{broker::Broker, data_storage::DataStorageTemp, start_logging, start_logging_filter_level};
+    use flarch::{
+        broker::Broker, data_storage::DataStorageTemp, start_logging, start_logging_filter_level,
+    };
     use flmodules::gossip_events::{
         core::{Category, Event},
         messages::GossipIn,

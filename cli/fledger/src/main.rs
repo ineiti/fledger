@@ -8,7 +8,7 @@ use flarch::{
 use flcrypto::{access::Condition, signer::SignerTrait};
 use flmodules::{
     dht_storage::{broker::DHTStorage, core::RealmConfig, realm_view::RealmView},
-    flo::crypto::FloVerifier,
+    flo::{crypto::FloVerifier, realm::Realm},
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
@@ -231,23 +231,36 @@ impl Fledger {
 
     async fn list_realms(&mut self) -> anyhow::Result<()> {
         log::info!("Waiting for update of data");
-        self.loop_node(Some(20)).await?;
+        self.loop_node(Some(1)).await?;
         log::info!("Requesting sync of DHT-storage and waiting for answers");
         self.ds.sync()?;
         self.ds.propagate()?;
         self.loop_node(Some(2)).await?;
         let rids = self.ds.get_realm_ids().await?;
         if rids.len() == 0 {
-            log::info!("No realms found.");
+            println!("No realms found.");
             return Ok(());
         }
-        log::info!(
-            "Realm-IDs are: {}",
-            rids.iter()
-                .map(|rid| format!("{rid}"))
-                .collect::<Vec<_>>()
-                .join(" :: ")
-        );
+        if self.args.verbosity.log_level_filter() != log::LevelFilter::Off {
+            for rid in rids.iter() {
+                if let Ok(realm) = self.ds.get_flo::<Realm>(&rid.into()).await {
+                    println!("\nRealm: '{}'", realm.cache().get_name(),);
+                    println!("  ID: {:?}", realm.flo_id());
+                    println!("  Config: {:?}", realm.cache().get_config());
+                    for (k, v) in realm.cache().get_services() {
+                        println!("  Service '{}' - {:?}", k, v);
+                    }
+                }
+            }
+        } else {
+            println!(
+                "Realm-IDs are: {}",
+                rids.iter()
+                    .map(|rid| format!("{rid}"))
+                    .collect::<Vec<_>>()
+                    .join(" :: ")
+            );
+        }
 
         Ok(())
     }

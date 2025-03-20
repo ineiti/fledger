@@ -97,6 +97,7 @@ pub struct RealmStats {
 #[derive(Debug, Default, Clone)]
 pub struct Stats {
     pub realm_stats: HashMap<RealmID, RealmStats>,
+    pub system_realms: Vec<RealmID>,
 }
 
 /// The message handling part, but only for DHTStorage messages.
@@ -438,7 +439,7 @@ impl Messages {
 
     fn store(&mut self) {
         self.tx.clone().map(|tx| {
-            tx.send(Stats::from_realms(&self.realms))
+            tx.send(Stats::from_realms(&self.realms, self.config.realms.clone()))
                 .is_err()
                 .then(|| self.tx = None)
         });
@@ -469,12 +470,13 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
 }
 
 impl Stats {
-    fn from_realms(realms: &HashMap<RealmID, RealmStorage>) -> Self {
+    fn from_realms(realms: &HashMap<RealmID, RealmStorage>, system_realms: Vec<RealmID>) -> Self {
         Self {
             realm_stats: realms
                 .iter()
                 .map(|(id, realm)| (id.clone(), RealmStats::from_realm(realm)))
                 .collect(),
+            system_realms,
         }
     }
 }
