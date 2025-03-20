@@ -10,15 +10,15 @@ This file is in place of github issues, as currently I'm mostly developing on my
 
 ### User-facing
 
-Implement [DHT_STORAGE.md](./DHT_STORAGE.md).
+Implement [DHT_STORAGE.md](./DHT_STORAGE.md):
+- hide UNKNOWN PATH while loading
+- add editing of new pages
+- show pages on the bottom
 
 ### Signalling server
 
-Pass system realm to nodes.
-
 ### DHT_storage
 
-TODO:
 - add own Flos to DHTConfig.owned
 - verify Flos when they enter the system
 
@@ -37,6 +37,7 @@ DHT_Storage:
 DHT_Router:
 - KBucket.active is only be populated once a node has been confirmed.
   - Needs more testing if nodes fail and how they will be replaced
+    This definitely doesn't work currently
 - possible extension to allow for indpendant realms:
   - active nodes are stored in a global vec
   - each realm-kademlia looks in these nodes first to populate the buckets
@@ -69,6 +70,7 @@ Added fledger to blog: https://ineiti.ch/projects/fledger/
 # Some things done
 
 ### Done
+- Signalling server sends system realm to nodes
 - Flo
   - Uses real signatures and verifications now
 - DHT_storage
