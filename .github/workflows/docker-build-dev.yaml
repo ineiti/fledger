@@ -25,7 +25,7 @@ jobs:
           cargo-build
 
     - name: Install devbox
-      uses: jetify-com/devbox-install-action@v0.11.0
+      uses: jetify-com/devbox-install-action@v0.12.0
       with:
         enable-cache: 'true'
 
@@ -36,7 +36,7 @@ jobs:
       run: devbox run -- make build_cli_release build_web_release
 
     - name: Docker build signal
-      uses: mr-smithers-excellent/docker-build-push@v5
+      uses: mr-smithers-excellent/docker-build-push@v6
       with:
         image: fledgre/flsignal
         registry: docker.io
@@ -46,7 +46,7 @@ jobs:
         tags: dev
 
     - name: Docker build fledger
-      uses: mr-smithers-excellent/docker-build-push@v5
+      uses: mr-smithers-excellent/docker-build-push@v6
       with:
         image: fledgre/fledger
         registry: docker.io
@@ -56,7 +56,7 @@ jobs:
         tags: dev
 
     - name: Docker build web
-      uses: mr-smithers-excellent/docker-build-push@v5
+      uses: mr-smithers-excellent/docker-build-push@v6
       with:
         image: fledgre/web
         registry: docker.io
