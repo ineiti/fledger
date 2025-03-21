@@ -14,8 +14,6 @@ Implement [DHT_STORAGE.md](./DHT_STORAGE.md).
 
 ### Signalling server
 
-Pass system realm to nodes.
-
 ### DHT_storage
 
 TODO:
@@ -38,6 +36,7 @@ DHT_Storage:
 DHT_Router:
 - KBucket.active is only be populated once a node has been confirmed.
   - Needs more testing if nodes fail and how they will be replaced
+    This definitely doesn't work currently
 - possible extension to allow for indpendant realms:
   - active nodes are stored in a global vec
   - each realm-kademlia looks in these nodes first to populate the buckets
@@ -45,6 +44,7 @@ DHT_Router:
 ## Bugs
 
 - flmodules/web_proxy has horrible error handling - too many `expect`s
+  - if no nodes connected, still tries to fetch request
 - flarch/webrtc errors - perhaps not necessary to fix if matchbox works:
   - Find why the network stalls after some time
   - Doesn't work in EPFL network
@@ -70,6 +70,8 @@ Added fledger to blog: https://ineiti.ch/projects/fledger/
 # Some things done
 
 ### Done
+- hide UNKNOWN PATH while loading
+- Signalling server sends system realm to nodes
 - Flo
   - Uses real signatures and verifications now
 - DHT_storage

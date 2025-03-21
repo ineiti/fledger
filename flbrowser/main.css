@@ -1005,7 +1005,7 @@ i.fab {
 }
 
 .browse-btn {
-    width: 100%;
+    width: 10em;
     padding: 0.75rem;
     background-color: var(--primary-color);
     color: white;
@@ -1018,6 +1018,10 @@ i.fab {
 
 .browse-btn:hover {
     background-color: #2980b9;
+}
+
+.browse-btn:disabled {
+    background-color: #808080;
 }
 
 /* Proxy settings */
