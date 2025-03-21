@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
+use flcrypto::signer::KeyPairID;
 use flmodules::{
     dht_router,
     dht_storage::{self, broker::DHTStorage, realm_view::RealmView},
@@ -68,11 +69,13 @@ enum Button {
     SendMsg,
     _DownloadData,
     WebProxy,
+    SavePage,
 }
 
 #[wasm_bindgen(module = "/src/main.js")]
 extern "C" {
     fn downloadFile(fileName: JsString, data: JsString);
+    fn getEditorContent() -> JsString;
 }
 
 // Because I really want to have a 'normal' HTML file and then link it with rust,
@@ -130,6 +133,7 @@ impl WebState {
         ws.web.link_btn(Button::SendMsg, "send_message");
         // ws.web.link_btn(Button::DownloadData, "get_data");
         ws.web.link_btn(Button::WebProxy, "proxy_request");
+        ws.web.link_btn(Button::SavePage, "save-page");
 
         loop {
             let values = ws.node.get_values().await;
@@ -189,7 +193,10 @@ impl WebState {
         match &new_state {
             StateEnum::Init => {}
             StateEnum::ConnectingSignalling => {
-                self.status_box = UL(vec![LI("Connecting to signalling server".into(), None)])
+                self.status_box = UL(vec![LI("Connecting to signalling server".into(), None)]);
+                self.web
+                    .get_input("page-path")
+                    .set_value(&names::Generator::default().next().unwrap());
             }
             StateEnum::ConnectingNodes => self
                 .status_box
@@ -202,6 +209,28 @@ impl WebState {
                     "dht_page_path",
                     &format!("{}/{}", dp.realm, dp.path.clone()),
                 );
+                let mut our_pages = vec![];
+                for (_, fp) in self
+                    .node
+                    .realm_views
+                    .get(&dp.realm)
+                    .and_then(|pt| pt.pages.as_ref().map(|p| &p.storage))
+                    .unwrap()
+                {
+                    if self
+                        .node
+                        .node
+                        .dht_storage
+                        .as_mut()
+                        .unwrap()
+                        .convert(fp.cond(), &fp.realm_id())
+                        .await
+                        .can_verify(&KeyPairID::rnd())
+                    {
+                        our_pages.push(fp.clone());
+                    }
+                }
+                self.web.set_editable_pages(&our_pages);
             }
             StateEnum::Idle => {}
         }
@@ -267,6 +296,11 @@ impl WebState {
                         proxy_button.set_disabled(false);
                     });
                 }
+            }
+            Button::SavePage => {
+                let page_path = self.web.get_input("page-path").value();
+                let page_content: String = getEditorContent().into();
+                log::info!("Page: {page_path} - {page_content}");
             }
         }
     }
@@ -519,6 +553,16 @@ impl Web {
             &human_readable_size(val.dht_storage_max()),
         );
         self.set_id_inner("connected_stats", &val.connected_stats());
+    }
+
+    fn set_editable_pages(&mut self, _pages: &Vec<FloBlobPage>) {
+        // r#"
+        //     <li>
+        //         <span>/example/path</span>
+        //         <button class="edit-btn" title="Edit Page"><i class="fas fa-edit"></i></button>
+        //         <button class="view-btn" title="View Page"><i class="fas fa-eye"></i></button>
+        //     </li>
+        // "#;
     }
 
     fn set_data_storage() {

@@ -10,7 +10,9 @@ This file is in place of github issues, as currently I'm mostly developing on my
 
 ### User-facing
 
-Implement [DHT_STORAGE.md](./DHT_STORAGE.md).
+Implement [DHT_STORAGE.md](./DHT_STORAGE.md):
+- add editing of new pages
+- show pages on the bottom
 
 ### Signalling server
 
@@ -44,7 +46,8 @@ DHT_Router:
 ## Bugs
 
 - flmodules/web_proxy has horrible error handling - too many `expect`s
-  - if no nodes connected, still tries to fetch request
+  - show an error if no nodes are connected
+- UI chat should scroll to the bottom when showing the first message.
 - flarch/webrtc errors - perhaps not necessary to fix if matchbox works:
   - Find why the network stalls after some time
   - Doesn't work in EPFL network
@@ -70,8 +73,6 @@ Added fledger to blog: https://ineiti.ch/projects/fledger/
 # Some things done
 
 ### Done
-- hide UNKNOWN PATH while loading
-- Signalling server sends system realm to nodes
 - Flo
   - Uses real signatures and verifications now
 - DHT_storage
