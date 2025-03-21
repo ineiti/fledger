@@ -2,6 +2,14 @@
 
 This file is in place of github issues, as currently I'm mostly developing on my own.
 
+## Name suggestions:
+
+- sharea.it
+- webloom.at
+- DanuS.net (Celtic mother goddess associated with abundance and sharing)
+- Maat.li (Egyptian goddess of truth, balance, and shared justice)
+- danu.li - Decentralized Accessible Nexus Union and Ledger Infrastructure
+
 ## Current high-level goal
 
 - Store a webpage in fledger
