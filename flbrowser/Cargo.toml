@@ -16,21 +16,23 @@ local = []
 
 [dependencies]
 flarch = {path="../flarch", version = "0.9"}
+flcrypto = {path="../flcrypto", version = "0.9"}
 flmodules = {path="../flmodules", version = "0.9"}
 flnode = {path = "../flnode", version = "0.9"}
 
-chrono = "0.4"
 anyhow = "1"
+chrono = "0.4"
+console_error_panic_hook = "0.1"
 itertools = "0.14"
 js-sys = "0.3"
-regex = "1"
 log = "0.4"
+names = { version = "0.14", default-features = false }
+regex = "1"
+tokio = "1"
+urlencoding = "2"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
-console_error_panic_hook = "0.1"
 wasm-bindgen-futures = "0.4"
 wasm-logger = "0.2"
-urlencoding = "2"
-tokio = "1"
 
 [dependencies.web-sys]
 version = "0.3"

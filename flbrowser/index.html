@@ -109,8 +109,8 @@
             <div class="column main-column">
                 <!-- Home Module Content -->
                 <div id="home-module" class="module-content active">
-                    <h2>About Fledger <button class="expand-btn" id="loading-info-button" onclick="toggle_div('loading-info', this)"><i
-                                class="fas fa-chevron-down"></i></button>
+                    <h2>About Fledger <button class="expand-btn" id="loading-info-button"
+                            onclick="toggle_div('loading-info', this)"><i class="fas fa-chevron-down"></i></button>
                     </h2>
                     <div id="loading-info" class="show">
                         <section class="about-section">
@@ -140,12 +140,14 @@
                         </section>
                     </div>
 
-                    <section id="home_page">
-                        <h2 id="dht_page_path">UNKNOWN PATH</h2>
-                        <div class="homepage-container" id="dht_page">
-                            <p>Loading available pages...</p>
-                        </div>
-                    </section>
+                    <div id="home_page" hidden>
+                        <section>
+                            <h2 id="dht_page_path">UNKNOWN PATH</h2>
+                            <div class="homepage-container" id="dht_page">
+                                <p>Loading available pages...</p>
+                            </div>
+                        </section>
+                    </div>
                 </div>
 
                 <!-- Chat Module Content -->
@@ -202,10 +204,10 @@
                             <div class="url-input-wrap">
                                 <i class="fas fa-search"></i>
                                 <input type="url" id="proxy_url" placeholder="Enter URL to browse via proxy"
-                                    value="https://news.ycombinator.com/"
+                                    value="https://lobste.rs/"
                                     onkeypress="if(event.key === 'Enter') document.getElementById('proxy_request').click();" />
+                                <button class="browse-btn" id="proxy_request">Browse</button>
                             </div>
-                            <button class="browse-btn" id="proxy_request">Browse</button>
                         </div>
                         <!-- Updated proxy display with border and an example page -->
                         <div id="proxy_div" style="border:1px solid var(--border-color); padding:1rem;">
@@ -360,7 +362,7 @@
                     document.getElementById(`${moduleId}-module`).classList.add('active');
 
                     console.log(moduleId);
-                    if (moduleId == "chat"){
+                    if (moduleId == "chat") {
                         document.getElementById('your_message').focus();
                         let msgs = document.getElementById('messages');
                         msgs.scrollTop = msgs.scrollHeight

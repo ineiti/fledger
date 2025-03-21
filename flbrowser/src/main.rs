@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Result};
 use chrono::{prelude::DateTime, Utc};
 use flmodules::{
-    dht_router, dht_storage,
+    dht_router,
+    dht_storage::{self, broker::DHTStorage, realm_view::RealmView},
     flo::{
         blob::{BlobID, FloBlobPage},
         realm::RealmID,
@@ -12,14 +13,16 @@ use flmodules::{
 };
 use itertools::Itertools;
 use js_sys::JsString;
-use realm_pages::PageFetcher;
 use regex::Regex;
 use std::{
     collections::HashMap,
     mem::ManuallyDrop,
     time::{Duration, UNIX_EPOCH},
 };
-use tokio::sync::{mpsc::UnboundedSender, watch};
+use tokio::sync::{
+    mpsc::{UnboundedReceiver, UnboundedSender},
+    watch,
+};
 use wasm_bindgen::{
     prelude::{wasm_bindgen, Closure},
     JsCast,
@@ -38,8 +41,6 @@ use flarch::{
 use flmodules::network::broker::NetworkConnectionState;
 use flmodules::network::network_start;
 use flnode::{node::Node, version::VERSION_STRING};
-
-mod realm_pages;
 
 #[derive(Debug)]
 struct NetConf<'a> {
@@ -65,7 +66,7 @@ const NETWORK_CONFIG: NetConf = NetConf {
 #[derive(Debug, Clone)]
 enum Button {
     SendMsg,
-    DownloadData,
+    _DownloadData,
     WebProxy,
 }
 
@@ -126,11 +127,9 @@ impl WebState {
 
     pub async fn start() -> Result<()> {
         let mut ws = Self::new().await?;
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Button>();
-        ws.web.link_btn(tx.clone(), Button::SendMsg, "send_message");
-        ws.web
-            .link_btn(tx.clone(), Button::DownloadData, "get_data");
-        ws.web.link_btn(tx, Button::WebProxy, "proxy_request");
+        ws.web.link_btn(Button::SendMsg, "send_message");
+        // ws.web.link_btn(Button::DownloadData, "get_data");
+        ws.web.link_btn(Button::WebProxy, "proxy_request");
 
         loop {
             let values = ws.node.get_values().await;
@@ -139,25 +138,25 @@ impl WebState {
             ws.check_state().await;
             tokio::select! {
                 _ = wait_ms(1000) => {},
-                Some(btn) = rx.recv() => {ws.clicked(btn).await;}
+                Some(btn) = ws.web.rx.recv() => {ws.clicked(btn).await;}
             }
         }
     }
 
     async fn check_state(&mut self) {
         match self.state {
-            StateEnum::Init => self.set_state(StateEnum::ConnectingSignalling),
+            StateEnum::Init => self.set_state(StateEnum::ConnectingSignalling).await,
             StateEnum::ConnectingSignalling => {
                 if let Ok(nbr) = self.node.node.nodes_online() {
                     if nbr.len() > 0 {
-                        self.set_state(StateEnum::ConnectingNodes);
+                        self.set_state(StateEnum::ConnectingNodes).await;
                     }
                 }
             }
             StateEnum::ConnectingNodes => {
                 if let Ok(nbr) = self.node.node.nodes_online() {
                     if nbr.len() >= 2 {
-                        self.set_state(StateEnum::UpdateDHT);
+                        self.set_state(StateEnum::UpdateDHT).await;
                     }
                 }
             }
@@ -170,23 +169,23 @@ impl WebState {
                     self.web
                         .get_element::<HtmlElement>("home_page")
                         .set_hidden(false);
-                    self.set_state(StateEnum::ShowPage(dp));
+                    self.set_state(StateEnum::ShowPage(dp)).await;
                 }
             }
             StateEnum::ShowPage(_) => {
-                self.set_state(StateEnum::Idle);
+                self.set_state(StateEnum::Idle).await;
             }
             StateEnum::Idle => {
                 let new_msgs = self.values().await.get_msgs();
                 if Some(&new_msgs) != self.previous_chat.as_ref() {
-                    self.web.set_html_id("messages", &new_msgs);
+                    self.web.set_id_inner("messages", &new_msgs);
                     self.previous_chat = Some(new_msgs);
                 }
             }
         }
     }
 
-    fn set_state(&mut self, new_state: StateEnum) {
+    async fn set_state(&mut self, new_state: StateEnum) {
         match &new_state {
             StateEnum::Init => {}
             StateEnum::ConnectingSignalling => {
@@ -198,8 +197,8 @@ impl WebState {
                 .push(LI("Connecting to other nodes".into(), None)),
             StateEnum::UpdateDHT => self.status_box.0.push(LI("Updating pages".into(), None)),
             StateEnum::ShowPage(dp) => {
-                self.web.set_html_id("dht_page", &dp.page.get_index());
-                self.web.set_html_id(
+                self.web.set_id_inner("dht_page", &dp.page.get_index());
+                self.web.set_id_inner(
                     "dht_page_path",
                     &format!("{}/{}", dp.realm, dp.path.clone()),
                 );
@@ -225,15 +224,16 @@ impl WebState {
                         .expect("Should add chat message");
                 }
             }
-            Button::DownloadData => {
+            Button::_DownloadData => {
                 let data = self.node.get_gossip_data();
                 downloadFile("gossip_event.yaml".into(), data.into());
             }
             Button::WebProxy => {
                 let proxy_url = self.web.get_input("proxy_url");
                 if proxy_url.value() != "" {
+                    let proxy_button = self.web.get_button("proxy_request");
+                    proxy_button.set_disabled(true);
                     let mut url = proxy_url.value();
-                    proxy_url.set_value("");
                     if !Regex::new("^https?://").unwrap().is_match(&url) {
                         url = format!("https://{url}");
                     }
@@ -264,6 +264,7 @@ impl WebState {
                                 proxy_div.set_inner_html(&text);
                             }
                         }
+                        proxy_button.set_disabled(false);
                     });
                 }
             }
@@ -280,7 +281,9 @@ impl WebState {
 pub struct WebNode {
     node: Node,
     dht_storage_stats: watch::Receiver<dht_storage::messages::Stats>,
-    page_fetcher: PageFetcher,
+    realm_views: HashMap<RealmID, RealmView>,
+    dht_storage: DHTStorage,
+    // page_fetcher: PageFetcher,
     counter: u32,
 }
 
@@ -291,7 +294,8 @@ impl WebNode {
 
         Ok(Self {
             dht_storage_stats: node.dht_storage.as_ref().unwrap().stats.clone(),
-            page_fetcher: PageFetcher::new(node.dht_storage.as_ref().unwrap().clone()).await,
+            dht_storage: node.dht_storage.as_ref().unwrap().clone(),
+            realm_views: HashMap::new(),
             node,
             counter: 0,
         })
@@ -307,7 +311,31 @@ impl WebNode {
                 log::warn!("Couldn't send request for a new list: {e:?}");
             }
         }
+        if let Ok(realms) = self.dht_storage.get_realm_ids().await {
+            self.update_realms(realms).await;
+        }
+        self.update_pages().await;
         Values::new(&self.node)
+    }
+
+    async fn update_realms(&mut self, realms: Vec<RealmID>) {
+        for realm in realms {
+            if !self.realm_views.contains_key(&realm) {
+                if let Ok(rv) =
+                    RealmView::new_from_id(self.dht_storage.clone(), realm.clone()).await
+                {
+                    self.realm_views.insert(realm, rv);
+                }
+            }
+        }
+    }
+
+    async fn update_pages(&mut self) {
+        for (_, rv) in &mut self.realm_views {
+            if let Err(e) = rv.update_pages().await {
+                log::warn!("While updating pages: {e:?}");
+            }
+        }
     }
 
     pub fn get_dht_page_first(&self) -> Option<DhtPage> {
@@ -315,42 +343,34 @@ impl WebNode {
             .borrow()
             .system_realms
             .iter()
-            .chain(self.page_fetcher.page_tags_rx.borrow().keys())
+            .chain(self.realm_views.keys())
             .filter_map(|rid| self.get_dht_page_root(rid))
             .next()
     }
 
     pub fn get_dht_page_root(&self, rid: &RealmID) -> Option<DhtPage> {
-        self.page_fetcher
-            .page_tags_rx
-            .borrow()
-            .get(rid)
-            .and_then(|pt| {
-                pt.realm
-                    .cache()
-                    .get_services()
-                    .get("http")
-                    .and_then(|root_id| self.get_dht_page(rid, &(**root_id).into()))
-            })
+        self.realm_views.get(rid).and_then(|rv| {
+            rv.realm
+                .cache()
+                .get_services()
+                .get("http")
+                .and_then(|root_id| self.get_dht_page(rid, &(**root_id).into()))
+        })
     }
 
     pub fn get_dht_page(&self, rid: &RealmID, page_id: &BlobID) -> Option<DhtPage> {
-        self.page_fetcher
-            .page_tags_rx
-            .borrow()
-            .get(rid)
-            .and_then(|pt| {
-                pt.pages.as_ref().and_then(|pages| {
-                    pages
-                        .storage
-                        .get(&(**page_id).into())
-                        .map(|root_page| DhtPage {
-                            realm: rid.clone(),
-                            page: root_page.clone(),
-                            path: pt.realm.cache().get_name(),
-                        })
-                })
+        self.realm_views.get(rid).and_then(|rv| {
+            rv.pages.as_ref().and_then(|pages| {
+                pages
+                    .storage
+                    .get(&(**page_id).into())
+                    .map(|root_page| DhtPage {
+                        realm: rid.clone(),
+                        page: root_page.clone(),
+                        path: rv.realm.cache().get_name(),
+                    })
             })
+        })
     }
 
     pub fn get_gossip_data(&self) -> String {
@@ -388,6 +408,8 @@ impl WebNode {
 #[derive(Debug)]
 pub struct Web {
     document: Document,
+    tx: UnboundedSender<Button>,
+    rx: UnboundedReceiver<Button>,
 }
 
 #[derive(Debug)]
@@ -402,13 +424,17 @@ impl Web {
         Web::set_data_storage();
         log::info!("Starting Web");
 
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Button>();
         let window = web_sys::window().expect("no global `window` exists");
         Ok(Self {
             document: window.document().expect("should have a document on window"),
+            tx,
+            rx,
         })
     }
 
-    fn link_btn(&self, tx: UnboundedSender<Button>, btn: Button, id: &str) {
+    fn link_btn(&self, btn: Button, id: &str) {
+        let tx = self.tx.clone();
         let cb = ManuallyDrop::new(Closure::wrap(Box::new(move |_: Event| {
             tx.send(btn.clone())
                 .err()
@@ -425,7 +451,7 @@ impl Web {
         );
     }
 
-    fn set_html_id(&self, id: &str, inner_html: &str) {
+    fn set_id_inner(&self, id: &str, inner_html: &str) {
         if self
             .document
             .get_element_by_id(id)
@@ -465,30 +491,34 @@ impl Web {
         self.get_element(id)
     }
 
+    fn get_button(&self, id: &str) -> HtmlButtonElement {
+        self.get_element(id)
+    }
+
     pub fn udpate_values(&mut self, val: &Values) {
-        self.set_html_id("node_info", &val.get_node_name());
-        self.set_html_id("username_display", &val.get_node_name());
-        self.set_html_id("version", &val.get_version());
-        self.set_html_id("nodes_online", &format!("{}", val.nodes_online));
-        self.set_html_id("nodes_online_random", &format!("{}", val.nodes_online));
-        self.set_html_id("nodes_connected", &format!("{}", val.nodes_connected));
-        self.set_html_id("msgs_system", &format!("{}", val.msgs_system));
-        self.set_html_id("msgs_local", &format!("{}", val.msgs_local));
+        self.set_id_inner("node_info", &val.get_node_name());
+        self.set_id_inner("username_display", &val.get_node_name());
+        self.set_id_inner("version", &val.get_version());
+        self.set_id_inner("nodes_online", &format!("{}", val.nodes_online));
+        self.set_id_inner("nodes_online_random", &format!("{}", val.nodes_online));
+        self.set_id_inner("nodes_connected", &format!("{}", val.nodes_connected));
+        self.set_id_inner("msgs_system", &format!("{}", val.msgs_system));
+        self.set_id_inner("msgs_local", &format!("{}", val.msgs_local));
         // self.set_html_id("dht_stats", &val.get_dht_stats());
-        self.set_html_id("dht_connections", &val.dht_router.active.to_string());
-        self.set_html_id(
+        self.set_id_inner("dht_connections", &val.dht_router.active.to_string());
+        self.set_id_inner(
             "realms_count",
             &val.dht_storage.realm_stats.len().to_string(),
         );
-        self.set_html_id(
+        self.set_id_inner(
             "dht_storage_local",
             &human_readable_size(val.dht_storage_local()),
         );
-        self.set_html_id(
+        self.set_id_inner(
             "dht_storage_limit",
             &human_readable_size(val.dht_storage_max()),
         );
-        self.set_html_id("connected_stats", &val.connected_stats());
+        self.set_id_inner("connected_stats", &val.connected_stats());
     }
 
     fn set_data_storage() {
