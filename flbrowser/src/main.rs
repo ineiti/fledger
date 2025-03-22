@@ -198,10 +198,18 @@ impl WebState {
                     .get_input("page-path")
                     .set_value(&names::Generator::default().next().unwrap());
             }
-            StateEnum::ConnectingNodes => self
-                .status_box
-                .0
-                .push(LI("Connecting to other nodes".into(), None)),
+            StateEnum::ConnectingNodes => {
+                for div in ["node-stats", "global-stats"].iter() {
+                    self.web
+                        .get_element::<HtmlElement>(div)
+                        .class_list()
+                        .add_1("show")
+                        .expect("add show");
+                }
+                self.status_box
+                    .0
+                    .push(LI("Connecting to other nodes".into(), None))
+            }
             StateEnum::UpdateDHT => self.status_box.0.push(LI("Updating pages".into(), None)),
             StateEnum::ShowPage(dp) => {
                 self.web.set_id_inner("dht_page", &dp.page.get_index());

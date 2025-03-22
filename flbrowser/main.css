@@ -242,7 +242,23 @@ header h1 {
     flex: 1;
     background-color: var(--stats-bg-color);
     max-width: 250px;
-    transition: background-color 0.3s ease;
+    /* transition: background-color 0.3s ease; */
+    transition: max-height 0.3s ease-out, transform 1s ease-out, opacity 0.3s ease-out;
+    opacity: 0;
+    z-index: -100;
+}
+
+.stats-column.left {
+    transform: translateX(250px);
+}
+
+.stats-column.right {
+    transform: translateX(-250px);
+}
+
+.stats-column.show {
+    opacity: 0.7;
+    transform: translateX(0);
 }
 
 /* Stats container for mobile view - updated for placement below main content */
