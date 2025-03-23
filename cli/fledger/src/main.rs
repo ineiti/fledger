@@ -1,13 +1,18 @@
+use anyhow::bail;
 use clap::{Parser, Subcommand};
 
 use flarch::{
     data_storage::{DataStorage, DataStorageFile},
+    nodeids::U256,
     tasks::wait_ms,
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
 use flmodules::{
     dht_router::broker::DHTRouter,
     dht_storage::broker::DHTStorage,
+    dht_storage::{broker::DHTStorage, core::RealmConfig, realm_view::RealmView},
+    flo::{crypto::FloVerifier, realm::Realm},
+    gossip_events::core::Event,
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
@@ -74,6 +79,27 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     log_dht_storage: bool,
 
+    /// Print new messages as they come
+    #[arg(long, default_value = "false")]
+    print_new_messages: bool,
+
+    /// Timeout after which the node exists with nonzero code
+    /// If the timeout is 0, then it is disabled.
+    #[arg(long, default_value = "0")]
+    timeout: u32,
+
+    /// Send a chat message upon node creation
+    /// If the message is an empty string, ignore it.
+    #[arg(long, default_value = "")]
+    send_chat_msg: String,
+
+    /// Wait for a chat message with the given body.
+    /// Exit with 0 code if the message is received.
+    /// To be combined with the --timeout option.
+    /// If the message is an empty string, ignore it.
+    #[arg(long, default_value = "")]
+    recv_chat_msg: String,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -101,6 +127,7 @@ struct Fledger {
     ds: DHTStorage,
     dr: DHTRouter,
     args: Args,
+    acked_msg_ids: Vec<U256>,
 }
 
 #[tokio::main]
@@ -157,6 +184,7 @@ impl Fledger {
             dr: node.dht_router.as_ref().unwrap().clone(),
             node,
             args,
+            acked_msg_ids: Vec::new(),
         };
 
         match f.args.command.clone() {
@@ -182,6 +210,14 @@ impl Fledger {
             FledgerState::Duration(i) => log::info!("Just hanging around {i} seconds"),
             FledgerState::Forever => log::info!("Looping forever"),
         }
+
+        // Handle --send-chat-msg
+        if self.args.send_chat_msg != "" {
+            self.node
+                .add_chat_message(self.args.send_chat_msg.clone())
+                .await?;
+        }
+
         loop {
             count += 1;
 
@@ -209,6 +245,7 @@ impl Fledger {
             } {
                 return Ok(());
             }
+
             self.ds.sync()?;
             println!(
                 "dht-connections: {}/{}",
@@ -222,6 +259,32 @@ impl Fledger {
                     .collect::<Vec<_>>()
                     .join(", ")
             );
+
+            // Handle --recv-chat-msg
+            if self.args.recv_chat_msg != "" {
+                if self
+                    .node
+                    .gossip
+                    .as_ref()
+                    .unwrap()
+                    .chat_events()
+                    .iter()
+                    .filter(|ev| ev.msg == self.args.recv_chat_msg)
+                    .count()
+                    > 0
+                {
+                    log::info!(
+                        "Trigger message received: {}. Exiting.",
+                        self.args.recv_chat_msg
+                    );
+                    return Ok(());
+                }
+            }
+
+            // Handle --timeout
+            if timeout != 0 && timeout <= i {
+                bail!("Timeout reached.");
+            }
         }
     }
 
@@ -265,6 +328,25 @@ impl Fledger {
                             .collect::<Vec<_>>()
                             .join(" :: ")
                     );
+                }
+            }
+
+            // Handle --print-new-messages
+            if self.args.print_new_messages {
+                let chat_events = self.node.gossip.as_ref().unwrap().chat_events();
+                let chats: Vec<&Event> = chat_events
+                    .iter()
+                    .filter(|ev| !self.acked_msg_ids.contains(&ev.get_id()))
+                    .collect();
+
+                if chats.len() <= 0 {
+                    log::debug!("... No new message");
+                } else {
+                    log::info!("--- New Messages ---");
+                    for chat in chats {
+                        self.acked_msg_ids.push(chat.get_id());
+                        log::info!("    [{}] {}", chat.src, chat.msg);
+                    }
                 }
             }
         }
