@@ -102,6 +102,7 @@ impl std::fmt::Display for FloBlobPage {
                 .collect::<Vec<_>>()
                 .join(", ")
         ))?;
+        f.write_fmt(format_args!("    version: {}\n", self.version()))?;
         f.write_fmt(format_args!(
             "    children: {}\n",
             self.get_children()

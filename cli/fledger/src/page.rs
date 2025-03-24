@@ -66,7 +66,10 @@ impl Page {
         let mut page = Page { f, ds, realms };
 
         match cmd {
-            PageCommands::List => page.page_list().await,
+            PageCommands::List => {
+                page.page_list().await?;
+                return Ok(());
+            }
             PageCommands::Create {
                 path,
                 realm,
@@ -77,7 +80,12 @@ impl Page {
                 path,
                 command,
             } => page.page_modify(realm, path, command).await,
-        }
+        }?;
+        page.f.loop_node(Some(3)).await?;
+        log::info!("Requesting propagation");
+        page.ds.propagate()?;
+        page.f.loop_node(Some(3)).await?;
+        Ok(())
     }
 
     async fn page_list(&mut self) -> anyhow::Result<()> {
@@ -133,8 +141,6 @@ impl Page {
                 )
                 .await?;
             log::info!("Created new page {new_page}");
-            log::info!("Waiting to sync to other nodes");
-            self.f.loop_node(Some(5)).await?;
         }
         Ok(())
     }
@@ -154,9 +160,8 @@ impl Page {
         }
         match command {
             ModifyCommands::Content { mut content } => {
-                log::info!("1");
-                if std::path::Path::new("content").exists() {
-                    content = std::fs::read_to_string("content")?;
+                if std::path::Path::new(&content).exists() {
+                    content = std::fs::read_to_string(&content)?;
                 }
                 let new_page = page.edit_data_signers(
                     cond,
@@ -170,7 +175,6 @@ impl Page {
                 self.ds.store_flo(new_page.into())?;
             }
             ModifyCommands::Path { new_path } => {
-                log::info!("2");
                 let new_page = page.edit_data_signers(
                     cond,
                     |p| {
@@ -183,8 +187,6 @@ impl Page {
                 self.ds.store_flo(new_page.into())?;
             }
         }
-        log::info!("Waiting for propagation");
-        self.f.loop_node(Some(5)).await?;
         Ok(())
     }
 

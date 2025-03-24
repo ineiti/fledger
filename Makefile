@@ -11,8 +11,8 @@ CRATES := flcrypto flmacro flarch flmodules flnode
 SHELL := /bin/bash
 PKILL = @/bin/ps aux | grep "$1" | egrep -v "(grep|vscode|rust-analyzer)" | awk '{print $$2}' | xargs -r kill
 PUBLISH = --token $$CARGO_REGISTRY_TOKEN
-FLEDGER = cargo run --bin fledger -- --config fledger/flnode0$1 --name Local0$1 \
-		--log-dht-storage -vvv -s ws://localhost:8765 --disable-turn-stun
+FLEDGER = cargo run --bin fledger -- --config fledger/test0$1 --name Local0$1 \
+		--log-dht-storage -s ws://localhost:8765 --disable-turn-stun
 
 cargo_check:
 	for c in ${CARGO_LOCKS}; do \

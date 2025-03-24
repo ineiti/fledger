@@ -172,7 +172,15 @@ impl Fledger {
             self.log(i).await?;
             self.ds.sync()?;
             let dr = self.node.dht_router.as_ref().unwrap().stats.borrow();
-            println!("nodes: {}/{:?}", dr.active, dr.all_nodes);
+            println!(
+                "nodes: {}/{}",
+                dr.active,
+                dr.all_nodes
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
 
             if let Some(c) = max_count.as_ref() {
                 if c < &i {
