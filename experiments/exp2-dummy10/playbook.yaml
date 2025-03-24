@@ -1,4 +1,13 @@
-- name: Setup for all nodes
+- name: Generate environments on ansible host
+  hosts: 127.0.0.1
+  connection: local
+  tasks:
+    - name: Generate environemnts
+      changed_when: true
+      ansible.builtin.command:
+        cmd: ./generate-env.sh
+
+- name: Clean nodes and upload files (binaries and services)
   hosts: all
   become: true
   tasks:
@@ -8,12 +17,24 @@
         dest: ~/
         mode: preserve
 
+    - name: Copy fledger service (send)
+      ansible.builtin.copy:
+        src: fledger-send.service
+        dest: /etc/systemd/system/
+        mode: preserve
+
+    - name: Copy fledger service (recv)
+      ansible.builtin.copy:
+        src: fledger-recv.service
+        dest: /etc/systemd/system/
+        mode: preserve
+
     - name: Remove config folders
       ansible.builtin.file:
         path: /root/flnode
         state: absent
 
-- name: Setup node a
+- name: Run signaling server on node A
   hosts: a
   become: true
   tasks:
@@ -22,32 +43,27 @@
         src: flsignal.service
         dest: /etc/systemd/system/
         mode: preserve
-    - name: Copy fledger service (send)
-      ansible.builtin.copy:
-        src: fledger-send.service
-        dest: /etc/systemd/system/
-        mode: preserve
     - name: Start signaling server
       ansible.builtin.systemd_service:
         name: flsignal
         state: restarted
         daemon_reload: true
         no_block: true
+
+- name: Upload env and run fleger send / recv on each node
+  hosts: all
+  become: true
+  tasks:
+    - name: Copy env file to nodes
+      ansible.builtin.copy:
+        src: "env.systemd/{{ inventory_hostname }}.env"
+        dest: ~/env.systemd
+        mode: preserve
     - name: Start fledger node (send)
       ansible.builtin.systemd_service:
         name: fledger-send
         state: restarted
         no_block: true
-
-- name: Setup node b
-  hosts: b
-  become: true
-  tasks:
-    - name: Copy fledger service (recv)
-      ansible.builtin.copy:
-        src: fledger-recv.service
-        dest: /etc/systemd/system/
-        mode: preserve
     - name: Start fledger node (recv)
       ansible.builtin.systemd_service:
         name: fledger-recv
