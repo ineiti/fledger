@@ -4,13 +4,18 @@
 
 Those experiments are meant to be run on sphere.
 
-Each is composed of
+Each is composed of:
 
+- A README (`README.md`)
 - A mergeTB model (`model.py`)
 - An ansible playbook (`playbook.yaml`)
 - The ansible inventory (`hosts`)
-- A plantUML sequence diagram of the experiment (`explanation.puml`, `explanation.png`)
 - Oneshot systemd services to run the actual nodes
+
+And sometimes:
+
+- A plantUML sequence diagram of the experiment (`explanation.puml`, `explanation.png`)
+- A plantUML network diagram (`network.puml`, `network.png`)
 
 The services can either be ran synchronously (ansible blocks) or asynchronously
 (ansible starts the node and goes to the next task).
