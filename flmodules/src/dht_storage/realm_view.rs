@@ -161,11 +161,11 @@ impl RealmView {
             if cond != Condition::Pass && !cond.can_verify(&verifiers.iter().collect::<Vec<_>>()) {
                 log::warn!("Cannot update parent with this signer - so this page will be difficult to find!");
             } else {
-                self.dht_storage.store_flo(parent_page.edit_data_signers(
-                    cond,
-                    |page| page.0.add_child(fp.blob_id()),
-                    signers,
-                )?.into())?;
+                self.dht_storage.store_flo(
+                    parent_page
+                        .edit_data_signers(cond, |page| page.0.add_child(fp.blob_id()), signers)?
+                        .into(),
+                )?;
             }
         } else {
             log::warn!("Couldn't get parent page to update 'children'");
@@ -278,8 +278,11 @@ impl RealmView {
         )
     }
 
-    pub fn get_page_path(&self, path: &str) -> Option<&FloBlobPage> {
-        self.pages.as_ref().and_then(|page| page.get_path(path))
+    pub fn get_page_path(&self, path: &str) -> anyhow::Result<&FloBlobPage> {
+        self.pages
+            .as_ref()
+            .map(|page| page.get_path(path))
+            .ok_or(anyhow::anyhow!("Don't have any pages stored"))?
     }
 }
 
@@ -287,7 +290,7 @@ impl<T: Serialize + DeserializeOwned + Clone + std::fmt::Debug> RealmStorage<T>
 where
     FloWrapper<T>: BlobPath + BlobFamily,
 {
-    pub fn get_path(&self, path: &str) -> Option<&FloWrapper<T>> {
+    pub fn get_path(&self, path: &str) -> anyhow::Result<&FloWrapper<T>> {
         self.get_path_internal(path.split('/').collect::<Vec<_>>(), vec![&self.root])
     }
 
@@ -309,7 +312,11 @@ where
             .collect::<Vec<_>>())
     }
 
-    fn get_path_internal(&self, parts: Vec<&str>, curr: Vec<&BlobID>) -> Option<&FloWrapper<T>> {
+    fn get_path_internal(
+        &self,
+        parts: Vec<&str>,
+        curr: Vec<&BlobID>,
+    ) -> anyhow::Result<&FloWrapper<T>> {
         let ids = curr
             .into_iter()
             .flat_map(|id| once(id).chain(self.cuckoos.get(id).into_iter().flatten()))
@@ -321,17 +328,16 @@ where
                 .find(|f| f.get_path().map(|p| p == part.0).unwrap_or(false))
             {
                 if part.1.len() == 0 {
-                    return Some(f);
+                    return Ok(f);
                 } else {
                     let children = f.get_children();
-                    if children.is_empty() {
-                        return None;
+                    if !children.is_empty() {
+                        return self.get_path_internal(part.1.to_vec(), children.iter().collect());
                     }
-                    return self.get_path_internal(part.1.to_vec(), children.iter().collect());
                 }
             }
         }
-        None
+        Err(anyhow::anyhow!("Couldn't find page"))
     }
 
     async fn from_root(ds: &mut DHTStorage, root: GlobalID) -> anyhow::Result<Self> {
@@ -438,23 +444,23 @@ mod test {
             Cuckoo::Parent(root_c0.flo_id()),
         );
 
-        assert_eq!(None, rs.get_path("/"));
-        assert_eq!(None, rs.get_path("blob"));
+        assert!(rs.get_path("/").is_err());
+        assert!(rs.get_path("blob").is_err());
         // Cannot compare root itself, as the rs.root got some children...
         assert_eq!(
-            Some(root.blob_id()),
+            Ok(root.blob_id()),
             rs.get_path("danu").map(|f| f.blob_id())
         );
         assert_eq!(
-            Some(root_c0.blob_id()),
+            Ok(root_c0.blob_id()),
             rs.get_path("dahu").map(|f| f.blob_id())
         );
         assert_eq!(
-            Some(root_blog.blob_id()),
+            Ok(root_blog.blob_id()),
             rs.get_path("danu/blog").map(|f| f.blob_id())
         );
         assert_eq!(
-            Some(root_c0_article.blob_id()),
+            Ok(root_c0_article.blob_id()),
             rs.get_path("dahu/montagne").map(|f| f.blob_id())
         );
 
