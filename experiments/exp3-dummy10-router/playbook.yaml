@@ -1,0 +1,98 @@
+- name: Generate environments on ansible host
+  hosts: 127.0.0.1
+  connection: local
+  tasks:
+    - name: Generate environemnts
+      changed_when: true
+      ansible.builtin.command:
+        cmd: ./generate-env.sh
+
+- name: Clean nodes and upload files (binaries and services)
+  hosts: nodes
+  become: true
+  tasks:
+    - name: Copy fledger binary to nodes
+      ansible.builtin.copy:
+        src: ~/musl/fledger
+        dest: ~/
+        mode: preserve
+
+    - name: Copy fledger service (send)
+      ansible.builtin.copy:
+        src: fledger-send.service
+        dest: /etc/systemd/system/
+        mode: preserve
+
+    - name: Copy fledger service (recv)
+      ansible.builtin.copy:
+        src: fledger-recv.service
+        dest: /etc/systemd/system/
+        mode: preserve
+
+    - name: Remove config folders
+      ansible.builtin.file:
+        path: /root/flnode
+        state: absent
+
+- name: Run signaling server on node signaling
+  hosts: signaling
+  become: true
+  tasks:
+    - name: Copy flsignal
+      ansible.builtin.copy:
+        src: ~/musl/flsignal
+        dest: ~/
+        mode: preserve
+    - name: Copy signaling service
+      ansible.builtin.copy:
+        src: flsignal.service
+        dest: /etc/systemd/system/
+        mode: preserve
+    - name: Start signaling server
+      ansible.builtin.systemd_service:
+        name: flsignal
+        state: restarted
+        daemon_reload: true
+        no_block: true
+    - name: Disable ip forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: 0
+        sysctl_set: true
+        state: present
+        reload: true
+
+- name: Upload env and run fleger send / recv on each node
+  hosts: nodes
+  become: true
+  tasks:
+    - name: Copy env file to nodes
+      ansible.builtin.copy:
+        src: "env.systemd/{{ inventory_hostname }}.env"
+        dest: ~/env.systemd
+        mode: preserve
+    - name: Stop fledger node (recv)
+      ansible.builtin.systemd_service:
+        name: fledger-recv
+        state: stopped
+        daemon_reload: true
+    - name: Start fledger node (recv)
+      ansible.builtin.systemd_service:
+        name: fledger-recv
+        state: restarted
+        no_block: true
+    - name: Start fledger node (send)
+      ansible.builtin.systemd_service:
+        name: fledger-send
+        state: restarted
+        no_block: true
+    - name: Wait for fledger node (recv) to be ran
+      ansible.builtin.systemd:
+        name: fledger-recv
+      register: result
+      until: result.status['ExecMainCode'] == '1'
+      retries: 12
+      delay: 5
+    - name: Check exit code of fledger node
+      changed_when: false
+      ansible.builtin.command: '/bin/bash -c "test $(/usr/bin/systemctl show -P ExecMainStatus fledger-recv) -eq 0"'
