@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::Fledger;
 use anyhow::anyhow;
 use clap::Subcommand;
 use flarch::tasks::wait_ms;
@@ -11,13 +12,9 @@ use flmodules::{
     dht_storage::{broker::DHTStorage, core::Cuckoo, realm_view::RealmView},
     flo::realm::RealmID,
 };
-use flnode::node::Node;
-
-use crate::Args;
 
 pub struct Page {
-    _node: Node,
-    _args: Args,
+    f: Fledger,
     ds: DHTStorage,
     realms: HashMap<RealmID, RealmView>,
 }
@@ -51,37 +48,30 @@ pub enum PageCommands {
 }
 
 impl Page {
-    pub async fn new(node: Node, args: Args) -> anyhow::Result<Self> {
-        let mut ds = node.dht_storage.as_ref().unwrap().clone();
+    pub async fn run(f: Fledger, cmd: PageCommands) -> anyhow::Result<()> {
+        let mut ds = f.node.dht_storage.as_ref().unwrap().clone();
         let mut realms = HashMap::new();
         for rid in ds.get_realm_ids().await? {
             realms.insert(rid.clone(), ds.get_realm_view(rid).await?);
         }
-        Ok(Page {
-            _node: node,
-            _args: args,
-            ds,
-            realms,
-        })
-    }
+        let mut page = Page { f, ds, realms };
 
-    pub async fn run(&mut self, cmd: PageCommands) -> anyhow::Result<()> {
         match cmd {
-            PageCommands::List => self.page_list().await,
+            PageCommands::List => page.page_list().await,
             PageCommands::Create {
                 path,
                 realm,
                 content,
-            } => self.page_create(path, realm, content).await,
-            PageCommands::Delete { path } => self.page_delete(path).await,
-            PageCommands::Modify { path, content } => self.page_modify(path, content).await,
+            } => page.page_create(path, realm, content).await,
+            PageCommands::Delete { path } => page.page_delete(path).await,
+            PageCommands::Modify { path, content } => page.page_modify(path, content).await,
         }
     }
 
     async fn page_list(&mut self) -> anyhow::Result<()> {
         for (rid, rv) in &self.realms {
             log::info!("\nRealm: {}", rid);
-            let vid = self._node.crypto_storage.get_signer().verifier().get_id();
+            let vid = self.f.node.crypto_storage.get_signer().verifier().get_id();
             for (_, page) in rv.pages.as_ref().unwrap().storage.iter() {
                 log::info!(
                     "{page}\n    editable: {}",
@@ -99,7 +89,7 @@ impl Page {
         &mut self,
         path: String,
         realm: String,
-        _content: String,
+        content: String,
     ) -> anyhow::Result<()> {
         let mut parts = path.split("/").collect::<Vec<_>>();
         if let Some(new_path) = parts.pop() {
@@ -128,11 +118,11 @@ impl Page {
                 } else {
                     Cuckoo::None
                 };
-                let signer = self._node.crypto_storage.get_signer();
+                let signer = self.f.node.crypto_storage.get_signer();
                 let new_page = rv
                     .create_http_cuckoo(
                         new_path,
-                        _content,
+                        content,
                         parent_id.clone(),
                         Condition::Verifier(signer.verifier()),
                         cuckoo,
