@@ -1,0 +1,12 @@
+[Unit]
+Description=Fledger node
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/fledger --config /root/flnode -vvv -s ws://10.0.0.1:8765 --disable-turn-stun --send-chat-msg message --timeout 10
+RemainAfterExit=yes
+User=root
+
+[Install]
+WantedBy=multi-user.target
