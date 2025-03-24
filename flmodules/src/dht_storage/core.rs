@@ -354,7 +354,7 @@ mod tests {
     use flarch::start_logging_filter_level;
     use flcrypto::access::Condition;
 
-    use crate::flo::blob::{Blob, FloBlob};
+    use crate::flo::blob::{Blob, BlobPath, FloBlob};
 
     use super::*;
 
@@ -534,7 +534,7 @@ mod tests {
             }])
         );
 
-        let fw2 = fw.edit_data_signers(Condition::Pass, |b| b.set_path("path"), &[])?;
+        let fw2 = fw.edit_data_signers(Condition::Pass, |b| b.set_path("path".into()), &[])?;
 
         assert!(storage.upsert_flo(fw2.into()));
         assert_eq!(

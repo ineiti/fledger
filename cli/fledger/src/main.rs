@@ -12,11 +12,14 @@ use flmodules::{
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
+use page::{Page, PageCommands};
+
+mod page;
 
 /// Fledger node CLI binary
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
-struct Args {
+pub struct Args {
     /// Path to the configuration directory
     #[arg(short, long, default_value = "./flnode")]
     config: String,
@@ -48,7 +51,7 @@ struct Args {
 
     /// Verbosity of the logger
     #[clap(flatten)]
-    verbosity: clap_verbosity_flag::Verbosity,
+    verbosity: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
 
     /// Log frequency in seconds
     #[arg(long, default_value = "5")]
@@ -74,12 +77,17 @@ struct Args {
     command: Option<Commands>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 enum Commands {
     /// Handles Realms
     Realm {
         #[command(subcommand)]
         command: RealmCommands,
+    },
+    /// Adds, removes, and edits pages
+    Page {
+        #[command(subcommand)]
+        command: PageCommands,
     },
     /// Lists cryptographic keys stored
     Crypto {},
@@ -87,7 +95,7 @@ enum Commands {
     Stats {},
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 enum RealmCommands {
     /// List available realms
     List,
@@ -152,7 +160,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 impl Fledger {
-    async fn run(&mut self) -> anyhow::Result<()> {
+    async fn run(mut self) -> anyhow::Result<()> {
         let nc = &self.node.node_config.info;
         log::info!("Started node {}: {}", nc.get_id(), nc.name);
 
@@ -171,6 +179,12 @@ impl Fledger {
                 },
                 Commands::Crypto {} => todo!(),
                 Commands::Stats {} => todo!(),
+                Commands::Page { command } => {
+                    Page::new(self.node, self.args.clone())
+                        .await?
+                        .run(command.clone())
+                        .await?
+                }
             },
             None => self.loop_node(None).await?,
         }
@@ -215,7 +229,7 @@ impl Fledger {
             None,
             cond.clone(),
             signers,
-        )?;
+        ).await?;
         rv.set_realm_http(root_http.blob_id(), signers).await?;
         let root_tag = rv.create_tag("fledger", None, cond.clone(), signers)?;
         rv.set_realm_tag(root_tag.blob_id(), signers).await?;
@@ -231,11 +245,11 @@ impl Fledger {
 
     async fn list_realms(&mut self) -> anyhow::Result<()> {
         log::info!("Waiting for update of data");
-        self.loop_node(Some(1)).await?;
+        self.loop_node(Some(5)).await?;
         log::info!("Requesting sync of DHT-storage and waiting for answers");
         self.ds.sync()?;
         self.ds.propagate()?;
-        self.loop_node(Some(2)).await?;
+        self.loop_node(Some(10)).await?;
         let rids = self.ds.get_realm_ids().await?;
         if rids.len() == 0 {
             println!("No realms found.");
@@ -276,6 +290,9 @@ impl Fledger {
             wait_ms(1000).await;
 
             self.log(i).await?;
+            self.ds.sync()?;
+            let dr = self.node.dht_router.as_ref().unwrap().stats.borrow();
+            println!("nodes: {}/{:?}", dr.active, dr.all_nodes);
 
             if let Some(c) = max_count.as_ref() {
                 if c < &i {

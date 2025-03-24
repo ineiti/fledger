@@ -11,8 +11,12 @@ This file is in place of github issues, as currently I'm mostly developing on my
 ### User-facing
 
 Implement [DHT_STORAGE.md](./DHT_STORAGE.md):
+- update page in the cli
+- link browser and cli using a badge
+- add handling of pages with cybernode code
+- add FloAlias/FloUser/FloName/FloIdentity/FloSomething and use it in the chat
 - add editing of new pages
-- show pages on the bottom
+- show cuckoo pages on the bottom
 
 ### Signalling server
 

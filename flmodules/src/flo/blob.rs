@@ -15,7 +15,7 @@ pub struct BlobID(U256);
 
 pub type FloBlob = FloWrapper<Blob>;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Blob {
     blob_type: String,
     links: HashMap<String, Vec<BlobID>>,
@@ -23,13 +23,13 @@ pub struct Blob {
     datas: HashMap<String, Bytes>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BlobPage(Blob);
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct BlobPage(pub Blob);
 
 pub type FloBlobPage = FloWrapper<BlobPage>;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BlobTag(Blob);
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct BlobTag(pub Blob);
 
 pub type FloBlobTag = FloWrapper<BlobTag>;
 
@@ -85,6 +85,55 @@ impl FloBlobPage {
     }
 }
 
+impl std::fmt::Display for FloBlobPage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("  {}\n", self.flo_id()))?;
+        f.write_fmt(format_args!(
+            "    {}\n",
+            self.get_path()
+                .map(|p| format!("path: {p}"))
+                .unwrap_or("no path".into())
+        ))?;
+        f.write_fmt(format_args!(
+            "    parents: {}\n",
+            self.get_parents()
+                .iter()
+                .map(|p| format!("{p}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ))?;
+        f.write_fmt(format_args!(
+            "    children: {}\n",
+            self.get_children()
+                .iter()
+                .map(|p| format!("{p}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ))?;
+        f.write_fmt(format_args!(
+            "    files:\n{}",
+            self.datas()
+                .iter()
+                .map(|(k, v)| format!("      {k} -> {} B", v.len()))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ))
+    }
+}
+
+impl BlobAccess for FloBlobPage {
+    fn get_blob(&self) -> &Blob {
+        &self.cache().0
+    }
+
+    fn get_blob_mut(&mut self) -> &mut Blob {
+        &mut self.cache_mut().0
+    }
+}
+
+impl BlobFamily for FloBlobPage {}
+impl BlobPath for FloBlobPage {}
+
 impl FloBlobTag {
     pub fn new(
         realm: RealmID,
@@ -126,6 +175,19 @@ impl FloBlobTag {
     }
 }
 
+impl BlobAccess for FloBlobTag {
+    fn get_blob(&self) -> &Blob {
+        &self.cache().0
+    }
+
+    fn get_blob_mut(&mut self) -> &mut Blob {
+        &mut self.cache_mut().0
+    }
+}
+
+impl BlobFamily for FloBlobTag {}
+impl BlobPath for FloBlobTag {}
+
 impl Blob {
     pub fn new(blob_type: &str) -> Self {
         Self {
@@ -135,95 +197,83 @@ impl Blob {
             datas: HashMap::new(),
         }
     }
+}
 
-    pub fn set_parents(&mut self, parents: Vec<BlobID>) {
-        self.links.insert("parent".into(), parents);
+impl BlobAccess for Blob {
+    fn get_blob(&self) -> &Blob {
+        &self
     }
 
-    pub fn set_path(&mut self, path: &str) {
-        self.values.insert("path".into(), path.to_string());
-    }
-
-    pub fn get_parents(&mut self) -> Option<&Vec<BlobID>> {
-        self.links.get("parent")
-    }
-
-    pub fn get_path(&mut self) -> Option<&String> {
-        self.values.get("path")
+    fn get_blob_mut(&mut self) -> &mut Blob {
+        self
     }
 }
+
+impl BlobFamily for Blob {}
+impl BlobPath for Blob {}
 
 pub trait BlobAccess {
-    fn links(&self) -> &HashMap<String, Vec<BlobID>>;
-    fn values(&self) -> &HashMap<String, String>;
-    fn datas(&self) -> &HashMap<String, Bytes>;
-    fn links_mut(&mut self) -> &mut HashMap<String, Vec<BlobID>>;
-    fn values_mut(&mut self) -> &mut HashMap<String, String>;
-    fn datas_mut(&mut self) -> &mut HashMap<String, Bytes>;
-}
+    fn get_blob(&self) -> &Blob;
+    fn get_blob_mut(&mut self) -> &mut Blob;
 
-pub trait BlobParents: BlobAccess {
-    fn set_parents(&mut self, parents: Vec<BlobID>) {
-        self.links_mut().insert("parents".into(), parents);
-    }
-    fn get_parents(&mut self) -> Vec<BlobID> {
-        self.links().get("parents").unwrap_or(&vec![]).clone()
-    }
-}
-
-impl BlobPage {
-    pub fn set_parents(&mut self, parents: Vec<BlobID>) {
-        self.0.set_parents(parents);
-    }
-
-    pub fn set_path(&mut self, path: &str) {
-        self.0.set_path(path);
-    }
-
-    pub fn set_data(&mut self, file: &str, data: Bytes) {
-        self.0.datas.insert(file.into(), data);
-    }
-}
-
-impl BlobAccess for BlobPage {
     fn links(&self) -> &HashMap<String, Vec<BlobID>> {
-        &self.0.links
+        &self.get_blob().links
     }
 
     fn values(&self) -> &HashMap<String, String> {
-        &self.0.values
+        &self.get_blob().values
     }
 
     fn datas(&self) -> &HashMap<String, Bytes> {
-        &self.0.datas
+        &self.get_blob().datas
     }
 
     fn links_mut(&mut self) -> &mut HashMap<String, Vec<BlobID>> {
-        &mut self.0.links
+        &mut self.get_blob_mut().links
     }
 
     fn values_mut(&mut self) -> &mut HashMap<String, String> {
-        &mut self.0.values
+        &mut self.get_blob_mut().values
     }
 
     fn datas_mut(&mut self) -> &mut HashMap<String, Bytes> {
-        &mut self.0.datas
+        &mut self.get_blob_mut().datas
     }
 }
 
-impl BlobParents for BlobPage {}
-
-impl BlobTag {
-    pub fn set_parents(&mut self, parents: Vec<BlobID>) {
-        self.0.set_parents(parents);
+pub trait BlobFamily: BlobAccess {
+    fn set_parents(&mut self, parents: Vec<BlobID>) {
+        self.links_mut().insert("parents".into(), parents);
     }
-
-    pub fn set_path(&mut self, path: &str) {
-        self.0.set_path(path);
+    fn add_parent(&mut self, parent: BlobID) {
+        self.links_mut()
+            .entry("parents".into())
+            .or_insert_with(Vec::new)
+            .push(parent);
     }
+    fn get_parents(&self) -> Vec<BlobID> {
+        self.links().get("parents").unwrap_or(&vec![]).clone()
+    }
+    fn set_children(&mut self, children: Vec<BlobID>) {
+        self.links_mut().insert("children".into(), children);
+    }
+    fn add_child(&mut self, child: BlobID) {
+        self.links_mut()
+            .entry("children".into())
+            .or_insert_with(Vec::new)
+            .push(child);
+    }
+    fn get_children(&self) -> Vec<BlobID> {
+        self.links().get("children").unwrap_or(&vec![]).clone()
+    }
+}
 
-    pub fn set_services(&mut self, services: Vec<BlobID>) {
-        self.0.links.insert("services".into(), services);
+pub trait BlobPath: BlobAccess {
+    fn set_path(&mut self, path: String) {
+        self.values_mut().insert("path".into(), path);
+    }
+    fn get_path(&self) -> Option<&String> {
+        self.values().get("path")
     }
 }
 

@@ -230,14 +230,21 @@ impl Condition {
         }
     }
 
-    pub fn can_verify(&self, vid: &KeyPairID) -> bool {
-        match self {
-            Condition::Verifier(verifier) => &verifier.get_id() == vid,
-            Condition::Badge(_, badge) => badge.condition.can_verify( vid),
-            Condition::NofT(nbr, conditions) => conditions.iter().any(|c| c.can_verify(vid)) && nbr == &1,
-            Condition::NotAvailable => false,
-            Condition::Pass => true,
-            Condition::Fail => false,
+    pub fn can_verify(&self, vids: &[&KeyPairID]) -> bool {
+        if vids.len() > 1 {
+            todo!("Check with more than one signer");
+        } 
+        if let Some(&vid) = vids.first(){
+            match self {
+                Condition::Verifier(verifier) => &verifier.get_id() == vid,
+                Condition::Badge(_, badge) => badge.condition.can_verify( &[vid]),
+                Condition::NofT(nbr, conditions) => conditions.iter().any(|c| c.can_verify(&[vid])) && nbr == &1,
+                Condition::NotAvailable => false,
+                Condition::Pass => true,
+                Condition::Fail => false,
+            }
+        } else {
+            self == &Condition::Pass
         }
     }
 }

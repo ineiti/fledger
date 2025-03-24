@@ -233,7 +233,7 @@ impl WebState {
                         .unwrap()
                         .convert(fp.cond(), &fp.realm_id())
                         .await
-                        .can_verify(&KeyPairID::rnd())
+                        .can_verify(&[&KeyPairID::rnd()])
                     {
                         our_pages.push(fp.clone());
                     }
