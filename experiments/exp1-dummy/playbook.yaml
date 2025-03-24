@@ -1,0 +1,64 @@
+- name: Setup for all nodes
+  hosts: all
+  become: true
+  tasks:
+    - name: Copy executable to nodes
+      ansible.builtin.copy:
+        src: ~/musl/
+        dest: ~/
+        mode: preserve
+
+    - name: Remove config folders
+      ansible.builtin.file:
+        path: /root/flnode
+        state: absent
+
+- name: Setup node a
+  hosts: a
+  become: true
+  environment:
+    FLEDGER_SIGNAL_HOST: localhost
+    FLEDGER_MSG: message
+  tasks:
+    - name: Copy signaling service
+      ansible.builtin.copy:
+        src: flsignal.service
+        dest: /etc/systemd/system/
+        mode: preserve
+    - name: Copy fledger service (send)
+      ansible.builtin.copy:
+        src: fledger-send.service
+        dest: /etc/systemd/system/
+        mode: preserve
+    - name: Start signaling server
+      ansible.builtin.systemd_service:
+        name: flsignal
+        state: restarted
+        daemon_reload: true
+        no_block: true
+    - name: Start fledger node (send)
+      ansible.builtin.systemd_service:
+        name: fledger-send
+        state: restarted
+        no_block: true
+
+- name: Setup node b
+  hosts: b
+  become: true
+  environment:
+    FLEDGER_SIGNAL_HOST: 10.0.0.11
+    FLEDGER_MSG: message
+  tasks:
+    - name: Copy fledger service (recv)
+      ansible.builtin.copy:
+        src: fledger-recv.service
+        dest: /etc/systemd/system/
+        mode: preserve
+    - name: Start fledger node (recv)
+      ansible.builtin.systemd_service:
+        name: fledger-recv
+        state: restarted
+        daemon_reload: true
+    - name: Check exit code of fledger node
+      changed_when: false
+      ansible.builtin.command: '/bin/bash -c "test $(/usr/bin/systemctl show -P ExecMainStatus fledger-recv) -eq 0"'

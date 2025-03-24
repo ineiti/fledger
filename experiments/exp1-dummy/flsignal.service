@@ -1,0 +1,12 @@
+[Unit]
+Description=Fledger signaling server
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/flsignal -vvv 
+RemainAfterExit=yes
+User=root
+
+[Install]
+WantedBy=multi-user.target
