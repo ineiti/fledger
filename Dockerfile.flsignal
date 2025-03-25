@@ -10,4 +10,4 @@ WORKDIR /fledger
 COPY --from=0 flsignal /fledger/flsignal
 COPY --from=0 /etc/ssl /etc/ssl
 
-ENTRYPOINT ["/fledger/flsignal", "-vv"]
+ENTRYPOINT ["/fledger/flsignal"]
