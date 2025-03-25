@@ -11,6 +11,8 @@ CRATES := flcrypto flmacro flarch flmodules flnode
 SHELL := /bin/bash
 PKILL = @/bin/ps aux | grep "$1" | egrep -v "(grep|vscode|rust-analyzer)" | awk '{print $$2}' | xargs -r kill
 PUBLISH = --token $$CARGO_REGISTRY_TOKEN
+FLEDGER = cargo run --bin fledger -- --config fledger/test0$1 --name Local0$1 \
+		--log-dht-storage -s ws://localhost:8765 --disable-turn-stun
 
 cargo_check:
 	for c in ${CARGO_LOCKS}; do \
@@ -100,8 +102,7 @@ build_local: build_local_web build_cli
 serve_two: kill build_cli
 	( cd cli && cargo run --bin flsignal -- -vv ) &
 	sleep 4
-	( cd cli && ( cargo run --bin fledger -- --config fledger/flnode --log-dht-storage -vvv -s ws://localhost:8765 --disable-turn-stun & \
-		cargo run --bin fledger -- --config fledger/flnode2 --log-dht-storage -vvv -s ws://localhost:8765 --disable-turn-stun & ) )
+	( cd cli && ( $(call FLEDGER,1) & $(call FLEDGER,2) & ) )
 
 serve_local: kill build_local_web serve_two
 	cd flbrowser && RUST_BACKTRACE=1 trunk serve --features local &

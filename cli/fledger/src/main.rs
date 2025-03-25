@@ -5,18 +5,22 @@ use flarch::{
     tasks::wait_ms,
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
-use flcrypto::{access::Condition, signer::SignerTrait};
 use flmodules::{
-    dht_storage::{broker::DHTStorage, core::RealmConfig, realm_view::RealmView},
-    flo::{crypto::FloVerifier, realm::Realm},
+    dht_router::broker::DHTRouter,
+    dht_storage::broker::DHTStorage,
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
+use page::{Page, PageCommands};
+use realm::{RealmCommands, RealmHandler};
+
+mod page;
+mod realm;
 
 /// Fledger node CLI binary
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
-struct Args {
+pub struct Args {
     /// Path to the configuration directory
     #[arg(short, long, default_value = "./flnode")]
     config: String,
@@ -48,7 +52,7 @@ struct Args {
 
     /// Verbosity of the logger
     #[clap(flatten)]
-    verbosity: clap_verbosity_flag::Verbosity,
+    verbosity: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
 
     /// Log frequency in seconds
     #[arg(long, default_value = "5")]
@@ -74,12 +78,17 @@ struct Args {
     command: Option<Commands>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 enum Commands {
     /// Handles Realms
     Realm {
         #[command(subcommand)]
         command: RealmCommands,
+    },
+    /// Adds, removes, and edits pages
+    Page {
+        #[command(subcommand)]
+        command: PageCommands,
     },
     /// Lists cryptographic keys stored
     Crypto {},
@@ -87,25 +96,10 @@ enum Commands {
     Stats {},
 }
 
-#[derive(Subcommand, Debug)]
-enum RealmCommands {
-    /// List available realms
-    List,
-    /// Creates a new realm
-    Create {
-        /// The name of the new realm.
-        name: String,
-        /// The maximum size of the sum of all the objects in the realm. The actual
-        /// size will be bigger, as the data is serialized.
-        max_space: Option<u64>,
-        /// The maximum size of a single object in this realm.
-        max_flo_size: Option<u32>,
-    },
-}
-
 struct Fledger {
     node: Node,
     ds: DHTStorage,
+    dr: DHTRouter,
     args: Args,
 }
 
@@ -142,150 +136,96 @@ async fn main() -> anyhow::Result<()> {
     log::debug!("Connecting to websocket at {:?}", cc);
     let network = network_start(node_config.clone(), cc).await?;
     let node = Node::start(Box::new(storage), node_config, network.broker).await?;
-    Ok(Fledger {
-        ds: node.dht_storage.as_ref().unwrap().clone(),
-        node,
-        args,
-    }
-    .run()
-    .await?)
+    Fledger::run(node, args).await
+}
+
+pub enum FledgerState {
+    Connected(usize),
+    DHTAvailable,
+    Sync(usize),
+    Duration(usize),
+    Forever,
 }
 
 impl Fledger {
-    async fn run(&mut self) -> anyhow::Result<()> {
-        let nc = &self.node.node_config.info;
+    async fn run(node: Node, args: Args) -> anyhow::Result<()> {
+        let nc = &node.node_config.info;
         log::info!("Started node {}: {}", nc.get_id(), nc.name);
 
-        match &self.args.command {
+        let mut f = Fledger {
+            ds: node.dht_storage.as_ref().unwrap().clone(),
+            dr: node.dht_router.as_ref().unwrap().clone(),
+            node,
+            args,
+        };
+
+        match f.args.command.clone() {
             Some(cmd) => match cmd {
-                Commands::Realm { command } => match command {
-                    RealmCommands::List => self.list_realms().await?,
-                    RealmCommands::Create {
-                        name,
-                        max_space,
-                        max_flo_size,
-                    } => {
-                        self.realm_create(name.clone(), *max_space, *max_flo_size)
-                            .await?
-                    }
-                },
+                Commands::Realm { command } => RealmHandler::run(f, command).await,
                 Commands::Crypto {} => todo!(),
                 Commands::Stats {} => todo!(),
+                Commands::Page { command } => Page::run(f, command).await,
             },
-            None => self.loop_node(None).await?,
+            None => f.loop_node(FledgerState::Forever).await,
         }
-
-        Ok(())
     }
 
-    async fn realm_create(
-        &mut self,
-        name: String,
-        max_space: Option<u64>,
-        max_flo_size: Option<u32>,
-    ) -> anyhow::Result<()> {
-        log::info!("Waiting for connection to other nodes");
-        self.loop_node(Some(2)).await?;
-
-        let config = RealmConfig {
-            max_space: max_space.unwrap_or(1000000),
-            max_flo_size: max_flo_size.unwrap_or(10000),
-        };
-        log::info!(
-            "Creating realm with name '{name}' / total space: {} / flo size: {}",
-            config.max_space,
-            config.max_flo_size
-        );
-        let signer = self.node.crypto_storage.get_signer();
-        let signers = &[&signer];
-        let cond = Condition::Verifier(signer.verifier());
-        let mut rv = RealmView::new_create_realm_config(
-            self.ds.clone(),
-            &name,
-            cond.clone(),
-            config,
-            signers,
-        )
-        .await?;
-        self.ds
-            .store_flo(FloVerifier::new(rv.realm.realm_id(), signer.verifier()).into())?;
-        let root_http = rv.create_http(
-            "fledger",
-            INDEX_HTML.to_string(),
-            None,
-            cond.clone(),
-            signers,
-        )?;
-        rv.set_realm_http(root_http.blob_id(), signers).await?;
-        let root_tag = rv.create_tag("fledger", None, cond.clone(), signers)?;
-        rv.set_realm_tag(root_tag.blob_id(), signers).await?;
-
-        log::info!("Waiting for propagation");
-        self.ds.propagate()?;
-        self.loop_node(Some(2)).await?;
-
-        self.list_realms().await?;
-
-        Ok(())
-    }
-
-    async fn list_realms(&mut self) -> anyhow::Result<()> {
-        log::info!("Waiting for update of data");
-        self.loop_node(Some(1)).await?;
-        log::info!("Requesting sync of DHT-storage and waiting for answers");
-        self.ds.sync()?;
-        self.ds.propagate()?;
-        self.loop_node(Some(2)).await?;
-        let rids = self.ds.get_realm_ids().await?;
-        if rids.len() == 0 {
-            println!("No realms found.");
-            return Ok(());
-        }
-        if self.args.verbosity.log_level_filter() != log::LevelFilter::Off {
-            for rid in rids.iter() {
-                if let Ok(realm) = self.ds.get_flo::<Realm>(&rid.into()).await {
-                    println!("\nRealm: '{}'", realm.cache().get_name(),);
-                    println!("  ID: {:?}", realm.flo_id());
-                    println!("  Config: {:?}", realm.cache().get_config());
-                    for (k, v) in realm.cache().get_services() {
-                        println!("  Service '{}' - {:?}", k, v);
-                    }
-                }
-            }
-        } else {
-            println!(
-                "Realm-IDs are: {}",
-                rids.iter()
-                    .map(|rid| format!("{rid}"))
-                    .collect::<Vec<_>>()
-                    .join(" :: ")
-            );
-        }
-
-        Ok(())
-    }
-
-    async fn loop_node(&mut self, max_count: Option<u32>) -> anyhow::Result<()> {
-        let mut i: u32 = 0;
+    pub async fn loop_node(&mut self, state: FledgerState) -> anyhow::Result<()> {
+        let mut count: usize = 0;
         self.node
             .broker_net
             .emit_msg_in(NetworkIn::WSUpdateListRequest)?;
+        match state {
+            FledgerState::Connected(i) => log::info!("Waiting for {i} connected nodes"),
+            FledgerState::DHTAvailable => log::info!("Waiting for a DHT to be available"),
+            FledgerState::Sync(_) => log::info!("Synching with neighbours"),
+            FledgerState::Duration(i) => log::info!("Just hanging around {i} seconds"),
+            FledgerState::Forever => log::info!("Looping forever"),
+        }
         loop {
-            i += 1;
+            count += 1;
 
             wait_ms(1000).await;
 
-            self.log(i).await?;
-
-            if let Some(c) = max_count.as_ref() {
-                if c < &i {
-                    return Ok(());
+            if match state {
+                FledgerState::Connected(i) => self.dr.stats.borrow().active >= i,
+                FledgerState::DHTAvailable => !self.ds.stats.borrow().realm_stats.is_empty(),
+                FledgerState::Sync(i) => {
+                    if self.dr.stats.borrow().active == 0
+                        || self.ds.stats.borrow().realm_stats.is_empty()
+                    {
+                        count = 0;
+                    } else {
+                        self.ds.sync()?;
+                        self.ds.propagate()?;
+                    }
+                    count > i
                 }
+                FledgerState::Duration(i) => count >= i,
+                FledgerState::Forever => {
+                    self.log(count as u32).await?;
+                    false
+                }
+            } {
+                return Ok(());
             }
+            self.ds.sync()?;
+            println!(
+                "dht-connections: {}/{}",
+                self.dr.stats.borrow().active,
+                self.dr
+                    .stats
+                    .borrow()
+                    .all_nodes
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
         }
     }
 
-    async fn log(&mut self, i: u32) -> anyhow::Result<()> {
+    pub async fn log(&mut self, i: u32) -> anyhow::Result<()> {
         if i % self.args.log_freq == self.args.log_freq - 1 {
             if self.args.log_random {
                 log::info!(
@@ -332,17 +272,3 @@ impl Fledger {
         Ok(())
     }
 }
-
-const INDEX_HTML: &str = r##"
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Fledger</title>
-  </head>
-<body>
-<h1>Fledger</h1>
-
-Fast, Fun, Fair Ledger, or Fledger puts the <strong>FUN</strong> back in blockchain!
-</body>
-</html>
-    "##;

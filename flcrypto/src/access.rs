@@ -218,6 +218,35 @@ impl Condition {
             Condition::Fail => ConditionLink::Fail,
         }
     }
+
+    pub fn has_verifier(&self, vid: &KeyPairID) -> bool {
+        match self {
+            Condition::Verifier(verifier) => &verifier.get_id() == vid,
+            Condition::Badge(_, badge) => badge.condition.has_verifier( vid),
+            Condition::NofT(_, conditions) => conditions.iter().any(|c| c.has_verifier(vid)),
+            Condition::NotAvailable => false,
+            Condition::Pass => true,
+            Condition::Fail => false,
+        }
+    }
+
+    pub fn can_verify(&self, vids: &[&KeyPairID]) -> bool {
+        if vids.len() > 1 {
+            todo!("Check with more than one signer");
+        } 
+        if let Some(&vid) = vids.first(){
+            match self {
+                Condition::Verifier(verifier) => &verifier.get_id() == vid,
+                Condition::Badge(_, badge) => badge.condition.can_verify( &[vid]),
+                Condition::NofT(nbr, conditions) => conditions.iter().any(|c| c.can_verify(&[vid])) && nbr == &1,
+                Condition::NotAvailable => false,
+                Condition::Pass => true,
+                Condition::Fail => false,
+            }
+        } else {
+            self == &Condition::Pass
+        }
+    }
 }
 
 impl ConditionSignature {
@@ -240,7 +269,7 @@ impl ConditionSignature {
     }
 
     pub fn sign_digest(&mut self, sig: &Signer, digest: &U256) -> anyhow::Result<()> {
-        if !self.has_verifier(&self.condition, &sig.get_id()) {
+        if !self.condition.has_verifier( &sig.get_id()) {
             return Err(SignerError::NoSuchSigner.into());
         }
         self.signatures.insert(sig.get_id(), sig.sign(&digest.bytes())?);
@@ -257,7 +286,7 @@ impl ConditionSignature {
 
     pub fn signers_digest(&mut self, signers: &[&Signer], digest: &U256) -> anyhow::Result<()> {
         for sig in signers{
-            if !self.has_verifier(&self.condition, &sig.get_id()) {
+            if !self.condition.has_verifier( &sig.get_id()) {
                 return Err(SignerError::NoSuchSigner.into());
             }
             self.signatures.insert(sig.get_id(), sig.sign(&digest.bytes())?);
@@ -278,17 +307,6 @@ impl ConditionSignature {
             "flcrypto::ConditionSignature::sign",
             &[self.condition.hash().as_ref(), msg],
         )
-    }
-
-    fn has_verifier(&self, cond: &Condition, vid: &KeyPairID) -> bool {
-        match cond {
-            Condition::Verifier(verifier) => &verifier.get_id() == vid,
-            Condition::Badge(_, badge) => self.has_verifier(&badge.condition, vid),
-            Condition::NofT(_, conditions) => conditions.iter().any(|c| self.has_verifier(c, vid)),
-            Condition::NotAvailable => false,
-            Condition::Pass => true,
-            Condition::Fail => false,
-        }
     }
 
     pub fn verify_cond(&self, cond: &Condition, digest: &U256) -> anyhow::Result<bool> {

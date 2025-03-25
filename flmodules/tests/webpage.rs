@@ -383,7 +383,7 @@ async fn page_full() -> anyhow::Result<()> {
         None,
         wallet_root.get_badge_cond(),
         root_signers,
-    )?;
+    ).await?;
     let signers_val = vec![root_nodes[0].wallet.get_signer()];
     let signers = signers_val.iter().collect::<Vec<_>>();
     rv_root
@@ -400,7 +400,7 @@ async fn page_full() -> anyhow::Result<()> {
     simul.sync_check(&root_tag).await?;
     simul.sync_check(&root_http).await?;
 
-    let mut rv_noise = RealmView::new(noise_nodes[0].dht_storage.clone()).await?;
+    let mut rv_noise = RealmView::new_first(noise_nodes[0].dht_storage.clone()).await?;
     assert!(rv_noise.pages.as_ref().unwrap().storage.len() > 0);
     assert!(rv_noise.tags.as_ref().unwrap().storage.len() > 0);
     assert_eq!(root_http.blob_id(), rv_noise.pages.as_ref().unwrap().root);
@@ -416,7 +416,7 @@ async fn page_full() -> anyhow::Result<()> {
             wallet_root.get_badge_cond(),
             Cuckoo::Parent(root_http.flo_id()),
             root_signers,
-        )?;
+        ).await?;
         let cuckoo_tag = rv_noise.create_tag_cuckoo(
             &format!("cuckoo_{nbr}"),
             None,
@@ -436,7 +436,7 @@ async fn page_full() -> anyhow::Result<()> {
     simul.sync_check(&rv_root.realm).await?;
     simul.sync_check_cuckoos(&root_http, cuckoo_nbr).await?;
     simul.sync_check_cuckoos(&root_tag, cuckoo_nbr).await?;
-    let rv_new = RealmView::new(new_node.dht_storage.clone()).await?;
+    let rv_new = RealmView::new_first(new_node.dht_storage.clone()).await?;
     assert_eq!(cuckoo_nbr + 1, rv_new.pages.as_ref().unwrap().storage.len());
     assert_eq!(cuckoo_nbr + 1, rv_new.tags.as_ref().unwrap().storage.len());
 

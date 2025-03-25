@@ -29,6 +29,7 @@ use flarch::nodeids::NodeID;
 use super::{
     core::{CoreError, DHTConfig, FloCuckoo},
     messages::{InternIn, InternOut, Messages, Stats},
+    realm_view::RealmView,
 };
 
 pub(super) const MODULE_NAME: &str = "DHTStorage";
@@ -236,6 +237,10 @@ impl DHTStorage {
         let cond_old = self.convert(fw.cond(), &rid).await;
         let cond_new = self.convert(cl, &rid).await;
         fw.start_sign_cond(cond_old, cond_new)
+    }
+
+    pub async fn get_realm_view(&mut self, rid: RealmID) -> anyhow::Result<RealmView> {
+        Ok(RealmView::new_from_id(self.clone(), rid).await?)
     }
 
     async fn send_wait<T>(

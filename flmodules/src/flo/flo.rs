@@ -449,6 +449,10 @@ impl<T: Serialize + DeserializeOwned + Clone> FloWrapper<T> {
         &self.object
     }
 
+    pub fn cache_mut(&mut self) -> &mut T {
+        &mut self.object
+    }
+
     pub fn flo(&self) -> &Flo {
         &self.flo
     }

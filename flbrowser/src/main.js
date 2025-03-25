@@ -9,3 +9,11 @@ export function downloadFile(fileName, data) {
     aElement.click();
     URL.revokeObjectURL(href);
 };
+
+export function getEditorContent() {
+  if (typeof ace !== 'undefined' && ace.edit) {
+    const editor = ace.edit("editor");
+    return editor.getValue();
+  }
+  return "";
+}

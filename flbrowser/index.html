@@ -45,7 +45,7 @@
     <main>
         <div class="container">
             <!-- Left column - Node Statistics -->
-            <div class="column stats-column" id="node-stats">
+            <div class="column stats-column left" id="node-stats">
                 <h3>Node Statistics <button class="expand-btn" onclick="toggle_div('stats-left', this)"><i
                             class="fas fa-chevron-left"></i></button></h3>
                 <div class="stats-content">
@@ -176,19 +176,16 @@
                         <p>Edit and save HTML content for your webpage.</p>
                     </section>
                     <section class="editor-section">
-                        <div id="editor" style="height:300px; width:100%; border:1px solid #ccc;"></div>
-                        <input type="text" id="page-path" placeholder="Enter path"
-                            style="margin-top:1rem; padding:0.5rem; width:100%; border:1px solid #ccc; border-radius:4px;">
-                    </section>
-                    <section class="past-paths">
-                        <h3>Past Pages</h3>
-                        <ul id="past-paths">
-                            <li>
-                                <span>/example/path</span>
-                                <button class="edit-btn" title="Edit Page"><i class="fas fa-edit"></i></button>
-                                <button class="view-btn" title="View Page"><i class="fas fa-eye"></i></button>
-                            </li>
-                        </ul>
+                        <div id="editor" class="editor-container"></div>
+                        <div class="editor-controls">
+                            <input type="text" id="page-path" placeholder="Enter path">
+                            <button id="save-page" class="primary-button">Save Page</button>
+                        </div>
+                        <section class="editable-pages">
+                            <h3>Editable Pages</h3>
+                            <ul id="editable-pages">
+                            </ul>
+                        </section>
                     </section>
                 </div>
 
@@ -232,7 +229,7 @@
             </div>
 
             <!-- Right column - Global Statistics -->
-            <div class="column stats-column" id="global-stats">
+            <div class="column stats-column right" id="global-stats">
                 <h3>Global Statistics <button class="expand-btn" onclick="toggle_div('stats-right', this)"><i
                             class="fas fa-chevron-left"></i></button></h3>
                 <div class="stats-content">
@@ -272,6 +269,8 @@
         <!-- External links will be moved here in mobile view -->
     </footer>
 
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
     <script>
         // Define toggle_div function globally
         function toggle_div(id, caller) {
@@ -501,6 +500,32 @@
 
             // Update on resize
             window.addEventListener('resize', handleMobileLayout);
+
+            // Initialize Ace Editor for HTML content
+            var editor = ace.edit("editor");
+            editor.setTheme("ace/theme/monokai");
+            editor.session.setMode("ace/mode/html");
+            // Set default content with a simple "Hello Fledger" page
+            editor.setValue(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Hello Fledger</title>
+</head>
+<body>
+  <h1>Hello Fledger</h1>
+  <p>Welcome to Fledger.</p>
+</body>
+</html>`, -1);
+            // Add event listener for cmd+enter or ctrl+enter in the editor
+            editor.commands.addCommand({
+                name: "savePageShortcut",
+                bindKey: { win: "Ctrl-Enter", mac: "Cmd-Enter" },
+                exec: function () {
+                    document.getElementById('save-page').click();
+                }
+            });
+
         });
     </script>
 
@@ -535,26 +560,5 @@
             }
         }
     </style>
-
-    <!-- Add Ace Editor CDN and initialization
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
-    <script>
-        // Initialize Ace Editor for HTML content
-        var editor = ace.edit("editor");
-        editor.setTheme("ace/theme/monokai");
-        editor.session.setMode("ace/mode/html");
-        // Set default content with a simple "Hello Fledger" page
-        editor.setValue(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Hello Fledger</title>
-</head>
-<body>
-  <h1>Hello Fledger</h1>
-  <p>Welcome to Fledger.</p>
-</body>
-</html>`, -1);
-    </script> -->
 
 </html>
