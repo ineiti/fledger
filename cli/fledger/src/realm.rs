@@ -5,7 +5,7 @@ use flmodules::{
     flo::{crypto::FloVerifier, realm::Realm},
 };
 
-use crate::Fledger;
+use crate::{Fledger, FledgerState};
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum RealmCommands {
@@ -43,8 +43,7 @@ impl RealmHandler {
         max_space: Option<u64>,
         max_flo_size: Option<u32>,
     ) -> anyhow::Result<()> {
-        log::info!("Waiting for connection to other nodes");
-        f.loop_node(Some(2)).await?;
+        f.loop_node(crate::FledgerState::Connected(1)).await?;
 
         let config = RealmConfig {
             max_space: max_space.unwrap_or(1000000),
@@ -75,20 +74,13 @@ impl RealmHandler {
         let root_tag = rv.create_tag("fledger", None, cond.clone(), signers)?;
         rv.set_realm_tag(root_tag.blob_id(), signers).await?;
 
-        log::info!("Waiting for propagation");
-        f.ds.propagate()?;
-        f.loop_node(Some(2)).await?;
+        f.loop_node(FledgerState::Sync(3)).await?;
 
         Self::list_realms(f).await
     }
 
     async fn list_realms(mut f: Fledger) -> anyhow::Result<()> {
-        log::info!("Waiting for update of data");
-        f.loop_node(Some(5)).await?;
-        log::info!("Requesting sync of DHT-storage and waiting for answers");
-        f.ds.sync()?;
-        f.ds.propagate()?;
-        f.loop_node(Some(10)).await?;
+        f.loop_node(FledgerState::Sync(5)).await?;
         let rids = f.ds.get_realm_ids().await?;
         if rids.len() == 0 {
             println!("No realms found.");

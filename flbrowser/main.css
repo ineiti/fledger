@@ -236,6 +236,7 @@ header h1 {
     flex: 3;
     background-color: var(--card-bg-color);
     transition: background-color 0.3s ease;
+    z-index: 1;
 }
 
 .stats-column {
@@ -245,7 +246,6 @@ header h1 {
     /* transition: background-color 0.3s ease; */
     transition: max-height 0.3s ease-out, transform 1s ease-out, opacity 0.3s ease-out;
     opacity: 0;
-    z-index: -100;
 }
 
 .stats-column.left {
@@ -257,7 +257,7 @@ header h1 {
 }
 
 .stats-column.show {
-    opacity: 0.7;
+    opacity: 0.8;
     transform: translateX(0);
 }
 

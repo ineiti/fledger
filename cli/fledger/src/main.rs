@@ -6,6 +6,7 @@ use flarch::{
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
 use flmodules::{
+    dht_router::broker::DHTRouter,
     dht_storage::broker::DHTStorage,
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
@@ -98,6 +99,7 @@ enum Commands {
 struct Fledger {
     node: Node,
     ds: DHTStorage,
+    dr: DHTRouter,
     args: Args,
 }
 
@@ -137,6 +139,14 @@ async fn main() -> anyhow::Result<()> {
     Fledger::run(node, args).await
 }
 
+pub enum FledgerState {
+    Connected(usize),
+    DHTAvailable,
+    Sync(usize),
+    Duration(usize),
+    Forever,
+}
+
 impl Fledger {
     async fn run(node: Node, args: Args) -> anyhow::Result<()> {
         let nc = &node.node_config.info;
@@ -144,6 +154,7 @@ impl Fledger {
 
         let mut f = Fledger {
             ds: node.dht_storage.as_ref().unwrap().clone(),
+            dr: node.dht_router.as_ref().unwrap().clone(),
             node,
             args,
         };
@@ -155,38 +166,62 @@ impl Fledger {
                 Commands::Stats {} => todo!(),
                 Commands::Page { command } => Page::run(f, command).await,
             },
-            None => f.loop_node(None).await,
+            None => f.loop_node(FledgerState::Forever).await,
         }
     }
 
-    pub async fn loop_node(&mut self, max_count: Option<u32>) -> anyhow::Result<()> {
-        let mut i: u32 = 0;
+    pub async fn loop_node(&mut self, state: FledgerState) -> anyhow::Result<()> {
+        let mut count: usize = 0;
         self.node
             .broker_net
             .emit_msg_in(NetworkIn::WSUpdateListRequest)?;
+        match state {
+            FledgerState::Connected(i) => log::info!("Waiting for {i} connected nodes"),
+            FledgerState::DHTAvailable => log::info!("Waiting for a DHT to be available"),
+            FledgerState::Sync(_) => log::info!("Synching with neighbours"),
+            FledgerState::Duration(i) => log::info!("Just hanging around {i} seconds"),
+            FledgerState::Forever => log::info!("Looping forever"),
+        }
         loop {
-            i += 1;
+            count += 1;
 
             wait_ms(1000).await;
 
-            self.log(i).await?;
+            if match state {
+                FledgerState::Connected(i) => self.dr.stats.borrow().active >= i,
+                FledgerState::DHTAvailable => !self.ds.stats.borrow().realm_stats.is_empty(),
+                FledgerState::Sync(i) => {
+                    if self.dr.stats.borrow().active == 0
+                        || self.ds.stats.borrow().realm_stats.is_empty()
+                    {
+                        count = 0;
+                    } else {
+                        self.ds.sync()?;
+                        self.ds.propagate()?;
+                    }
+                    count > i
+                }
+                FledgerState::Duration(i) => count >= i,
+                FledgerState::Forever => {
+                    self.log(count as u32).await?;
+                    false
+                }
+            } {
+                return Ok(());
+            }
             self.ds.sync()?;
-            let dr = self.node.dht_router.as_ref().unwrap().stats.borrow();
             println!(
-                "nodes: {}/{}",
-                dr.active,
-                dr.all_nodes
+                "dht-connections: {}/{}",
+                self.dr.stats.borrow().active,
+                self.dr
+                    .stats
+                    .borrow()
+                    .all_nodes
                     .iter()
                     .map(|n| n.to_string())
                     .collect::<Vec<_>>()
                     .join(", ")
             );
-
-            if let Some(c) = max_count.as_ref() {
-                if c < &i {
-                    return Ok(());
-                }
-            }
         }
     }
 
