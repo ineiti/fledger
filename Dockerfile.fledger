@@ -10,4 +10,4 @@ WORKDIR /fledger
 COPY --from=0 fledger /fledger/fledger
 COPY --from=0 /etc/ssl /etc/ssl
 
-ENTRYPOINT ["/fledger/fledger", "-vv"]
+ENTRYPOINT ["/fledger/fledger"]

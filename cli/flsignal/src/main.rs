@@ -13,7 +13,7 @@ use flmodules::{
 struct Args {
     /// Verbosity
     #[clap(flatten)]
-    verbosity: clap_verbosity_flag::Verbosity,
+    verbosity: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
 
     /// System realm - if this is set, no other realms are allowed by default.
     #[arg(long)]
