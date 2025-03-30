@@ -4,10 +4,11 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/root/fledger --config /root/flnode -vvv -s ws://${FLEDGER_FLSIGNAL_HOST}:8765 --disable-turn-stun --print-new-messages --recv-chat-msg ${FLEDGER_RECV_MSG} --timeout 10
+ExecStart=/root/fledger --config /root/flnode -vv -s ws://${FLEDGER_FLSIGNAL_HOST}:8765 --disable-turn-stun --print-new-messages --recv-chat-msg ${FLEDGER_RECV_MSG}
 RemainAfterExit=yes
 User=root
 EnvironmentFile=/root/env.systemd
+StandardOutput=append:/var/log/fledger-recv
 
 [Install]
 WantedBy=multi-user.target
