@@ -4,14 +4,21 @@
   tasks:
     - name: Copy executable to nodes
       ansible.builtin.copy:
-        src: ~/musl/
+        src: "~/{{ item }}"
         dest: ~/
         mode: preserve
+      loop:
+        - fledger
+        - flsignal
 
-    - name: Remove config folders
+    - name: Remove config folders and logs
       ansible.builtin.file:
-        path: /root/flnode
+        path: '{{ item }}'
         state: absent
+      loop:
+        - /root/flnode
+        - /var/log/fledger-recv
+        - /var/log/fledger-send
 
 - name: Setup node a
   hosts: a
@@ -53,6 +60,9 @@
         name: fledger-recv
         state: restarted
         daemon_reload: true
-    - name: Check exit code of fledger node
-      changed_when: false
-      ansible.builtin.command: '/bin/bash -c "test $(/usr/bin/systemctl show -P ExecMainStatus fledger-recv) -eq 0"'
+        no_block: true
+    - name: Wait for message received on fledger node (recv)
+      ansible.builtin.wait_for:
+        path: /var/log/fledger-recv
+        search_regex: "RECV_CHAT_MSG TRIGGERED"
+        timeout: 10
