@@ -2,22 +2,22 @@ use clap::{Parser, Subcommand};
 
 use flarch::{
     data_storage::{DataStorage, DataStorageFile},
-    nodeids::U256,
     tasks::wait_ms,
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
 use flmodules::{
     dht_router::broker::DHTRouter,
     dht_storage::broker::DHTStorage,
-    gossip_events::core::Event,
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
 use page::{Page, PageCommands};
 use realm::{RealmCommands, RealmHandler};
+use simulation::{SimulationCommands, SimulationHandler};
 
 mod page;
 mod realm;
+mod simulation;
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug, Clone)]
@@ -64,6 +64,10 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     log_gossip: bool,
 
+    /// Log dht connections
+    #[arg(long, default_value = "false")]
+    log_dht_connections: bool,
+
     /// Log random router
     #[arg(long, default_value = "false")]
     log_random: bool,
@@ -75,21 +79,6 @@ pub struct Args {
     /// Log dht-storage stats
     #[arg(long, default_value = "false")]
     log_dht_storage: bool,
-
-    /// Print new messages as they come
-    #[arg(long, default_value = "false")]
-    print_new_messages: bool,
-
-    /// Send a chat message upon node creation
-    /// If the message is an empty string, ignore it.
-    #[arg(long, default_value = "")]
-    send_chat_msg: String,
-
-    /// Wait for a chat message with the given body.
-    /// If the message is an empty string, ignore it.
-    /// log "RECV_CHAT_MSG TRIGGERED" upon message received, at log level info
-    #[arg(long, default_value = "")]
-    recv_chat_msg: String,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -111,6 +100,11 @@ enum Commands {
     Crypto {},
     /// Prints the statistics of the different modules and then quits
     Stats {},
+    /// Simulation tasks
+    Simulation {
+        #[command(subcommand)]
+        command: SimulationCommands,
+    },
 }
 
 struct Fledger {
@@ -118,7 +112,6 @@ struct Fledger {
     ds: DHTStorage,
     dr: DHTRouter,
     args: Args,
-    acked_msg_ids: Vec<U256>,
 }
 
 #[tokio::main]
@@ -175,7 +168,6 @@ impl Fledger {
             dr: node.dht_router.as_ref().unwrap().clone(),
             node,
             args,
-            acked_msg_ids: Vec::new(),
         };
 
         match f.args.command.clone() {
@@ -184,6 +176,7 @@ impl Fledger {
                 Commands::Crypto {} => todo!(),
                 Commands::Stats {} => todo!(),
                 Commands::Page { command } => Page::run(f, command).await,
+                Commands::Simulation { command } => SimulationHandler::run(f, command).await,
             },
             None => f.loop_node(FledgerState::Forever).await,
         }
@@ -200,17 +193,6 @@ impl Fledger {
             FledgerState::Sync(_) => log::info!("Synching with neighbours"),
             FledgerState::Duration(i) => log::info!("Just hanging around {i} seconds"),
             FledgerState::Forever => log::info!("Looping forever"),
-        }
-
-        // Handle --send-chat-msg
-        if self.args.send_chat_msg != "" {
-            self.node
-                .add_chat_message(self.args.send_chat_msg.clone())
-                .await?;
-        }
-
-        if self.args.recv_chat_msg != "" {
-            log::info!("Waiting for chat message {}.", self.args.recv_chat_msg);
         }
 
         loop {
@@ -242,35 +224,19 @@ impl Fledger {
             }
 
             self.ds.sync()?;
-            println!(
-                "dht-connections: {}/{}",
-                self.dr.stats.borrow().active,
-                self.dr
-                    .stats
-                    .borrow()
-                    .all_nodes
-                    .iter()
-                    .map(|n| n.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-
-            // Handle --recv-chat-msg
-            if self.args.recv_chat_msg != "" {
-                if self
-                    .node
-                    .gossip
-                    .as_ref()
-                    .unwrap()
-                    .chat_events()
-                    .iter()
-                    .filter(|ev| ev.msg == self.args.recv_chat_msg)
-                    .count()
-                    > 0
-                {
-                    log::info!("RECV_CHAT_MSG TRIGGERED");
-                    self.args.recv_chat_msg = "".into();
-                }
+            if self.args.log_dht_connections {
+                log::info!(
+                    "dht-connections: {}/{}",
+                    self.dr.stats.borrow().active,
+                    self.dr
+                        .stats
+                        .borrow()
+                        .all_nodes
+                        .iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
             }
         }
     }
@@ -315,25 +281,6 @@ impl Fledger {
                             .collect::<Vec<_>>()
                             .join(" :: ")
                     );
-                }
-            }
-
-            // Handle --print-new-messages
-            if self.args.print_new_messages {
-                let chat_events = self.node.gossip.as_ref().unwrap().chat_events();
-                let chats: Vec<&Event> = chat_events
-                    .iter()
-                    .filter(|ev| !self.acked_msg_ids.contains(&ev.get_id()))
-                    .collect();
-
-                if chats.len() <= 0 {
-                    log::debug!("... No new message");
-                } else {
-                    log::info!("--- New Messages ---");
-                    for chat in chats {
-                        self.acked_msg_ids.push(chat.get_id());
-                        log::info!("    [{}] {}", chat.src, chat.msg);
-                    }
                 }
             }
         }
