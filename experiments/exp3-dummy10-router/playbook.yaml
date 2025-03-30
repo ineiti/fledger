@@ -13,26 +13,27 @@
   tasks:
     - name: Copy fledger binary to nodes
       ansible.builtin.copy:
-        src: ~/musl/fledger
+        src: ~/fledger
         dest: ~/
         mode: preserve
 
-    - name: Copy fledger service (send)
+    - name: Copy fledger services
       ansible.builtin.copy:
-        src: fledger-send.service
+        src: "{{ item }}"
         dest: /etc/systemd/system/
         mode: preserve
+      loop:
+        - fledger-send.service
+        - fledger-recv.service
 
-    - name: Copy fledger service (recv)
-      ansible.builtin.copy:
-        src: fledger-recv.service
-        dest: /etc/systemd/system/
-        mode: preserve
-
-    - name: Remove config folders
+    - name: Remove config folders and log files
       ansible.builtin.file:
-        path: /root/flnode
+        path: "{{ item }}"
         state: absent
+      loop:
+        - /root/flnode
+        - /var/log/fledger-recv
+        - /var/log/fledger-send
 
 - name: Run signaling server on node signaling
   hosts: signaling
@@ -40,7 +41,7 @@
   tasks:
     - name: Copy flsignal
       ansible.builtin.copy:
-        src: ~/musl/flsignal
+        src: ~/flsignal
         dest: ~/
         mode: preserve
     - name: Copy signaling service
@@ -86,13 +87,8 @@
         name: fledger-send
         state: restarted
         no_block: true
-    - name: Wait for fledger node (recv) to be ran
-      ansible.builtin.systemd:
-        name: fledger-recv
-      register: result
-      until: result.status['ExecMainCode'] == '1'
-      retries: 12
-      delay: 5
-    - name: Check exit code of fledger node
-      changed_when: false
-      ansible.builtin.command: '/bin/bash -c "test $(/usr/bin/systemctl show -P ExecMainStatus fledger-recv) -eq 0"'
+    - name: Wait for message received on fledger node (recv)
+      ansible.builtin.wait_for:
+        path: /var/log/fledger-recv
+        search_regex: "RECV_CHAT_MSG TRIGGERED"
+        timeout: 600
