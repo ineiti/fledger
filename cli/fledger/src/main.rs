@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 
 use flarch::{
     data_storage::{DataStorage, DataStorageFile},
+    random,
     tasks::wait_ms,
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
@@ -134,6 +135,20 @@ async fn main() -> anyhow::Result<()> {
         SIGNAL_VERSION,
         VERSION_STRING
     );
+
+    // wait a random amount of time before running a simulation
+    // to avoid overloading the signaling server
+    match args.command.clone() {
+        Some(cmd) => match cmd {
+            Commands::Simulation { command: _ } => {
+                let randtime: u64 = random::<u64>() % 5000;
+                log::info!("Waiting {}ms before running this node...", randtime);
+                wait_ms(randtime).await;
+            }
+            _ => {}
+        },
+        _ => {}
+    }
 
     let cc = if args.disable_turn_stun {
         ConnectionConfig::from_signal(&args.signal_url)
