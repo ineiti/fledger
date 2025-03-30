@@ -1,4 +1,3 @@
-use anyhow::bail;
 use clap::{Parser, Subcommand};
 
 use flarch::{
@@ -10,8 +9,6 @@ use flarch::{
 use flmodules::{
     dht_router::broker::DHTRouter,
     dht_storage::broker::DHTStorage,
-    dht_storage::{broker::DHTStorage, core::RealmConfig, realm_view::RealmView},
-    flo::{crypto::FloVerifier, realm::Realm},
     gossip_events::core::Event,
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
@@ -83,20 +80,14 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     print_new_messages: bool,
 
-    /// Timeout after which the node exists with nonzero code
-    /// If the timeout is 0, then it is disabled.
-    #[arg(long, default_value = "0")]
-    timeout: u32,
-
     /// Send a chat message upon node creation
     /// If the message is an empty string, ignore it.
     #[arg(long, default_value = "")]
     send_chat_msg: String,
 
     /// Wait for a chat message with the given body.
-    /// Exit with 0 code if the message is received.
-    /// To be combined with the --timeout option.
     /// If the message is an empty string, ignore it.
+    /// log "RECV_CHAT_MSG TRIGGERED" upon message received, at log level info
     #[arg(long, default_value = "")]
     recv_chat_msg: String,
 
@@ -218,6 +209,10 @@ impl Fledger {
                 .await?;
         }
 
+        if self.args.recv_chat_msg != "" {
+            log::info!("Waiting for chat message {}.", self.args.recv_chat_msg);
+        }
+
         loop {
             count += 1;
 
@@ -273,17 +268,9 @@ impl Fledger {
                     .count()
                     > 0
                 {
-                    log::info!(
-                        "Trigger message received: {}. Exiting.",
-                        self.args.recv_chat_msg
-                    );
-                    return Ok(());
+                    log::info!("RECV_CHAT_MSG TRIGGERED");
+                    self.args.recv_chat_msg = "".into();
                 }
-            }
-
-            // Handle --timeout
-            if timeout != 0 && timeout <= i {
-                bail!("Timeout reached.");
             }
         }
     }
