@@ -14,7 +14,7 @@ use flmodules::{
 use flnode::{node::Node, version::VERSION_STRING};
 use page::{Page, PageCommands};
 use realm::{RealmCommands, RealmHandler};
-use simulation::{SimulationCommands, SimulationHandler};
+use simulation::{SimulationCommand, SimulationHandler};
 
 mod metrics;
 mod page;
@@ -108,10 +108,7 @@ enum Commands {
     /// Prints the statistics of the different modules and then quits
     Stats {},
     /// Simulation tasks
-    Simulation {
-        #[command(subcommand)]
-        command: SimulationCommands,
-    },
+    Simulation(SimulationCommand),
 }
 
 struct Fledger {
@@ -147,7 +144,7 @@ async fn main() -> anyhow::Result<()> {
     if !args.no_simulation_wait {
         match args.command.clone() {
             Some(cmd) => match cmd {
-                Commands::Simulation { command: _ } => {
+                Commands::Simulation(_) => {
                     let randtime: u64 = random::<u64>() % 5000;
                     log::info!("Waiting {}ms before running this node...", randtime);
                     wait_ms(randtime).await;
@@ -199,7 +196,7 @@ impl Fledger {
                 Commands::Crypto {} => todo!(),
                 Commands::Stats {} => todo!(),
                 Commands::Page { command } => Page::run(f, command).await,
-                Commands::Simulation { command } => SimulationHandler::run(f, command).await,
+                Commands::Simulation(command) => SimulationHandler::run(f, command).await,
             },
             None => f.loop_node(FledgerState::Forever).await,
         }
@@ -270,7 +267,7 @@ impl Fledger {
                 log::info!(
                     "Nodes are: {}",
                     self.node
-                        .nodes_online()?
+                        .nodes_connected()?
                         .iter()
                         .map(|n| format!("{}/{}", n.name, n.get_id()))
                         .collect::<Vec<_>>()
