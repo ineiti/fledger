@@ -16,6 +16,7 @@ use page::{Page, PageCommands};
 use realm::{RealmCommands, RealmHandler};
 use simulation::{SimulationCommands, SimulationHandler};
 
+mod metrics;
 mod page;
 mod realm;
 mod simulation;
@@ -81,6 +82,11 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     log_dht_storage: bool,
 
+    /// Do not wait for a random amount
+    /// of ms if the command is simulation
+    #[arg(long, default_value = "false")]
+    no_simulation_wait: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -138,16 +144,18 @@ async fn main() -> anyhow::Result<()> {
 
     // wait a random amount of time before running a simulation
     // to avoid overloading the signaling server
-    match args.command.clone() {
-        Some(cmd) => match cmd {
-            Commands::Simulation { command: _ } => {
-                let randtime: u64 = random::<u64>() % 5000;
-                log::info!("Waiting {}ms before running this node...", randtime);
-                wait_ms(randtime).await;
-            }
+    if !args.no_simulation_wait {
+        match args.command.clone() {
+            Some(cmd) => match cmd {
+                Commands::Simulation { command: _ } => {
+                    let randtime: u64 = random::<u64>() % 5000;
+                    log::info!("Waiting {}ms before running this node...", randtime);
+                    wait_ms(randtime).await;
+                }
+                _ => {}
+            },
             _ => {}
-        },
-        _ => {}
+        }
     }
 
     let cc = if args.disable_turn_stun {
