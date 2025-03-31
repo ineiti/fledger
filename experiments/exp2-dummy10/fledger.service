@@ -1,0 +1,15 @@
+[Unit]
+Description=Fledger node
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/root/fledger --config /root/flnode -v -s ws://${FLEDGER_FLSIGNAL_HOST}:8765 --name ${FLEDGER_NODE_NAME} --disable-turn-stun simulation --print-new-messages chat --send-msg ${FLEDGER_SEND_MSG} --recv-msg ${FLEDGER_RECV_MSG}
+RemainAfterExit=yes
+Restart=no
+User=root
+EnvironmentFile=/root/env.systemd
+StandardOutput=append:/var/log/fledger
+
+[Install]
+WantedBy=multi-user.target

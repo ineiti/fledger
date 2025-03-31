@@ -3,10 +3,11 @@ Description=Fledger signaling server
 After=network.target
 
 [Service]
-Type=oneshot
-ExecStart=/root/flsignal -vvv 
-RemainAfterExit=yes
+Type=simple
+ExecStart=/root/flsignal -v
 User=root
+Restart=no
+StandardOutput=append:/var/log/flsignal
 
 [Install]
 WantedBy=multi-user.target

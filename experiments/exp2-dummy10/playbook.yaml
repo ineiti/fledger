@@ -26,8 +26,7 @@
         dest: /etc/systemd/system/
         mode: preserve
       loop:
-        - fledger-send.service
-        - fledger-recv.service
+        - fledger.service
 
     - name: Remove config folders and logs
       ansible.builtin.file:
@@ -35,8 +34,8 @@
         state: absent
       loop:
         - /root/flnode
-        - /var/log/fledger-recv
-        - /var/log/fledger-send
+        - /var/log/fledger
+        - /var/log/flsignal
 
 - name: Run signaling server on node A
   hosts: a
@@ -52,9 +51,8 @@
         name: flsignal
         state: restarted
         daemon_reload: true
-        no_block: true
 
-- name: Upload env and run fleger send / recv on each node
+- name: Upload env and run fleger on each node
   hosts: all
   become: true
   tasks:
@@ -63,19 +61,14 @@
         src: "env.systemd/{{ inventory_hostname }}.env"
         dest: ~/env.systemd
         mode: preserve
-    - name: Start fledger node (send)
+    - name: Start fledger node
       ansible.builtin.systemd_service:
-        name: fledger-send
+        name: fledger
         state: restarted
         no_block: true
         daemon_reload: true
-    - name: Start fledger node (recv)
-      ansible.builtin.systemd_service:
-        name: fledger-recv
-        state: restarted
-        no_block: true
-    - name: Wait for message received on fledger node (recv)
+    - name: Wait for message received
       ansible.builtin.wait_for:
-        path: /var/log/fledger-recv
+        path: /var/log/fledger
         search_regex: "RECV_CHAT_MSG TRIGGERED"
-        timeout: 10
+        timeout: 120
