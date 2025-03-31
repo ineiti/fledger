@@ -41,6 +41,7 @@ pub struct Messages {
     id: NodeID,
     nodes: NodeIDs,
     outstanding: Vec<U256>,
+    ticks: usize,
 }
 
 impl std::fmt::Debug for Messages {
@@ -76,6 +77,7 @@ impl Messages {
                 id,
                 nodes: NodeIDs::empty(),
                 outstanding: vec![],
+                ticks: 0,
             },
             storage_rx,
         )
@@ -95,10 +97,7 @@ impl Messages {
     }
 
     /// Processes many messages at a time.
-    pub fn process_messages(
-        &mut self,
-        msgs: Vec<GossipIn>,
-    ) -> anyhow::Result<Vec<GossipOut>> {
+    pub fn process_messages(&mut self, msgs: Vec<GossipIn>) -> anyhow::Result<Vec<GossipOut>> {
         let mut out = vec![];
         for msg in msgs {
             out.extend(self.process_message(msg));
@@ -110,7 +109,15 @@ impl Messages {
     pub fn process_message(&mut self, msg: GossipIn) -> Vec<GossipOut> {
         // log::trace!("{} got message {:?}", self.id, msg);
         match msg {
-            GossipIn::Tick => self.tick(),
+            GossipIn::Tick => {
+                self.ticks += 1;
+                // Magic number - 3 seems to work fine here...
+                if self.ticks >= 3 {
+                    self.tick()
+                } else {
+                    vec![]
+                }
+            }
             GossipIn::FromNetwork(src, node_msg) => self.process_node_message(src, node_msg),
             GossipIn::AddEvent(ev) => self.add_event(ev),
             GossipIn::UpdateNodeList(ids) => self.node_list(ids),

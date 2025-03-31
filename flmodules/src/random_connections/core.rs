@@ -68,6 +68,7 @@ impl RandomStorage {
     }
 
     pub fn disconnect(&mut self, nodes: NodeIDs) {
+        self.known.remove_existing(&nodes);
         self.connected.remove(&nodes);
         self.connecting.remove(&nodes);
     }

@@ -447,22 +447,22 @@ mod test {
         assert!(rs.get_path("/").is_err());
         assert!(rs.get_path("blob").is_err());
         // Cannot compare root itself, as the rs.root got some children...
-        assert_eq!(
-            Ok(root.blob_id()),
-            rs.get_path("danu").map(|f| f.blob_id())
-        );
-        assert_eq!(
-            Ok(root_c0.blob_id()),
-            rs.get_path("dahu").map(|f| f.blob_id())
-        );
-        assert_eq!(
-            Ok(root_blog.blob_id()),
-            rs.get_path("danu/blog").map(|f| f.blob_id())
-        );
-        assert_eq!(
-            Ok(root_c0_article.blob_id()),
-            rs.get_path("dahu/montagne").map(|f| f.blob_id())
-        );
+        assert!(rs
+            .get_path("danu")
+            .map(|f| f.blob_id())
+            .is_ok_and(|id| id == root.blob_id()));
+        assert!(rs
+            .get_path("dahu")
+            .map(|f| f.blob_id())
+            .is_ok_and(|id| id == root_c0.blob_id()));
+        assert!(rs
+            .get_path("danu/blog")
+            .map(|f| f.blob_id())
+            .is_ok_and(|id| id == root_blog.blob_id()));
+        assert!(rs
+            .get_path("dahu/montagne")
+            .map(|f| f.blob_id())
+            .is_ok_and(|id| id == root_c0_article.blob_id()));
 
         Ok(())
     }

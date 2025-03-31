@@ -105,7 +105,7 @@ impl SubsystemHandler<WSClientIn, WSClientOut> for WebSocketClient {
                 }
                 WSClientIn::Connect => {
                     if let Err(e) = self.connect_ws().await {
-                        log::error!("Couldn't connect: {e}");
+                        log::error!("Couldn't connect to {}: {e}", self.url);
                     }
                 }
             }
