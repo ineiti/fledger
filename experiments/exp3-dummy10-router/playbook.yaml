@@ -1,11 +1,16 @@
-- name: Generate environments on ansible host
+- name: Prepare ansible host
   hosts: 127.0.0.1
   connection: local
   tasks:
-    - name: Generate environemnts
+    - name: Generate node environments
       changed_when: true
       ansible.builtin.command:
         cmd: ./generate-env.sh
+
+    - name: Create metrics directory
+      ansible.builtin.file:
+        path: metrics
+        state: directory
 
 - name: Clean nodes and upload files (binaries and services)
   hosts: nodes
@@ -19,12 +24,9 @@
 
     - name: Copy fledger services
       ansible.builtin.copy:
-        src: "{{ item }}"
+        src: fledger.service
         dest: /etc/systemd/system/
         mode: preserve
-      loop:
-        - fledger-send.service
-        - fledger-recv.service
 
     - name: Remove config folders and log files
       ansible.builtin.file:
@@ -32,8 +34,8 @@
         state: absent
       loop:
         - /root/flnode
-        - /var/log/fledger-recv
-        - /var/log/fledger-send
+        - /var/log/fledger
+        - /var/log/flsignal
 
 - name: Run signaling server on central node
   hosts: central
@@ -54,7 +56,6 @@
         name: flsignal
         state: restarted
         daemon_reload: true
-        no_block: true
     - name: Disable ip forwarding
       ansible.posix.sysctl:
         name: net.ipv4.ip_forward
@@ -63,7 +64,7 @@
         state: present
         reload: true
 
-- name: Upload env and run fleger send / recv on each node
+- name: Upload env and run fleger on each node
   hosts: nodes
   become: true
   tasks:
@@ -72,23 +73,34 @@
         src: "env.systemd/{{ inventory_hostname }}.env"
         dest: ~/env.systemd
         mode: preserve
-    - name: Stop fledger node (recv)
+    - name: (Re)start fledger node
       ansible.builtin.systemd_service:
-        name: fledger-recv
-        state: stopped
+        name: fledger
+        state: restarted
+        no_block: true
         daemon_reload: true
-    - name: Start fledger node (recv)
-      ansible.builtin.systemd_service:
-        name: fledger-recv
-        state: restarted
-        no_block: true
-    - name: Start fledger node (send)
-      ansible.builtin.systemd_service:
-        name: fledger-send
-        state: restarted
-        no_block: true
-    - name: Wait for message received on fledger node (recv)
+    - name: Wait for message received on fledger node
       ansible.builtin.wait_for:
-        path: /var/log/fledger-recv
+        path: /var/log/fledger
         search_regex: "RECV_CHAT_MSG TRIGGERED"
-        timeout: 600
+        timeout: 120
+
+- name: Download metrics
+  hosts: nodes
+  become: true
+  tasks:
+    - name: Download metrics
+      ansible.builtin.fetch:
+        src: /tmp/out.metrics
+        flat: true
+        dest: "metrics/{{ inventory_hostname }}.metrics"
+
+- name: Assemble metrics into one file
+  hosts: 127.0.0.1
+  connection: local
+  tasks:
+    - name: Assemble metrics
+      ansible.builtin.assemble:
+        src: metrics
+        dest: assembled.metrics
+        mode: "644"

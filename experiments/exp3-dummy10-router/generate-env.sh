@@ -25,9 +25,12 @@ for i in $(seq 0 $((amount - 1))); do
     signalhost="10.0.1.128"
   fi
 
-  echo "FLEDGER_CENTRAL_HOST=${signalhost}" >"$envfile"
-  echo "FLEDGER_SEND_MSG=${send_msg}" >>"$envfile"
-  echo "FLEDGER_RECV_MSG=${recv_msg}" >>"$envfile"
+  {
+    echo "FLEDGER_CENTRAL_HOST=${signalhost}"
+    echo "FLEDGER_SEND_MSG=${send_msg}"
+    echo "FLEDGER_RECV_MSG=${recv_msg}"
+    echo "FLEDGER_NODE_NAME=${nodename}"
+  } >"$envfile"
 
   echo "[node $nodename]"
   echo "    <- ${recv_msg} [$i]"
