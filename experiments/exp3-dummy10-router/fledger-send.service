@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/root/fledger --config /root/flnode -v -s ws://${FLEDGER_FLSIGNAL_HOST}:8765 --disable-turn-stun simulation send-chat ${FLEDGER_SEND_MSG}
+ExecStart=/root/fledger --config /root/flnode -v -s ws://${FLEDGER_CENTRAL_HOST}:8765 --disable-turn-stun simulation send-chat ${FLEDGER_SEND_MSG}
 RemainAfterExit=yes
 User=root
 EnvironmentFile=/root/env.systemd
