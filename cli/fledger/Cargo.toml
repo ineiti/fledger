@@ -17,7 +17,7 @@ flmodules = { path = "../../flmodules", version = "0.9" }
 flnode = { path = "../../flnode", version = "0.9" }
 flcrypto = { path = "../../flcrypto", version = "0.9" }
 
-anyhow = {version = "1", features = ["backtrace"]}
+anyhow = { version = "1", features = ["backtrace"] }
 clap = "4"
 clap-verbosity-flag = "3"
 env_logger = "0.11"
@@ -25,3 +25,5 @@ log = "0.4"
 thiserror = "2"
 tokio = "1"
 webrtc-util = "0.10"
+metrics = "0.21.1"
+metrics-exporter-influx = { version = "0.2.2", path = "../../metrics-exporter-influx" }

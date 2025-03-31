@@ -1,8 +1,8 @@
+use crate::{metrics::Metrics, Fledger};
 use clap::{arg, Subcommand};
 use flarch::{nodeids::U256, tasks::wait_ms};
 use flmodules::gossip_events::core::Event;
-
-use crate::Fledger;
+use metrics::{absolute_counter, increment_counter};
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum SimulationCommands {
@@ -16,6 +16,10 @@ pub enum SimulationCommands {
         /// Print new messages as they come
         #[arg(long, default_value = "false")]
         print_new_messages: bool,
+
+        /// Node's name
+        #[arg(long, default_value = "unknown")]
+        node_name: String,
     },
 }
 
@@ -28,7 +32,8 @@ impl SimulationHandler {
             SimulationCommands::RecvChat {
                 msg,
                 print_new_messages,
-            } => Self::simulation_recv_chat(f, msg, print_new_messages).await,
+                node_name,
+            } => Self::simulation_recv_chat(f, msg, print_new_messages, node_name).await,
         }
     }
 
@@ -46,6 +51,7 @@ impl SimulationHandler {
         mut f: Fledger,
         msg: String,
         print_new_messages: bool,
+        node_name: String,
     ) -> anyhow::Result<()> {
         f.loop_node(crate::FledgerState::Connected(1)).await?;
 
@@ -53,8 +59,18 @@ impl SimulationHandler {
 
         let mut acked_msg_ids: Vec<U256> = Vec::new();
 
+        // necessary to grab the variable for lifetime purposes.
+        let _influx = Metrics::setup(node_name);
+
         loop {
             wait_ms(1000).await;
+
+            let fledger_message_total = f.node.gossip.as_ref().unwrap().chat_events().len();
+            absolute_counter!(
+                "fledger_message_total",
+                fledger_message_total.try_into().unwrap()
+            );
+            increment_counter!("fledger_iterations_total");
 
             if print_new_messages {
                 Self::log_new_messages(&f, &mut acked_msg_ids);
