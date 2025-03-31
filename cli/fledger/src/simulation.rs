@@ -1,61 +1,62 @@
 use crate::{metrics::Metrics, Fledger};
-use clap::{arg, Subcommand};
+use clap::{arg, Args, Subcommand};
 use flarch::{nodeids::U256, tasks::wait_ms};
 use flmodules::gossip_events::core::Event;
 use metrics::{absolute_counter, increment_counter};
 
+#[derive(Args, Debug, Clone)]
+pub struct SimulationCommand {
+    /// Print new messages as they come
+    #[arg(long, default_value = "false")]
+    print_new_messages: bool,
+
+    #[command(subcommand)]
+    pub subcommand: SimulationSubcommand,
+}
+
 #[derive(Subcommand, Debug, Clone)]
-pub enum SimulationCommands {
-    /// Send a chat message upon node creation
-    SendChat { msg: String },
-    /// Wait for a chat message with the given body.
-    /// log "RECV_CHAT_MSG TRIGGERED" upon message received, at log level info
-    RecvChat {
-        msg: String,
+pub enum SimulationSubcommand {
+    Chat {
+        /// Send a chat message upon node creation
+        #[arg(long)]
+        send_msg: Option<String>,
 
-        /// Print new messages as they come
-        #[arg(long, default_value = "false")]
-        print_new_messages: bool,
-
-        /// Node's name
-        #[arg(long, default_value = "unknown")]
-        node_name: String,
+        /// Wait for a chat message with the given body.
+        /// log "RECV_CHAT_MSG TRIGGERED" upon message received, at log level info
+        #[arg(long)]
+        recv_msg: Option<String>,
     },
 }
 
 pub struct SimulationHandler {}
 
 impl SimulationHandler {
-    pub async fn run(f: Fledger, command: SimulationCommands) -> anyhow::Result<()> {
-        match command {
-            SimulationCommands::SendChat { msg } => Self::simulation_send_chat(f, msg).await,
-            SimulationCommands::RecvChat {
-                msg,
-                print_new_messages,
-                node_name,
-            } => Self::simulation_recv_chat(f, msg, print_new_messages, node_name).await,
+    pub async fn run(f: Fledger, command: SimulationCommand) -> anyhow::Result<()> {
+        match command.subcommand.clone() {
+            SimulationSubcommand::Chat { send_msg, recv_msg } => {
+                Self::run_chat(f, command, send_msg, recv_msg).await
+            }
         }
     }
 
-    async fn simulation_send_chat(mut f: Fledger, msg: String) -> anyhow::Result<()> {
-        f.loop_node(crate::FledgerState::Connected(1)).await?;
-
-        log::info!("Sending chat message {}.", msg);
-        f.node.add_chat_message(msg).await?;
-
-        f.loop_node(crate::FledgerState::Forever).await?;
-        Ok(())
-    }
-
-    async fn simulation_recv_chat(
+    async fn run_chat(
         mut f: Fledger,
-        msg: String,
-        print_new_messages: bool,
-        node_name: String,
+        simulation_args: SimulationCommand,
+        send_msg: Option<String>,
+        recv_msg: Option<String>,
     ) -> anyhow::Result<()> {
         f.loop_node(crate::FledgerState::Connected(1)).await?;
 
-        log::info!("Waiting for chat message {}.", msg);
+        let node_name = f.args.name.clone().unwrap_or("unknown".into());
+
+        if let Some(ref msg) = recv_msg {
+            log::info!("Waiting for chat message {}.", msg);
+        }
+
+        if let Some(ref msg) = send_msg {
+            log::info!("Sending chat message {}.", msg);
+            f.node.add_chat_message(msg.into()).await?;
+        }
 
         let mut acked_msg_ids: Vec<U256> = Vec::new();
 
@@ -72,15 +73,22 @@ impl SimulationHandler {
             );
             increment_counter!("fledger_iterations_total");
 
-            if print_new_messages {
+            if simulation_args.print_new_messages {
                 Self::log_new_messages(&f, &mut acked_msg_ids);
             }
 
-            let gossip = f.node.gossip.as_ref();
-            if gossip.unwrap().chat_events().iter().any(|ev| ev.msg == msg) {
-                log::info!("RECV_CHAT_MSG TRIGGERED");
-                f.loop_node(crate::FledgerState::Forever).await?;
-                return Ok(());
+            if let Some(ref msg) = recv_msg {
+                let gossip = f.node.gossip.as_ref();
+                if gossip
+                    .unwrap()
+                    .chat_events()
+                    .iter()
+                    .any(|ev| ev.msg.eq(msg))
+                {
+                    log::info!("RECV_CHAT_MSG TRIGGERED");
+                    f.loop_node(crate::FledgerState::Forever).await?;
+                    return Ok(());
+                }
             }
         }
     }
