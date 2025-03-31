@@ -21,6 +21,7 @@ for i in $(seq 0 9); do
   echo "FLEDGER_FLSIGNAL_HOST=${signalhost}" >"$envfile"
   echo "FLEDGER_SEND_MSG=${send_msg}" >>"$envfile"
   echo "FLEDGER_RECV_MSG=${recv_msg}" >>"$envfile"
+  echo "FLEDGER_NODE_NAME=${nodename}" >>"$envfile"
 
   echo "[node $nodename]"
   echo "    <- ${recv_msg} [$i]"

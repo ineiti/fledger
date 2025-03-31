@@ -12,10 +12,7 @@ participant "Node J (10)" as J
 
 hnote over A: signaling server
 hnote across
-  fledger (send)
-endhnote
-hnote across
-  fledger (recv)
+  fledger (send-recv)
 endhnote
 rnote across
   Setup with signaling server
@@ -33,7 +30,7 @@ I -> A: **broadcast** //"ItoA"//
 J -> B: **broadcast** //"JtoB"//
 
 rnote across
-  Timeout 10s
+  Timeout 120s
 endrnote
 rnote across
   //exit code 0//

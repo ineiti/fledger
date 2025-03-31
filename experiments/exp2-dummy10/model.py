@@ -8,7 +8,7 @@ def makeNode(i: int):
 
 sna = [makeNode(i) for i in range(10)]
 
-link = net.connect(sna)
+link = net.connect(sna, capacity==mbps(1), latency==ms(10))
 
 for i in range(10):
     suffix = str(i + 1)
