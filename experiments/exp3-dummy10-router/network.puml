@@ -11,7 +11,7 @@ nwdiag {
       n4 [address = 10.0.0.6];
 
       router [address = 10.0.0.1];
-      signaling [address = 10.0.0.128];
+      central [address = 10.0.0.128];
   }
 
   network snb {
@@ -24,7 +24,7 @@ nwdiag {
       n9 [address = 10.0.1.6];
 
       router [address = 10.0.1.1];
-      signaling [address = 10.0.1.128];
+      central [address = 10.0.1.128];
   }
 }
 @enduml

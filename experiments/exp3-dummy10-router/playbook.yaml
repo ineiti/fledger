@@ -35,8 +35,8 @@
         - /var/log/fledger-recv
         - /var/log/fledger-send
 
-- name: Run signaling server on node signaling
-  hosts: signaling
+- name: Run signaling server on central node
+  hosts: central
   become: true
   tasks:
     - name: Copy flsignal

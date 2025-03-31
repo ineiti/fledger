@@ -29,7 +29,7 @@ Check `exp1-dummy` for an example of both
 Read the documentation and do the hello world.
 
 Then, create one XDC to be used for all experiments.
-Use this configuration (read the documentation before using it):
+Use this SSH configuration (read the documentation before using it):
 
 ```bash
 Host sphere
@@ -49,6 +49,9 @@ Host sphere-fledger
 Don't forget to replace the values for `YOUR_USER` and `SSH_NAME_FROM_SPHERE`.
 
 On the XDC, install ansible (use the ansible/ansible apt ppa!).
+
+Then install ansible's prometheus collection with
+`ansible-galaxy collection install prometheus.prometheus`
 
 Configure ansible with this `~/.ansible.cfg` from the documentation :
 
