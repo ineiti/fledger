@@ -15,8 +15,8 @@ central = net.node('central', proc.cores>=2, memory.capacity>=mb(512))
 sna.extend([router, central])
 snb.extend([router, central])
 
-linka = net.connect(sna)
-linkb = net.connect(snb)
+linka = net.connect(sna, capacity==mbps(1), latency==ms(10))
+linkb = net.connect(snb, capacity==mbps(1), latency==ms(10))
 
 linka[router].socket.addrs = ip4("10.0.0.1/24")
 linkb[router].socket.addrs = ip4("10.0.1.1/24")
