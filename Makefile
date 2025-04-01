@@ -100,7 +100,7 @@ build_local_web:
 build_local: build_local_web build_cli
 
 serve_two: kill build_cli
-	( cd cli && cargo run --bin flsignal -- -vv ) &
+	( cd cli && cargo run --bin flsignal -- -v ) &
 	sleep 4
 	( cd cli && ( $(call FLEDGER,1) & $(call FLEDGER,2) & ) )
 
