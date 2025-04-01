@@ -6,7 +6,9 @@ use flarch::{
         connection::ConnectionConfig, web_socket_server::WebSocketServer, websocket::WSServerIn,
     },
 };
+use flcrypto::access::Condition;
 use flmodules::{
+    dht_storage::realm_view::RealmView,
     network::{
         network_start,
         signal::{BrokerSignal, SignalConfig, SignalIn, SignalOut, SignalServer},
@@ -25,15 +27,15 @@ use tokio::sync::watch;
  * This makes it also easier to test and have a fast test-feedback.
  *
  * Some measurements on a local Mac OSX:
- * 003 nodes ->      9kB
- * 010 nodes ->     79kB
- * 100 nodes ->  7_000kB
- * 150 nodes -> 41_000kB
+ * 003 nodes ->      18kB
+ * 010 nodes ->     269kB
+ * 100 nodes ->  13_000kB
+ * 200 nodes -> 276_000kB
  */
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 16)]
-async fn gossip_large() -> anyhow::Result<()> {
-    start_logging_filter_level(vec!["fl", "gossip_large"], log::LevelFilter::Debug);
+async fn dht_large() -> anyhow::Result<()> {
+    start_logging_filter_level(vec!["fl", "dht_large"], log::LevelFilter::Debug);
 
     log::info!("This uses a lot of connections. So be sure to run the following:");
     log::info!("sudo sysctl -w kern.maxfiles=2048000");
@@ -44,8 +46,12 @@ async fn gossip_large() -> anyhow::Result<()> {
     let signal_rx = signal.broker.get_tap_out_sync().await?;
     let nbr_nodes: usize = 50;
     let mut nodes = vec![];
+    let mut dhts = vec![];
     for i in 0..nbr_nodes {
-        nodes.push(start_node(i).await?);
+        let mut node = start_node(i).await?;
+        dhts.push(node.dht_storage.as_mut().unwrap().clone());
+        nodes.push(node);
+        wait_ms(200).await;
     }
 
     signal_rx
@@ -55,21 +61,42 @@ async fn gossip_large() -> anyhow::Result<()> {
         .take(nbr_nodes)
         .count();
 
-    nodes[0].add_chat_message("something".into()).await?;
+    RealmView::new_create_realm(
+        nodes[0].dht_storage.as_mut().unwrap().clone(),
+        "root",
+        Condition::Pass,
+        &[],
+    )
+    .await?;
 
     let mut count = 1;
     loop {
-        let rx: usize = nodes
-            .iter()
-            .map(|n| n.gossip.as_ref().unwrap().chat_events().len())
-            .sum();
+        let mut rx: usize = 0;
+        for dht in &mut dhts {
+            if dht.stats.borrow().realm_stats.len() > 0 {
+                rx += 1;
+            }
+        }
         log::info!(
-            "{count:3} - used {:9} bytes to get the message in {} nodes",
+            "{count:3} - used {:9} bytes to get the realm in {} nodes",
             *signal.rx.borrow(),
             rx
         );
         if rx == nbr_nodes {
             break;
+        }
+
+        if count % 5 == 0 {
+            let mut connections = 0;
+            for node in &mut nodes {
+                let connection = node.dht_router.as_ref().unwrap().stats.borrow().active;
+                connections += connection;
+                node.request_list().await?;
+            }
+            log::info!("Total Connections: {connections}");
+            for dht in &mut dhts {
+                dht.sync()?;
+            }
         }
 
         count += 1;
@@ -91,7 +118,7 @@ async fn start_node(i: usize) -> anyhow::Result<Node> {
     let mut nc = NodeConfig::new();
     nc.info.name = format!("{i:2}");
     // nc.info.modules = Modules::all();
-    nc.info.modules = Modules::all() - Modules::PING;
+    nc.info.modules = Modules::all() - Modules::PING - Modules::RAND - Modules::GOSSIP;
     let net = network_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),

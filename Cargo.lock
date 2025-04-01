@@ -923,6 +923,7 @@ dependencies = [
  "ed25519-compact",
  "env_logger",
  "flarch",
+ "flcrypto",
  "flmodules",
  "futures",
  "getrandom 0.2.15",
