@@ -82,10 +82,12 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     log_dht_storage: bool,
 
-    /// Do not wait for a random amount
-    /// of ms if the command is simulation
-    #[arg(long, default_value = "false")]
-    no_simulation_wait: bool,
+    /// Wait a random amount of ms, bounded by
+    /// bootwait_max, before starting the node.
+    /// This allows the signaling server to be
+    /// less overwhelmed
+    #[arg(long, default_value = "0")]
+    bootwait_max: u64,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -141,11 +143,11 @@ async fn main() -> anyhow::Result<()> {
 
     // wait a random amount of time before running a simulation
     // to avoid overloading the signaling server
-    if !args.no_simulation_wait {
+    if !args.bootwait_max != 0 {
         match args.command.clone() {
             Some(cmd) => match cmd {
                 Commands::Simulation(_) => {
-                    let randtime: u64 = random::<u64>() % 5000;
+                    let randtime: u64 = random::<u64>() % args.bootwait_max;
                     log::info!("Waiting {}ms before running this node...", randtime);
                     wait_ms(randtime).await;
                 }
