@@ -67,10 +67,12 @@ impl SimulationHandler {
             wait_ms(1000).await;
 
             let fledger_message_total = f.node.gossip.as_ref().unwrap().chat_events().len();
+            let fledger_connected_total = f.node.nodes_connected()?.len();
             absolute_counter!(
                 "fledger_message_total",
                 fledger_message_total.try_into().unwrap()
             );
+            absolute_counter!("fledger_connected_total", fledger_connected_total as u64);
             increment_counter!("fledger_iterations_total");
 
             if simulation_args.print_new_messages {
