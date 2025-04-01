@@ -9,7 +9,6 @@ use flmodules::{
         realm::RealmID,
     },
     nodeconfig::NodeInfo,
-    ping::core::{PingStat, PingStorage},
     Modules,
 };
 use itertools::Itertools;
@@ -603,7 +602,6 @@ pub struct Values {
     info: NodeInfo,
     nodes_info: HashMap<U256, NodeInfo>,
     states: HashMap<U256, NetworkConnectionState>,
-    pings: PingStorage,
     msgs: FledgerMessages,
     dht_storage: dht_storage::messages::Stats,
     dht_router: dht_router::messages::Stats,
@@ -664,20 +662,12 @@ impl Values {
             dht_router: node.dht_router.as_ref().unwrap().stats.borrow().clone(),
             dht_storage: node.dht_storage.as_ref().unwrap().stats.borrow().clone(),
             states: node.stat.as_ref().unwrap().borrow().clone(),
-            pings: node.ping.as_ref().unwrap().storage.borrow().clone(),
             info,
         }
     }
 
     pub fn get_node_name(&self) -> String {
         self.info.name.clone()
-    }
-
-    pub fn get_node_table(&self) -> String {
-        match self.get_node_table_result() {
-            Ok(res) => res,
-            Err(_) => String::from(""),
-        }
     }
 
     pub fn get_version(&self) -> String {
@@ -723,49 +713,6 @@ impl Values {
         out.to_string()
     }
 
-    fn get_nodes(&self) -> Vec<NodeDesc> {
-        let mut out = vec![];
-        let mut nodes: Vec<(&U256, &NodeInfo)> =
-            self.nodes_info.iter().map(|(k, v)| (k, v)).collect();
-        nodes.sort_by(|a, b| a.1.name.partial_cmp(&b.1.name).unwrap());
-        for (id, ni) in &nodes {
-            let stat = self
-                .states
-                .get(id)
-                .map(|s| format!("{:?}", s.s.type_local))
-                .unwrap_or("n/a".into());
-            let info = ni.name.clone();
-            if let Some(ping) = self.pings.stats.get(id) {
-                out.push(NodeDesc {
-                    info,
-                    ping: ping.clone(),
-                    stat,
-                })
-            }
-        }
-        out
-    }
-
-    fn get_node_table_result(&self) -> Result<String> {
-        let stats_vec: Vec<String> = self
-            .get_nodes()
-            .into_iter()
-            .map(|node| {
-                vec![
-                    node.info,
-                    format!("rx:{} tx:{}", node.ping.rx, node.ping.tx),
-                    node.ping.lastping.to_string(),
-                    node.stat,
-                ]
-                .join("</td><td>")
-            })
-            .collect();
-        Ok(format!(
-            "<tr><td>{}</td></tr>",
-            stats_vec.join("</td></tr><tr><td>")
-        ))
-    }
-
     fn dht_storage_local(&self) -> usize {
         self.dht_storage
             .realm_stats
@@ -799,12 +746,6 @@ impl Values {
             .collect::<Vec<String>>()
             .join("<br>")
     }
-}
-
-struct NodeDesc {
-    info: String,
-    ping: PingStat,
-    stat: String,
 }
 
 #[derive(Clone, Debug)]
