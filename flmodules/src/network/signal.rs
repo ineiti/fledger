@@ -88,7 +88,7 @@ pub enum SignalIn {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-/// Messages sent by the signalling server to an evenutal listener
+/// Messages sent by the signalling server to an eventual listener
 pub enum SignalOut {
     /// Statistics about the connected nodes
     NodeStats(Vec<NodeStat>),

@@ -13,6 +13,7 @@ keywords = ["test", "utils", "fledger"]
 [dependencies]
 flmodules = {path = "../flmodules", version = "0.9"}
 flarch = {path = "../flarch", version = "0.9"}
+flcrypto = {path = "../flcrypto", version = "0.9"}
 
 anyhow = {version = "1", features = ["backtrace"]}
 async-trait = "0.1"
