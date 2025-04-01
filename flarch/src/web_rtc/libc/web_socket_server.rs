@@ -34,20 +34,23 @@ impl WebSocketServer {
         let conn_thread = tokio::spawn(async move {
             let mut connection_id = 0;
             loop {
-                if let Ok((stream, _)) = server.accept().await {
-                    let broker_cl2 = broker_cl.clone();
-                    match WSConnection::new(stream, broker_cl2, connection_id).await {
-                        Ok(conn) => {
-                            log::trace!("Got new connection");
-                            connections_cl.lock().await.push(conn);
-                            broker_cl
-                                .emit_msg_out(WSServerOut::NewConnection(connection_id))
-                                .expect("Error sending connect message");
+                match server.accept().await {
+                    Ok((stream, _)) => {
+                        let broker_cl2 = broker_cl.clone();
+                        match WSConnection::new(stream, broker_cl2, connection_id).await {
+                            Ok(conn) => {
+                                log::trace!("Got new connection");
+                                connections_cl.lock().await.push(conn);
+                                broker_cl
+                                    .emit_msg_out(WSServerOut::NewConnection(connection_id))
+                                    .expect("Error sending connect message");
+                            }
+                            Err(e) => log::error!("Error while getting connection: {:?}", e),
                         }
-                        Err(e) => log::error!("Error while getting connection: {:?}", e),
                     }
-                    connection_id += 1;
+                    Err(e) => log::error!("While accepting connection: {e:?}"),
                 }
+                connection_id += 1;
             }
         });
 

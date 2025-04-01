@@ -83,9 +83,11 @@ pub enum SignalIn {
     Timer,
     /// Message coming from the WebSocket server.
     WSServer(WSServerOut),
+    /// Stop the signalling server
+    Stop,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 /// Messages sent by the signalling server to an evenutal listener
 pub enum SignalOut {
     /// Statistics about the connected nodes
@@ -149,6 +151,7 @@ impl SignalServer {
                 vec![]
             }
             SignalIn::WSServer(msg_wss) => self.msg_wss(msg_wss),
+            SignalIn::Stop => vec![SignalOut::WSServer(WSServerIn::Stop)],
         }
     }
 
@@ -228,7 +231,7 @@ impl SignalServer {
         let mut msgs = self.send_msg_node(
             index,
             WSSignalMessageToNode::SystemConfig(FledgerConfig {
-            system_realm: self.config.system_realm.clone(),
+                system_realm: self.config.system_realm.clone(),
             }),
         );
         msgs.push(SignalOut::NewNode(id));
@@ -398,6 +401,7 @@ impl std::fmt::Debug for SignalIn {
         match self {
             SignalIn::WSServer(_) => write!(f, "WebSocket"),
             SignalIn::Timer => write!(f, "Timer"),
+            SignalIn::Stop => write!(f, "Stop"),
         }
     }
 }

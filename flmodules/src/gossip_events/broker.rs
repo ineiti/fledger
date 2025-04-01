@@ -41,7 +41,7 @@ impl Gossip {
         let mut broker = Broker::new();
         broker.add_handler(Box::new(messages)).await?;
 
-        timer.tick_minute(broker.clone(), GossipIn::Tick).await?;
+        timer.tick_second(broker.clone(), GossipIn::Tick).await?;
         broker.link_bi(rc).await?;
 
         let mut gb = Gossip { storage, broker };

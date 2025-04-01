@@ -311,22 +311,21 @@ impl Messages {
 
     /// Connect to the given node.
     fn connect(&mut self, dst: &U256) -> Vec<NetworkOut> {
-        let mut out = vec![NetworkOut::Connected(*dst)];
         if self.connections.contains(dst) {
-            log::warn!("Already connected to {}", dst);
+            log::trace!("Already connected to {}", dst);
+            vec![]
         } else {
             self.connections.push(dst.clone());
             self.send_connections();
-            out.push(NetworkOut::WebRTC(WebRTCConnInput::Connect(*dst)));
+            vec![NetworkOut::WebRTC(WebRTCConnInput::Connect(*dst))]
         }
-        out
     }
 
     /// Disconnects from a given node.
     async fn disconnect(&mut self, dst: &U256) -> Vec<NetworkOut> {
         let mut out = vec![NetworkOut::Disconnected(*dst)];
         if !self.connections.contains(dst) {
-            log::warn!("Already disconnected from {}", dst);
+            log::trace!("Already disconnected from {}", dst);
         } else {
             self.connections.retain(|id| id != dst);
             self.send_connections();

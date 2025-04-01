@@ -1,9 +1,10 @@
+use flcrypto::tofrombytes::ToFromBytes;
 use itertools::concat;
 use serde::{Deserialize, Serialize};
 
 use flarch::{
     broker::SubsystemHandler,
-    nodeids::{NodeIDs, U256},
+    nodeids::{NodeID, NodeIDs, U256},
     platform_async_trait,
 };
 use tokio::sync::watch;
@@ -58,18 +59,21 @@ impl Messages {
             }
             RandomIn::NodeConnected(node) => {
                 self.storage.connect((&vec![node]).into());
-                self.need_drop()
+                concat([
+                    // self.need_drop(),
+                    self.connected_msg(),
+                ])
             }
             RandomIn::NodeDisconnected(node) => {
                 self.storage.disconnect((&vec![node]).into());
-                self.new_connection()
+                concat([self.new_connection(), self.connected_msg()])
             }
             RandomIn::NodeFailure(node) => {
                 self.storage.failure(&(&vec![node]).into());
                 concat([
-                    vec![RandomOut::DisconnectNode(node)],
                     self.new_connection(),
-                    self.need_drop(),
+                    // self.need_drop(),
+                    self.disconnect_msg(node),
                 ])
             }
             RandomIn::Tick => {
@@ -77,8 +81,8 @@ impl Messages {
 
                 concat([
                     self.new_connection(),
-                    self.need_drop(),
-                    self.churn(),
+                    // self.need_drop(),
+                    // self.churn(),
                     self.fill_connection(),
                     self.update(),
                 ])
@@ -91,24 +95,33 @@ impl Messages {
                         ModuleMessage::Module(msg),
                     )]
                 } else {
-                    log::warn!(
-                        "{self:p} Dropping message {msg:?} to unconnected node {dst} - making sure we're disconnected"
+                    self.storage.disconnect((&vec![dst]).into());
+                    log::trace!(
+                        "{self:p} Dropping message with len {} to unconnected node {dst} - making sure list is updated", msg.to_rmp_bytes().len()
                     );
-                    vec![
-                        RandomOut::DisconnectNode(dst),
-                        RandomOut::NodeIDsConnected(self.storage.connected.get_nodes()),
-                        RandomOut::NodeInfosConnected(self.storage.get_connected_info()),
-                    ]
+                    self.connected_msg()
                 }
             }
         };
         out
     }
 
+    fn disconnect_msg(&self, dst: NodeID) -> Vec<RandomOut> {
+        concat([self.connected_msg(), vec![RandomOut::DisconnectNode(dst)]])
+    }
+
+    fn connected_msg(&self) -> Vec<RandomOut> {
+        vec![
+            RandomOut::NodeIDsConnected(self.storage.connected.get_nodes()),
+            RandomOut::NodeInfosConnected(self.storage.get_connected_info()),
+        ]
+    }
+
     /// Processes one message from the network.
     pub fn network_msg(&mut self, id: U256, msg: ModuleMessage) -> Vec<RandomOut> {
         match msg {
             ModuleMessage::Module(msg_mod) => {
+                self.storage.connect((&vec![id]).into());
                 vec![RandomOut::NetworkWrapperFromNetwork(id, msg_mod)]
             }
             ModuleMessage::DropConnection => {
@@ -135,7 +148,7 @@ impl Messages {
 
     /// Asks other nodes to drop the connection if there are too many connections.
     /// First asks nodes that need to be churned out, then the latest nodes to join.
-    fn need_drop(&mut self) -> Vec<RandomOut> {
+    fn _need_drop(&mut self) -> Vec<RandomOut> {
         let drop: Vec<RandomOut> = self
             .storage
             .limit_active(self.cfg.churn_connected)
@@ -149,12 +162,12 @@ impl Messages {
             })
             .collect();
         if drop.len() > 0 {
-            log::debug!("Dropping connections: {drop:?}");
+            log::trace!("Dropping connections because there are too many: {drop:?}");
         }
         drop
     }
 
-    fn churn(&mut self) -> Vec<RandomOut> {
+    fn _churn(&mut self) -> Vec<RandomOut> {
         self.storage
             .choose_new(
                 self.storage
@@ -190,10 +203,7 @@ impl Messages {
                 .is_err()
                 .then(|| self.tx = None)
         });
-        vec![
-            RandomOut::NodeIDsConnected(self.storage.connected.get_nodes()),
-            RandomOut::NodeInfosConnected(self.storage.get_connected_info()),
-        ]
+        self.connected_msg()
     }
 }
 
