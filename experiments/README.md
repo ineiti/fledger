@@ -22,6 +22,21 @@ The services can either be ran synchronously (ansible blocks) or asynchronously
 Check `exp1-dummy` for an example of both
 (fledger-send is blocking and fledger-recv is non-blocking).
 
+## Create hosts file for a new experiment
+
+When creating a new experiment, there is a simple (but imperfect) command to generate the hosts file.
+It's `mrg nodes generate inventory expX.fledger.abehsser > hosts`
+
+- abehsser is the project name
+- fledger the experiment name
+- expX the reservation name).
+
+You'll need to modify it to:
+
+1. Group the nodes together in a \[nodes\] group.
+2. Put the central server  in a \[central\] group.
+3. Remove the router.
+
 ## Running experiments
 
 ### Setup mergeTB
