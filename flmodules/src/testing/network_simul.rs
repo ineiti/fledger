@@ -39,11 +39,11 @@ impl NetworkSimul {
         self.nsh_broker
             .add_translator_direct(
                 nm_broker.clone(),
-                Box::new(move |msg| Some(NSHubIn::FromClient(nc_id, msg))),
                 Box::new(move |msg| {
                     let NSHubOut::ToClient(dst, net_msg) = msg;
                     (dst == nc_id).then_some(net_msg)
                 }),
+                Box::new(move |msg| Some(NSHubIn::FromClient(nc_id, msg))),
             )
             .await?;
         self.nsh_broker

@@ -7,9 +7,7 @@ use flarch::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
-use crate::gossip_events::broker::MODULE_NAME;
-
-use super::core::*;
+use super::{broker::MODULE_NAME, core::*};
 
 /// These are the messages which will be exchanged between the nodes for this
 /// module.

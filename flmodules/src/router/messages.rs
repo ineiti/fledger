@@ -12,6 +12,7 @@ pub struct NetworkWrapper {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RouterIn {
     NetworkWrapperToNetwork(NodeID, NetworkWrapper),
+    // TODO: Replace this with Network(NetworkOut), and add a Network(NetworkIn) to RouterOut
     Internal(RouterInternal),
 }
 

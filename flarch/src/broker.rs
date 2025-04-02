@@ -205,8 +205,8 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     pub async fn add_translator_direct<TI: Message + 'static, TO: Message + 'static>(
         &mut self,
         mut broker: Broker<TI, TO>,
-        tr_ti_i: Translate<TI, I>,
         tr_o_to: Translate<O, TO>,
+        tr_ti_i: Translate<TI, I>,
     ) -> anyhow::Result<usize> {
         broker.add_translator_i_ti(self.clone(), tr_ti_i).await?;
         self.add_translator_o_to(broker, tr_o_to).await
@@ -403,7 +403,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         I: TranslateFrom<TI>,
         O: TranslateInto<TO>,
     {
-        self.add_translator_direct(other, Box::new(I::translate), Box::new(O::translate))
+        self.add_translator_direct(other, Box::new(O::translate), Box::new(I::translate))
             .await?;
         Ok(())
     }
