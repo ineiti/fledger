@@ -14,7 +14,7 @@ use super::{
 
 pub type BrokerEndpoint = Broker<TemplateIn, TemplateOut>;
 
-const MODULE_NAME: &str = "Template";
+pub(super) const MODULE_NAME: &str = "Template";
 
 /// This links the Template module with other modules, so that
 /// all messages are correctly translated from one to the other.

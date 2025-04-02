@@ -19,7 +19,7 @@ use crate::{
 
 pub type BrokerGossip = Broker<GossipIn, GossipOut>;
 
-pub const MODULE_NAME: &str = "Gossip";
+pub(super) const MODULE_NAME: &str = "Gossip";
 
 /// This links the GossipEvent module with a RandomConnections module, so that
 /// all messages are correctly translated from one to the other.

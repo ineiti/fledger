@@ -21,7 +21,7 @@ use super::{
     response::Response,
 };
 
-const MODULE_NAME: &str = "WebProxy";
+pub(super) const MODULE_NAME: &str = "WebProxy";
 
 #[derive(Debug, Error)]
 pub enum WebProxyError {

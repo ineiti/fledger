@@ -24,8 +24,8 @@ impl RouterRandom {
         random
             .add_translator_direct(
                 b.clone(),
-                Box::new(Self::translate_rtr_rnd),
                 Box::new(Self::translate_rnd_rtr),
+                Box::new(Self::translate_rtr_rnd),
             )
             .await?;
         Ok(b)

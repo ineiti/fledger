@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
 use crate::{
-    flo::realm::RealmID, router::{broker::BrokerRouter, messages::NetworkWrapper}, timer::Timer
+    flo::realm::RealmID,
+    router::{broker::BrokerRouter, messages::NetworkWrapper},
+    timer::Timer,
 };
 use flarch::nodeids::NodeID;
 
@@ -78,11 +80,11 @@ impl DHTRouter {
         intern
             .add_translator_direct(
                 broker.clone(),
-                Box::new(|msg| Some(InternIn::DHTRouter(msg))),
                 Box::new(|msg| match msg {
                     InternOut::DHTRouter(dht) => Some(dht),
                     _ => None,
                 }),
+                Box::new(|msg| Some(InternIn::DHTRouter(msg))),
             )
             .await?;
 
@@ -220,7 +222,7 @@ mod tests {
         wait_ms(1000).await;
 
         // TODO implement rest of test - I have no idea what was here :(
-        
+
         Ok(())
     }
 }

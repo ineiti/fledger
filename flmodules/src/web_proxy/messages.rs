@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch;
 
-use crate::gossip_events::broker::MODULE_NAME;
 use crate::nodeconfig::NodeInfo;
 use crate::Modules;
 
+use super::broker::MODULE_NAME;
 use super::{
     core::*,
     response::{ResponseHeader, ResponseMessage},

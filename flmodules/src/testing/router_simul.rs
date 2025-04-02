@@ -44,8 +44,8 @@ impl RouterSimul {
         self.nsh_broker
             .add_translator_direct(
                 nm_broker.clone(),
-                Self::net_nsh(id),
                 Self::nsh_net(id.clone()),
+                Self::net_nsh(id),
             )
             .await?;
         self.nsh_broker

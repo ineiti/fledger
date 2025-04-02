@@ -118,11 +118,11 @@ impl DHTStorage {
         intern
             .add_translator_direct(
                 broker.clone(),
-                Box::new(|msg| Some(InternIn::Storage(msg))),
                 Box::new(|msg| match msg {
                     InternOut::Storage(dhtstorage_out) => Some(dhtstorage_out),
                     _ => None,
                 }),
+                Box::new(|msg| Some(InternIn::Storage(msg))),
             )
             .await?;
         timer
