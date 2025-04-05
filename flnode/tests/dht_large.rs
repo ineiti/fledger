@@ -27,15 +27,16 @@ use tokio::sync::watch;
  * This makes it also easier to test and have a fast test-feedback.
  *
  * Some measurements on a local Mac OSX:
- * 003 nodes ->      18kB
- * 010 nodes ->     269kB
- * 100 nodes ->  13_000kB
- * 200 nodes -> 276_000kB
+ * 003 nodes ->      18kB ->     6kB
+ * 010 nodes ->     269kB ->    27kB
+ * 050 nodes ->   5_000kB ->   100kB
+ * 100 nodes ->  15_000kB ->   150kB
+ * 200 nodes -> 330_000kB -> 1_500kB
  */
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 16)]
 async fn dht_large() -> anyhow::Result<()> {
-    start_logging_filter_level(vec!["fl", "dht_large"], log::LevelFilter::Debug);
+    start_logging_filter_level(vec!["fl", "dht_large"], log::LevelFilter::Info);
 
     log::info!("This uses a lot of connections. So be sure to run the following:");
     log::info!("sudo sysctl -w kern.maxfiles=2048000");
@@ -51,7 +52,7 @@ async fn dht_large() -> anyhow::Result<()> {
         let mut node = start_node(i).await?;
         dhts.push(node.dht_storage.as_mut().unwrap().clone());
         nodes.push(node);
-        wait_ms(200).await;
+        wait_ms(nbr_nodes as u64 / 2).await;
     }
 
     signal_rx
@@ -60,6 +61,8 @@ async fn dht_large() -> anyhow::Result<()> {
         .filter(|out| matches!(out, SignalOut::NewNode(_)))
         .take(nbr_nodes)
         .count();
+
+    log::info!("All {nbr_nodes} nodes registered");
 
     RealmView::new_create_realm(
         nodes[0].dht_storage.as_mut().unwrap().clone(),
