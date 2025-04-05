@@ -4,7 +4,7 @@
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 use console_error_panic_hook::set_once as set_panic_hook;
-use flmodules::nodeconfig::NodeConfig;
+use flmodules::{nodeconfig::NodeConfig, timer::Timer};
 use tokio::select;
 use ybc::TileCtx::{Ancestor, Child, Parent};
 use yew::prelude::*;
@@ -53,6 +53,7 @@ impl Component for App {
                     let net = flmodules::network::network_start(
                         config,
                         ConnectionConfig::from_signal(shared::handler::URL),
+                        &mut Timer::start().await.expect("Start timer"),
                     )
                     .await
                     .expect("Couldn't start network")

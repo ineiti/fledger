@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
 use crate::{
-    network::broker::{BrokerNetwork, NetworkIn, NetworkOut},
+    network::broker::{BrokerNetwork, NetworkIn, NetworkOut, MODULE_NAME},
     nodeconfig::NodeInfo,
     random_connections::{
         core::RandomStorage,
-        messages::{ModuleMessage, Messages},
+        messages::{Messages, ModuleMessage},
     },
     router::messages::NetworkWrapper,
     timer::Timer,
@@ -67,11 +67,9 @@ impl RandomBroker {
 
     fn link_net_rnd(our_id: U256) -> Translate<NetworkOut, RandomIn> {
         Box::new(move |msg: NetworkOut| match msg {
-            NetworkOut::MessageFromNode(id, msg_str) => {
-                serde_yaml::from_str::<ModuleMessage>(&msg_str)
-                    .ok()
-                    .map(|msg_rnd| RandomIn::NodeCommFromNetwork(id, msg_rnd))
-            }
+            NetworkOut::MessageFromNode(id, msg_nw) => msg_nw
+                .unwrap_yaml::<ModuleMessage>(MODULE_NAME)
+                .map(|msg_mod| RandomIn::NodeCommFromNetwork(id, msg_mod)),
             NetworkOut::NodeListFromWS(list) => Some(RandomIn::NodeList(
                 list.into_iter()
                     .filter(|ni| ni.get_id() != our_id)
@@ -87,10 +85,9 @@ impl RandomBroker {
         match msg {
             RandomOut::ConnectNode(id) => return Some(NetworkIn::Connect(id)),
             RandomOut::DisconnectNode(id) => return Some(NetworkIn::Disconnect(id)),
-            RandomOut::NodeCommToNetwork(id, msg) => {
-                let msg_str = serde_yaml::to_string(&msg).unwrap();
-                return Some(NetworkIn::MessageToNode(id, msg_str));
-            }
+            RandomOut::NodeCommToNetwork(id, msg) => NetworkWrapper::wrap_yaml(MODULE_NAME, &msg)
+                .ok()
+                .map(|msg_nw| NetworkIn::MessageToNode(id, msg_nw)),
             _ => None,
         }
     }
