@@ -39,7 +39,6 @@ use flarch::{
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
 use flmodules::network::broker::NetworkConnectionState;
-use flmodules::network::network_start;
 use flnode::{node::Node, version::VERSION_STRING};
 
 #[derive(Debug)]
@@ -437,9 +436,8 @@ impl WebNode {
                 .turn_server
                 .and_then(|url| HostLogin::from_login_url(url).ok()),
         );
-        let network = network_start(node_config.clone(), config).await?;
         node_config.info.modules = Modules::all() - Modules::WEBPROXY_REQUESTS;
-        Ok(Node::start(my_storage, node_config, network.broker)
+        Ok(Node::start_network(my_storage, node_config, config)
             .await
             .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
     }

@@ -53,6 +53,7 @@ impl Component for App {
                     let net = flmodules::network::network_start(
                         config,
                         ConnectionConfig::from_signal(shared::handler::URL),
+                        Timer::start().await?,
                     )
                     .await
                     .expect("Couldn't start network")

@@ -20,7 +20,6 @@ pub mod flo;
 pub mod gossip_events;
 pub mod network;
 pub mod nodeconfig;
-pub mod node_signal;
 pub mod router;
 pub mod ping;
 pub mod random_connections;
