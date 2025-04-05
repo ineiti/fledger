@@ -6,15 +6,19 @@ use flarch::{
     start_logging_filter,
     web_rtc::{connection::ConnectionConfig, web_socket_server::WebSocketServer},
 };
-use flmodules::network::{
-    broker::{BrokerNetwork, NetworkIn, NetworkOut},
-    network_start,
-    signal::{SignalConfig, SignalServer},
-    NetworkSetupError,
+use flmodules::{
+    network::{
+        broker::{BrokerNetwork, NetworkIn, NetworkOut},
+        network_start,
+        signal::{SignalConfig, SignalServer},
+        NetworkSetupError,
+    },
+    timer::Timer,
 };
-use flmodules::nodeconfig::NodeConfig;
+use flmodules::{nodeconfig::NodeConfig, router::messages::NetworkWrapper};
 
 const URL: &str = "ws://127.0.0.1:8765";
+const MODULE_NAME: &str = "LIBC_WASM";
 
 #[derive(Debug, Error)]
 enum MainError {
@@ -40,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     loop {
         let msg = tap.recv().await.expect("expected message");
         if let NetworkOut::MessageFromNode(id, msg_net) = msg {
-            log::info!("Got message from other node: {}", msg_net);
+            log::info!("Got message from other node: {:?}", msg_net);
             if msgs_rcv == 0 {
                 msgs_rcv += 1;
                 send(&mut broker, id, "Reply from libc").await;
@@ -72,16 +76,23 @@ async fn spawn_node() -> anyhow::Result<(NodeConfig, BrokerNetwork)> {
 
     log::info!("Starting node {}: {}", nc.info.get_id(), nc.info.name);
     log::debug!("Connecting to websocket at {URL}");
-    let net = network_start(nc.clone(), ConnectionConfig::from_signal(URL))
-        .await
-        .expect("Starting node failed");
+    let net = network_start(
+        nc.clone(),
+        ConnectionConfig::from_signal(URL),
+        &mut Timer::start().await?,
+    )
+    .await
+    .expect("Starting node failed");
 
     Ok((nc, net.broker))
 }
 
 async fn send(src: &mut BrokerNetwork, id: U256, msg: &str) {
-    src.emit_msg_in(NetworkIn::MessageToNode(id, msg.into()))
-        .expect("Sending to node");
+    src.emit_msg_in(NetworkIn::MessageToNode(
+        id,
+        NetworkWrapper::wrap_yaml(MODULE_NAME, &msg.to_string()).expect("Creating NetworkWrapper"),
+    ))
+    .expect("Sending to node");
 }
 
 #[cfg(test)]
@@ -91,7 +102,6 @@ mod tests {
 
     use flarch::tasks::wait_ms;
 
-    // #[tokio::test]
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
     async fn test_two_nodes() -> anyhow::Result<()> {
         start_logging_filter(vec!["fl"]);
@@ -107,20 +117,24 @@ mod tests {
         wait_ms(1000).await;
         for _ in 1..=2 {
             log::debug!("Sending first message");
-            send(&mut broker1, nc2.info.get_id(), "Message 1").await;
-            wait_msg(&tap2, "Message 1").await;
+            let msg1 = "Message1".to_string();
+            send(&mut broker1, nc2.info.get_id(), &msg1).await;
+            wait_msg(&tap2, &msg1).await;
             log::debug!("Sending second message");
-            send(&mut broker2, nc1.info.get_id(), "Message 2").await;
-            wait_msg(&tap1, "Message 2").await;
+            let msg2 = "Message2".to_string();
+            send(&mut broker2, nc1.info.get_id(), &msg2).await;
+            wait_msg(&tap1, &msg1).await;
         }
         Ok(())
     }
 
-    async fn wait_msg(tap: &Receiver<NetworkOut>, msg: &str) {
+    async fn wait_msg(tap: &Receiver<NetworkOut>, msg: &String) {
         for msg_net in tap {
             if let NetworkOut::MessageFromNode(_, nm) = &msg_net {
-                if nm == msg {
-                    break;
+                if let Some(msg_mod) = nm.unwrap_yaml::<String>(MODULE_NAME) {
+                    if &msg_mod == msg {
+                        break;
+                    }
                 }
             }
         }

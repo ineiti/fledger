@@ -902,6 +902,7 @@ dependencies = [
  "chrono",
  "ed25519-compact",
  "flarch",
+ "flcrypto",
  "flmodules",
  "futures",
  "getrandom 0.2.15",
