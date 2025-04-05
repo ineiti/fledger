@@ -6,12 +6,12 @@ use flarch::{
     start_logging_filter,
     web_rtc::{connection::ConnectionConfig, web_socket_server::WebSocketServer},
 };
-use flmodules::network::{
+use flmodules::{network::{
     broker::{BrokerNetwork, NetworkIn, NetworkOut},
     network_start,
     signal::{SignalConfig, SignalServer},
     NetworkSetupError,
-};
+}, timer::Timer};
 use flmodules::nodeconfig::NodeConfig;
 
 const URL: &str = "ws://127.0.0.1:8765";
@@ -72,9 +72,13 @@ async fn spawn_node() -> anyhow::Result<(NodeConfig, BrokerNetwork)> {
 
     log::info!("Starting node {}: {}", nc.info.get_id(), nc.info.name);
     log::debug!("Connecting to websocket at {URL}");
-    let net = network_start(nc.clone(), ConnectionConfig::from_signal(URL))
-        .await
-        .expect("Starting node failed");
+    let net = network_start(
+        nc.clone(),
+        ConnectionConfig::from_signal(URL),
+        &mut Timer::start().await?,
+    )
+    .await
+    .expect("Starting node failed");
 
     Ok((nc, net.broker))
 }

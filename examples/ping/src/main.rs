@@ -10,7 +10,7 @@ use flarch::{
     web_rtc::connection::ConnectionConfig,
 };
 use flmodules::nodeconfig::NodeConfig;
-use flmodules::network::broker::NetworkOut;
+use flmodules::{network::broker::NetworkOut, timer::Timer};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -49,6 +49,7 @@ async fn ping() -> anyhow::Result<()> {
     let mut net = flmodules::network::network_webrtc_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
+        &mut Timer::start().await?,
     )
     .await
     .expect("Setting up network");
@@ -84,6 +85,7 @@ async fn server() -> anyhow::Result<()> {
     let mut net = flmodules::network::network_webrtc_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
+        &mut Timer::start().await?,
     )
     .await
     .expect("Starting network");
@@ -103,6 +105,7 @@ async fn client(server_id: &str) -> anyhow::Result<()> {
     let mut net = flmodules::network::network_webrtc_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
+        &mut Timer::start().await?,
     )
     .await
     .expect("Starting network");
