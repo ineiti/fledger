@@ -8,13 +8,20 @@ use flarch::{
     tasks::wait_ms,
     web_rtc::connection::ConnectionConfig,
 };
-use flmodules::network::{
-    broker::{NetworkError, NetworkIn, NetworkOut},
-    network_start, NetworkSetupError,
+use flmodules::{
+    network::{
+        broker::{NetworkError, NetworkIn, NetworkOut},
+        network_start, NetworkSetupError,
+    },
+    timer::Timer,
 };
-use flmodules::nodeconfig::{NodeConfig, NodeInfo};
+use flmodules::{
+    nodeconfig::{NodeConfig, NodeInfo},
+    router::messages::NetworkWrapper,
+};
 
 const URL: &str = "ws://127.0.0.1:8765";
+const MODULE_NAME: &str = "LIBC_WASM";
 
 #[derive(Debug, Error)]
 enum StartError {
@@ -32,9 +39,13 @@ async fn run_app() -> anyhow::Result<()> {
     log::info!("Starting app");
 
     let nc = NodeConfig::new();
-    let mut net = network_start(nc.clone(), ConnectionConfig::from_signal(URL))
-        .await?
-        .broker;
+    let mut net = network_start(
+        nc.clone(),
+        ConnectionConfig::from_signal(URL),
+        &mut Timer::start().await?,
+    )
+    .await?
+    .broker;
     let (rx, tap_indx) = net.get_tap_out_sync().await?;
     let mut i: i32 = 0;
     loop {
@@ -62,7 +73,11 @@ async fn run_app() -> anyhow::Result<()> {
                             Destination::NoTap,
                             NetworkIn::MessageToNode(
                                 other.get(0).unwrap().get_id(),
-                                "Hello from Rust wasm".to_string(),
+                                NetworkWrapper::wrap_yaml(
+                                    MODULE_NAME,
+                                    &"Hello from Rust wasm".to_string(),
+                                )
+                                .expect("Creating NetworkWrapper"),
                             )
                             .into(),
                         )?;

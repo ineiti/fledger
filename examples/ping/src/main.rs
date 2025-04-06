@@ -10,7 +10,7 @@ use flarch::{
     web_rtc::connection::ConnectionConfig,
 };
 use flmodules::nodeconfig::NodeConfig;
-use flmodules::network::broker::NetworkOut;
+use flmodules::{network::broker::NetworkOut, timer::Timer};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -49,6 +49,7 @@ async fn ping() -> anyhow::Result<()> {
     let mut net = flmodules::network::network_webrtc_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
+        &mut Timer::start().await?,
     )
     .await
     .expect("Setting up network");
@@ -65,7 +66,7 @@ async fn ping() -> anyhow::Result<()> {
                         NetworkOut::NodeListFromWS(list) => for node in list {
                             if node.get_id() != nc.info.get_id() {
                                 // Sends a text message to the 'node' if it's not ourselves
-                                net.send_msg(node.get_id(), "Ping".into())?
+                                net.send_str(node.get_id(), "Ping".into())?
                             }
                         },
                         _ => {}
@@ -84,6 +85,7 @@ async fn server() -> anyhow::Result<()> {
     let mut net = flmodules::network::network_webrtc_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
+        &mut Timer::start().await?,
     )
     .await
     .expect("Starting network");
@@ -103,6 +105,7 @@ async fn client(server_id: &str) -> anyhow::Result<()> {
     let mut net = flmodules::network::network_webrtc_start(
         nc.clone(),
         ConnectionConfig::from_signal("ws://localhost:8765"),
+        &mut Timer::start().await?,
     )
     .await
     .expect("Starting network");
@@ -114,7 +117,7 @@ async fn client(server_id: &str) -> anyhow::Result<()> {
     // The client must already be running and be registered with the signalling server.
     // Using `MessageToNode` will set up a connection using the signalling server, but
     // in the best case, the signalling server will not be used anymore afterwards.
-    net.send_msg(server_id, "ping".into())?;
+    net.send_str(server_id, "ping".into())?;
 
     // Wait for the connection to be set up and the message to be sent.
     wait_ms(1000).await;

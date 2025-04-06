@@ -42,7 +42,6 @@ pub struct NodeInfo {
     #[serde_as(as = "Hex")]
     pub pubkey: Vec<u8>,
     // capabilities of this node
-    #[serde(default = "Modules::all")]
     pub modules: Modules,
     #[serde(skip)]
     id: Option<NodeID>,
@@ -55,7 +54,7 @@ impl NodeInfo {
             name: names::Generator::default().next().unwrap(),
             client: "libc".to_string(),
             pubkey: pubkey.as_ref().to_vec(),
-            modules: Modules::all(),
+            modules: Modules::stable(),
             id: None,
         }
     }
@@ -70,7 +69,7 @@ impl NodeInfo {
             name: names::Generator::default().next().unwrap(),
             client: "libc".to_string(),
             pubkey: pubkey.as_ref().to_vec(),
-            modules: Modules::all(),
+            modules: Modules::stable(),
             id: Some(id),
         }
     }
@@ -156,7 +155,7 @@ struct NodeInfoV2 {
 
 impl Into<Modules> for ModulesV2 {
     fn into(self) -> Modules {
-        Modules::from_bits(self.bits()).unwrap_or(Modules::all())
+        Modules::from_bits(self.bits()).unwrap_or(Modules::stable())
     }
 }
 

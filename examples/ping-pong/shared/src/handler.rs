@@ -6,10 +6,14 @@ use flarch::{
 use flmodules::{
     network::broker::{BrokerNetwork, NetworkIn, NetworkOut},
     nodeconfig::NodeInfo,
+    router::messages::NetworkWrapper,
     timer::Timer,
 };
 
-use crate::common::{PPMessageNode, PingPongIn, PingPongOut};
+use crate::{
+    common::{PPMessageNode, PingPongIn, PingPongOut},
+    event_loop::MODULE_NAME,
+};
 
 /// This only runs on localhost.
 pub const URL: &str = "ws://localhost:8765";
@@ -39,9 +43,10 @@ impl PingPong {
                 net.clone(),
                 Box::new(|msg| {
                     Some(match msg {
-                        PingPongOut::ToNetwork(dst, pp_msg) => {
-                            NetworkIn::MessageToNode(dst, serde_json::to_string(&pp_msg).unwrap())
-                        }
+                        PingPongOut::ToNetwork(dst, pp_msg) => NetworkIn::MessageToNode(
+                            dst,
+                            NetworkWrapper::wrap_yaml(MODULE_NAME, &pp_msg).expect("Serializing"),
+                        ),
                         PingPongOut::WSUpdateListRequest => NetworkIn::WSUpdateListRequest,
                     })
                 }),
@@ -71,11 +76,9 @@ impl PingPong {
     // All other messages coming from Network are ignored.
     fn net_to_pp(msg: NetworkOut) -> Option<PingPongIn> {
         match msg {
-            NetworkOut::MessageFromNode(from, node_msg) => {
-                serde_json::from_str::<PPMessageNode>(&node_msg)
-                    .ok()
-                    .map(|ppm| PingPongIn::FromNetwork(from, ppm))
-            }
+            NetworkOut::MessageFromNode(from, node_msg) => node_msg
+                .unwrap_yaml(MODULE_NAME)
+                .map(|ppm| PingPongIn::FromNetwork(from, ppm)),
             NetworkOut::NodeListFromWS(nodes) => Some(PingPongIn::List(nodes)),
             _ => None,
         }
@@ -168,7 +171,7 @@ mod test {
             Destination::NoTap,
             NetworkOut::MessageFromNode(
                 dst_id.clone(),
-                serde_json::to_string(&PPMessageNode::Ping).unwrap(),
+                NetworkWrapper::wrap_yaml(MODULE_NAME, &&PPMessageNode::Ping).expect("Serializing"),
             ),
         )?;
         assert_eq!(
@@ -185,7 +188,10 @@ mod test {
     }
 
     fn node_msg(dst: &U256, msg: &PPMessageNode) -> NetworkIn {
-        NetworkIn::MessageToNode(dst.clone(), serde_json::to_string(msg).unwrap())
+        NetworkIn::MessageToNode(
+            dst.clone(),
+            NetworkWrapper::wrap_yaml(MODULE_NAME, msg).expect("Serializing"),
+        )
     }
 
     use tokio::time::sleep;
