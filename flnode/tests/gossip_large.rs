@@ -42,7 +42,7 @@ async fn gossip_large() -> anyhow::Result<()> {
 
     let mut signal = start_signal().await?;
     let signal_rx = signal.broker.get_tap_out_sync().await?;
-    let nbr_nodes: usize = 50;
+    let nbr_nodes: usize = 100;
     let mut nodes = vec![];
     for i in 0..nbr_nodes {
         nodes.push(start_node(i).await?);
@@ -111,6 +111,7 @@ async fn start_signal() -> anyhow::Result<Signal> {
         SignalConfig {
             ttl_minutes: 2,
             system_realm: None,
+            max_list_len: Some(10),
         },
     )
     .await?;

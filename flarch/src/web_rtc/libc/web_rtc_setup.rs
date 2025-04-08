@@ -30,7 +30,6 @@ use crate::{
     broker::{Broker, SubsystemHandler},
     web_rtc::{
         connection::{ConnectionConfig, IceServer},
-        
         messages::{
             ConnType, ConnectionStateMap, DataChannelState, PeerMessage, SetupError,
             SignalingState, WebRTCInput, WebRTCOutput, WebRTCSpawner,
@@ -168,11 +167,10 @@ impl WebRTCConnectionSetupLibc {
                 let mut broker_cl = broker_cl.clone();
                 Box::pin(async move {
                     match s {
-                        RTCPeerConnectionState::Disconnected
-                        | RTCPeerConnectionState::Failed
-                        | RTCPeerConnectionState::Closed => {
+                        RTCPeerConnectionState::Disconnected | RTCPeerConnectionState::Closed => {
                             broker_cl.emit_msg_out(WebRTCOutput::Disconnected)
                         }
+                        RTCPeerConnectionState::Failed => Ok(()),
                         _ => broker_cl.emit_msg_in(WebRTCInput::UpdateState),
                     }
                     .err()

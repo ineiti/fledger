@@ -61,7 +61,7 @@ impl WebSocketClient {
             log::debug!("Reconnecting to websocket at {}", self.url);
             write.close().await?;
         } else {
-            log::debug!("Connecting to websocket at {}", self.url);
+            log::trace!("Connecting to websocket at {}", self.url);
         }
         let (websocket, _) = connect_async(self.url.clone()).await?;
         let (write, read) = websocket.split();

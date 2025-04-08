@@ -2,7 +2,7 @@ use std::time::Duration;
 use tokio_stream::StreamExt;
 
 use flarch::broker::{Broker, Message};
-use flarch::tasks::{spawn_local, Interval};
+use flarch::tasks::{now, spawn_local, Interval};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TimerMessage {
@@ -24,10 +24,15 @@ impl Timer {
         let broker = Broker::new();
         let mut broker_cl = broker.clone();
         spawn_local(async move {
+            let mut last_tick = now();
             let mut seconds = 0;
             let mut interval = Interval::new_interval(Duration::from_secs(1));
             loop {
                 interval.next().await;
+                if now() - last_tick > 2000 {
+                    log::warn!("Timer took {}ms instead of 1000ms, this means the machine is too busy!", now() - last_tick);
+                }
+                last_tick = now();
                 seconds += 1;
                 broker_cl
                     .emit_msg_out(TimerMessage::Second)

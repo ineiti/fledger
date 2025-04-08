@@ -28,8 +28,12 @@ Implement [DHT_STORAGE.md](./DHT_STORAGE.md):
 - DHT Storage
   - add own Flos to DHTConfig.owned
   - verify Flos when they enter the system
-- DHT_routing: check disconnection of nodes when no pings received - doesn't seem to disconnect
-  - also ask other nodes for their list of nodes, so the node can connect there
+- DHT_router
+  - check disconnection of nodes when no pings received - doesn't seem to disconnect
+  - change broadcast: 
+    - add NeighborMessage which is not forwarded
+    - DHTRouterIn::Broadcast sends to all active nodes a NeighborMessage
+    - The answer is also a NeighborMessage
 
 ### Testing
 
@@ -47,6 +51,8 @@ DHT_Router:
 - KBucket.active is only be populated once a node has been confirmed.
   - Needs more testing if nodes fail and how they will be replaced
     This definitely doesn't work currently
+    - Some testing: cached nodes sometimes time out, while active nodes doesn't
+    seem to timeout
 - possible extension to allow for indpendant realms:
   - active nodes are stored in a global vec
   - each realm-kademlia looks in these nodes first to populate the buckets
@@ -81,6 +87,7 @@ Added fledger to blog: https://ineiti.ch/projects/fledger/
 # Some things done
 
 ### Done
+- DHTRouter: also ask other nodes for their list of nodes, so the node can connect there
 - update page in the cli
 - Flo
   - Uses real signatures and verifications now

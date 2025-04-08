@@ -18,6 +18,10 @@ struct Args {
     /// System realm - if this is set, no other realms are allowed by default.
     #[arg(long)]
     system_realm: Option<String>,
+
+    /// Maximum list size to return when a node asks for the list of other nodes.
+    #[arg(long)]
+    max_list_len: Option<usize>,
 }
 
 #[tokio::main]
@@ -37,6 +41,7 @@ async fn main() -> anyhow::Result<()> {
         SignalConfig {
             ttl_minutes: 2,
             system_realm,
+            max_list_len: args.max_list_len,
         },
     )
     .await?;

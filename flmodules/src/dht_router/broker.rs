@@ -48,7 +48,7 @@ pub type BrokerDHTRouter = Broker<DHTRouterIn, DHTRouterOut>;
 /// all messages are correctly translated from one to the other.
 /// For this example, it uses the RandomConnections module to communicate
 /// with other nodes.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DHTRouter {
     pub broker: BrokerDHTRouter,
     pub stats: watch::Receiver<Stats>,

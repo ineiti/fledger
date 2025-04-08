@@ -10,7 +10,7 @@
 //!
 //! _If you come here, I hope you're not trying to debug something that doesn't work.
 //! This code is quite obscure, and should be rewritten for the 5th time or so._
-use crate::broker::{BrokerError, Broker, SubsystemHandler};
+use crate::broker::{Broker, BrokerError, SubsystemHandler};
 use flmacro::platform_async_trait;
 use thiserror::Error;
 
@@ -119,9 +119,7 @@ impl NodeConnection {
             state_incoming: None,
             state_outgoing: None,
         };
-        broker
-            .add_handler(Box::new(nc))
-            .await?;
+        broker.add_handler(Box::new(nc)).await?;
         Ok(broker)
     }
 
