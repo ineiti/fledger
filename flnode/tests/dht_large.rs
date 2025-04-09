@@ -27,15 +27,15 @@ use tokio::sync::watch;
  * This makes it also easier to test and have a fast test-feedback.
  *
  * Some measurements on a local Mac OSX:
- * 003 nodes ->      18kB
- * 010 nodes ->     269kB
- * 100 nodes ->  13_000kB
- * 200 nodes -> 276_000kB
+ * 003 nodes ->     19kB
+ * 010 nodes ->    200kB
+ * 100 nodes ->  6_000kB
+ * 200 nodes -> 12_000kB
  */
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 16)]
 async fn dht_large() -> anyhow::Result<()> {
-    start_logging_filter_level(vec!["fl", "dht_large"], log::LevelFilter::Debug);
+    start_logging_filter_level(vec!["dht_large", "fl"], log::LevelFilter::Debug);
 
     log::info!("This uses a lot of connections. So be sure to run the following:");
     log::info!("sudo sysctl -w kern.maxfiles=2048000");
@@ -44,14 +44,13 @@ async fn dht_large() -> anyhow::Result<()> {
 
     let mut signal = start_signal().await?;
     let signal_rx = signal.broker.get_tap_out_sync().await?;
-    let nbr_nodes: usize = 50;
+    let nbr_nodes: usize = 200;
     let mut nodes = vec![];
     let mut dhts = vec![];
     for i in 0..nbr_nodes {
         let mut node = start_node(i).await?;
         dhts.push(node.dht_storage.as_mut().unwrap().clone());
         nodes.push(node);
-        wait_ms(200).await;
     }
 
     signal_rx
@@ -60,6 +59,14 @@ async fn dht_large() -> anyhow::Result<()> {
         .filter(|out| matches!(out, SignalOut::NewNode(_)))
         .take(nbr_nodes)
         .count();
+
+    let mut connections = 0;
+    for node in &mut nodes {
+        let connection = node.dht_router.as_ref().unwrap().stats.borrow().active;
+        connections += connection;
+        node.request_list().await?;
+    }
+    log::info!("Total Connections: {connections}");
 
     RealmView::new_create_realm(
         nodes[0].dht_storage.as_mut().unwrap().clone(),
@@ -71,12 +78,10 @@ async fn dht_large() -> anyhow::Result<()> {
 
     let mut count = 1;
     loop {
-        let mut rx: usize = 0;
-        for dht in &mut dhts {
-            if dht.stats.borrow().realm_stats.len() > 0 {
-                rx += 1;
-            }
-        }
+        let rx: usize = dhts
+            .iter()
+            .map(|dht| dht.stats.borrow().realm_stats.len())
+            .sum();
         log::info!(
             "{count:3} - used {:9} bytes to get the realm in {} nodes",
             *signal.rx.borrow(),
@@ -87,20 +92,24 @@ async fn dht_large() -> anyhow::Result<()> {
         }
 
         if count % 5 == 0 {
-            let mut connections = 0;
-            for node in &mut nodes {
-                let connection = node.dht_router.as_ref().unwrap().stats.borrow().active;
-                connections += connection;
-                node.request_list().await?;
-            }
-            log::info!("Total Connections: {connections}");
+            let connections: (usize, usize) = nodes
+                .iter()
+                .map(|node| node.dht_router.as_ref().unwrap().stats.borrow())
+                .map(|stats| (stats.active, stats.all_nodes.len() - stats.active))
+                .fold((0, 0), |(sum_a, sum_b), (a, b)| (sum_a + a, sum_b + b));
+            log::info!(
+                "Total Connections active / cache: {} / {}",
+                connections.0,
+                connections.1
+            );
+
             for dht in &mut dhts {
                 dht.sync()?;
             }
         }
 
         count += 1;
-        wait_ms(500).await;
+        wait_ms(1000).await;
     }
 
     log::info!("Signal sent {} bytes over websocket", *signal.rx.borrow());
@@ -138,6 +147,7 @@ async fn start_signal() -> anyhow::Result<Signal> {
         SignalConfig {
             ttl_minutes: 2,
             system_realm: None,
+            max_list_len: Some(5),
         },
     )
     .await?;

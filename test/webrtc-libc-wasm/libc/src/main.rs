@@ -61,6 +61,7 @@ async fn start_signal_server() {
         SignalConfig {
             ttl_minutes: 1,
             system_realm: None,
+            max_list_len: None,
         },
     )
     .await

@@ -37,6 +37,7 @@ async fn main() -> anyhow::Result<()> {
         SignalConfig {
             ttl_minutes: 2,
             system_realm: None,
+            max_list_len: None,
         },
     )
     .await?;

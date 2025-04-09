@@ -131,14 +131,16 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
             if let RouterIn::Internal(internal) = msg {
                 match internal {
                     RouterInternal::Connected(id) => {
-                        if self.available_connected(id) == (true, false) {
+                        if !self.available_connected(id).1 {
                             self.nodes_connected.push(id);
+                            // out.push(RouterOut::Connected(id));
                             ret = true;
                         }
                     }
                     RouterInternal::Disconnected(id) => {
                         if self.available_connected(id).1 == true {
                             self.nodes_connected.retain(|&other| other != id);
+                            // out.push(RouterOut::Disconnected(id));
                             ret = true;
                         }
                     }

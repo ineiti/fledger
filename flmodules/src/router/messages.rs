@@ -22,6 +22,8 @@ pub enum RouterOut {
     NodeIDsConnected(NodeIDs),
     NodeInfosConnected(Vec<NodeInfo>),
     NetworkWrapperFromNetwork(NodeID, NetworkWrapper),
+    Disconnected(NodeID),
+    Connected(NodeID),
     SystemConfig(FledgerConfig),
 }
 

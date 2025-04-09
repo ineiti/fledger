@@ -30,7 +30,7 @@ impl Default for Config {
         Self {
             k: 2,
             ping_interval: 10,
-            ping_timeout: 20,
+            ping_timeout: 30,
         }
     }
 }
@@ -79,6 +79,16 @@ impl Kademlia {
                 }
             }
         }
+    }
+
+    pub fn node_disconnected(&mut self, id: NodeID) {
+        let node = KNode::new(&self.root, id);
+        if let Some(bucket) = self.buckets.get_mut(node.depth) {
+            bucket.remove_node(&node.id);
+            if self.root_bucket.status() == BucketStatus::Wanting {
+                self.rebalance_wanting();
+            }
+        };
     }
 
     pub fn remove_node(&mut self, id: &NodeID) {
@@ -376,6 +386,9 @@ impl KBucket {
     fn tick(&mut self) -> TickIDs {
         let mut ticks = self.tick_active();
         ticks.extend(self.tick_cache());
+        for id in &ticks.deleted {
+            self.remove_node(id);
+        }
         ticks
     }
 

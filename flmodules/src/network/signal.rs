@@ -48,6 +48,7 @@
 //! <https://github.com/ineiti/fledger/tree/0.7.0/cli/flsignal/src/main.rs>
 
 use bimap::BiMap;
+use rand::{rngs::StdRng, seq::IteratorRandom, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_with::{hex::Hex, serde_as};
 use std::{collections::HashMap, fmt::Formatter};
@@ -74,6 +75,7 @@ pub struct FledgerConfig {
 pub struct SignalConfig {
     pub ttl_minutes: u16,
     pub system_realm: Option<RealmID>,
+    pub max_list_len: Option<usize>,
 }
 
 #[derive(Clone)]
@@ -198,7 +200,7 @@ impl SignalServer {
     }
 
     fn msg_ws_connect(&mut self, index: usize) -> Vec<SignalOut> {
-        log::debug!("Sending challenge to new connection");
+        log::trace!("Sending challenge to new connection");
         let challenge = U256::rnd();
         self.connection_ids.insert(challenge, index);
         self.ttl.insert(index, self.config.ttl_minutes);
@@ -239,10 +241,15 @@ impl SignalServer {
     }
 
     fn ws_list_ids(&mut self, id: usize) -> Vec<SignalOut> {
-        self.send_msg_node(
-            id,
-            WSSignalMessageToNode::ListIDsReply(self.info.values().cloned().collect()),
-        )
+        let mut rng = StdRng::seed_from_u64(id as u64);
+        let max_size = self.config.max_list_len.unwrap_or(self.info.len());
+        let list = self
+            .info
+            .values()
+            .cloned()
+            .choose_multiple(&mut rng, max_size);
+
+        self.send_msg_node(id, WSSignalMessageToNode::ListIDsReply(list))
     }
 
     fn ws_peer_setup(&mut self, index: usize, pi: PeerInfo) -> Vec<SignalOut> {

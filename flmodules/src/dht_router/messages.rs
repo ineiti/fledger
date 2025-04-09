@@ -22,8 +22,14 @@ use super::{
 /// module.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ModuleMessage {
+    /// Request if a node is alive or not
     Ping,
+    /// Answer for a Ping
     Pong,
+    /// Request the IDs of all connected nodes
+    ConnectedIDsRequest,
+    /// Returns all connected IDs,
+    ConnectedIDsReply(Vec<NodeID>),
     /// A broadcast message to all connected nodes.
     /// Carries the originator of the broadcast message.
     Broadcast(NodeID, NetworkWrapper),
@@ -61,6 +67,9 @@ pub struct Stats {
 pub(super) struct Messages {
     core: Kademlia,
     tx: Option<watch::Sender<Stats>>,
+    // This is different than core.active, because there can be connections from other
+    // modules, or connections from another node.
+    connected: Vec<NodeID>,
 }
 
 impl Messages {
@@ -71,6 +80,7 @@ impl Messages {
             Self {
                 core: Kademlia::new(root, cfg),
                 tx: Some(tx),
+                connected: vec![],
             },
             rx,
         )
@@ -90,6 +100,11 @@ impl Messages {
                 ModuleMessage::Broadcast(u256, network_wrapper) => {
                     vec![DHTRouterOut::MessageBroadcast(u256, network_wrapper).into()]
                 }
+                ModuleMessage::ConnectedIDsRequest => {
+                    vec![ModuleMessage::ConnectedIDsReply(self.core.active_nodes())
+                        .wrapper_network(from)]
+                }
+                ModuleMessage::ConnectedIDsReply(nodes) => self.add_nodes(nodes),
             },
             None => vec![],
         };
@@ -102,9 +117,12 @@ impl Messages {
     }
 
     // Stores the new node list, excluding the ID of this node.
-    fn node_list(&mut self, infos: Vec<NodeInfo>) -> Vec<InternOut> {
-        self.core
-            .add_nodes(infos.iter().map(|i| i.get_id()).collect());
+    fn add_node_infos(&mut self, infos: Vec<NodeInfo>) -> Vec<InternOut> {
+        self.add_nodes(infos.iter().map(|i| i.get_id()).collect())
+    }
+
+    fn add_nodes(&mut self, nodes: Vec<NodeID>) -> Vec<InternOut> {
+        self.core.add_nodes(nodes);
         vec![InternOut::DHTRouter(DHTRouterOut::NodeList(
             self.core.active_nodes(),
         ))]
@@ -112,16 +130,37 @@ impl Messages {
 
     // One second passes - and return messages for nodes to ping.
     fn tick(&mut self) -> Vec<InternOut> {
-        self.core
-            .tick()
+        let ping_delete = self.core.tick();
+        // if !ping_delete.deleted.is_empty() {
+        //     log::info!(
+        //         "{} deleted {} nodes",
+        //         self.core.root,
+        //         ping_delete.deleted.len()
+        //     );
+        // }
+        ping_delete
             .ping
             .iter()
             .map(|&id| ModuleMessage::Ping.wrapper_network(id))
+            .chain(
+                self.core
+                    .active_nodes()
+                    .iter()
+                    .map(|id| ModuleMessage::ConnectedIDsRequest.wrapper_network(*id)),
+            )
             .collect()
     }
 
+    fn closest_or_connected(&self, key: U256, last: Option<&U256>) -> Vec<U256> {
+        if self.connected.contains(&key) {
+            vec![key]
+        } else {
+            self.core.route_closest(&key, last)
+        }
+    }
+
     fn new_closest(&self, key: U256, msg: NetworkWrapper) -> Vec<InternOut> {
-        if let Some(&next_hop) = self.core.route_closest(&key, None).first() {
+        if let Some(&next_hop) = self.closest_or_connected(key.clone(), None).first() {
             vec![ModuleMessage::Closest(self.core.root, key, msg.clone()).wrapper_network(next_hop)]
         } else {
             // log::trace!(
@@ -133,7 +172,7 @@ impl Messages {
     }
 
     fn new_direct(&self, dst: NodeID, msg: NetworkWrapper) -> Vec<InternOut> {
-        if let Some(&next_hop) = self.core.route_closest(&dst, None).first() {
+        if let Some(&next_hop) = self.closest_or_connected(dst.clone(), None).first() {
             vec![ModuleMessage::Direct(self.core.root, dst, msg.clone()).wrapper_network(next_hop)]
         } else {
             // log::trace!(
@@ -151,7 +190,10 @@ impl Messages {
         key: U256,
         msg: NetworkWrapper,
     ) -> Vec<InternOut> {
-        match self.core.route_closest(&key, Some(&last_hop)).first() {
+        match self
+            .closest_or_connected(key.clone(), Some(&last_hop))
+            .first()
+        {
             Some(&next_hop) => vec![
                 ModuleMessage::Closest(orig, key, msg.clone()).wrapper_network(next_hop),
                 DHTRouterOut::MessageRouting(orig, last_hop, next_hop, key, msg).into(),
@@ -176,11 +218,18 @@ impl Messages {
         if dst == self.core.root {
             return vec![DHTRouterOut::MessageDest(orig, last, msg).into()];
         }
-        let next_hops = self.core.route_direct(&dst);
-        next_hops
-            .choose(&mut rand::thread_rng())
-            .map(|next_hop| vec![ModuleMessage::Direct(orig, dst, msg).wrapper_network(*next_hop)])
-            .unwrap_or(vec![])
+        let next_hops = self.closest_or_connected(dst, Some(&last));
+        if next_hops.len() == 0 {
+            // log::debug!("{}: cannot hop to {}", self.core.root, dst);
+            vec![]
+        } else {
+            next_hops
+                .choose(&mut rand::thread_rng())
+                .map(|next_hop| {
+                    vec![ModuleMessage::Direct(orig, dst, msg).wrapper_network(*next_hop)]
+                })
+                .unwrap_or(vec![])
+        }
     }
 
     fn update_stats(&mut self) {
@@ -208,7 +257,7 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
         let id = self.core.root.clone();
         let out = msgs
             .into_iter()
-            // .inspect(|msg| log::debug!("{_id}: DHTRouterIn: {msg:?}"))
+            // .inspect(|msg| log::debug!("{id}: DHTRouterIn: {msg:?}"))
             .flat_map(|msg| match msg {
                 InternIn::Tick => self.tick(),
                 InternIn::DHTRouter(DHTRouterIn::MessageBroadcast(msg)) => self
@@ -226,7 +275,11 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
                     self.new_direct(key, msg)
                 }
                 InternIn::Network(from_router) => match from_router {
-                    RouterOut::NodeInfoAvailable(node_infos) => self.node_list(node_infos),
+                    RouterOut::NodeInfoAvailable(node_infos) => self.add_node_infos(node_infos),
+                    RouterOut::NodeIDsConnected(connected) => {
+                        self.connected = connected.0.clone();
+                        self.add_nodes(connected.0)
+                    }
                     RouterOut::NetworkWrapperFromNetwork(from, network_wrapper) => {
                         self.process_node_message(from, network_wrapper)
                     }
@@ -234,10 +287,14 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
                         .system_realm
                         .map(|rid| vec![InternOut::DHTRouter(DHTRouterOut::SystemRealm(rid))])
                         .unwrap_or(vec![]),
+                    RouterOut::Disconnected(id) => {
+                        self.core.node_disconnected(id);
+                        vec![]
+                    }
                     _ => vec![],
                 },
             })
-            // .inspect(|msg| log::debug!("{id}: Out: {msg:?}"))
+            // .inspect(|msg| log::debug!("{id}: DHTRouterOut: {msg:?}"))
             .collect();
         self.update_stats();
         out
