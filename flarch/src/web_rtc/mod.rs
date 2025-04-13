@@ -18,6 +18,7 @@
 use std::collections::HashMap;
 
 use flmacro::platform_async_trait;
+use node_connection::Direction;
 
 use crate::{
     broker::{Broker, SubsystemHandler},
@@ -52,7 +53,7 @@ pub type BrokerWebRTCConn = Broker<WebRTCConnInput, WebRTCConnOutput>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum WebRTCConnInput {
     Message(NodeID, NCInput),
-    Connect(NodeID),
+    Connect(NodeID, Direction),
     Disconnect(NodeID),
 }
 
@@ -83,7 +84,7 @@ impl WebRTCConn {
     }
 
     /// Ensures that a given connection exists.
-    async fn ensure_connection(&mut self, id: NodeID) -> anyhow::Result<()> {
+    async fn ensure_connection(&mut self, id: NodeID, dir: Direction) -> anyhow::Result<()> {
         if !self.connections.contains_key(&id) {
             let mut nc = NodeConnection::new(&self.web_rtc).await?;
             self.connections.insert(id.clone(), nc.clone());
@@ -92,6 +93,12 @@ impl WebRTCConn {
                 Box::new(move |msg| Some(WebRTCConnOutput::Message(id.clone(), msg))),
             )
             .await?;
+            if dir == Direction::Outgoing {
+                self.try_send(
+                    id,
+                    NCInput::Setup(Direction::Outgoing, messages::PeerMessage::Init),
+                );
+            }
         }
 
         Ok(())
@@ -119,18 +126,11 @@ impl SubsystemHandler<WebRTCConnInput, WebRTCConnOutput> for WebRTCConn {
                 WebRTCConnInput::Disconnect(dst) => {
                     self.try_send(dst, NCInput::Disconnect);
                 }
-                WebRTCConnInput::Connect(dst) => {
-                    self.ensure_connection(dst.clone())
+                WebRTCConnInput::Connect(dst, dir) => {
+                    self.ensure_connection(dst.clone(), dir)
                         .await
                         .err()
                         .map(|e| log::error!("When starting webrtc-connection {e:?}"));
-                    self.try_send(
-                        dst,
-                        NCInput::Setup(
-                            node_connection::Direction::Outgoing,
-                            messages::PeerMessage::Init,
-                        ),
-                    );
                 }
             };
         }

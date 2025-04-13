@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter};
+use std::collections::HashMap;
 
 use flarch::{
     broker::SubsystemHandler,
@@ -30,7 +30,7 @@ pub enum InternIn {
     Routing(DHTRouterOut),
     Storage(DHTStorageIn),
     /// Ask all neighbors to sync with us.
-    BroadcastSync,
+    PropagateFlos,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,7 +42,7 @@ pub enum InternOut {
 /// These messages are sent to the closest node given in the DHTRouting message.
 /// Per default, the 'key' value of the DHTRouting will be filled with the FloID.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum MessageNodeClosest {
+pub enum MessageClosest {
     // Stores the given Flo in the closest node, and all nodes on the route
     // which have enough place left.
     StoreFlo(Flo),
@@ -59,25 +59,17 @@ pub enum MessageNodeClosest {
 /// These messages are sent directly to the requester of the MessageNodeClosest.
 /// As in this case there is no 'key', the IDs need to be transmitted completely.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum MessageNodeDirect {
+pub enum MessageDest {
     // Returns the result of the requested Flo, including any available Cuckoo-IDs.
     FloValue(FloCuckoo),
     // Indicates this Flo is not in the closest node.
     UnknownFlo(GlobalID),
     // The Cuckoo-IDs stored next to the Flo composed of the GlobalID
     CookooIDs(GlobalID, Vec<FloID>),
-    // The update protocol
-    Update(Sync),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum MessageBroadcast {
-    // Asks all nodes to sync with the source node.
-    Sync,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum Sync {
+pub enum MessageNeighbour {
     RequestRealmIDs,
     AvailableRealmIDs(Vec<RealmID>),
     RequestFloMetas(RealmID),
@@ -132,7 +124,7 @@ impl Messages {
         (msgs, rx)
     }
 
-    fn msg_in_routing(&mut self, msg: DHTRouterOut) -> Vec<InternOut> {
+    fn msg_dht_router(&mut self, msg: DHTRouterOut) -> Vec<InternOut> {
         match msg {
             DHTRouterOut::MessageRouting(origin, _last_hop, _next_hop, key, msg) => msg
                 .unwrap_yaml(MODULE_NAME)
@@ -140,16 +132,16 @@ impl Messages {
             DHTRouterOut::MessageClosest(origin, _last_hop, key, msg) => msg
                 .unwrap_yaml(MODULE_NAME)
                 .map(|mn| self.msg_routing(true, origin, key, mn)),
-            DHTRouterOut::MessageDest(origin, _last_hop, msg) => msg
-                .unwrap_yaml(MODULE_NAME)
-                .map(|mn| self.msg_dest(origin, mn)),
+            DHTRouterOut::MessageDest(_origin, _last_hop, msg) => {
+                msg.unwrap_yaml(MODULE_NAME).map(|mn| self.msg_dest(mn))
+            }
             DHTRouterOut::NodeList(nodes) => {
                 self.nodes = nodes;
                 None
             }
-            DHTRouterOut::MessageBroadcast(origin, msg) => msg
+            DHTRouterOut::MessageNeighbour(origin, msg) => msg
                 .unwrap_yaml(MODULE_NAME)
-                .map(|mn| self.msg_broadcast(origin, mn)),
+                .map(|mn| self.msg_neighbour(origin, mn)),
             DHTRouterOut::SystemRealm(realm_id) => {
                 if !self.config.realms.contains(&realm_id) {
                     self.config.realms.push(realm_id);
@@ -160,13 +152,13 @@ impl Messages {
         .unwrap_or(vec![])
     }
 
-    fn msg_in_storage(&mut self, msg: DHTStorageIn) -> Vec<InternOut> {
+    fn msg_dht_storage(&mut self, msg: DHTStorageIn) -> Vec<InternOut> {
         // log::warn!("Storing {msg:?}");
         match msg {
             DHTStorageIn::StoreFlo(flo) => self.store_flo(flo),
             DHTStorageIn::ReadFlo(id) => vec![match self.read_flo(&id) {
                 Some(df) => DHTStorageOut::FloValue(df.clone()).into(),
-                None => MessageNodeClosest::ReadFlo(id.realm_id().clone())
+                None => MessageClosest::ReadFlo(id.realm_id().clone())
                     .to_intern_out(id.flo_id().clone().into())
                     // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
                     .expect("Creating ReadFlo message"),
@@ -179,26 +171,15 @@ impl Messages {
                     .map(|cids| vec![DHTStorageOut::CuckooIDs(id.clone(), cids).into()])
                     .unwrap_or_default();
                 out.push(
-                    MessageNodeClosest::GetCuckooIDs(id.realm_id().clone())
+                    MessageClosest::GetCuckooIDs(id.realm_id().clone())
                         .to_intern_out(id.flo_id().clone().into())
                         .expect("Creating GetCuckoos"),
                 );
                 out
             }
-            DHTStorageIn::SyncFromNeighbors => self
-                .nodes
-                .iter()
-                .flat_map(|n| {
-                    iter::once(Sync::RequestRealmIDs)
-                        .chain(
-                            self.realms
-                                .keys()
-                                .map(|rid| Sync::RequestFloMetas(rid.clone())),
-                        )
-                        .filter_map(|msg| MessageNodeDirect::Update(msg).to_intern_out(*n))
-                        .collect::<Vec<_>>()
-                })
-                .collect(),
+            DHTStorageIn::SyncFromNeighbors => vec![MessageNeighbour::RequestRealmIDs
+                .to_broadcast()
+                .expect("Creating Request broadcast")],
             DHTStorageIn::GetRealms => {
                 vec![DHTStorageOut::RealmIDs(self.realms.keys().cloned().collect()).into()]
             }
@@ -210,14 +191,14 @@ impl Messages {
         _closest: bool,
         origin: NodeID,
         key: U256,
-        msg: MessageNodeClosest,
+        msg: MessageClosest,
     ) -> Vec<InternOut> {
         let fid: FloID = key.into();
         match msg {
-            MessageNodeClosest::StoreFlo(flo) => {
+            MessageClosest::StoreFlo(flo) => {
                 return self.store_flo(flo);
             }
-            MessageNodeClosest::ReadFlo(rid) => {
+            MessageClosest::ReadFlo(rid) => {
                 // log::info!(
                 //     "{} got request for {}/{} from {}",
                 //     self.our_id,
@@ -232,25 +213,25 @@ impl Messages {
                     .and_then(|realm| realm.get_flo_cuckoo(&fid))
                 {
                     // log::info!("sends flo {:?}", fc.0);
-                    return MessageNodeDirect::FloValue(fc)
+                    return MessageDest::FloValue(fc)
                         .to_intern_out(origin)
                         // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
                         .map_or(vec![], |msg| vec![msg]);
                 }
             }
-            MessageNodeClosest::GetCuckooIDs(rid) => {
+            MessageClosest::GetCuckooIDs(rid) => {
                 let parent = GlobalID::new(rid.clone(), fid.clone());
                 return self
                     .realms
                     .get(&rid)
                     .and_then(|realm| realm.get_cuckoo_ids(&fid))
                     .map_or(vec![], |ids| {
-                        MessageNodeDirect::CookooIDs(parent, ids)
+                        MessageDest::CookooIDs(parent, ids)
                             .to_intern_out(origin)
                             .map_or(vec![], |msg| vec![msg])
                     });
             }
-            MessageNodeClosest::StoreCuckooID(gid) => {
+            MessageClosest::StoreCuckooID(gid) => {
                 self.realms
                     .get_mut(&gid.realm_id())
                     .map(|realm| realm.store_cuckoo_id(&fid, gid.flo_id().clone()));
@@ -259,9 +240,9 @@ impl Messages {
         vec![]
     }
 
-    fn msg_dest(&mut self, origin: NodeID, msg: MessageNodeDirect) -> Vec<InternOut> {
+    fn msg_dest(&mut self, msg: MessageDest) -> Vec<InternOut> {
         match msg {
-            MessageNodeDirect::FloValue(fc) => {
+            MessageDest::FloValue(fc) => {
                 // log::info!("{} stores {:?}", self.our_id, flo.0);
                 self.store_flo(fc.0.clone());
                 self.realms
@@ -269,29 +250,13 @@ impl Messages {
                     .map(|realm| realm.store_cuckoo_ids(&fc.0.flo_id(), fc.1.clone()));
                 Some(DHTStorageOut::FloValue(fc).into())
             }
-            MessageNodeDirect::UnknownFlo(key) => Some(DHTStorageOut::ValueMissing(key).into()),
-            MessageNodeDirect::Update(sync) => return self.msg_sync(origin, sync),
-            MessageNodeDirect::CookooIDs(gid, cids) => {
-                Some(DHTStorageOut::CuckooIDs(gid, cids).into())
-            }
+            MessageDest::UnknownFlo(key) => Some(DHTStorageOut::ValueMissing(key).into()),
+            MessageDest::CookooIDs(gid, cids) => Some(DHTStorageOut::CuckooIDs(gid, cids).into()),
         }
         .map_or(vec![], |msg| vec![msg])
     }
 
-    fn msg_broadcast(&mut self, origin: NodeID, msg: MessageBroadcast) -> Vec<InternOut> {
-        match msg {
-            MessageBroadcast::Sync => iter::once(Sync::RequestRealmIDs)
-                .chain(
-                    self.realms
-                        .keys()
-                        .map(|rid| Sync::RequestFloMetas(rid.clone())),
-                )
-                .filter_map(|msg| MessageNodeDirect::Update(msg).to_intern_out(origin))
-                .collect::<Vec<_>>(),
-        }
-    }
-
-    fn msg_sync(&mut self, origin: NodeID, msg: Sync) -> Vec<InternOut> {
+    fn msg_neighbour(&mut self, origin: NodeID, msg: MessageNeighbour) -> Vec<InternOut> {
         // log::trace!("{} syncs {:?}", self.our_id, msg);
         // if let Sync::RequestFloMetas(rid) = &msg {
         //     log::trace!(
@@ -311,25 +276,29 @@ impl Messages {
         //     );
         // }
         match msg {
-            Sync::RequestRealmIDs => vec![Sync::AvailableRealmIDs(
+            MessageNeighbour::RequestRealmIDs => vec![MessageNeighbour::AvailableRealmIDs(
                 self.realms.keys().cloned().collect(),
             )],
-            Sync::AvailableRealmIDs(realm_ids) => realm_ids
+            MessageNeighbour::AvailableRealmIDs(realm_ids) => realm_ids
                 .into_iter()
                 .filter(|rid| !self.realms.contains_key(&rid) && self.config.accepts_realm(&rid))
-                .map(|rid| Sync::RequestFlos(rid.clone(), vec![(*rid).into()]))
+                .map(|rid| MessageNeighbour::RequestFlos(rid.clone(), vec![(*rid).into()]))
                 .collect(),
-            Sync::RequestFloMetas(realm_id) => self
+            MessageNeighbour::RequestFloMetas(realm_id) => self
                 .realms
                 .get(&realm_id)
                 .map(|realm| realm.get_flo_metas())
-                .map_or(vec![], |fm| vec![Sync::AvailableFlos(realm_id, fm)]),
-            Sync::AvailableFlos(realm_id, flo_metas) => self
+                .map_or(vec![], |fm| {
+                    vec![MessageNeighbour::AvailableFlos(realm_id, fm)]
+                }),
+            MessageNeighbour::AvailableFlos(realm_id, flo_metas) => self
                 .realms
                 .get(&realm_id)
                 .and_then(|realm| realm.sync_available(&flo_metas))
-                .map_or(vec![], |needed| vec![Sync::RequestFlos(realm_id, needed)]),
-            Sync::RequestFlos(realm_id, flo_ids) => self
+                .map_or(vec![], |needed| {
+                    vec![MessageNeighbour::RequestFlos(realm_id, needed)]
+                }),
+            MessageNeighbour::RequestFlos(realm_id, flo_ids) => self
                 .realms
                 .get(&realm_id)
                 .map(|realm| {
@@ -338,8 +307,8 @@ impl Messages {
                         .filter_map(|id| realm.get_flo_cuckoo(id))
                         .collect::<Vec<_>>()
                 })
-                .map_or(vec![], |flos| vec![Sync::Flos(flos)]),
-            Sync::Flos(flo_cuckoos) => {
+                .map_or(vec![], |flos| vec![MessageNeighbour::Flos(flos)]),
+            MessageNeighbour::Flos(flo_cuckoos) => {
                 for (flo, cuckoos) in flo_cuckoos {
                     self.store_flo(flo.clone());
                     self.realms.get_mut(&flo.realm_id()).map(|realm| {
@@ -352,7 +321,7 @@ impl Messages {
             }
         }
         .into_iter()
-        .filter_map(|msg| msg.to_intern_out(origin))
+        .filter_map(|msg| msg.to_neighbour(origin))
         .collect()
     }
 
@@ -367,12 +336,12 @@ impl Messages {
         if self.upsert_flo(flo.clone()) {
             // log::info!("{}: store_flo", self.our_id);
             // TODO: this should not be sent in all cases...
-            res.extend(vec![MessageNodeClosest::StoreFlo(flo.clone())
+            res.extend(vec![MessageClosest::StoreFlo(flo.clone())
                 .to_intern_out(flo.flo_id().into())
                 .expect("Storing new DHT")]);
         }
         if let Some(parent) = flo.flo_config().cuckoo_parent() {
-            res.extend(vec![MessageNodeClosest::StoreCuckooID(flo.global_id())
+            res.extend(vec![MessageClosest::StoreCuckooID(flo.global_id())
                 .to_intern_out(*parent.clone())
                 .expect("Storing new Cuckoo")])
         }
@@ -457,12 +426,13 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
             .into_iter()
             // .inspect(|msg| log::debug!("{_id}: In: {msg:?}"))
             .flat_map(|msg| match msg {
-                InternIn::Routing(dhtrouting_out) => __self.msg_in_routing(dhtrouting_out),
-                InternIn::Storage(dhtstorage_in) => __self.msg_in_storage(dhtstorage_in),
-                InternIn::BroadcastSync => MessageBroadcast::Sync
-                    .try_into()
-                    .map(|dht| vec![InternOut::Routing(dht)])
-                    .unwrap_or(vec![]),
+                InternIn::Routing(dhtrouting_out) => self.msg_dht_router(dhtrouting_out),
+                InternIn::Storage(dhtstorage_in) => self.msg_dht_storage(dhtstorage_in),
+                InternIn::PropagateFlos => {
+                    MessageNeighbour::AvailableRealmIDs(self.realms.keys().cloned().collect())
+                        .to_broadcast()
+                        .map_or(vec![], |msg| vec![msg])
+                }
             })
             // .inspect(|msg| log::debug!("{_id}: Out: {msg:?}"))
             .collect()
@@ -492,7 +462,7 @@ impl RealmStats {
     }
 }
 
-impl MessageNodeClosest {
+impl MessageClosest {
     fn to_intern_out(&self, dst: NodeID) -> Option<InternOut> {
         NetworkWrapper::wrap_yaml(MODULE_NAME, self)
             .ok()
@@ -500,22 +470,11 @@ impl MessageNodeClosest {
     }
 }
 
-impl MessageNodeDirect {
+impl MessageDest {
     fn to_intern_out(&self, dst: NodeID) -> Option<InternOut> {
         NetworkWrapper::wrap_yaml(MODULE_NAME, self)
             .ok()
             .map(|msg_wrap| InternOut::Routing(DHTRouterIn::MessageDirect(dst, msg_wrap)))
-    }
-}
-
-impl TryInto<DHTRouterIn> for MessageBroadcast {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> anyhow::Result<DHTRouterIn> {
-        Ok(DHTRouterIn::MessageBroadcast(NetworkWrapper::wrap_yaml(
-            MODULE_NAME,
-            &self,
-        )?))
     }
 }
 
@@ -525,16 +484,38 @@ impl From<DHTStorageOut> for InternOut {
     }
 }
 
-impl Sync {
-    fn to_intern_out(self, dst: NodeID) -> Option<InternOut> {
+impl MessageNeighbour {
+    fn to_neighbour(self, dst: NodeID) -> Option<InternOut> {
         (match &self {
-            Sync::AvailableRealmIDs(realm_ids) => realm_ids.len(),
-            Sync::AvailableFlos(_, flo_metas) => flo_metas.len(),
-            Sync::RequestFlos(_, flo_ids) => flo_ids.len(),
-            Sync::Flos(items) => items.len(),
+            MessageNeighbour::AvailableRealmIDs(realm_ids) => realm_ids.len(),
+            MessageNeighbour::AvailableFlos(_, flo_metas) => flo_metas.len(),
+            MessageNeighbour::RequestFlos(_, flo_ids) => flo_ids.len(),
+            MessageNeighbour::Flos(items) => items.len(),
             _ => 1,
         } > 0)
-            .then(|| MessageNodeDirect::Update(self).to_intern_out(dst))
+            .then(|| {
+                NetworkWrapper::wrap_yaml(MODULE_NAME, &self)
+                    .ok()
+                    .map(|msg_wrap| {
+                        InternOut::Routing(DHTRouterIn::MessageNeighbour(dst, msg_wrap))
+                    })
+            })
+            .flatten()
+    }
+
+    fn to_broadcast(self) -> Option<InternOut> {
+        (match &self {
+            MessageNeighbour::AvailableRealmIDs(realm_ids) => realm_ids.len(),
+            MessageNeighbour::AvailableFlos(_, flo_metas) => flo_metas.len(),
+            MessageNeighbour::RequestFlos(_, flo_ids) => flo_ids.len(),
+            MessageNeighbour::Flos(items) => items.len(),
+            _ => 1,
+        } > 0)
+            .then(|| {
+                NetworkWrapper::wrap_yaml(MODULE_NAME, &self)
+                    .ok()
+                    .map(|msg_wrap| InternOut::Routing(DHTRouterIn::MessageBroadcast(msg_wrap)))
+            })
             .flatten()
     }
 }
@@ -560,8 +541,8 @@ mod tests {
 
         let mut wallet = Wallet::new();
         let realm = wallet.get_realm();
-        dht.msg_in_storage(DHTStorageIn::StoreFlo(realm.flo().clone()));
-        let out = dht.msg_in_storage(DHTStorageIn::ReadFlo(realm.global_id()));
+        dht.msg_dht_storage(DHTStorageIn::StoreFlo(realm.flo().clone()));
+        let out = dht.msg_dht_storage(DHTStorageIn::ReadFlo(realm.global_id()));
         assert_eq!(1, out.len());
         assert_eq!(
             *out.get(0).unwrap(),
@@ -587,11 +568,11 @@ mod tests {
 
         let out = NetworkWrapper::wrap_yaml(
             MODULE_NAME,
-            &MessageNodeDirect::FloValue((fr.flo().clone(), vec![])),
+            &MessageDest::FloValue((fr.flo().clone(), vec![])),
         )
         .unwrap();
 
-        if let MessageNodeDirect::FloValue(flo) = out.unwrap_yaml(MODULE_NAME).unwrap() {
+        if let MessageDest::FloValue(flo) = out.unwrap_yaml(MODULE_NAME).unwrap() {
             let fr2 = TryInto::<FloRealm>::try_into(flo.0)?;
             assert_eq!(fr, fr2);
         } else {

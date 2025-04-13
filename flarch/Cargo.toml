@@ -19,6 +19,7 @@ flmacro = { version = "0.9", path = "../flmacro" }
 anyhow = {version = "1", features = ["backtrace"]}
 bytes = "1.9"
 chrono = "0.4"
+enum-display = "0.1"
 env_logger = "0.11"
 futures = "0.3"
 log = "0.4"
