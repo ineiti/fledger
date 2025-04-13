@@ -279,11 +279,22 @@ impl Messages {
             MessageNeighbour::RequestRealmIDs => vec![MessageNeighbour::AvailableRealmIDs(
                 self.realms.keys().cloned().collect(),
             )],
-            MessageNeighbour::AvailableRealmIDs(realm_ids) => realm_ids
-                .into_iter()
-                .filter(|rid| !self.realms.contains_key(&rid) && self.config.accepts_realm(&rid))
-                .map(|rid| MessageNeighbour::RequestFlos(rid.clone(), vec![(*rid).into()]))
-                .collect(),
+            MessageNeighbour::AvailableRealmIDs(realm_ids) => {
+                let our_realms = realm_ids
+                    .into_iter()
+                    .filter(|rid| self.config.accepts_realm(&rid))
+                    .collect::<Vec<_>>();
+                our_realms
+                    .iter()
+                    .filter(|id| !self.realms.contains_key(id))
+                    .map(|rid| MessageNeighbour::RequestFlos(rid.clone(), vec![(**rid).into()]))
+                    .chain(
+                        our_realms
+                            .iter()
+                            .map(|rid| MessageNeighbour::RequestFloMetas(rid.clone())),
+                    )
+                    .collect()
+            }
             MessageNeighbour::RequestFloMetas(realm_id) => self
                 .realms
                 .get(&realm_id)
