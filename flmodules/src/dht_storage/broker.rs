@@ -146,7 +146,7 @@ impl DHTStorage {
     }
 
     pub fn propagate(&mut self) -> anyhow::Result<()> {
-        Ok(self.intern.emit_msg_in(InternIn::BroadcastSync)?)
+        Ok(self.intern.emit_msg_in(InternIn::PropagateFlos)?)
     }
 
     pub async fn get_realm_ids(&mut self) -> anyhow::Result<Vec<RealmID>> {

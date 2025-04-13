@@ -20,6 +20,9 @@ pub(super) const MODULE_NAME: &str = "DHTRouter";
 pub enum DHTRouterIn {
     /// Sends a message to all nodes connected directly to this node.
     MessageBroadcast(NetworkWrapper),
+    /// Sends the message to a direct neighbour and drops it if
+    /// the neighbour is not reachable.
+    MessageNeighbour(NodeID, NetworkWrapper),
     /// Routes the message to the closest node representing the ID.
     MessageClosest(U256, NetworkWrapper),
     /// Routes the message to a specific node. No guarantee can be given
@@ -29,7 +32,7 @@ pub enum DHTRouterIn {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTRouterOut {
-    MessageBroadcast(NodeID, NetworkWrapper),
+    MessageNeighbour(NodeID, NetworkWrapper),
     // MessageRouting(origin, last_hop, next_hop, key, msg)
     MessageRouting(NodeID, NodeID, NodeID, U256, NetworkWrapper),
     // MessageClosest(origin, last_hop, key, msg)

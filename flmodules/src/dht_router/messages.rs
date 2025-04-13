@@ -30,13 +30,14 @@ pub enum ModuleMessage {
     ConnectedIDsRequest,
     /// Returns all connected IDs,
     ConnectedIDsReply(Vec<NodeID>),
-    /// A broadcast message to all connected nodes.
-    /// Carries the originator of the broadcast message.
-    Broadcast(NodeID, NetworkWrapper),
+    /// A message going only to direct neighbours.
+    Neighbour(NetworkWrapper),
     /// Sends the message to the closest node and emits messages
     /// on the path.
     Closest(NodeID, U256, NetworkWrapper),
     /// Sends the message to a specific node, using Kademlia routing.
+    /// TODO: should also emit msgs, e.g., a reply for a request of a Flo
+    /// should get an opportunity for cache in all nodes it passes through.
     /// No messages are emitted during routing.
     Direct(NodeID, NodeID, NetworkWrapper),
 }
@@ -97,8 +98,8 @@ impl Messages {
                     self.message_closest(orig, from, key, msg)
                 }
                 ModuleMessage::Direct(orig, dst, msg) => self.message_direct(orig, from, dst, msg),
-                ModuleMessage::Broadcast(u256, network_wrapper) => {
-                    vec![DHTRouterOut::MessageBroadcast(u256, network_wrapper).into()]
+                ModuleMessage::Neighbour(network_wrapper) => {
+                    vec![DHTRouterOut::MessageNeighbour(from, network_wrapper).into()]
                 }
                 ModuleMessage::ConnectedIDsRequest => {
                     vec![ModuleMessage::ConnectedIDsReply(self.core.active_nodes())
@@ -114,6 +115,56 @@ impl Messages {
             )));
         }
         out
+    }
+
+    fn msg_dht(&mut self, msg: DHTRouterIn) -> Vec<InternOut> {
+        match msg {
+            DHTRouterIn::MessageBroadcast(msg) => self
+                .core
+                .active_nodes()
+                .iter()
+                .map(|dst| {
+                    ModuleMessage::Neighbour(msg.clone())
+                        .wrapper_network(dst.clone())
+                })
+                .collect(),
+            DHTRouterIn::MessageClosest(key, msg) => self.new_closest(key, msg),
+            DHTRouterIn::MessageDirect(key, msg) => self.new_direct(key, msg),
+            DHTRouterIn::MessageNeighbour(dst, network_wrapper) => {
+                if self.connected.contains(&dst) {
+                    vec![ModuleMessage::Neighbour(network_wrapper).wrapper_network(dst)]
+                } else {
+                    log::warn!(
+                        "{} doesn't have a connection to {} anymore",
+                        self.core.root,
+                        dst
+                    );
+                    vec![]
+                }
+            }
+        }
+    }
+
+    fn msg_network(&mut self, msg: RouterOut) -> Vec<InternOut> {
+        match msg {
+            RouterOut::NodeInfoAvailable(node_infos) => self.add_node_infos(node_infos),
+            RouterOut::NodeIDsConnected(connected) => {
+                self.connected = connected.0.clone();
+                self.add_nodes(connected.0)
+            }
+            RouterOut::NetworkWrapperFromNetwork(from, network_wrapper) => {
+                self.process_node_message(from, network_wrapper)
+            }
+            RouterOut::SystemConfig(conf) => conf
+                .system_realm
+                .map(|rid| vec![InternOut::DHTRouter(DHTRouterOut::SystemRealm(rid))])
+                .unwrap_or(vec![]),
+            RouterOut::Disconnected(id) => {
+                self.core.node_disconnected(id);
+                vec![]
+            }
+            _ => vec![],
+        }
     }
 
     // Stores the new node list, excluding the ID of this node.
@@ -254,47 +305,16 @@ impl Messages {
 #[platform_async_trait()]
 impl SubsystemHandler<InternIn, InternOut> for Messages {
     async fn messages(&mut self, msgs: Vec<InternIn>) -> Vec<InternOut> {
-        let id = self.core.root.clone();
+        let _id = self.core.root.clone();
         let out = msgs
             .into_iter()
-            // .inspect(|msg| log::debug!("{id}: DHTRouterIn: {msg:?}"))
+            // .inspect(|msg| log::debug!("{_id}: DHTRouterIn: {msg:?}"))
             .flat_map(|msg| match msg {
                 InternIn::Tick => self.tick(),
-                InternIn::DHTRouter(DHTRouterIn::MessageBroadcast(msg)) => self
-                    .core
-                    .active_nodes()
-                    .iter()
-                    .map(|dst| {
-                        ModuleMessage::Broadcast(id, msg.clone()).wrapper_network(dst.clone())
-                    })
-                    .collect(),
-                InternIn::DHTRouter(DHTRouterIn::MessageClosest(key, msg)) => {
-                    self.new_closest(key, msg)
-                }
-                InternIn::DHTRouter(DHTRouterIn::MessageDirect(key, msg)) => {
-                    self.new_direct(key, msg)
-                }
-                InternIn::Network(from_router) => match from_router {
-                    RouterOut::NodeInfoAvailable(node_infos) => self.add_node_infos(node_infos),
-                    RouterOut::NodeIDsConnected(connected) => {
-                        self.connected = connected.0.clone();
-                        self.add_nodes(connected.0)
-                    }
-                    RouterOut::NetworkWrapperFromNetwork(from, network_wrapper) => {
-                        self.process_node_message(from, network_wrapper)
-                    }
-                    RouterOut::SystemConfig(conf) => conf
-                        .system_realm
-                        .map(|rid| vec![InternOut::DHTRouter(DHTRouterOut::SystemRealm(rid))])
-                        .unwrap_or(vec![]),
-                    RouterOut::Disconnected(id) => {
-                        self.core.node_disconnected(id);
-                        vec![]
-                    }
-                    _ => vec![],
-                },
+                InternIn::DHTRouter(dht_msg) => self.msg_dht(dht_msg),
+                InternIn::Network(net_msg) => self.msg_network(net_msg),
             })
-            // .inspect(|msg| log::debug!("{id}: DHTRouterOut: {msg:?}"))
+            // .inspect(|msg| log::debug!("{_id}: DHTRouterOut: {msg:?}"))
             .collect();
         self.update_stats();
         out
