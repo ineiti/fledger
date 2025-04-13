@@ -211,16 +211,12 @@ impl Messages {
                 let remote_node = match pi.get_remote(&own_id) {
                     Some(id) => id,
                     None => {
-                        log::warn!("Got PeerSetup from unknown node");
+                        log::warn!("Got PeerSetup where this node is not involved");
                         return vec![];
                     }
                 };
                 concat(vec![
-                    if !self.connections.contains(&remote_node) {
-                        self.connect(&remote_node)
-                    } else {
-                        vec![]
-                    },
+                    self.assure_connection(&remote_node, Direction::Incoming),
                     vec![NetworkOut::WebRTC(WebRTCConnInput::Message(
                         remote_node,
                         NCInput::Setup(pi.get_direction(&own_id), pi.message),
@@ -245,11 +241,7 @@ impl Messages {
                 );
 
                 Ok(concat(vec![
-                    if !self.connections.contains(&id) {
-                        self.connect(&id)
-                    } else {
-                        vec![]
-                    },
+                    self.assure_connection(&id, Direction::Outgoing),
                     vec![NetworkOut::WebRTC(WebRTCConnInput::Message(
                         id,
                         NCInput::Text(msg_str),
@@ -258,7 +250,7 @@ impl Messages {
             }
             NetworkIn::StatsToWS(ss) => WSSignalMessageFromNode::NodeStats(ss.clone()).into(),
             NetworkIn::WSUpdateListRequest => WSSignalMessageFromNode::ListIDsRequest.into(),
-            NetworkIn::Connect(id) => Ok(self.connect(&id)),
+            NetworkIn::Connect(id) => Ok(self.assure_connection(&id, Direction::Outgoing)),
             NetworkIn::Disconnect(id) => Ok(self.disconnect(&id).await),
             NetworkIn::Tick => {
                 self.get_update -= 1;
@@ -310,14 +302,13 @@ impl Messages {
     }
 
     /// Connect to the given node.
-    fn connect(&mut self, dst: &U256) -> Vec<NetworkOut> {
+    fn assure_connection(&mut self, dst: &U256, dir: Direction) -> Vec<NetworkOut> {
         if self.connections.contains(dst) {
-            log::trace!("Already connected to {}", dst);
             vec![]
         } else {
             self.connections.push(dst.clone());
             self.send_connections();
-            vec![NetworkOut::WebRTC(WebRTCConnInput::Connect(*dst))]
+            vec![NetworkOut::WebRTC(WebRTCConnInput::Connect(*dst, dir))]
         }
     }
 

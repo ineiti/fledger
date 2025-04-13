@@ -11,6 +11,7 @@
 //! _If you come here, I hope you're not trying to debug something that doesn't work.
 //! This code is quite obscure, and should be rewritten for the 5th time or so._
 use crate::broker::{Broker, BrokerError, SubsystemHandler};
+use enum_display::EnumDisplay;
 use flmacro::platform_async_trait;
 use thiserror::Error;
 
@@ -32,7 +33,7 @@ pub enum NCError {
     Broker(#[from] BrokerError),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, EnumDisplay)]
 /// Messages from the [`crate::web_rtc::WebRTCConn`]
 pub enum NCInput {
     /// Text to be sent over the first available connection
@@ -158,13 +159,7 @@ impl NodeConnection {
         match msg {
             NCInput::Text(msg_str) => {
                 self.msg_queue.push(msg_str);
-                let mut out = vec![];
-                out.extend(self.send_queue());
-                if self.state_outgoing.is_none() {
-                    out.push(NCOutput::Outgoing(WebRTCInput::Setup(PeerMessage::Init)));
-                    self.state_outgoing = Some(ConnectionStateMap::default());
-                }
-                out
+                self.send_queue()
             }
             NCInput::Disconnect => vec![
                 NCOutput::Incoming(WebRTCInput::Disconnect),
@@ -181,10 +176,17 @@ impl NodeConnection {
                 }
                 out
             }
-            NCInput::Setup(dir, pm) => match dir {
-                Direction::Incoming => vec![NCOutput::Incoming(WebRTCInput::Setup(pm))],
-                Direction::Outgoing => vec![NCOutput::Outgoing(WebRTCInput::Setup(pm))],
-            },
+            NCInput::Setup(dir, pm) => {
+                match dir {
+                    Direction::Incoming => vec![NCOutput::Incoming(WebRTCInput::Setup(pm))],
+                    Direction::Outgoing => {
+                        if self.state_outgoing.is_none() {
+                            self.state_outgoing = Some(ConnectionStateMap::default());
+                        }
+                        vec![NCOutput::Outgoing(WebRTCInput::Setup(pm))]
+                    }
+                }
+            }
             _ => vec![],
         }
     }

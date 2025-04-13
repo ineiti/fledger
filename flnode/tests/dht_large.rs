@@ -11,7 +11,9 @@ use flmodules::{
     dht_storage::realm_view::RealmView,
     network::{
         network_start,
-        signal::{BrokerSignal, SignalConfig, SignalIn, SignalOut, SignalServer},
+        signal::{
+            BrokerSignal, SignalConfig, SignalIn, SignalOut, SignalServer, WSSignalMessageFromNode,
+        },
     },
     nodeconfig::NodeConfig,
     Modules,
@@ -27,14 +29,21 @@ use tokio::sync::watch;
  * This makes it also easier to test and have a fast test-feedback.
  *
  * Some measurements on a local Mac OSX:
- * 003 nodes ->     19kB
- * 010 nodes ->    200kB
- * 100 nodes ->  6_000kB
- * 200 nodes -> 12_000kB
+ * 003 nodes ->     15kB
+ * 010 nodes ->    114kB
+ * 030 nodes ->    562kB
+ * 100 nodes ->  2_600kB
+ * 200 nodes ->  6_000kB
+ * 250 nodes ->  8_200kB
+ * 300 nodes -> 10_000kB // Already has problems with some of the connections
  */
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 16)]
 async fn dht_large() -> anyhow::Result<()> {
+    // start_logging_filter_level(
+    //     vec!["flarch::web_rtc", "dht_large", "flmodules::dht_storage"],
+    //     log::LevelFilter::Trace,
+    // );
     start_logging_filter_level(vec!["dht_large", "fl"], log::LevelFilter::Debug);
 
     log::info!("This uses a lot of connections. So be sure to run the following:");
@@ -44,7 +53,7 @@ async fn dht_large() -> anyhow::Result<()> {
 
     let mut signal = start_signal().await?;
     let signal_rx = signal.broker.get_tap_out_sync().await?;
-    let nbr_nodes: usize = 200;
+    let nbr_nodes: usize = 100;
     let mut nodes = vec![];
     let mut dhts = vec![];
     for i in 0..nbr_nodes {
@@ -147,7 +156,7 @@ async fn start_signal() -> anyhow::Result<Signal> {
         SignalConfig {
             ttl_minutes: 2,
             system_realm: None,
-            max_list_len: Some(5),
+            max_list_len: Some(3),
         },
     )
     .await?;
@@ -158,7 +167,14 @@ async fn start_signal() -> anyhow::Result<Signal> {
     tokio::spawn(async move {
         let mut total = 0;
         for msg in msgs.0 {
-            log::trace!("Signal out: {msg:?}");
+            // log::trace!("Signal out: {msg:?}");
+            if let SignalOut::WSServer(WSServerIn::Message(ch, msg_str)) = &msg {
+                if let Ok(msg_ws) = serde_json::from_str::<WSSignalMessageFromNode>(&msg_str) {
+                    if let WSSignalMessageFromNode::PeerSetup(msg_peer) = msg_ws {
+                        log::trace!("{}: {} {} -> {}", ch, msg_peer.message, msg_peer.id_init, msg_peer.id_follow);
+                    }
+                }
+            }
             match msg {
                 SignalOut::WSServer(WSServerIn::Message(_, m)) => {
                     total += m.len() as u64;

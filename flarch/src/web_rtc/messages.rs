@@ -5,13 +5,14 @@
 //! of the WebRTC subsystem.
 //! Both the wasm and the libc implementation for the WebRTC system return a [`Broker<WebRTCInput, WebRTCOutput>`]
 //! that is then given to the [`crate::web_rtc::WebRTCConn`].
+use enum_display::EnumDisplay;
 use futures::{channel::oneshot::Canceled, Future};
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc::RecvError;
 use thiserror::Error;
 
 use crate::{
-    broker::{BrokerError, Broker},
+    broker::{Broker, BrokerError},
     nodeids::NodeID,
 };
 
@@ -79,17 +80,16 @@ pub enum WebRTCOutput {
 /// or an outgoing connection.
 pub type WebRTCSpawner = Box<
     dyn Fn() -> Box<
-            dyn Future<Output = anyhow::Result<Broker<WebRTCInput, WebRTCOutput>>>
-                + Unpin
-                + Send,
+            dyn Future<Output = anyhow::Result<Broker<WebRTCInput, WebRTCOutput>>> + Unpin + Send,
         > + Send
         + Sync,
 >;
 #[cfg(target_family = "wasm")]
 /// The spawner will create a new [`Broker<WebRTCInput, WebRTCOutput>`] ready to handle either an incoing
 /// or an outgoing connection.
-pub type WebRTCSpawner =
-    Box<dyn Fn() -> Box<dyn Future<Output = anyhow::Result<Broker<WebRTCInput, WebRTCOutput>>> + Unpin>>;
+pub type WebRTCSpawner = Box<
+    dyn Fn() -> Box<dyn Future<Output = anyhow::Result<Broker<WebRTCInput, WebRTCOutput>>> + Unpin>,
+>;
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 /// How the current connection is being setup.
@@ -184,7 +184,7 @@ impl Default for ConnectionStateMap {
 
 /// A setup message being sent between two nodes to setup or maintain
 /// a WebRTC connection.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, EnumDisplay)]
 pub enum PeerMessage {
     /// The receiver should start the connection by creating an offer
     Init,
@@ -196,17 +196,6 @@ pub enum PeerMessage {
     /// Detailed information about available ports, poked holes in the NAT, or any other information
     /// to connect two nodes over WebRTC
     IceCandidate(String),
-}
-
-impl std::fmt::Display for PeerMessage {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            PeerMessage::Init => write!(f, "Init"),
-            PeerMessage::Offer(_) => write!(f, "Offer"),
-            PeerMessage::Answer(_) => write!(f, "Answer"),
-            PeerMessage::IceCandidate(_) => write!(f, "IceCandidate"),
-        }
-    }
 }
 
 /// Data sent between two nodes using the signalling server to set up
@@ -234,15 +223,6 @@ impl std::fmt::Display for PeerInfo {
 }
 
 impl PeerInfo {
-    /// Creates a new [`PeerInfo`] with an init message
-    pub fn new(init: &NodeID, follow: &NodeID) -> PeerInfo {
-        PeerInfo {
-            id_init: *init,
-            id_follow: *follow,
-            message: PeerMessage::Init,
-        }
-    }
-
     /// Gets the other ID given one of the two IDs
     pub fn get_remote(&self, local: &NodeID) -> Option<NodeID> {
         if self.id_init == *local {
