@@ -283,7 +283,7 @@ mod tests {
         flo::realm::{FloRealm, Realm},
         testing::{
             network_simul::NetworkSimul,
-            wallet::{FloTesting, Wallet},
+            wallet::{FloTesting, Testing, Wallet},
         },
         timer::{Timer, TimerMessage},
     };
@@ -353,7 +353,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_storage_propagation() -> anyhow::Result<()> {
+    async fn test_realm_propagation() -> anyhow::Result<()> {
         start_logging_filter_level(vec!["flmodules"], log::LevelFilter::Info);
 
         let mut router = SimulStorage::new().await?;
@@ -380,9 +380,7 @@ mod tests {
 
         router.simul.send_node_info().await?;
         ds_2.sync()?;
-        ds_0.broker.settle(vec![]).await?;
-        ds_1.broker.settle(vec![]).await?;
-        ds_2.broker.settle(vec![]).await?;
+        router.settle_all().await;
         assert!(ds_2
             .get_flo::<Realm>(&router.realm.global_id())
             .await
@@ -428,6 +426,22 @@ mod tests {
         log::info!("Cuckoo in ds_1");
         router.sync_all().await?;
         assert_eq!(1, ds_1.get_cuckoos(&t0.global_id()).await?.len());
+
+        // Testing copy of flo in other node(s) who join later.
+        log::info!("Copying flos to new nodes");
+        let mut ds_2 = router.node().await?;
+
+        router.simul.send_node_info().await?;
+        ds_2.sync()?;
+        router.settle_all().await;
+        assert!(ds_2
+            .get_flo::<Testing>(&t0.flo().global_id())
+            .await
+            .is_ok());
+        assert!(ds_2
+            .get_flo::<Testing>(&t1.flo().global_id())
+            .await
+            .is_ok());
 
         Ok(())
     }

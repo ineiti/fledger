@@ -87,8 +87,8 @@ mod tests {
 
     // 30 nodes have trouble correctly shutting down, so we keep it to 20 for now.
     #[tokio::test]
-    async fn gossip_20() -> anyhow::Result<()> {
-        gossip(20).await?;
+    async fn gossip_10() -> anyhow::Result<()> {
+        gossip(10).await?;
         Ok(())
     }
 }

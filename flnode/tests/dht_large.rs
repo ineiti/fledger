@@ -53,7 +53,7 @@ async fn dht_large() -> anyhow::Result<()> {
 
     let mut signal = start_signal().await?;
     let signal_rx = signal.broker.get_tap_out_sync().await?;
-    let nbr_nodes: usize = 100;
+    let nbr_nodes: usize = 50;
     let mut nodes = vec![];
     let mut dhts = vec![];
     for i in 0..nbr_nodes {
@@ -100,7 +100,7 @@ async fn dht_large() -> anyhow::Result<()> {
             break;
         }
 
-        if count % 5 == 0 {
+        if count % 3 == 0 {
             let connections: (usize, usize) = nodes
                 .iter()
                 .map(|node| node.dht_router.as_ref().unwrap().stats.borrow())

@@ -20,11 +20,11 @@ WORKDIR /fledger
 COPY --from=build /home/target-common/release/flsignal .
 COPY --from=build /etc/ssl /etc/ssl
 
-ENTRYPOINT ["/fledger/flsignal", "-vv"]
+ENTRYPOINT ["/fledger/flsignal", "-v"]
 
 FROM debian:bookworm-slim AS fledger
 WORKDIR /fledger
 COPY --from=build /home/target-common/release/fledger .
 COPY --from=build /etc/ssl /etc/ssl
 
-ENTRYPOINT ["/fledger/fledger", "-vv"]
+ENTRYPOINT ["/fledger/fledger", "-v"]

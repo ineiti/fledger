@@ -9,7 +9,7 @@ build:
 	cd wasm && trunk build
 
 run: build
-	cd ../../cli/flsignal && cargo run -- -vv &
+	cd ../../cli/flsignal && cargo run -- -v &
 	sleep 2
 	cd libc && cargo run &
 	cd libc && cargo run &

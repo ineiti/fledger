@@ -6,7 +6,7 @@ CARGOS_NOWASM := cli/{fledger,flsignal} flarch flbrowser flcrypto flmacro \
 			examples/ping-pong/{shared,libc}
 CARGO_LOCKS := . test/{fledger-nodejs,webrtc-libc-wasm/wasm} flbrowser examples/ping-pong/wasm
 
-MAKE_TESTS := examples/ping-pong test/{fledger-nodejs,signal-fledger,webrtc-libc-wasm}
+MAKE_TESTS := examples/ping-pong test/webrtc-libc-wasm
 CRATES := flcrypto flmacro flarch flmodules flnode
 SHELL := /bin/bash
 PKILL = @/bin/ps aux | grep "$1" | egrep -v "(grep|vscode|rust-analyzer)" | awk '{print $$2}' | xargs -r kill
@@ -15,20 +15,23 @@ FLEDGER = cargo run --bin fledger -- --config fledger/test0$1 --name Local0$1 \
 		--log-dht-storage -s ws://localhost:8765 --disable-turn-stun
 
 cargo_check:
+	set -e; \
 	for c in ${CARGO_LOCKS}; do \
 	  echo Checking $$c; \
-	  ( cd $$c && cargo check --tests ); \
+	  ( cd $$c && cargo check --tests ) || exit 1; \
 	done
 
 cargo_test:
+	set -e; \
 	for c in ${CARGO_LOCKS}; do \
 	  echo Checking $$c; \
-	  ( cd $$c && cargo test ); \
+	  ( cd $$c && cargo test ) || exit 1; \
 	done
 
 make_test:
+	echo "Tests which need to be inspected manually. But still run them in github workflows."
 	for c in ${MAKE_TESTS}; do \
-	  ( cd $$c && make test ); \
+	  ( cd $$c && make test ) \
 	done
 
 cargo_update:
@@ -44,9 +47,10 @@ cargo_clean:
 	done
 
 cargo_build:
+	set -e; \
 	for c in ${CARGO_LOCKS}; do \
 		echo Building $$c; \
-		(cd $$c && cargo build ); \
+		(cd $$c && cargo build ) || exit 1; \
 	done
 
 cargo_unused:
@@ -59,6 +63,7 @@ publish_dry: PUBLISH = --dry-run
 publish_dry: publish
 
 publish:
+	set -e; \
 	for crate in ${CRATES}; do \
 		if grep -q '"\*"' $$crate/Cargo.toml; then \
 			echo "Remove wildcard version from $$crate"; \

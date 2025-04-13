@@ -280,16 +280,16 @@ impl Messages {
                 self.realms.keys().cloned().collect(),
             )],
             MessageNeighbour::AvailableRealmIDs(realm_ids) => {
-                let our_realms = realm_ids
+                let accepted_realms = realm_ids
                     .into_iter()
                     .filter(|rid| self.config.accepts_realm(&rid))
                     .collect::<Vec<_>>();
-                our_realms
+                accepted_realms
                     .iter()
                     .filter(|id| !self.realms.contains_key(id))
                     .map(|rid| MessageNeighbour::RequestFlos(rid.clone(), vec![(**rid).into()]))
                     .chain(
-                        our_realms
+                        accepted_realms
                             .iter()
                             .map(|rid| MessageNeighbour::RequestFloMetas(rid.clone())),
                     )

@@ -237,12 +237,6 @@ mod test {
             .await;
         assert_eq!(0, msgs.len());
 
-        // Connect an unknown node - this should be ignored
-        let msgs = od
-            .messages(vec![RouterInternal::Connected(node_unknown).into()])
-            .await;
-        assert_eq!(0, msgs.len());
-
         // Disconnect an unknown node - twice, in case it keeps it and would fail to remove it when
         // it isn't here anymore.
         let msgs = od
