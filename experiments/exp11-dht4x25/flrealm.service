@@ -1,0 +1,23 @@
+
+[Unit]
+Description=Fledger node to create a realm
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/root/fledger \
+    --config /root/flrealm \
+    --name flrealm \
+    --disable-turn-stun \
+    --signal-url ws://127.0.0.1:8765 \
+    -v \
+    realm create \
+      65535 \
+      65535
+RemainAfterExit=yes
+Restart=no
+User=root
+StandardOutput=append:/var/log/flrealm
+
+[Install]
+WantedBy=multi-user.target
