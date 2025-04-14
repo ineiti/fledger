@@ -26,6 +26,8 @@ pub enum SimulationSubcommand {
         #[arg(long)]
         recv_msg: Option<String>,
     },
+
+    DhtJoinRealm {},
 }
 
 pub struct SimulationHandler {}
@@ -36,6 +38,7 @@ impl SimulationHandler {
             SimulationSubcommand::Chat { send_msg, recv_msg } => {
                 Self::run_chat(f, command, send_msg, recv_msg).await
             }
+            SimulationSubcommand::DhtJoinRealm {} => Self::run_dht_join_realm(f).await,
         }
     }
 
@@ -93,6 +96,14 @@ impl SimulationHandler {
                 }
             }
         }
+    }
+
+    async fn run_dht_join_realm(mut f: Fledger) -> anyhow::Result<()> {
+        f.loop_node(crate::FledgerState::DHTAvailable).await?;
+        log::info!("SIMULATION END");
+
+        f.loop_node(crate::FledgerState::Forever).await?;
+        return Ok(());
     }
 
     fn log_new_messages(f: &Fledger, acked_msg_ids: &mut Vec<U256>) {
