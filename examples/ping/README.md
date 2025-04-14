@@ -14,7 +14,7 @@ Before it can be run, the signalling server needs to be started locally in
 a separate terminal:
 
 ```bash
-cd ../../cli && cargo run -p flsignal -- -vv
+cd ../../cli && cargo run -p flsignal -- -v
 ```
 
 Once the signalling server is started, the server can be started:
@@ -46,7 +46,7 @@ To run it, a signalling server needs to be started first,
 like with the `Server Action`:
 
 ```bash
-cd ../../cli && cargo run -p flsignal -- -vv
+cd ../../cli && cargo run -p flsignal -- -v
 ```
 
 Then you must run at least two nodes, but you can run as many as you

@@ -123,10 +123,7 @@ impl Messages {
                 .core
                 .active_nodes()
                 .iter()
-                .map(|dst| {
-                    ModuleMessage::Neighbour(msg.clone())
-                        .wrapper_network(dst.clone())
-                })
+                .map(|dst| ModuleMessage::Neighbour(msg.clone()).wrapper_network(dst.clone()))
                 .collect(),
             DHTRouterIn::MessageClosest(key, msg) => self.new_closest(key, msg),
             DHTRouterIn::MessageDirect(key, msg) => self.new_direct(key, msg),

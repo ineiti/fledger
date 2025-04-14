@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use flarch::{
     broker::{Broker, SubsystemHandler},
     nodeids::{NodeID, U256},
@@ -104,26 +106,47 @@ enum NSHubOut {
 
 struct NSHub {
     nodes: Vec<NodeInfo>,
+    connected: HashMap<NodeID, Vec<NodeID>>,
 }
 
 impl NSHub {
     async fn new() -> anyhow::Result<Broker<NSHubIn, NSHubOut>> {
         let mut b = Broker::new();
-        b.add_handler(Box::new(Self { nodes: vec![] })).await?;
+        b.add_handler(Box::new(Self {
+            nodes: vec![],
+            connected: HashMap::new(),
+        }))
+        .await?;
         Ok(b)
     }
 
-    fn net_msg(&self, id: U256, msg: NetworkIn) -> Vec<NSHubOut> {
+    fn net_msg(&mut self, from: U256, msg: NetworkIn) -> Vec<NSHubOut> {
         match msg {
             NetworkIn::MessageToNode(id_dst, msg_node) => {
-                vec![NSHubOut::ToClient(
-                    id_dst,
-                    NetworkOut::MessageFromNode(id, msg_node),
-                )]
+                let mut out = vec![NSHubOut::ToClient(
+                    id_dst.clone(),
+                    NetworkOut::MessageFromNode(from, msg_node),
+                )];
+                if self
+                    .connected
+                    .get(&from)
+                    .map(|conns| conns.contains(&id_dst))
+                    == Some(false)
+                {
+                    self.connected
+                        .get_mut(&from)
+                        .map(|conns| conns.push(id_dst.clone()));
+                    self.connected
+                        .get_mut(&id_dst)
+                        .map(|conns| conns.push(from.clone()));
+                    out.push(NSHubOut::ToClient(id_dst, NetworkOut::Connected(from)));
+                    out.push(NSHubOut::ToClient(from, NetworkOut::Connected(id_dst)));
+                }
+                out
             }
             NetworkIn::WSUpdateListRequest => {
                 vec![NSHubOut::ToClient(
-                    id,
+                    from,
                     NetworkOut::NodeListFromWS(self.nodes.clone()),
                 )]
             }
@@ -141,10 +164,11 @@ impl SubsystemHandler<NSHubIn, NSHubOut> for NSHub {
 
         for msg in msgs {
             match msg {
-                NSHubIn::FromClient(id, net_msg) => {
-                    out.append(&mut self.net_msg(id, net_msg));
+                NSHubIn::FromClient(from, net_msg) => {
+                    out.append(&mut self.net_msg(from, net_msg));
                 }
                 NSHubIn::NewClient(info) => {
+                    self.connected.insert(info.get_id(), vec![]);
                     self.nodes.push(info);
                 }
             }

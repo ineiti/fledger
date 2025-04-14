@@ -43,7 +43,7 @@
 //! you need a locally runing signalling server that you can spin up with:
 //!
 //! ```bash
-//! cd cli; cargo run --bin flsignal -- -vv
+//! cd cli; cargo run --bin flsignal -- -v
 //! ```
 //!
 //! For more debugging, it is sometimes useful to add `-vvv`, or even `-vvvv`, but then
