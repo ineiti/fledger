@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 
 use flarch::{
     data_storage::{DataStorage, DataStorageFile},
+    random,
     tasks::wait_ms,
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
@@ -13,9 +14,12 @@ use flmodules::{
 use flnode::{node::Node, version::VERSION_STRING};
 use page::{Page, PageCommands};
 use realm::{RealmCommands, RealmHandler};
+use simulation::{SimulationCommand, SimulationHandler};
 
+mod metrics;
 mod page;
 mod realm;
+mod simulation;
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug, Clone)]
@@ -62,6 +66,10 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     log_gossip: bool,
 
+    /// Log dht connections
+    #[arg(long, default_value = "false")]
+    log_dht_connections: bool,
+
     /// Log random router
     #[arg(long, default_value = "false")]
     log_random: bool,
@@ -73,6 +81,13 @@ pub struct Args {
     /// Log dht-storage stats
     #[arg(long, default_value = "false")]
     log_dht_storage: bool,
+
+    /// Wait a random amount of ms, bounded by
+    /// bootwait_max, before starting the node.
+    /// This allows the signaling server to be
+    /// less overwhelmed
+    #[arg(long, default_value = "0")]
+    bootwait_max: u64,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -94,6 +109,8 @@ enum Commands {
     Crypto {},
     /// Prints the statistics of the different modules and then quits
     Stats {},
+    /// Simulation tasks
+    Simulation(SimulationCommand),
 }
 
 struct Fledger {
@@ -123,6 +140,22 @@ async fn main() -> anyhow::Result<()> {
         SIGNAL_VERSION,
         VERSION_STRING
     );
+
+    // wait a random amount of time before running a simulation
+    // to avoid overloading the signaling server
+    if !args.bootwait_max != 0 {
+        match args.command.clone() {
+            Some(cmd) => match cmd {
+                Commands::Simulation(_) => {
+                    let randtime: u64 = random::<u64>() % args.bootwait_max;
+                    log::info!("Waiting {}ms before running this node...", randtime);
+                    wait_ms(randtime).await;
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
 
     let cc = if args.disable_turn_stun {
         ConnectionConfig::from_signal(&args.signal_url)
@@ -165,6 +198,7 @@ impl Fledger {
                 Commands::Crypto {} => todo!(),
                 Commands::Stats {} => todo!(),
                 Commands::Page { command } => Page::run(f, command).await,
+                Commands::Simulation(command) => SimulationHandler::run(f, command).await,
             },
             None => f.loop_node(FledgerState::Forever).await,
         }
@@ -182,6 +216,7 @@ impl Fledger {
             FledgerState::Duration(i) => log::info!("Just hanging around {i} seconds"),
             FledgerState::Forever => log::info!("Looping forever"),
         }
+
         loop {
             count += 1;
 
@@ -209,19 +244,22 @@ impl Fledger {
             } {
                 return Ok(());
             }
+
             self.ds.sync()?;
-            println!(
-                "dht-connections: {}/{}",
-                self.dr.stats.borrow().active,
-                self.dr
-                    .stats
-                    .borrow()
-                    .all_nodes
-                    .iter()
-                    .map(|n| n.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
+            if self.args.log_dht_connections {
+                log::info!(
+                    "dht-connections: {}/{}",
+                    self.dr.stats.borrow().active,
+                    self.dr
+                        .stats
+                        .borrow()
+                        .all_nodes
+                        .iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
         }
     }
 
@@ -231,7 +269,7 @@ impl Fledger {
                 log::info!(
                     "Nodes are: {}",
                     self.node
-                        .nodes_online()?
+                        .nodes_connected()?
                         .iter()
                         .map(|n| format!("{}/{}", n.name, n.get_id()))
                         .collect::<Vec<_>>()

@@ -1,0 +1,157 @@
+- name: Prepare ansible host
+  hosts: 127.0.0.1
+  connection: local
+  tasks:
+    - name: Generate node environments
+      changed_when: true
+      ansible.builtin.command:
+        cmd: ./generate-env.sh
+
+    - name: Create metrics directory
+      ansible.builtin.file:
+        path: metrics
+        state: directory
+        mode: "0755"
+
+- name: Prepare fledger nodes
+  hosts: nodes
+  become: true
+  tasks:
+    - name: Copy binary
+      ansible.builtin.copy:
+        src: ~/fledger
+        dest: ~/
+        mode: preserve
+
+    - name: Copy services
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: /etc/systemd/system/
+        mode: preserve
+      loop:
+        - fledgerA.service
+        - fledgerB.service
+
+    - name: Stop services
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+        daemon_reload: true
+      loop:
+        - fledgerA
+        - fledgerB
+
+    - name: Copy environment
+      ansible.builtin.copy:
+        src: "env.systemd/{{ inventory_hostname }}.env"
+        dest: ~/env.systemd
+        mode: preserve
+
+    - name: Remove old node and logs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /root/fledgerA
+        - /root/fledgerB
+        - /var/log/fledgerA
+        - /var/log/fledgerB
+
+
+- name: Prepare central node
+  hosts: central
+  become: true
+  tasks:
+    - name: Disable ip forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: 0
+        sysctl_set: true
+        state: present
+        reload: true
+
+    - name: Copy binaries
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: ~/
+        mode: preserve
+      loop:
+        - ~/fledger
+        - ~/flsignal
+
+    - name: Copy services
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: /etc/systemd/system/
+        mode: preserve
+      loop:
+        - flsignal.service
+        - flrealm.service
+
+    - name: Stop services
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+        daemon_reload: true
+      loop:
+        - flsignal
+        - flrealm
+
+    - name: Remove logs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/log/flsignal
+        - /var/log/flrealm
+
+    - name: Start services
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - flsignal
+        - flrealm
+
+- name: Run the simulation
+  hosts: nodes
+  become: true
+  timeout: 300
+  tasks:
+    - name: Start fledger nodes
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: restarted
+        daemon_reload: true
+      loop:
+        - fledgerA
+        - fledgerB
+
+    - name: Wait for success triggers
+      ansible.builtin.wait_for:
+        path: "/var/log/fledger{{ item }}"
+        search_regex: "SIMULATION END"
+      loop:
+        - A
+        - B
+
+# Must remain separate so it runs even if the simulation fails
+# - name: Download metrics
+#   hosts: nodes
+#   become: true
+#   tasks:
+#     - name: Download metrics
+#       ansible.builtin.fetch:
+#         src: /tmp/out.metrics
+#         flat: true
+#         dest: "metrics/{{ inventory_hostname }}.metrics"
+#
+# - name: Assemble metrics into one file
+#   hosts: 127.0.0.1
+#   connection: local
+#   tasks:
+#     - name: Assemble metrics
+#       ansible.builtin.assemble:
+#         src: metrics
+#         dest: assembled.metrics
+#         mode: "644"
