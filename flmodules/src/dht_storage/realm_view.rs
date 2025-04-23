@@ -26,8 +26,8 @@ use super::broker::StorageError;
 pub struct RealmView {
     dht_storage: DHTStorage,
     pub realm: FloRealm,
-    pub pages: Option<RealmStorage<BlobPage>>,
-    pub tags: Option<RealmStorage<BlobTag>>,
+    pub pages: RealmStorage<BlobPage>,
+    pub tags: RealmStorage<BlobTag>,
 }
 
 #[derive(Debug, Clone)]
@@ -72,16 +72,22 @@ impl RealmView {
         Self::new_from_realm(dht_storage, realm).await
     }
 
-    pub async fn new_from_realm(dht_storage: DHTStorage, realm: FloRealm) -> anyhow::Result<Self> {
-        let mut rv = Self {
+    pub async fn new_from_realm(
+        mut dht_storage: DHTStorage,
+        realm: FloRealm,
+    ) -> anyhow::Result<Self> {
+        let pages = RealmStorage::from_service(&mut dht_storage, &realm, "http")
+            .await?
+            .unwrap();
+        let tags = RealmStorage::from_service(&mut dht_storage, &realm, "tag")
+            .await?
+            .unwrap();
+        Ok(Self {
             realm,
-            pages: None,
-            tags: None,
+            pages,
+            tags,
             dht_storage,
-        };
-        rv.pages = rv.get_realm_storage("http").await?;
-        rv.tags = rv.get_realm_storage("tag").await?;
-        Ok(rv)
+        })
     }
 
     pub async fn new_create_realm(
@@ -145,11 +151,7 @@ impl RealmView {
             signers,
         )?;
         self.dht_storage.store_flo(fp.clone().into())?;
-        if let Some(parent_page) = parent.and_then(|p| {
-            self.pages
-                .as_mut()
-                .and_then(|pages| pages.storage.get_mut(&p))
-        }) {
+        if let Some(parent_page) = parent.and_then(|p| self.pages.storage.get_mut(&p)) {
             let cond = self
                 .dht_storage
                 .convert(parent_page.cond(), &self.realm.realm_id())
@@ -228,61 +230,29 @@ impl RealmView {
     }
 
     pub async fn read_pages(&mut self, id: BlobID) -> anyhow::Result<()> {
-        if let Some(page) = self.pages.as_mut() {
-            page.update_blobs_from_ds(&mut self.dht_storage, &id)
-                .await?;
-        }
-        Ok(())
+        self.pages
+            .update_blobs_from_ds(&mut self.dht_storage, &id)
+            .await
     }
 
     pub async fn read_tags(&mut self, id: BlobID) -> anyhow::Result<()> {
-        if let Some(tag) = self.tags.as_mut() {
-            tag.update_blobs_from_ds(&mut self.dht_storage, &id).await?;
-        }
-        Ok(())
+        self.tags
+            .update_blobs_from_ds(&mut self.dht_storage, &id)
+            .await
     }
 
     pub async fn update_pages(&mut self) -> anyhow::Result<()> {
-        if let Some(pages) = self.pages.as_mut() {
-            pages.update_blobs(&mut self.dht_storage).await?;
-        }
-        Ok(())
+        self.pages.update_blobs(&mut self.dht_storage).await
     }
 
     pub async fn update_tags(&mut self) -> anyhow::Result<()> {
-        if let Some(tags) = self.tags.as_mut() {
-            tags.update_blobs(&mut self.dht_storage).await?;
-        }
-        Ok(())
-    }
-
-    async fn get_realm_storage<T: Serialize + DeserializeOwned + Clone + std::fmt::Debug>(
-        &mut self,
-        service: &str,
-    ) -> anyhow::Result<Option<RealmStorage<T>>>
-    where
-        FloWrapper<T>: BlobPath + BlobFamily,
-    {
-        Ok(
-            if let Some(id) = self.realm.cache().get_services().get(service) {
-                Some(
-                    RealmStorage::from_root(
-                        &mut self.dht_storage,
-                        self.realm.realm_id().global_id(id.clone()),
-                    )
-                    .await?,
-                )
-            } else {
-                None
-            },
-        )
+        self.tags.update_blobs(&mut self.dht_storage).await
     }
 
     pub fn get_page_path(&self, path: &str) -> anyhow::Result<&FloBlobPage> {
         self.pages
-            .as_ref()
-            .map(|page| page.get_path(path))
-            .ok_or(anyhow::anyhow!("Don't have any pages stored"))?
+            .get_path(path)
+            .map_err(|_| anyhow::anyhow!("Don't have any pages stored"))
     }
 }
 
@@ -290,6 +260,32 @@ impl<T: Serialize + DeserializeOwned + Clone + std::fmt::Debug> RealmStorage<T>
 where
     FloWrapper<T>: BlobPath + BlobFamily,
 {
+    async fn from_root(ds: &mut DHTStorage, root: GlobalID) -> anyhow::Result<Self> {
+        let mut rs = Self {
+            realm: root.realm_id().clone(),
+            root: (*root.flo_id().clone()).into(),
+            storage: HashMap::new(),
+            cuckoos: HashMap::new(),
+        };
+        rs.update_blobs_from_ds(ds, &rs.root.clone()).await?;
+        Ok(rs)
+    }
+
+    async fn from_service(
+        ds: &mut DHTStorage,
+        fr: &FloRealm,
+        service: &str,
+    ) -> anyhow::Result<Option<Self>>
+    where
+        FloWrapper<T>: BlobPath + BlobFamily,
+    {
+        Ok(if let Some(id) = fr.cache().get_services().get(service) {
+            Some(RealmStorage::from_root(ds, fr.realm_id().global_id(id.clone())).await?)
+        } else {
+            None
+        })
+    }
+
     pub fn get_path(&self, path: &str) -> anyhow::Result<&FloWrapper<T>> {
         self.get_path_internal(path.split('/').collect::<Vec<_>>(), vec![&self.root])
     }
@@ -338,17 +334,6 @@ where
             }
         }
         Err(anyhow::anyhow!("Couldn't find page"))
-    }
-
-    async fn from_root(ds: &mut DHTStorage, root: GlobalID) -> anyhow::Result<Self> {
-        let mut rs = Self {
-            realm: root.realm_id().clone(),
-            root: (*root.flo_id().clone()).into(),
-            storage: HashMap::new(),
-            cuckoos: HashMap::new(),
-        };
-        rs.update_blobs_from_ds(ds, &rs.root.clone()).await?;
-        Ok(rs)
     }
 
     async fn update_blobs_from_ds(

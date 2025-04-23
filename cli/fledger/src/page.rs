@@ -98,16 +98,14 @@ impl Page {
         for (rid, rv) in &self.realms {
             log::info!("\nRealm: {}", rid);
             let vid = self.f.node.crypto_storage.get_signer().verifier().get_id();
-            if let Some(storage) = rv.pages.as_ref().map(|p| &p.storage) {
-                for (_, page) in storage.iter() {
-                    println!(
-                        "{page}\n    editable: {}",
-                        self.ds
-                            .convert(page.cond(), &page.realm_id())
-                            .await
-                            .can_verify(&[&vid])
-                    );
-                }
+            for (_, page) in rv.pages.storage.iter() {
+                println!(
+                    "{page}\n    editable: {}",
+                    self.ds
+                        .convert(page.cond(), &page.realm_id())
+                        .await
+                        .can_verify(&[&vid])
+                );
             }
         }
         Ok(())
@@ -130,7 +128,7 @@ impl Page {
                 Some(parent.blob_id())
             };
             let cuckoo = if parts.is_empty() {
-                Cuckoo::Parent((*rv.pages.as_ref().unwrap().root).into())
+                Cuckoo::Parent((*rv.pages.root).into())
             } else {
                 Cuckoo::None
             };
