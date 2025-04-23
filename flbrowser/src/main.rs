@@ -150,17 +150,13 @@ impl WebState {
         match self.state {
             StateEnum::Init => self.set_state(StateEnum::ConnectingSignalling).await,
             StateEnum::ConnectingSignalling => {
-                if let Ok(nbr) = self.node.node.nodes_online() {
-                    if nbr.len() > 0 {
-                        self.set_state(StateEnum::ConnectingNodes).await;
-                    }
+                if self.node.node.nodes_online().unwrap_or(vec![]).len() > 0 {
+                    self.set_state(StateEnum::ConnectingNodes).await;
                 }
             }
             StateEnum::ConnectingNodes => {
-                if let Ok(nbr) = self.node.node.nodes_online() {
-                    if nbr.len() >= 2 {
-                        self.set_state(StateEnum::UpdateDHT).await;
-                    }
+                if self.node.get_dht_active_nodes() >= 2 {
+                    self.set_state(StateEnum::UpdateDHT).await;
                 }
             }
             StateEnum::UpdateDHT => {
@@ -221,7 +217,7 @@ impl WebState {
                     .node
                     .realm_views
                     .get(&dp.realm)
-                    .and_then(|pt| pt.pages.as_ref().map(|p| &p.storage))
+                    .map(|pt| &pt.pages.storage)
                     .unwrap()
                 {
                     if self
@@ -401,16 +397,14 @@ impl WebNode {
 
     pub fn get_dht_page(&self, rid: &RealmID, page_id: &BlobID) -> Option<DhtPage> {
         self.realm_views.get(rid).and_then(|rv| {
-            rv.pages.as_ref().and_then(|pages| {
-                pages
-                    .storage
-                    .get(&(**page_id).into())
-                    .map(|root_page| DhtPage {
-                        realm: rid.clone(),
-                        page: root_page.clone(),
-                        path: rv.realm.cache().get_name(),
-                    })
-            })
+            rv.pages
+                .storage
+                .get(&(**page_id).into())
+                .map(|root_page| DhtPage {
+                    realm: rid.clone(),
+                    page: root_page.clone(),
+                    path: rv.realm.cache().get_name(),
+                })
         })
     }
 
@@ -423,6 +417,10 @@ impl WebNode {
             .borrow()
             .get()
             .unwrap()
+    }
+
+    pub fn get_dht_active_nodes(&self) -> usize {
+        self.node.dht_router.as_ref().unwrap().stats.borrow().active
     }
 
     async fn node_start() -> Result<Node> {
