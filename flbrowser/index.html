@@ -22,11 +22,11 @@
             <ul class="module-tabs">
                 <li class="active"><a href="#" data-module="home" class="module-link"><i class="fas fa-home"></i>
                         Home</a></li>
-                <!-- <li><a href="#" data-module="sharing" class="module-link"><i class="fas fa-share-alt"></i> Store
-                        webpage</a></li> -->
-                <li><a href="#" data-module="chat" class="module-link"><i class="fas fa-comments"></i> Global Chat</a>
+                <li class="hidden" id="menu-page-edit"><a href="#" data-module="sharing" class="module-link"><i class="fas fa-share-alt"></i> Store
+                        webpage</a></li>
+                <li class="hidden" id="menu-chat"><a href="#" data-module="chat" class="module-link"><i class="fas fa-comments"></i> Global Chat</a>
                 </li>
-                <li><a href="#" data-module="proxy" class="module-link"><i class="fas fa-globe"></i> Web Proxy</a></li>
+                <li class="hidden" id="menu-proxy"><a href="#" data-module="proxy" class="module-link"><i class="fas fa-globe"></i> Web Proxy</a></li>
             </ul>
             <div class="external-links">
                 <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode">
@@ -373,13 +373,13 @@
             // Chat module functionality
             const chatInput = document.getElementById('chat-input');
             const sendButton = document.getElementById('send-message-btn');
-    
+
             function sendMessage() {
                 if (chatInput.value.trim() !== '') {
                     const messageContainer = document.getElementById('message-container');
                     const now = new Date();
                     const timeString = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
+
                     const messageHTML = `
                         <div class="message-item sent">
                             <div class="message-sender">You</div>
@@ -387,17 +387,17 @@
                             <div class="message-time">${timeString}</div>
                         </div>
                     `;
-    
+
                     messageContainer.innerHTML += messageHTML;
                     messageContainer.scrollTop = messageContainer.scrollHeight;
                     chatInput.value = '';
                 }
             }
-    
+
             if (sendButton) {
                 sendButton.addEventListener('click', sendMessage);
             }
-    
+
             if (chatInput) {
                 chatInput.addEventListener('keypress', function (e) {
                     if (e.key === 'Enter') {

@@ -35,7 +35,7 @@ pub enum WebProxyError {
     ResponseTimeout,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct WebProxy {
     /// Represents the underlying broker.
     pub web_proxy: Broker<WebProxyIn, WebProxyOut>,

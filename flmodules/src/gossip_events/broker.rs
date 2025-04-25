@@ -23,37 +23,54 @@ pub(super) const MODULE_NAME: &str = "Gossip";
 
 /// This links the GossipEvent module with a RandomConnections module, so that
 /// all messages are correctly translated from one to the other.
+#[derive(Clone, Debug)]
 pub struct Gossip {
     /// Represents the underlying broker.
     pub broker: BrokerGossip,
     /// Is used to pass the EventsStorage structure from the Translate to the GossipLink.
     pub storage: watch::Receiver<EventsStorage>,
+    info: NodeInfo,
 }
 
 impl Gossip {
     pub async fn start(
         storage: Box<dyn DataStorage + Send>,
-        node_info: NodeInfo,
+        info: NodeInfo,
         rc: BrokerRandom,
         timer: &mut Timer,
     ) -> anyhow::Result<Self> {
-        let (messages, storage) = Messages::new(node_info.get_id(), storage);
+        let src = info.get_id();
+        let (messages, storage) = Messages::new(src.clone(), storage);
         let mut broker = Broker::new();
         broker.add_handler(Box::new(messages)).await?;
 
         timer.tick_second(broker.clone(), GossipIn::Tick).await?;
         broker.link_bi(rc).await?;
 
-        let mut gb = Gossip { storage, broker };
+        let mut gb = Gossip {
+            storage,
+            broker,
+            info: info.clone(),
+        };
         gb.add_event(Event {
             category: Category::NodeInfo,
-            src: node_info.get_id(),
+            src,
             created: now(),
-            msg: node_info.encode(),
+            msg: info.encode(),
         })
         .await?;
 
         Ok(gb)
+    }
+
+    pub async fn add_chat_message(&mut self, msg: String) -> anyhow::Result<()> {
+        self.add_event(Event {
+            category: Category::TextMessage,
+            src: self.info.get_id(),
+            created: now(),
+            msg,
+        })
+        .await
     }
 
     /// Adds a new event to the GossipMessage module.
