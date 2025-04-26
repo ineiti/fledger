@@ -4,4 +4,3 @@ target-common/
 femme
 dist/
 *.code-workspace
-assembled.metrics

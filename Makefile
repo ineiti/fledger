@@ -85,17 +85,11 @@ kill:
 	$(call PKILL,fledger)
 	$(call PKILL,trunk serve)
 
-devbox_check_or_abort:
-	@test "${DEVBOX_SHELL_ENABLED}" == "1" || (echo "Devbox not enabled. Aborting..."; exit 1)
-
 build_cli:
 	cd cli && cargo build -p fledger && cargo build -p flsignal
 
 build_cli_release:
 	cd cli && cargo build --release -p fledger && cargo build --release -p flsignal
-
-build_cli_release_musl: devbox_check_or_abort
-	cd cli && cargo build --release --target=x86_64-unknown-linux-musl -p fledger && cargo build --release --target=x86_64-unknown-linux-musl -p flsignal
 
 build_web_release:
 	cd flbrowser && trunk build --release
@@ -129,13 +123,11 @@ docker_dev:
 		docker push fledgre/$$cli:dev; \
 	done
 
-deploy_experiments_binaries: build_cli_release_musl
-	@echo "INFO: run make deploy_experiments to rsync the experiment files."
-	@cd experiments && ./deploy-binaries.sh
-
-deploy_experiments:
-	@echo "INFO: run make deploy_experiments_binaries to recompile and upload the binaries."
-	@cd experiments && ./deploy-experiments.sh
+deploy:
+	@test "${DEVBOX_SHELL_ENABLED}" == "1" || (echo "Devbox not enabled. Aborting..."; exit 1)
+	@echo "Building fledger with musl, then deploying to XDC..."
+	cd cli && cargo build --release --target=x86_64-unknown-linux-musl -p fledger && cargo build --release --target=x86_64-unknown-linux-musl -p flsignal
+	@./deploy-binaries.sh
 
 clean:
 	for c in ${CARGOS}; do \
