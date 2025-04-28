@@ -1,7 +1,14 @@
-use crate::{metrics::Metrics, Fledger};
+use std::any::type_name;
+
+use crate::Fledger;
 use clap::{arg, Args, Subcommand};
 use flarch::{nodeids::U256, tasks::wait_ms};
-use flmodules::gossip_events::core::Event;
+use flcrypto::tofrombytes::ToFromBytes;
+use flmodules::{
+    dht_storage::realm_view::RealmView,
+    flo::blob::{BlobAccess, BlobTag},
+    gossip_events::core::Event,
+};
 use metrics::{absolute_counter, increment_counter};
 
 #[derive(Args, Debug, Clone)]
@@ -28,6 +35,16 @@ pub enum SimulationSubcommand {
     },
 
     DhtJoinRealm {},
+
+    CreateTag {
+        #[arg(long)]
+        tag: String,
+    },
+
+    FetchTag {
+        #[arg(long)]
+        tag: String,
+    },
 }
 
 pub struct SimulationHandler {}
@@ -39,6 +56,8 @@ impl SimulationHandler {
                 Self::run_chat(f, command, send_msg, recv_msg).await
             }
             SimulationSubcommand::DhtJoinRealm {} => Self::run_dht_join_realm(f).await,
+            SimulationSubcommand::CreateTag { tag } => Self::run_dht_create_tag(f, tag).await,
+            SimulationSubcommand::FetchTag { tag } => Self::run_dht_fetch_tag(f, tag).await,
         }
     }
 
@@ -50,8 +69,6 @@ impl SimulationHandler {
     ) -> anyhow::Result<()> {
         f.loop_node(crate::FledgerState::Connected(1)).await?;
 
-        let node_name = f.args.name.clone().unwrap_or("unknown".into());
-
         if let Some(ref msg) = recv_msg {
             log::info!("Waiting for chat message {}.", msg);
         }
@@ -62,9 +79,6 @@ impl SimulationHandler {
         }
 
         let mut acked_msg_ids: Vec<U256> = Vec::new();
-
-        // necessary to grab the variable for lifetime purposes.
-        let _influx = Metrics::setup(node_name);
 
         loop {
             wait_ms(1000).await;
@@ -90,7 +104,7 @@ impl SimulationHandler {
                     .iter()
                     .any(|ev| ev.msg.eq(msg))
                 {
-                    log::info!("RECV_CHAT_MSG TRIGGERED");
+                    log::info!("SIMULATION END");
                     f.loop_node(crate::FledgerState::Forever).await?;
                     return Ok(());
                 }
@@ -102,9 +116,164 @@ impl SimulationHandler {
         f.loop_node(crate::FledgerState::DHTAvailable).await?;
         log::info!("SIMULATION END");
 
+        absolute_counter!("fledger_realms_total", 1);
+
         f.loop_node(crate::FledgerState::Forever).await?;
         return Ok(());
     }
+
+    async fn run_dht_create_tag(mut f: Fledger, tag: String) -> anyhow::Result<()> {
+        f.loop_node(crate::FledgerState::DHTAvailable).await?;
+        absolute_counter!("fledger_dht_connected", 1);
+
+        log::info!("DHT CONNECTED");
+
+        //let router = f.node.dht_router.unwrap();
+        let ds = f.node.dht_storage.as_mut().unwrap();
+        let mut rv = RealmView::new_first(ds.clone()).await?;
+
+        // Send a Flo tag blob
+        log::info!("Storing tag in DHT {}.", tag);
+        let flo_tag = rv
+            .create_tag(&tag, None, flcrypto::access::Condition::Pass, &[])
+            .unwrap();
+        log::info!(
+            "tag {}/{}/{} | {}",
+            flo_tag.flo_id(),
+            flo_tag.realm_id(),
+            flo_tag.version(),
+            flo_tag.values().iter().next().unwrap().1,
+        );
+
+        let _ = ds.store_flo(flo_tag.flo().clone());
+        let _ = ds.propagate();
+        ds.broker.settle(Vec::new()).await?;
+
+        log::info!("SIMULATION END");
+        absolute_counter!("fledger_simulation_end", 1);
+
+        ds.get_flos(&rv.realm.realm_id())
+            .await
+            .unwrap()
+            .iter()
+            .for_each(|flo| {
+                let flo_type = type_name::<BlobTag>();
+                if flo.flo_type() == flo_type {
+                    let tag = BlobTag::from_rmp_bytes(flo_type, &flo.data()).unwrap();
+                    log::info!(
+                        "tag found {}/{}/{} | {}",
+                        flo.flo_id(),
+                        flo.realm_id(),
+                        flo.version(),
+                        tag.0.values().iter().next().unwrap().1,
+                    )
+                }
+            });
+
+        // if let Some(ref tags) = rv.tags {
+        //     log::info!("storage amt: {}", tags.storage.iter().count());
+        //
+        //     let tagname = tags
+        //         .storage
+        //         .iter()
+        //         .next()
+        //         .unwrap()
+        //         .1 // first tag stored
+        //         .values()
+        //         .iter()
+        //         .next()
+        //         .unwrap()
+        //         .1; // name of tag
+        //     log::info!("tag found: {}", tagname);
+        // } else {
+        //     log::info!("NOTICE: tag not found.")
+        // }
+
+        f.loop_node(crate::FledgerState::Forever).await?;
+        return Ok(());
+    }
+
+    async fn run_dht_fetch_tag(mut f: Fledger, tag: String) -> anyhow::Result<()> {
+        f.loop_node(crate::FledgerState::DHTAvailable).await?;
+        absolute_counter!("fledger_dht_connected", 1);
+
+        log::info!("DHT CONNECTED");
+
+        let ds = f.node.dht_storage.as_mut().unwrap();
+        let mut rv = RealmView::new_first(ds.clone()).await?;
+
+        loop {
+            wait_ms(1000).await;
+
+            // let fledger_connected_total = f.node.nodes_connected()?.len(); // TODO: does not
+            // compile.
+            //absolute_counter!("fledger_connected_total", fledger_connected_total as u64);
+            increment_counter!("fledger_iterations_total");
+
+            rv.update_tags().await?;
+
+            let flos = ds.get_flos(&rv.realm.realm_id()).await.unwrap().clone();
+            // flos.iter().for_each(|flo| {
+            //     log::info!(
+            //         "flo found {}/{}/{} [{}]",
+            //         flo.flo_id(),
+            //         flo.realm_id(),
+            //         flo.version(),
+            //         flo.flo_type(),
+            //     )
+            // });
+
+            let mut tags = flos
+                .iter()
+                .filter(|flo| flo.flo_type() == type_name::<BlobTag>())
+                .map(|flo| BlobTag::from_rmp_bytes(&flo.flo_type(), &flo.data()).unwrap());
+
+            tags.clone().for_each(|tag| {
+                log::info!("tag found {}", tag.0.values().iter().next().unwrap().1)
+            });
+
+            if tags.any(|flotag| {
+                flotag
+                    .0
+                    .values()
+                    .iter()
+                    .next()
+                    .is_some_and(|tagname| *tagname.1 == tag)
+            }) {
+                log::info!("SIMULATION END");
+                absolute_counter!("fledger_simulation_end", 1);
+                f.loop_node(crate::FledgerState::Forever).await?;
+
+                return Ok(());
+            } else {
+                log::info!("Tag not found...");
+            }
+            // tags.storage
+            //     .iter()
+            //     .any(|flotag| flotag.1.values().get(&tag).is_some());
+            // //.any(|flotag| flotag.1.values().iter().next().unwrap().1.eq(&tag));
+            // //.any(|tag| tag.1.values() tag.1.cache().0.get_blob_mut().values.get(tag).is_some());
+            // {
+            //     log::info!("SIMULATION END");
+            //     absolute_counter!("fledger_simulation_end", 1);
+            //     f.loop_node(crate::FledgerState::Forever).await?;
+            //
+            //     return Ok(());
+            // }
+        }
+    }
+
+    // async fn run_dht_request_random_flow(mut f: Fledger) -> anyhow::Result<()> {
+    //     let ds = f.node.dht_storage.unwrap();
+    //     let rv = RealmView::new_first(ds.clone()).await?;
+    //
+    //     // To send requests for random floID
+    //     // let realm_id = ds.get_realm_ids().await?.first().unwrap();
+    //     let realm_id = rv.realm.realm_id();
+    //     let res = ds.get_flo(&GlobalID::new(realm_id, FloID::rnd())).await;
+    //
+    //     return Ok(());
+    // }
 
     fn log_new_messages(f: &Fledger, acked_msg_ids: &mut Vec<U256>) {
         let chat_events = f.node.gossip.as_ref().unwrap().chat_events();
