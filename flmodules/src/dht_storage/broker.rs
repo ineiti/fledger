@@ -36,6 +36,7 @@ pub(super) const MODULE_NAME: &str = "DHTStorage";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTStorageIn {
+    ReadFlos(RealmID),
     StoreFlo(Flo),
     ReadFlo(GlobalID),
     ReadCuckooIDs(GlobalID),
@@ -46,6 +47,7 @@ pub enum DHTStorageIn {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTStorageOut {
+    Flos(Vec<Flo>),
     FloValue(FloCuckoo),
     RealmIDs(Vec<RealmID>),
     CuckooIDs(GlobalID, Vec<FloID>),
@@ -181,6 +183,15 @@ impl DHTStorage {
         Ok(self
             .send_wait(DHTStorageIn::ReadCuckooIDs(id.clone()), &|msg| match msg {
                 DHTStorageOut::CuckooIDs(rid, ids) => (&rid == id).then_some(ids),
+                _ => None,
+            })
+            .await?)
+    }
+
+    pub async fn get_flos(&mut self, realm_id: &RealmID) -> anyhow::Result<Vec<Flo>> {
+        Ok(self
+            .send_wait(DHTStorageIn::ReadFlos(realm_id.clone()), &|msg| match msg {
+                DHTStorageOut::Flos(flos) => Some(flos.clone()),
                 _ => None,
             })
             .await?)
@@ -434,14 +445,8 @@ mod tests {
         router.simul.send_node_info().await?;
         ds_2.sync()?;
         router.settle_all().await;
-        assert!(ds_2
-            .get_flo::<Testing>(&t0.flo().global_id())
-            .await
-            .is_ok());
-        assert!(ds_2
-            .get_flo::<Testing>(&t1.flo().global_id())
-            .await
-            .is_ok());
+        assert!(ds_2.get_flo::<Testing>(&t0.flo().global_id()).await.is_ok());
+        assert!(ds_2.get_flo::<Testing>(&t1.flo().global_id()).await.is_ok());
 
         Ok(())
     }

@@ -120,6 +120,12 @@ docker_dev:
 		docker push fledgre/$$cli:dev; \
 	done
 
+deploy:
+	@test "${DEVBOX_SHELL_ENABLED}" == "1" || (echo "Devbox not enabled. Aborting..."; exit 1)
+	@echo "Building fledger with musl, then deploying to XDC..."
+	cd cli && cargo build --release --target=x86_64-unknown-linux-musl -p fledger && cargo build --release --target=x86_64-unknown-linux-musl -p flsignal
+	@./deploy-binaries.sh
+
 clean:
 	for c in ${CARGOS}; do \
 		echo "Cleaning $$c"; \

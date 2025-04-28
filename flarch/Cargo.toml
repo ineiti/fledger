@@ -16,7 +16,7 @@ node = ["flmacro/node"]
 [dependencies]
 flmacro = { version = "0.9", path = "../flmacro" }
 
-anyhow = {version = "1", features = ["backtrace"]}
+anyhow = { version = "1", features = ["backtrace"] }
 bytes = "1.9"
 chrono = "0.4"
 enum-display = "0.1"
@@ -37,6 +37,7 @@ serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 rmp-serde = "1"
 btparse = "0.2"
+metrics = "0.21.1"
 
 # For libc
 [target.'cfg(target_family="unix")'.dependencies]
@@ -52,26 +53,26 @@ wasm-bindgen-test = "0.3"
 wasmtimer = "0.4"
 serde-wasm-bindgen = { version = "0.6" }
 web-sys = { version = "0.3", features = [
-    'Window',
-    "Storage",
-    "console",
-    "MessageEvent",
-    "RtcConfiguration",
-    "RtcDataChannel",
-    "RtcDataChannelEvent",
-    "RtcDataChannelState",
-    "RtcIceCandidate",
-    "RtcIceCandidateInit",
-    "RtcIceConnectionState",
-    "RtcIceGatheringState",
-    "RtcPeerConnection",
-    "RtcPeerConnectionIceEvent",
-    "RtcSdpType",
-    "RtcSessionDescriptionInit",
-    "RtcSignalingState",
-    "ErrorEvent",
-    "MessageEvent",
-    "WebSocket",
+  'Window',
+  "Storage",
+  "console",
+  "MessageEvent",
+  "RtcConfiguration",
+  "RtcDataChannel",
+  "RtcDataChannelEvent",
+  "RtcDataChannelState",
+  "RtcIceCandidate",
+  "RtcIceCandidateInit",
+  "RtcIceConnectionState",
+  "RtcIceGatheringState",
+  "RtcPeerConnection",
+  "RtcPeerConnectionIceEvent",
+  "RtcSdpType",
+  "RtcSessionDescriptionInit",
+  "RtcSignalingState",
+  "ErrorEvent",
+  "MessageEvent",
+  "WebSocket",
 ] }
 
 # [dev-dependencies]
