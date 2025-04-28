@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fs::File, str::FromStr, time::Duration};
 
 use clap::Parser;
 use flarch::web_rtc::web_socket_server::WebSocketServer;
@@ -6,6 +6,7 @@ use flmodules::{
     flo::realm::RealmID,
     network::signal::{SignalConfig, SignalOut, SignalServer},
 };
+use metrics_exporter_influx::{InfluxBuilder, InfluxRecorderHandle};
 
 /// Fledger signalling server
 #[derive(Parser, Debug)]
@@ -24,6 +25,18 @@ struct Args {
     max_list_len: Option<usize>,
 }
 
+fn setup_metrics(node_name: String) -> InfluxRecorderHandle {
+    log::info!("Setting up metrics");
+    let metrics_file = File::create(format!("/tmp/{}.metrics", node_name))
+        .expect(format!("could not create /tmp/{}.metrics", node_name).as_ref());
+    return InfluxBuilder::new()
+        .with_duration(Duration::from_secs(1))
+        .with_writer(metrics_file)
+        .add_global_tag("node_name", node_name)
+        .install()
+        .expect("could not setup influx recorder");
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
@@ -32,6 +45,8 @@ async fn main() -> anyhow::Result<()> {
     logger.filter_level(args.verbosity.log_level_filter());
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
+
+    let _influx = setup_metrics("flsignal".into());
 
     let wss = WebSocketServer::new(8765).await?;
     let system_realm = args.system_realm.and_then(|sr| RealmID::from_str(&sr).ok());
