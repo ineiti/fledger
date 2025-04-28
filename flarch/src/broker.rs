@@ -42,6 +42,7 @@ use std::{
 };
 
 use futures::lock::Mutex;
+use metrics::counter;
 use thiserror::Error;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
@@ -713,6 +714,11 @@ impl<I: Message + 'static, O: Message + 'static> Intern<I, O> {
             .map(|(_, msg)| msg.clone())
             .collect();
 
+        counter!(
+            "flarch_broker_tap_out_bytes",
+            msgs.clone().iter().map(|msg| size_of_val(msg) as u64).sum()
+        );
+
         let type_str = self.type_str();
         for (i, ss) in self.subsystems.iter_mut() {
             if let Err(e) = ss.send_tap_out(msgs.clone()).await {
@@ -737,6 +743,11 @@ impl<I: Message + 'static, O: Message + 'static> Intern<I, O> {
             .filter(|(dst, _)| dst != &Destination::NoTap)
             .map(|(_, msg)| msg.clone())
             .collect();
+
+        counter!(
+            "flarch_broker_tap_in_bytes",
+            msgs.iter().map(|msg| size_of_val(msg) as u64).sum()
+        );
 
         let type_str = self.type_str();
         for (i, ss) in self.subsystems.iter_mut() {
