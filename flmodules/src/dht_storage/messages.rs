@@ -190,7 +190,11 @@ impl Messages {
                         .iter()
                         .flat_map(|realm| realm.1.get_all_flo_cuckoos())
                         .collect::<Vec<_>>(),
-                ).into()]
+                )
+                .into()]
+            }
+            DHTStorageIn::ReadFlos(realm_id) => {
+                vec![DHTStorageOut::Flos(self.realms.get(&realm_id).unwrap().get_flos()).into()]
             }
         }
     }
@@ -372,14 +376,14 @@ impl Messages {
     // Either its realm is already known, or it is a new realm.
     // When 'true' is returned, then the flo has been stored.
     fn upsert_flo(&mut self, flo: Flo) -> bool {
-        // log::trace!(
-        //     "{} store_flo {}({}/{}) {}",
-        //     self.our_id,
-        //     flo.flo_type(),
-        //     flo.flo_id(),
-        //     flo.realm_id(),
-        //     flo.version()
-        // );
+        log::info!(
+            "{} store_flo {}({}/{}) {}",
+            self.our_id,
+            flo.flo_type(),
+            flo.flo_id(),
+            flo.realm_id(),
+            flo.version()
+        );
         // log::info!(
         //     "{} has realm: {}",
         //     self.our_id,
@@ -454,7 +458,7 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
                         .map_or(vec![], |msg| vec![msg])
                 }
             })
-            // .inspect(|msg| log::debug!("{_id}: Out: {msg:?}"))
+            //.inspect(|msg| log::debug!("{_id}: Out: {msg:?}"))
             .collect()
     }
 }

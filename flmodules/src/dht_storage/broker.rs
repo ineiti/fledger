@@ -36,6 +36,7 @@ pub(super) const MODULE_NAME: &str = "DHTStorage";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTStorageIn {
+    ReadFlos(RealmID),
     StoreFlo(Flo),
     ReadFlo(GlobalID),
     ReadCuckooIDs(GlobalID),
@@ -47,6 +48,7 @@ pub enum DHTStorageIn {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTStorageOut {
+    Flos(Vec<Flo>),
     FloValue(FloCuckoo),
     FloValues(Vec<FloCuckoo>),
     RealmIDs(Vec<RealmID>),
@@ -210,6 +212,15 @@ impl DHTStorage {
         Ok(self
             .send_wait(DHTStorageIn::ReadCuckooIDs(id.clone()), &|msg| match msg {
                 DHTStorageOut::CuckooIDs(rid, ids) => (&rid == id).then_some(ids),
+                _ => None,
+            })
+            .await?)
+    }
+
+    pub async fn get_flos(&mut self, realm_id: &RealmID) -> anyhow::Result<Vec<Flo>> {
+        Ok(self
+            .send_wait(DHTStorageIn::ReadFlos(realm_id.clone()), &|msg| match msg {
+                DHTStorageOut::Flos(flos) => Some(flos.clone()),
                 _ => None,
             })
             .await?)
