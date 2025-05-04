@@ -1,5 +1,4 @@
 use anyhow::Result;
-use chrono::{prelude::DateTime, Utc};
 use flmodules::{
     dht_router, dht_storage,
     flo::{
@@ -11,20 +10,14 @@ use flmodules::{
 use itertools::Itertools;
 use js_sys::JsString;
 use regex::Regex;
-use std::{
-    collections::HashMap,
-    time::{Duration, UNIX_EPOCH},
-};
+use std::collections::HashMap;
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast};
 use web_sys::{
     window, Document, HtmlButtonElement, HtmlDivElement, HtmlElement, HtmlInputElement,
     HtmlTextAreaElement,
 };
 
-use flarch::{
-    data_storage::DataStorageLocal,
-    nodeids::{NodeID, U256},
-};
+use flarch::{data_storage::DataStorageLocal, nodeids::U256};
 use flnode::{node::Node, stat::NetStats, version::VERSION_STRING};
 
 #[wasm_bindgen(module = "/src/main.js")]
@@ -217,7 +210,6 @@ pub struct Values {
     info: NodeInfo,
     nodes_info: HashMap<U256, NodeInfo>,
     states: NetStats,
-    msgs: FledgerMessages,
     dht_storage: dht_storage::messages::Stats,
     dht_router: dht_router::messages::Stats,
     pub msgs_system: usize,
@@ -279,11 +271,6 @@ impl Values {
             msgs_system: msgs.len(),
             msgs_local: msgs.len(),
             mana: 0,
-            msgs: FledgerMessages::new(
-                info.get_id(),
-                msgs,
-                &nodes_info.clone().into_values().collect(),
-            ),
             nodes_info,
             dht_router: node.dht_router.as_ref().unwrap().stats.borrow().clone(),
             dht_storage: node.dht_storage.as_ref().unwrap().stats.borrow().clone(),
@@ -298,10 +285,6 @@ impl Values {
 
     pub fn get_version(&self) -> String {
         VERSION_STRING.to_string()
-    }
-
-    pub fn get_msgs(&self) -> String {
-        self.msgs.get_messages()
     }
 
     pub fn get_dht_stats(&self) -> String {
@@ -372,83 +355,6 @@ impl Values {
             .sorted()
             .collect::<Vec<String>>()
             .join("<br>")
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct FledgerMessage {
-    from: String,
-    date: String,
-    text: String,
-    our_message: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct FledgerMessages {
-    msgs: Vec<FledgerMessage>,
-}
-
-impl FledgerMessages {
-    fn new(
-        our_id: NodeID,
-        mut tm_msgs: Vec<flmodules::gossip_events::core::Event>,
-        nodes: &Vec<NodeInfo>,
-    ) -> Self {
-        tm_msgs.sort_by(|a, b| a.created.partial_cmp(&b.created).unwrap());
-        let mut msgs = vec![];
-        for msg in tm_msgs {
-            let d = UNIX_EPOCH + Duration::from_secs(msg.created as u64 / 1000);
-            // Create DateTime from SystemTime
-            let datetime = DateTime::<Utc>::from(d);
-            // Formats the combined date and time with the specified format string.
-            let date = datetime.format("%A, the %d of %B at %H:%M:%S").to_string();
-
-            let node: Vec<&NodeInfo> = nodes.iter().filter(|&ni| ni.get_id() == msg.src).collect();
-            let from = if node.len() == 1 {
-                node[0].name.clone()
-            } else {
-                format!("{}", msg.src)
-            };
-            msgs.push(FledgerMessage {
-                our_message: our_id == msg.src,
-                from,
-                text: msg.msg.clone(),
-                date,
-            })
-        }
-        FledgerMessages { msgs }
-    }
-
-    pub fn get_messages(&self) -> String {
-        if self.msgs.is_empty() {
-            return String::from("No messages");
-        }
-        self.msgs
-            .iter()
-            .map(|fm| fm.to_string())
-            .collect::<Vec<String>>()
-            .join("")
-    }
-}
-
-impl FledgerMessage {
-    pub fn to_string(&self) -> String {
-        format!(
-            r#"{}
-                <div class="message-sender">{}</div>
-                <div class="message-content">{}</div>
-                <div class="message-time">{}</div>
-            </div>
-            "#,
-            if self.our_message {
-                format!(r#"<div class="message-item sent">"#)
-            } else {
-                format!(r#"<div class="message-item received">"#)
-            },
-            self.from,
-            self.text,
-            self.date
-        )
     }
 }
 

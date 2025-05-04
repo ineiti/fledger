@@ -29,7 +29,7 @@ pub struct Gossip {
     pub broker: BrokerGossip,
     /// Is used to pass the EventsStorage structure from the Translate to the GossipLink.
     pub storage: watch::Receiver<EventsStorage>,
-    info: NodeInfo,
+    pub info: NodeInfo,
 }
 
 impl Gossip {
@@ -115,11 +115,13 @@ impl TranslateFrom<RandomOut> for GossipIn {
 
 impl TranslateInto<RandomIn> for GossipOut {
     fn translate(self) -> Option<RandomIn> {
-        let GossipOut::ToNetwork(id, msg_node) = self;
-        Some(RandomIn::NetworkWrapperToNetwork(
-            id,
-            NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
-        ))
+        match self {
+            GossipOut::ToNetwork(id, msg_node) => Some(RandomIn::NetworkWrapperToNetwork(
+                id,
+                NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
+            )),
+            _ => None,
+        }
     }
 }
 

@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use chat::Chat;
 use flmodules::{
     dht_router::broker::DHTRouter,
     dht_storage::{self, broker::DHTStorage, realm_view::RealmView},
@@ -25,6 +26,7 @@ use flnode::{node::Node, stat::NetStats};
 
 mod web;
 use web::*;
+mod chat;
 mod pages;
 
 #[derive(Debug)]
@@ -105,7 +107,6 @@ pub struct WebState {
     state: StateEnum,
     status_box: UL,
     values: Option<Values>,
-    previous_chat: Option<String>,
     rx: broadcast::Receiver<Button>,
     tx: broadcast::Sender<Button>,
 }
@@ -130,7 +131,6 @@ impl WebState {
             state: StateEnum::Init,
             status_box: UL::default(),
             values: None,
-            previous_chat: None,
             rx,
             tx,
         };
@@ -179,13 +179,7 @@ impl WebState {
             StateEnum::ShowPage(_) => {
                 self.set_state(StateEnum::Idle).await;
             }
-            StateEnum::Idle => {
-                let new_msgs = self.values().await.get_msgs();
-                if Some(&new_msgs) != self.previous_chat.as_ref() {
-                    self.web.set_id_inner("messages", &new_msgs);
-                    self.previous_chat = Some(new_msgs);
-                }
-            }
+            StateEnum::Idle => {}
         }
     }
 
@@ -211,6 +205,9 @@ impl WebState {
                 self.web.unhide("menu-chat");
                 self.web.unhide("menu-proxy");
                 self.status_box.push(LI::new("Updating pages"));
+                Chat::new(self.webn.gossip.clone(), self.tx.subscribe())
+                    .await
+                    .expect("Creating Chat");
             }
             StateEnum::ShowPage(rv) => {
                 self.web.unhide("menu-page-edit");
@@ -228,19 +225,14 @@ impl WebState {
 
     async fn clicked(&mut self, btn: Button) {
         match btn {
-            Button::SendMsg => {
-                // User clicked on the `send_msg` button
-                let msg = self.web.get_chat_msg();
-                if msg != "" {
-                    self.webn
-                        .gossip
-                        .add_chat_message(msg)
-                        .await
-                        .expect("Should add chat message");
-                }
-            }
             Button::_DownloadData => {
-                let data = self.webn.get_gossip_data();
+                let data = self
+                    .webn
+                    .gossip
+                    .storage
+                    .borrow()
+                    .get()
+                    .expect("Dumping events");
                 downloadFile("gossip_event.yaml".into(), data.into());
             }
             Button::ProxyRequest => {
@@ -283,10 +275,6 @@ impl WebState {
             }
             _ => {}
         }
-    }
-
-    async fn values(&mut self) -> &Values {
-        self.values.get_or_insert(self.webn.get_values().await)
     }
 }
 
@@ -370,10 +358,6 @@ impl WebNode {
                 }
             }
         }
-    }
-
-    pub fn get_gossip_data(&self) -> String {
-        self.gossip.storage.borrow().get().unwrap()
     }
 
     async fn node_start() -> Result<Node> {
