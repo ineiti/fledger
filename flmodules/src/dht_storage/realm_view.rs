@@ -17,6 +17,7 @@ use flcrypto::{
     access::Condition,
     signer::{Signer, SignerError, SignerTrait, VerifierTrait},
 };
+use regex::Regex;
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
@@ -24,7 +25,7 @@ use super::broker::StorageError;
 
 #[derive(Debug, Clone)]
 pub struct RealmView {
-    dht_storage: DHTStorage,
+    pub dht_storage: DHTStorage,
     pub realm: FloRealm,
     pub pages: RealmStorage<BlobPage>,
     pub tags: RealmStorage<BlobTag>,
@@ -252,7 +253,16 @@ impl RealmView {
     pub fn get_page_path(&self, path: &str) -> anyhow::Result<&FloBlobPage> {
         self.pages
             .get_path(path)
-            .map_err(|_| anyhow::anyhow!("Don't have any pages stored"))
+            .map_err(|e| anyhow::anyhow!(format!("Didn't find page with path '{path}': {e:?}")))
+    }
+
+    pub fn get_new_page_path(&self, path: &str) -> anyhow::Result<(&FloBlobPage, String)> {
+        let re = Regex::new(r"^/(.*)/([^/]+)$").unwrap();
+        let (root, page) = re
+            .captures(path)
+            .map(|caps| (caps.get(1).unwrap().as_str(), caps.get(2).unwrap().as_str()))
+            .ok_or(anyhow::anyhow!("Not correct path format"))?;
+        Ok((self.get_page_path(root)?, page.to_string()))
     }
 }
 
@@ -317,10 +327,13 @@ where
             .into_iter()
             .flat_map(|id| once(id).chain(self.cuckoos.get(id).into_iter().flatten()))
             .collect::<Vec<_>>();
+        log::info!("Realm is: {}", self.realm);
         if let Some(part) = parts.split_first() {
+            log::info!("Parts {parts:?} are: {part:?}");
             if let Some(f) = ids
                 .iter()
                 .filter_map(|id| self.storage.get(id))
+                .inspect(|f| log::info!("Page-path: {:?}", f.get_path()))
                 .find(|f| f.get_path().map(|p| p == part.0).unwrap_or(false))
             {
                 if part.1.len() == 0 {

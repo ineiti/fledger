@@ -17,3 +17,10 @@ export function getEditorContent() {
   }
   return "";
 }
+
+export function setEditorContent(data) {
+  if (typeof ace !== 'undefined' && ace.edit) {
+    const editor = ace.edit("editor");
+    editor.setValue(data);
+  }
+}

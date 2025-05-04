@@ -1,20 +1,17 @@
 use anyhow::{anyhow, Result};
-use flcrypto::signer::KeyPairID;
 use flmodules::{
     dht_router::broker::DHTRouter,
     dht_storage::{self, broker::DHTStorage, realm_view::RealmView},
-    flo::{
-        blob::{BlobID, BlobPath},
-        realm::RealmID,
-    },
+    flo::{flo::FloID, realm::RealmID},
     gossip_events::broker::Gossip,
     web_proxy::broker::WebProxy,
     Modules,
 };
 use js_sys::JsString;
+use pages::Pages;
 use regex::Regex;
-use std::collections::HashMap;
-use tokio::sync::watch;
+use std::{collections::HashMap, str::FromStr};
+use tokio::sync::{mpsc::UnboundedSender, watch};
 use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::{HtmlButtonElement, HtmlElement, HtmlOListElement};
 
@@ -28,6 +25,7 @@ use flnode::{node::Node, stat::NetStats};
 
 mod web;
 use web::*;
+mod pages;
 
 #[derive(Debug)]
 struct NetConf<'a> {
@@ -50,25 +48,49 @@ const NETWORK_CONFIG: NetConf = NetConf {
     turn_server: None,
 };
 
-#[wasm_bindgen(module = "/src/main.js")]
-extern "C" {
-    fn downloadFile(fileName: JsString, data: JsString);
-    fn getEditorContent() -> JsString;
+#[wasm_bindgen]
+pub fn rust_func() {
+    log::info!("RustFunc called");
+}
+
+pub fn main() {
+    console_error_panic_hook::set_once();
+    wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
 }
 
 // Because I really want to have a 'normal' HTML file and then link it with rust,
 // this code is necessary to link the two.
 // Using things like Yew or others is too far from HTML for me.
 // Any suggestions for a framework that allows to do this in a cleaner way are welcome.
-pub fn main() {
-    console_error_panic_hook::set_once();
-    wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
+#[wasm_bindgen]
+pub struct JSInterface {
+    tx: UnboundedSender<Button>,
+}
 
-    spawn_local_nosend(async {
-        if let Err(e) = WebState::start().await {
-            log::error!("Error while executing fledger: {e:?}");
+#[wasm_bindgen]
+impl JSInterface {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            tx: WebState::new(),
         }
-    });
+    }
+
+    pub fn button_page_edit(&mut self, id: JsString) {
+        let flo_id =
+            FloID::from_str(&id.as_string().expect("id to string")).expect("string to FloID");
+        if let Err(e) = self.tx.send(Button::EditPage(flo_id)) {
+            log::error!("While sending Button::EditPage: {e:?}");
+        }
+    }
+
+    pub fn button_page_view(&mut self, id: JsString) {
+        let flo_id =
+            FloID::from_str(&id.as_string().expect("id to string")).expect("string to FloID");
+        if let Err(e) = self.tx.send(Button::ViewPage(flo_id)) {
+            log::error!("While sending Button::ViewPage: {e:?}");
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -87,31 +109,40 @@ enum StateEnum {
     ConnectingSignalling,
     ConnectingNodes,
     UpdateDHT,
-    ShowPage(DhtPage),
+    ShowPage(RealmView),
     Idle,
 }
 
 impl WebState {
-    pub async fn new() -> Result<Self> {
+    pub fn new() -> UnboundedSender<Button> {
         // Need to make sure that Web is started first, as it allows to set the storage
         // from an html anchor.
-        let web = Web::new().await?;
-        Ok(Self {
+        let web = Web::new().expect("Starting web component");
+        let tx = web.tx.clone();
+
+        spawn_local_nosend(async move {
+            if let Err(e) = Self::start(web).await {
+                log::error!("Error while executing fledger: {e:?}");
+            }
+        });
+
+        tx
+    }
+
+    pub async fn start(web: Web) -> Result<()> {
+        log::info!("Starting WebState");
+
+        let mut ws = Self {
             webn: WebNode::new().await?,
             web,
             state: StateEnum::Init,
             status_box: UL::default(),
             values: None,
             previous_chat: None,
-        })
-    }
-
-    pub async fn start() -> Result<()> {
-        let mut ws = Self::new().await?;
+        };
         ws.web.link_btn(Button::SendMsg, "send_message");
         // ws.web.link_btn(Button::DownloadData, "get_data");
         ws.web.link_btn(Button::WebProxy, "proxy_request");
-        ws.web.link_btn(Button::SavePage, "save-page");
 
         loop {
             let values = ws.webn.get_values().await;
@@ -139,7 +170,7 @@ impl WebState {
                 }
             }
             StateEnum::UpdateDHT => {
-                if let Some(dp) = self.webn.get_dht_page_first() {
+                if let Some(rv) = self.webn.rv_root.as_ref() {
                     self.status_box.push(LI::new("Loading finished"));
                     self.web
                         .get_element::<HtmlButtonElement>("loading-info-button")
@@ -147,7 +178,7 @@ impl WebState {
                     self.web
                         .get_element::<HtmlElement>("home_page")
                         .set_hidden(false);
-                    self.set_state(StateEnum::ShowPage(dp)).await;
+                    self.set_state(StateEnum::ShowPage(rv.clone())).await;
                 }
             }
             StateEnum::ShowPage(_) => {
@@ -182,47 +213,13 @@ impl WebState {
                 self.status_box.push(LI::new("Connecting to other nodes"))
             }
             StateEnum::UpdateDHT => {
-                self.web.remove_hidden("menu-chat");
-                self.web.remove_hidden("menu-proxy");
+                self.web.unhide("menu-chat");
+                self.web.unhide("menu-proxy");
                 self.status_box.push(LI::new("Updating pages"));
             }
-            StateEnum::ShowPage(dp) => {
-                self.web.remove_hidden("menu-page-edit");
-
-                let path = format!(
-                    "/{}/{}",
-                    dp.page.get_path().unwrap_or(&"".to_string()),
-                    names::Generator::default().next().unwrap()
-                );
-                self.web.get_input("page-path").set_value(&path);
-
-                self.web.set_id_inner("dht_page", &dp.page.get_index());
-                self.web.set_id_inner(
-                    "dht_page_path",
-                    &format!("{}/{}", dp.realm, dp.path.clone()),
-                );
-                let mut our_pages = vec![];
-                for (_, fp) in self
-                    .webn
-                    .realm_views
-                    .get(&dp.realm)
-                    .and_then(|pt| pt.as_ref().map(|pt| &pt.pages.storage))
-                    .unwrap()
-                {
-                    if self
-                        .webn
-                        .node
-                        .dht_storage
-                        .as_mut()
-                        .unwrap()
-                        .convert(fp.cond(), &fp.realm_id())
-                        .await
-                        .can_verify(&[&KeyPairID::rnd()])
-                    {
-                        our_pages.push(fp.clone());
-                    }
-                }
-                self.web.set_editable_pages(&our_pages);
+            StateEnum::ShowPage(rv) => {
+                self.web.unhide("menu-page-edit");
+                Pages::new(rv.clone()).await.expect("Initializing Pages");
             }
             StateEnum::Idle => {}
         }
@@ -287,12 +284,7 @@ impl WebState {
                     });
                 }
             }
-            Button::SavePage => {
-                let page_path = self.web.get_input("page-path").value();
-                let page_content: String = getEditorContent().into();
-
-                log::info!("Page: {page_path} - {page_content}");
-            }
+            _ => {}
         }
     }
 
@@ -360,7 +352,9 @@ impl WebNode {
                 if let Ok(rv) =
                     RealmView::new_from_id(self.dht_storage.clone(), realm.clone()).await
                 {
-                    if self.rv_root.is_none() {
+                    if self.rv_root.is_none()
+                        && rv.realm.cache().get_services().contains_key("http")
+                    {
                         self.rv_root = Some(rv.clone());
                     }
                     self.realm_views.insert(realm, Some(rv));
@@ -379,39 +373,6 @@ impl WebNode {
                 }
             }
         }
-    }
-
-    pub fn get_dht_page_first(&self) -> Option<DhtPage> {
-        self.rv_root
-            .as_ref()
-            .and_then(|rv| self.get_dht_page_root(&rv.realm.realm_id()))
-    }
-
-    pub fn get_dht_page_root(&self, rid: &RealmID) -> Option<DhtPage> {
-        self.realm_views.get(rid).and_then(|rvo| {
-            rvo.as_ref().and_then(|rv| {
-                rv.realm
-                    .cache()
-                    .get_services()
-                    .get("http")
-                    .and_then(|root_id| self.get_dht_page(rid, &(**root_id).into()))
-            })
-        })
-    }
-
-    pub fn get_dht_page(&self, rid: &RealmID, page_id: &BlobID) -> Option<DhtPage> {
-        self.realm_views.get(rid).and_then(|rvo| {
-            rvo.as_ref().and_then(|rv| {
-                rv.pages
-                    .storage
-                    .get(&(**page_id).into())
-                    .map(|root_page| DhtPage {
-                        realm: rid.clone(),
-                        page: root_page.clone(),
-                        path: rv.realm.cache().get_name(),
-                    })
-            })
-        })
     }
 
     pub fn get_gossip_data(&self) -> String {
