@@ -11,7 +11,7 @@ use js_sys::JsString;
 use pages::Pages;
 use regex::Regex;
 use std::{collections::HashMap, str::FromStr};
-use tokio::sync::{mpsc::UnboundedSender, watch};
+use tokio::sync::{broadcast, watch};
 use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::{HtmlButtonElement, HtmlElement, HtmlOListElement};
 
@@ -48,11 +48,6 @@ const NETWORK_CONFIG: NetConf = NetConf {
     turn_server: None,
 };
 
-#[wasm_bindgen]
-pub fn rust_func() {
-    log::info!("RustFunc called");
-}
-
 pub fn main() {
     console_error_panic_hook::set_once();
     wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
@@ -64,31 +59,41 @@ pub fn main() {
 // Any suggestions for a framework that allows to do this in a cleaner way are welcome.
 #[wasm_bindgen]
 pub struct JSInterface {
-    tx: UnboundedSender<Button>,
+    tx: broadcast::Sender<Button>,
 }
 
 #[wasm_bindgen]
 impl JSInterface {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         Self {
-            tx: WebState::new(),
+            tx: WebState::start().await.expect("Starting WebState"),
+        }
+    }
+
+    pub fn button_click(&mut self, btn: JsString) {
+        if let Ok(btn) = Button::try_from(btn.as_string().expect("JsString to String conversion")) {
+            self.tx.send(btn.clone()).expect("While sending {btn:?}");
         }
     }
 
     pub fn button_page_edit(&mut self, id: JsString) {
-        let flo_id =
-            FloID::from_str(&id.as_string().expect("id to string")).expect("string to FloID");
-        if let Err(e) = self.tx.send(Button::EditPage(flo_id)) {
-            log::error!("While sending Button::EditPage: {e:?}");
-        }
+        self.button_page(id, true);
     }
 
     pub fn button_page_view(&mut self, id: JsString) {
+        self.button_page(id, false);
+    }
+
+    fn button_page(&mut self, id: JsString, edit: bool) {
         let flo_id =
             FloID::from_str(&id.as_string().expect("id to string")).expect("string to FloID");
-        if let Err(e) = self.tx.send(Button::ViewPage(flo_id)) {
-            log::error!("While sending Button::ViewPage: {e:?}");
+        let btn = match edit {
+            true => Button::EditPage(flo_id),
+            false => Button::ViewPage(flo_id),
+        };
+        if let Err(e) = self.tx.send(btn.clone()) {
+            log::error!("While sending {btn:?}: {e:?}");
         }
     }
 }
@@ -101,6 +106,8 @@ pub struct WebState {
     status_box: UL,
     values: Option<Values>,
     previous_chat: Option<String>,
+    rx: broadcast::Receiver<Button>,
+    tx: broadcast::Sender<Button>,
 }
 
 #[derive(Debug)]
@@ -114,46 +121,34 @@ enum StateEnum {
 }
 
 impl WebState {
-    pub fn new() -> UnboundedSender<Button> {
-        // Need to make sure that Web is started first, as it allows to set the storage
-        // from an html anchor.
-        let web = Web::new().expect("Starting web component");
-        let tx = web.tx.clone();
-
-        spawn_local_nosend(async move {
-            if let Err(e) = Self::start(web).await {
-                log::error!("Error while executing fledger: {e:?}");
-            }
-        });
-
-        tx
-    }
-
-    pub async fn start(web: Web) -> Result<()> {
-        log::info!("Starting WebState");
-
+    pub async fn start() -> Result<broadcast::Sender<Button>> {
+        let (tx, rx) = broadcast::channel(10);
+        let txc = tx.clone();
         let mut ws = Self {
             webn: WebNode::new().await?,
-            web,
+            web: Web::new()?,
             state: StateEnum::Init,
             status_box: UL::default(),
             values: None,
             previous_chat: None,
+            rx,
+            tx,
         };
-        ws.web.link_btn(Button::SendMsg, "send_message");
-        // ws.web.link_btn(Button::DownloadData, "get_data");
-        ws.web.link_btn(Button::WebProxy, "proxy_request");
 
-        loop {
-            let values = ws.webn.get_values().await;
-            ws.web.udpate_values(&values);
-            ws.values = Some(values);
-            ws.check_state().await;
-            tokio::select! {
-                _ = wait_ms(1000) => {},
-                Some(btn) = ws.web.rx.recv() => {ws.clicked(btn).await;}
+        spawn_local_nosend(async move {
+            loop {
+                let values = ws.webn.get_values().await;
+                ws.web.udpate_values(&values);
+                ws.values = Some(values);
+                ws.check_state().await;
+                tokio::select! {
+                    _ = wait_ms(1000) => {},
+                    Ok(btn) = ws.rx.recv() => {ws.clicked(btn).await;}
+                }
             }
-        }
+        });
+
+        Ok(txc)
     }
 
     async fn check_state(&mut self) {
@@ -219,7 +214,9 @@ impl WebState {
             }
             StateEnum::ShowPage(rv) => {
                 self.web.unhide("menu-page-edit");
-                Pages::new(rv.clone()).await.expect("Initializing Pages");
+                Pages::new(rv.clone(), self.tx.subscribe())
+                    .await
+                    .expect("Initializing Pages");
             }
             StateEnum::Idle => {}
         }
@@ -246,7 +243,7 @@ impl WebState {
                 let data = self.webn.get_gossip_data();
                 downloadFile("gossip_event.yaml".into(), data.into());
             }
-            Button::WebProxy => {
+            Button::ProxyRequest => {
                 let proxy_url = self.web.get_input("proxy_url");
                 if proxy_url.value() != "" {
                     let proxy_button = self.web.get_button("proxy_request");

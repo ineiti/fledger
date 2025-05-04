@@ -5,7 +5,6 @@ use flmodules::{
     flo::{
         blob::{BlobPath, FloBlobPage},
         flo::FloID,
-        realm::RealmID,
     },
     nodeconfig::NodeInfo,
 };
@@ -14,13 +13,11 @@ use js_sys::JsString;
 use regex::Regex;
 use std::{
     collections::HashMap,
-    mem::ManuallyDrop,
     time::{Duration, UNIX_EPOCH},
 };
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use wasm_bindgen::{prelude::{wasm_bindgen, Closure}, JsCast};
+use wasm_bindgen::{prelude::wasm_bindgen, JsCast};
 use web_sys::{
-    window, Document, Event, HtmlButtonElement, HtmlDivElement, HtmlElement, HtmlInputElement,
+    window, Document, HtmlButtonElement, HtmlDivElement, HtmlElement, HtmlInputElement,
     HtmlTextAreaElement,
 };
 
@@ -41,7 +38,7 @@ extern "C" {
 pub enum Button {
     SendMsg,
     _DownloadData,
-    WebProxy,
+    ProxyRequest,
     UpdatePage,
     CreatePage,
     ResetPage,
@@ -49,61 +46,35 @@ pub enum Button {
     ViewPage(FloID),
 }
 
+impl TryFrom<String> for Button {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        match value {
+            _ if value == "send-message" => Ok(Button::SendMsg),
+            _ if value == "proxy-request" => Ok(Button::ProxyRequest),
+            _ if value == "update-page" => Ok(Button::UpdatePage),
+            _ if value == "create-page" => Ok(Button::CreatePage),
+            _ if value == "reset-page" => Ok(Button::ResetPage),
+            _ => Err(anyhow::anyhow!("Don't know {value}")),
+        }
+    }
+}
+
 /// Web interfaces with the html code.
 #[derive(Debug)]
 pub struct Web {
     document: Document,
-    pub tx: UnboundedSender<Button>,
-    pub rx: UnboundedReceiver<Button>,
-}
-
-#[derive(Debug)]
-pub struct DhtPage {
-    pub realm: RealmID,
-    pub page: FloBlobPage,
-    pub path: String,
-}
-
-impl From<FloBlobPage> for DhtPage {
-    fn from(value: FloBlobPage) -> Self {
-        DhtPage {
-            realm: value.realm_id(),
-            // TODO: this will not work for paths with multiple elements
-            path: value.get_path().unwrap_or(&"".to_string()).into(),
-            page: value,
-        }
-    }
 }
 
 impl Web {
     pub fn new() -> Result<Self> {
         Web::set_data_storage();
 
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Button>();
         let window = web_sys::window().expect("no global `window` exists");
         Ok(Self {
             document: window.document().expect("should have a document on window"),
-            tx,
-            rx,
         })
-    }
-
-    pub fn link_btn(&self, btn: Button, id: &str) {
-        let tx = self.tx.clone();
-        let cb = ManuallyDrop::new(Closure::wrap(Box::new(move |_: Event| {
-            tx.send(btn.clone())
-                .err()
-                .map(|e| log::error!("Couldn't send message: {e:?}"));
-        }) as Box<dyn FnMut(_)>));
-        self.document.get_element_by_id(id).map_or_else(
-            || {
-                log::warn!("Couldn't find button with id: {id}");
-            },
-            |el| {
-                el.add_event_listener_with_callback("click", &cb.as_ref().unchecked_ref())
-                    .expect("Should be able to add event listener");
-            },
-        );
     }
 
     pub fn set_id_inner(&self, id: &str, inner_html: &str) {

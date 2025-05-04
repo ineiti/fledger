@@ -2,10 +2,33 @@ use flarch::tasks::spawn_local_nosend;
 use flcrypto::{access::Condition, signer::KeyPairID};
 use flmodules::{
     dht_storage::{broker::DHTStorageOut, core::Cuckoo, realm_view::RealmView},
-    flo::{blob::BlobID, flo::FloID},
+    flo::{
+        blob::{BlobID, BlobPath, FloBlobPage},
+        flo::FloID,
+        realm::RealmID,
+    },
 };
+use tokio::sync::broadcast;
 
-use crate::web::{getEditorContent, setEditorContent, Button, DhtPage, Web};
+use crate::web::{getEditorContent, setEditorContent, Button, Web};
+
+#[derive(Debug)]
+pub struct DhtPage {
+    pub realm: RealmID,
+    pub page: FloBlobPage,
+    pub path: String,
+}
+
+impl From<FloBlobPage> for DhtPage {
+    fn from(value: FloBlobPage) -> Self {
+        DhtPage {
+            realm: value.realm_id(),
+            // TODO: this will not work for paths with multiple elements
+            path: value.get_path().unwrap_or(&"".to_string()).into(),
+            page: value,
+        }
+    }
+}
 
 pub struct Pages {
     rv: RealmView,
@@ -13,15 +36,12 @@ pub struct Pages {
 }
 
 impl Pages {
-    pub async fn new(mut rv: RealmView) -> anyhow::Result<()> {
+    pub async fn new(mut rv: RealmView, mut rx: broadcast::Receiver<Button>) -> anyhow::Result<()> {
         let mut tap = rv.dht_storage.broker.get_tap_out().await?.0;
         let mut p = Pages {
             rv,
             web: Web::new()?,
         };
-        p.web.link_btn(Button::CreatePage, "create-page");
-        p.web.link_btn(Button::UpdatePage, "update-page");
-        p.web.link_btn(Button::ResetPage, "reset-page");
 
         p.show_page(&p.get_dht_page(&p.rv.pages.root).unwrap());
         p.init_editor().await;
@@ -30,7 +50,7 @@ impl Pages {
             loop {
                 tokio::select! {
                     Some(msg) = tap.recv() => {p.dht_msg(msg).await;}
-                    Some(btn) = p.web.rx.recv() => {p.clicked(btn).await;}
+                    Ok(btn) = rx.recv() => {p.clicked(btn).await;}
                 }
             }
         });
@@ -54,7 +74,8 @@ impl Pages {
                     }
                 };
                 let cuckoo = Cuckoo::Parent(parent.flo_id());
-                match self.rv
+                match self
+                    .rv
                     .create_http_cuckoo(&path, page_content, None, Condition::Pass, cuckoo, &[])
                     .await
                 {
@@ -78,8 +99,8 @@ impl Pages {
 
     async fn dht_msg(&mut self, msg: DHTStorageOut) {
         match msg {
-            DHTStorageOut::FloValue(_) => todo!(),
-            DHTStorageOut::CuckooIDs(_gid, _fids) => todo!(),
+            DHTStorageOut::FloValue(_) => log::trace!("Got new value"),
+            DHTStorageOut::CuckooIDs(_gid, _fids) => log::trace!("Got new cuckoos"),
             _ => {}
         }
     }

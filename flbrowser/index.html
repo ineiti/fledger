@@ -11,7 +11,7 @@
 
     <script>
         window.addEventListener("load", (event) => {
-            jsi = new window.wasmBindings.JSInterface();
+            new window.wasmBindings.JSInterface().then((res) => { jsi = res });
         });
     </script>
 </head>
@@ -172,7 +172,8 @@
                             <div class="message-input">
                                 <textarea type="text" id="your_message" placeholder="Type your message..."
                                     onkeydown="if(event.key === 'Enter' && (event.metaKey || event.ctrlKey)) document.getElementById('send_message').click();"></textarea>
-                                <button id="send_message"><i class="fas fa-paper-plane"></i></button>
+                                <button id="send_message" onclick="jsi.button_click('send-message')"><i
+                                        class="fas fa-paper-plane"></i></button>
                             </div>
                         </div>
                     </section>
@@ -186,12 +187,16 @@
                     </section>
                     <section class="editor-section">
                         <div id="editor" class="editor-container"></div>
-                        <div id="page-id-div" class="page-id-label hidden">Page-ID: <span id="page-id" class="page-id">deadbeef</span></div>
+                        <div id="page-id-div" class="page-id-label hidden">Page-ID: <span id="page-id"
+                                class="page-id">deadbeef</span></div>
                         <div class="editor-controls">
                             <input type="text" id="page-path" placeholder="Enter path">
-                            <button id="create-page" class="primary-button">Create Page</button>
-                            <button id="update-page" class="primary-button hidden">Update Page</button>
-                            <button id="reset-page" class="secondary-button hidden">Reset Page</button>
+                            <button id="create-page" class="primary-button"
+                                onclick="jsi.button_click('create-page')">Create Page</button>
+                            <button id="update-page" class="primary-button hidden"
+                                onclick="jsi.button_click('update-page')">Update Page</button>
+                            <button id="reset-page" class="secondary-button hidden"
+                                onclick="jsi.button_click('reset-page')">Reset Page</button>
                         </div>
                         <section class="editable-pages">
                             <h3>Editable Pages</h3>
@@ -215,7 +220,8 @@
                                 <input type="url" id="proxy_url" placeholder="Enter URL to browse via proxy"
                                     value="https://lobste.rs/"
                                     onkeypress="if(event.key === 'Enter') document.getElementById('proxy_request').click();" />
-                                <button class="browse-btn" id="proxy_request">Browse</button>
+                                <button class="browse-btn" id="proxy_request"
+                                    onclick="jsi.button_click('proxy-request')">Browse</button>
                             </div>
                         </div>
                         <!-- Updated proxy display with border and an example page -->
@@ -560,4 +566,5 @@
             }
         }
     </style>
+
 </html>
