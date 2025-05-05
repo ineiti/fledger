@@ -5,12 +5,11 @@ use flmodules::{
     dht_storage::{self, broker::DHTStorage, realm_view::RealmView},
     flo::{flo::FloID, realm::RealmID},
     gossip_events::broker::Gossip,
-    web_proxy::broker::WebProxy,
     Modules,
 };
 use js_sys::JsString;
 use pages::Pages;
-use regex::Regex;
+use proxy::Proxy;
 use std::{collections::HashMap, str::FromStr};
 use tokio::sync::{broadcast, watch};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -28,6 +27,7 @@ mod web;
 use web::*;
 mod chat;
 mod pages;
+mod proxy;
 
 #[derive(Debug)]
 struct NetConf<'a> {
@@ -208,6 +208,12 @@ impl WebState {
                 Chat::new(self.webn.gossip.clone(), self.tx.subscribe())
                     .await
                     .expect("Creating Chat");
+                Proxy::new(
+                    self.webn.node.webproxy.as_ref().unwrap().clone(),
+                    self.webn.node.stat.as_ref().unwrap().clone(),
+                    self.tx.subscribe(),
+                )
+                .expect("Creating Proxy");
             }
             StateEnum::ShowPage(rv) => {
                 self.web.unhide("menu-page-edit");
@@ -235,44 +241,6 @@ impl WebState {
                     .expect("Dumping events");
                 downloadFile("gossip_event.yaml".into(), data.into());
             }
-            Button::ProxyRequest => {
-                let proxy_url = self.web.get_input("proxy_url");
-                if proxy_url.value() != "" {
-                    let proxy_button = self.web.get_button("proxy_request");
-                    proxy_button.set_disabled(true);
-                    let mut url = proxy_url.value();
-                    if !Regex::new("^https?://").unwrap().is_match(&url) {
-                        url = format!("https://{url}");
-                    }
-                    let proxy_div = self.web.get_div("proxy_div");
-                    let mut webproxy = self.webn.web_proxy.clone();
-                    let nodes = self.webn.stats.node_infos_connected();
-                    spawn_local_nosend(async move {
-                        let fetching = format!("Fetching url from proxy: {}", url);
-                        proxy_div.set_inner_html(&fetching);
-                        match webproxy.get(&url).await {
-                            Ok(mut response) => {
-                                let mut proxy_str = format!("{}", response.proxy());
-                                if let Some(info) =
-                                    nodes.iter().find(|&node| node.get_id() == response.proxy())
-                                {
-                                    proxy_str = format!("{} ({})", info.name, info.get_id());
-                                }
-                                let text = format!(
-                                    "Proxy: {proxy_str}<br>{}",
-                                    response.text().await.unwrap()
-                                );
-                                proxy_div.set_inner_html(&text);
-                            }
-                            Err(e) => {
-                                let text = format!("Got error while fetching page from proxy: {e}");
-                                proxy_div.set_inner_html(&text);
-                            }
-                        }
-                        proxy_button.set_disabled(false);
-                    });
-                }
-            }
             _ => {}
         }
     }
@@ -288,7 +256,6 @@ pub struct WebNode {
     dht_storage: DHTStorage,
     dht_router: DHTRouter,
     gossip: Gossip,
-    web_proxy: WebProxy,
     stats: NetStats,
     // page_fetcher: PageFetcher,
     counter: u32,
@@ -306,7 +273,6 @@ impl WebNode {
             realm_views: HashMap::new(),
             rv_root: None,
             gossip: node.gossip.as_ref().unwrap().clone(),
-            web_proxy: node.webproxy.as_ref().unwrap().clone(),
             node,
             stats: NetStats::default(),
             counter: 0,

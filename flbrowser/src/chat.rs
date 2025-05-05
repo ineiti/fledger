@@ -5,10 +5,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use flarch::{
-    nodeids::NodeID,
-    tasks::{spawn_local_nosend, wait_ms},
-};
+use flarch::{nodeids::NodeID, tasks::spawn_local_nosend};
 use flmodules::{
     gossip_events::{broker::Gossip, core::Category, messages::GossipOut},
     nodeconfig::NodeInfo,
@@ -40,7 +37,6 @@ impl Chat {
         spawn_local_nosend(async move {
             loop {
                 tokio::select! {
-                    _ = wait_ms(1000) => {},
                     Ok(btn) = rx.recv() => c.clicked(btn).await,
                     Some(msg) = tap.recv() => c.gossip_msg(msg).await,
                 }
