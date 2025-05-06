@@ -50,7 +50,7 @@ cargo_build:
 	set -e; \
 	for c in ${CARGO_LOCKS}; do \
 		echo Building $$c; \
-		(cd $$c && cargo build ) || exit 1; \
+		(cd $$c && cargo build --tests ) || exit 1; \
 	done
 
 cargo_unused:

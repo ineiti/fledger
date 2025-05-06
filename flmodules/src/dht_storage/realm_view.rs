@@ -60,12 +60,15 @@ pub enum RVError {
 }
 
 impl RealmView {
+    /// Returns the first realm which has a page and a tag stored in the root.
     pub async fn new_first(mut dht_storage: DHTStorage) -> anyhow::Result<Self> {
-        if let Some(id) = dht_storage.get_realm_ids().await?.first() {
-            Self::new_from_id(dht_storage, id.clone()).await
-        } else {
-            Err(RVError::NoRealm.into())
+        for id in dht_storage.get_realm_ids().await? {
+            match Self::new_from_id(dht_storage.clone(), id.clone()).await {
+                Ok(rv) => return Ok(rv),
+                Err(e) => log::warn!("Found partial realm {id}: {e:?}"),
+            }
         }
+        Err(RVError::NoRealm.into())
     }
 
     pub async fn new_from_id(mut dht_storage: DHTStorage, id: RealmID) -> anyhow::Result<Self> {
@@ -79,47 +82,16 @@ impl RealmView {
     ) -> anyhow::Result<Self> {
         let pages = RealmStorage::from_service(&mut dht_storage, &realm, "http")
             .await?
-            .unwrap();
+            .ok_or(anyhow::anyhow!("Didn't find the root page"))?;
         let tags = RealmStorage::from_service(&mut dht_storage, &realm, "tag")
             .await?
-            .unwrap();
+            .ok_or(anyhow::anyhow!("Didn't find the root tag"))?;
         Ok(Self {
             realm,
             pages,
             tags,
             dht_storage,
         })
-    }
-
-    pub async fn new_create_realm(
-        dht_storage: DHTStorage,
-        name: &str,
-        cond: Condition,
-        signers: &[&Signer],
-    ) -> anyhow::Result<Self> {
-        Self::new_create_realm_config(
-            dht_storage,
-            name,
-            cond,
-            RealmConfig {
-                max_space: 1e6 as u64,
-                max_flo_size: 1e4 as u32,
-            },
-            signers,
-        )
-        .await
-    }
-
-    pub async fn new_create_realm_config(
-        mut dht_storage: DHTStorage,
-        name: &str,
-        cond: Condition,
-        config: RealmConfig,
-        signers: &[&Signer],
-    ) -> anyhow::Result<Self> {
-        let realm = FloRealm::new(name, cond, config, signers)?;
-        dht_storage.store_flo(realm.clone().into())?;
-        Self::new_from_realm(dht_storage, realm).await
     }
 
     pub async fn create_http(
@@ -257,12 +229,20 @@ impl RealmView {
     }
 
     pub fn get_new_page_path(&self, path: &str) -> anyhow::Result<(&FloBlobPage, String)> {
-        let re = Regex::new(r"^/(.*)/([^/]+)$").unwrap();
+        let re = Regex::new(r"^/(.*)/([^/]+)$")?;
         let (root, page) = re
             .captures(path)
             .map(|caps| (caps.get(1).unwrap().as_str(), caps.get(2).unwrap().as_str()))
             .ok_or(anyhow::anyhow!("Not correct path format"))?;
         Ok((self.get_page_path(root)?, page.to_string()))
+    }
+
+    pub fn get_root_tag(&self) -> Option<&FloBlobTag>{
+        self.tags.storage.get(&self.tags.root)
+    }
+
+    pub fn get_root_page(&self) -> Option<&FloBlobPage>{
+        self.pages.storage.get(&self.pages.root)
     }
 }
 
@@ -380,6 +360,153 @@ where
             self.update_blobs_from_ds(ds, &bid).await?;
         }
         Ok(())
+    }
+}
+
+pub struct RealmViewBuilder {
+    dht_storage: DHTStorage,
+    name: String,
+    cond: Condition,
+    signers: Vec<Signer>,
+    config: RealmConfig,
+    page: Option<RVBuilderBlob>,
+    tag: Option<RVBuilderBlob>,
+}
+
+struct RVBuilderBlob {
+    path_name: String,
+    content: Option<String>,
+    parent: Option<BlobID>,
+    cond: Condition,
+    cuckoo: Cuckoo,
+    signers: Vec<Signer>,
+}
+
+impl RealmViewBuilder {
+    pub fn new(
+        dht_storage: DHTStorage,
+        name: String,
+        cond: Condition,
+        signers: Vec<Signer>,
+    ) -> Self {
+        Self {
+            dht_storage,
+            name,
+            cond,
+            config: RealmConfig {
+                max_space: 1e6 as u64,
+                max_flo_size: 1e4 as u32,
+            },
+            signers,
+            page: None,
+            tag: None,
+        }
+    }
+
+    pub fn config(mut self, config: RealmConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    pub fn root_http(
+        self,
+        path: String,
+        content: String,
+        parent: Option<BlobID>,
+        cond: Condition,
+        signers: Vec<Signer>,
+    ) -> Self {
+        Self::root_http_cuckoo(self, path, content, parent, cond, Cuckoo::None, signers)
+    }
+
+    pub fn root_http_cuckoo(
+        mut self,
+        path: String,
+        content: String,
+        parent: Option<BlobID>,
+        cond: Condition,
+        cuckoo: Cuckoo,
+        signers: Vec<Signer>,
+    ) -> Self {
+        self.page = Some(RVBuilderBlob {
+            path_name: path,
+            content: Some(content),
+            parent,
+            cond,
+            cuckoo,
+            signers,
+        });
+        self
+    }
+
+    pub fn root_tag(
+        self,
+        name: String,
+        parent: Option<BlobID>,
+        cond: Condition,
+        signers: Vec<Signer>,
+    ) -> Self {
+        Self::root_tag_cuckoo(self, name, parent, cond, Cuckoo::None, signers)
+    }
+
+    pub fn root_tag_cuckoo(
+        mut self,
+        name: String,
+        parent: Option<BlobID>,
+        cond: Condition,
+        cuckoo: Cuckoo,
+        signers: Vec<Signer>,
+    ) -> Self {
+        self.tag = Some(RVBuilderBlob {
+            path_name: name,
+            content: None,
+            parent,
+            cond,
+            cuckoo,
+            signers,
+        });
+        self
+    }
+
+    pub async fn build(mut self) -> anyhow::Result<RealmView> {
+        let p = self.page.ok_or(anyhow::anyhow!("Need root page"))?;
+        let t = self.tag.ok_or(anyhow::anyhow!("Need root tag"))?;
+        let realm_signers = &self.signers.iter().collect::<Vec<&Signer>>();
+        let realm = FloRealm::new(&self.name, self.cond.clone(), self.config, realm_signers)?;
+        self.dht_storage.store_flo(realm.clone().into())?;
+
+        let ft = FloBlobTag::new_cuckoo(
+            realm.realm_id(),
+            t.cond,
+            &t.path_name,
+            t.parent,
+            t.cuckoo,
+            &t.signers.iter().collect::<Vec<&Signer>>(),
+        )?;
+        self.dht_storage.store_flo(ft.clone().into())?;
+
+        let fp = FloBlobPage::new_cuckoo(
+            realm.realm_id(),
+            p.cond,
+            &p.path_name,
+            Bytes::from(p.content.unwrap()),
+            p.parent.clone(),
+            p.cuckoo,
+            &p.signers.iter().collect::<Vec<&Signer>>(),
+        )?;
+        self.dht_storage.store_flo(fp.clone().into())?;
+
+        let realm = realm.edit_data_signers(
+            self.cond,
+            |r| {
+                r.set_service("http", fp.flo_id());
+                r.set_service("tag", ft.flo_id());
+            },
+            &realm_signers,
+        )?;
+        self.dht_storage.store_flo(realm.clone().into())?;
+
+        RealmView::new_from_realm(self.dht_storage, realm).await
     }
 }
 
