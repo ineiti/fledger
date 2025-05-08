@@ -124,7 +124,7 @@ impl Page {
                 None
             } else {
                 let parent_path = parts.join("/");
-                let parent = rv.get_page_path(&parent_path)?;
+                let parent = rv.get_page_from_path(&parent_path)?;
                 Some(parent.blob_id())
             };
             let cuckoo = if parts.is_empty() {
@@ -155,7 +155,7 @@ impl Page {
         command: ModifyCommands,
     ) -> anyhow::Result<()> {
         let rv = self.get_rv(&realm)?;
-        let page = rv.get_page_path(&path)?;
+        let page = rv.get_page_from_path(&path)?;
         let signer = self.f.node.crypto_storage.get_signer();
         self.f.loop_node(FledgerState::Connected(2)).await?;
         let cond = self.ds.convert(page.cond(), &rv.realm.realm_id()).await;
@@ -197,7 +197,7 @@ impl Page {
 
     async fn print(&mut self, realm: String, path: String, file: String) -> anyhow::Result<()> {
         let rv = self.get_rv(&realm)?;
-        let page = rv.get_page_path(&path)?;
+        let page = rv.get_page_from_path(&path)?;
         log::info!("Printing {page}");
         if let Some(content) = page.datas().get(&file) {
             println!(

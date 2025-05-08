@@ -74,26 +74,24 @@ impl JSInterface {
     }
 
     pub fn button_click(&mut self, btn: JsString) {
-        if let Ok(btn) = Button::try_from(btn.as_string().expect("JsString to String conversion")) {
-            self.tx.send(btn.clone()).expect("While sending {btn:?}");
-        }
+        Button::try_from(btn.as_string().expect("JsString to String conversion"))
+            .ok()
+            .map(|btn| self.send_button(btn));
     }
 
     pub fn button_page_edit(&mut self, id: JsString) {
-        self.button_page(id, true);
+        Self::js_to_id(id).map(|fid| self.send_button(Button::EditPage(fid)));
     }
 
     pub fn button_page_view(&mut self, id: JsString) {
-        self.button_page(id, false);
+        Self::js_to_id(id).map(|fid| self.send_button(Button::ViewPage(fid)));
     }
 
-    fn button_page(&mut self, id: JsString, edit: bool) {
-        let flo_id =
-            FloID::from_str(&id.as_string().expect("id to string")).expect("string to FloID");
-        let btn = match edit {
-            true => Button::EditPage(flo_id),
-            false => Button::ViewPage(flo_id),
-        };
+    fn js_to_id(id: JsString) -> Option<FloID> {
+        FloID::from_str(&id.as_string().expect("id to string")).ok()
+    }
+
+    fn send_button(&mut self, btn: Button) {
         if let Err(e) = self.tx.send(btn.clone()) {
             log::error!("While sending {btn:?}: {e:?}");
         }
@@ -217,9 +215,13 @@ impl WebState {
             }
             StateEnum::ShowPage(rv) => {
                 self.web.unhide("menu-page-edit");
-                Pages::new(rv.clone(), self.tx.subscribe())
-                    .await
-                    .expect("Initializing Pages");
+                Pages::new(
+                    rv.clone(),
+                    self.tx.subscribe(),
+                    vec![self.webn.node.crypto_storage.get_signer()],
+                )
+                .await
+                .expect("Initializing Pages");
             }
             StateEnum::Idle => {}
         }

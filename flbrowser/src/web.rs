@@ -39,6 +39,14 @@ pub enum Button {
     ViewPage(FloID),
 }
 
+#[derive(PartialEq)]
+pub enum Tab {
+    Home,
+    Page,
+    Chat,
+    Proxy,
+}
+
 impl TryFrom<String> for Button {
     type Error = anyhow::Error;
 
@@ -46,8 +54,8 @@ impl TryFrom<String> for Button {
         match value {
             _ if value == "send-message" => Ok(Button::SendMsg),
             _ if value == "proxy-request" => Ok(Button::ProxyRequest),
-            _ if value == "update-page" => Ok(Button::UpdatePage),
             _ if value == "create-page" => Ok(Button::CreatePage),
+            _ if value == "update-page" => Ok(Button::UpdatePage),
             _ if value == "reset-page" => Ok(Button::ResetPage),
             _ => Err(anyhow::anyhow!("Don't know {value}")),
         }
@@ -202,6 +210,31 @@ impl Web {
         let msg = your_message.value();
         your_message.set_value("");
         msg
+    }
+
+    pub fn set_tab(&mut self, tab: Tab) {
+        for t in Tab::all() {
+            let id = t.to_id();
+            let class = (t == tab).then_some("active").unwrap_or("");
+            self.get_el(&format!("{id}-module")).set_class_name(&format!("{class} module-content"));
+            self.get_el(&format!("menu-{id}")).set_class_name(class);
+        }
+    }
+}
+
+impl Tab {
+    fn to_id(&self) -> String {
+        match self {
+            Tab::Home => "home",
+            Tab::Page => "page-edit",
+            Tab::Chat => "chat",
+            Tab::Proxy => "proxy",
+        }
+        .to_string()
+    }
+
+    fn all() -> Vec<Tab> {
+        vec![Self::Home, Self::Page, Self::Chat, Self::Proxy]
     }
 }
 

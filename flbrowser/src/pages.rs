@@ -1,5 +1,8 @@
 use flarch::tasks::spawn_local_nosend;
-use flcrypto::{access::Condition, signer::KeyPairID};
+use flcrypto::{
+    access::Condition,
+    signer::{KeyPairID, Signer},
+};
 use flmodules::{
     dht_storage::{broker::DHTStorageOut, core::Cuckoo, realm_view::RealmView},
     flo::{
@@ -10,7 +13,7 @@ use flmodules::{
 };
 use tokio::sync::broadcast;
 
-use crate::web::{getEditorContent, setEditorContent, Button, Web};
+use crate::web::{getEditorContent, setEditorContent, Button, Tab, Web};
 
 #[derive(Debug)]
 pub struct DhtPage {
@@ -33,14 +36,22 @@ impl From<FloBlobPage> for DhtPage {
 pub struct Pages {
     rv: RealmView,
     web: Web,
+    edit_id: Option<BlobID>,
+    signers: Vec<Signer>,
 }
 
 impl Pages {
-    pub async fn new(mut rv: RealmView, mut rx: broadcast::Receiver<Button>) -> anyhow::Result<()> {
+    pub async fn new(
+        mut rv: RealmView,
+        mut rx: broadcast::Receiver<Button>,
+        signers: Vec<Signer>,
+    ) -> anyhow::Result<()> {
         let mut tap = rv.dht_storage.broker.get_tap_out().await?.0;
         let mut p = Pages {
             rv,
             web: Web::new()?,
+            edit_id: None,
+            signers,
         };
 
         p.show_page(&p.get_dht_page(&p.rv.pages.root).unwrap());
@@ -64,9 +75,7 @@ impl Pages {
                 let page_path = self.web.get_input("page-path").value();
                 let page_content: String = getEditorContent().into();
 
-                log::info!("Storing page: {page_path} - {page_content}");
-
-                let (parent, path) = match self.rv.get_new_page_path(&page_path) {
+                let (parent, path) = match self.rv.get_page_parent_remaining(&page_path) {
                     Ok(pp) => pp,
                     Err(e) => {
                         log::error!("While splitting path: {e:?}");
@@ -83,7 +92,7 @@ impl Pages {
                     Err(e) => log::error!("While saving page: {e:?}"),
                 }
             }
-            Button::UpdatePage => {}
+            Button::UpdatePage => self.update_page().await.expect("Updating the page"),
             Button::ResetPage => self.reset_page(),
             Button::EditPage(id) => {
                 self.edit_page(&id);
@@ -95,6 +104,21 @@ impl Pages {
             }
             _ => {}
         }
+    }
+
+    async fn update_page(&mut self) -> anyhow::Result<()> {
+        let id = self
+            .edit_id
+            .as_ref()
+            .ok_or(anyhow::anyhow!("No ID stored for current page"))?;
+        let content = getEditorContent()
+            .as_string()
+            .ok_or(anyhow::anyhow!("Couldn't convert content"))?;
+
+        let signers = self.signers.iter().collect::<Vec<_>>();
+        self.rv.update_page(id, content, &signers).await?;
+
+        Ok(())
     }
 
     async fn dht_msg(&mut self, msg: DHTStorageOut) {
@@ -110,6 +134,7 @@ impl Pages {
             "dht_page_path",
             &format!("{}/{}", dp.realm, dp.path.clone()),
         );
+        self.web.set_tab(Tab::Home);
     }
 
     async fn init_editor(&mut self) {
@@ -131,6 +156,7 @@ impl Pages {
     }
 
     fn reset_page(&mut self) {
+        self.edit_id = None;
         setEditorContent(
             r#"<!DOCTYPE html>
 <html lang="en">
@@ -183,6 +209,7 @@ impl Pages {
     }
 
     fn edit_page(&mut self, id: &FloID) {
+        self.edit_id = Some((*id.clone()).into());
         if let Some(dp) = self.get_dht_page(&(**id).into()) {
             setEditorContent(dp.page.get_index().into());
             self.set_editor_id_buttons(Some(dp.page.flo_id()), false, true, true);
