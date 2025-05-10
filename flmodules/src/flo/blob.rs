@@ -55,7 +55,7 @@ impl FloBlobPage {
         signers: &[&Signer],
     ) -> anyhow::Result<Self> {
         let links = parent
-            .map(|p| [("parent".to_string(), vec![p])].into_iter().collect())
+            .map(|p| [("parents".to_string(), vec![p])].into_iter().collect())
             .unwrap_or(HashMap::new());
         Self::from_type_cuckoo(
             realm,
@@ -152,7 +152,7 @@ impl FloBlobTag {
         signers: &[&Signer],
     ) -> anyhow::Result<Self> {
         let links = parent
-            .map(|p| [("parent".to_string(), vec![p])].into_iter().collect())
+            .map(|p| [("parents".to_string(), vec![p])].into_iter().collect())
             .unwrap_or(HashMap::new());
         Self::from_type_cuckoo(
             realm,

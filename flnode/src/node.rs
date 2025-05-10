@@ -146,7 +146,7 @@ impl Node {
                 );
             }
             if modules.contains(Modules::PING) {
-                log::warn!("Ping is disabled");
+                // log::warn!("Ping is disabled");
                 // ping =
                 //     Some(Ping::start(PingConfig::default(), rnd.broker.clone(), &mut timer).await?);
             }

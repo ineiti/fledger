@@ -1,9 +1,10 @@
 use anyhow::{anyhow, Result};
 use chat::Chat;
+use flcrypto::signer::SignerTrait;
 use flmodules::{
     dht_router::broker::DHTRouter,
     dht_storage::{self, broker::DHTStorage, realm_view::RealmView},
-    flo::{flo::FloID, realm::RealmID},
+    flo::{crypto::FloVerifier, flo::FloID, realm::RealmID},
     gossip_events::broker::Gossip,
     Modules,
 };
@@ -214,11 +215,16 @@ impl WebState {
                 .expect("Creating Proxy");
             }
             StateEnum::ShowPage(rv) => {
+                let verifier = FloVerifier::new(
+                    rv.realm.realm_id(),
+                    self.webn.node.crypto_storage.get_signer().verifier(),
+                );
+                self.webn.dht_storage.store_flo(verifier.into()).expect("Storing verifier");
                 self.web.unhide("menu-page-edit");
                 Pages::new(
                     rv.clone(),
                     self.tx.subscribe(),
-                    vec![self.webn.node.crypto_storage.get_signer()],
+                    self.webn.node.crypto_storage.get_signer(),
                 )
                 .await
                 .expect("Initializing Pages");

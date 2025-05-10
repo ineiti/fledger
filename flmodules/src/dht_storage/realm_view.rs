@@ -7,8 +7,8 @@ use crate::{
     },
     flo::{
         blob::{
-            BlobAccess, BlobFamily, BlobID, BlobPage, BlobPath, BlobPathFamily, BlobTag,
-            FloBlobPage, FloBlobTag,
+            BlobFamily, BlobID, BlobPage, BlobPath, BlobPathFamily, BlobTag, FloBlobPage,
+            FloBlobTag,
         },
         flo::{FloError, FloID, FloWrapper},
         realm::{FloRealm, GlobalID, Realm, RealmID},
@@ -139,11 +139,12 @@ impl RealmView {
             path,
             Bytes::from(content),
             parent.clone(),
-            cuckoo,
+            cuckoo.clone(),
             signers,
         )?;
         self.dht_storage.store_flo(fp.clone().into())?;
-        if let Some(parent_page) = parent.and_then(|p| self.pages.storage.get_mut(&p)) {
+        self.pages.storage.insert(fp.blob_id(), fp.clone());
+        if let Some(parent_page) = parent.clone().and_then(|p| self.pages.storage.get_mut(&p)) {
             let cond = self
                 .dht_storage
                 .convert(parent_page.cond(), &self.realm.realm_id())
@@ -152,16 +153,24 @@ impl RealmView {
                 .iter()
                 .map(|sig| sig.verifier().get_id())
                 .collect::<Vec<_>>();
-            if cond != Condition::Pass && !cond.can_verify(&verifiers.iter().collect::<Vec<_>>()) {
-                log::warn!("Cannot update parent with this signer - so this page will be difficult to find!");
+            if !cond.can_verify(&verifiers.iter().collect::<Vec<_>>()) {
+                if !matches!(cuckoo, Cuckoo::Parent(_)) {
+                    log::warn!("Cannot update parent with this signer - so this page will be difficult to find!");
+                } else {
+                    log::warn!("Cannot update parent with this signer");
+                }
             } else {
-                self.dht_storage.store_flo(
-                    parent_page
-                        .edit_data_signers(cond, |page| page.add_child(fp.blob_id()), signers)?
-                        .into(),
+                let parent_update = parent_page.edit_data_signers(
+                    cond,
+                    |page| page.add_child(fp.blob_id()),
+                    signers,
                 )?;
+                self.dht_storage.store_flo(parent_update.clone().into())?;
+                self.pages
+                    .storage
+                    .insert(parent_update.blob_id(), parent_update);
             }
-        } else {
+        } else if parent.is_some() {
             log::warn!("Couldn't get parent page to update 'children'");
         }
         Ok(fp)
@@ -271,7 +280,7 @@ impl RealmView {
             .get_path()
             .ok_or(anyhow::anyhow!("Didn't find path in blob"))?;
         if let Some(p) = b.get_parents().first() {
-            return Ok(format!("/{}/{path}", self.get_full_path_id(p)?));
+            return Ok(format!("{}/{path}", self.get_full_path_id(p)?));
         }
         Ok(format!("/{path}"))
     }
@@ -285,13 +294,13 @@ impl RealmView {
     /// Returns the parent page and the remaining path.
     /// For example, given the path "/root/foo/new_page", it will search for the
     /// parent at "/root/foo", and return "new_page".
-    pub fn get_page_parent_remaining(&self, path: &str) -> anyhow::Result<(&FloBlobPage, String)> {
+    pub fn get_page_parent_remaining(&self, path: &str) -> anyhow::Result<(FloBlobPage, String)> {
         let re = Regex::new(r"^/(.*)/([^/]+)$")?;
         let (root, page) = re
             .captures(path)
             .map(|caps| (caps.get(1).unwrap().as_str(), caps.get(2).unwrap().as_str()))
             .ok_or(anyhow::anyhow!("Not correct path format"))?;
-        Ok((self.get_page_from_path(root)?, page.to_string()))
+        Ok((self.get_page_from_path(root)?.clone(), page.to_string()))
     }
 
     pub fn get_root_tag(&self) -> Option<&FloBlobTag> {
@@ -305,7 +314,7 @@ impl RealmView {
     pub async fn update_page(
         &mut self,
         id: &BlobID,
-        content: String,
+        edit: impl FnOnce(&mut BlobPage),
         signers: &[&Signer],
     ) -> anyhow::Result<FloBlobPage> {
         let page = self
@@ -317,11 +326,7 @@ impl RealmView {
             .dht_storage
             .convert(page.cond(), &page.realm_id())
             .await;
-        let new_page = page.edit_data_signers(
-            cond,
-            |bp| bp.set_data("index.html".into(), content.into()),
-            signers,
-        )?;
+        let new_page = page.edit_data_signers(cond, edit, signers)?;
         self.dht_storage.store_flo(new_page.clone().into())?;
         self.pages.storage.insert(id.clone(), new_page.clone());
         Ok(new_page)
@@ -371,9 +376,9 @@ where
         ds: &mut DHTStorage,
         bid: BlobID,
     ) -> anyhow::Result<Vec<&FloWrapper<T>>> {
-        if self.storage.get(&bid).is_none() {
-            self.update_blobs_from_ds(ds, &bid).await?;
-        }
+        // if self.storage.get(&bid).is_none() {
+        self.update_blobs_from_ds(ds, &bid).await?;
+        // }
         Ok(once(&bid)
             .chain(self.cuckoos.get(&bid).unwrap_or(&Vec::new()))
             .filter_map(|id| self.storage.get(id))
@@ -420,13 +425,14 @@ where
             .into_iter()
             .chain(std::iter::once((**bid).into()))
         {
-            let blob = ds.get_flo::<T>(&self.realm.global_id(id.clone())).await?;
-            self.storage.insert((*blob.flo_id()).into(), blob.clone());
-            if id != blob.flo_id() {
-                let new_id: BlobID = (*blob.flo_id()).into();
-                let cuckoos = self.cuckoos.entry(new_id.clone()).or_insert_with(Vec::new);
-                if !cuckoos.contains(&new_id) {
-                    cuckoos.push(new_id);
+            if let Ok(flo) = ds.get_flo::<T>(&self.realm.global_id(id.clone())).await {
+                self.storage.insert((*flo.flo_id()).into(), flo.clone());
+                let blob_id: BlobID = (*flo.flo_id()).into();
+                if *bid != blob_id {
+                    let cuckoos = self.cuckoos.entry(bid.clone()).or_insert_with(Vec::new);
+                    if !cuckoos.contains(&blob_id) {
+                        cuckoos.push(blob_id);
+                    }
                 }
             }
         }

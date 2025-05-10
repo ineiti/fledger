@@ -31,7 +31,8 @@
     <nav class="main-nav">
         <div class="nav-container">
             <ul class="module-tabs">
-                <li class="active" id="menu-home"><a href="#" data-module="home" class="module-link"><i class="fas fa-home"></i>
+                <li class="active" id="menu-home"><a href="#" data-module="home" class="module-link"><i
+                            class="fas fa-home"></i>
                         Home</a></li>
                 <li class="hidden" id="menu-page-edit"><a href="#" data-module="page-edit" class="module-link"><i
                             class="fas fa-share-alt"></i> Store
@@ -159,6 +160,34 @@
                             <h2 id="dht_page_path">UNKNOWN PATH</h2>
                             <div class="homepage-container" id="dht_page">
                                 <p>Loading available pages...</p>
+                            </div>
+                        </section>
+                        <section id="page_family">
+                            <div id="page_family_parents">
+                                <h2>Parent pages</h2>
+                                <p>The following pages point to this page as child:</p>
+                                <div class="page-links" id="page_family_parents_list">
+                                </div>
+                            </div>
+                            <div id="page_family_children">
+                                <h2>Children pages</h2>
+                                <p>The current page points to the following pages as children:</p>
+                                <div class="page-links" id="page_family_children_list">
+                                </div>
+                            </div>
+                        </section>
+                        <section id="page_cuckoos">
+                            <div id="page_cuckoos_parent">
+                                <h2>Parent cuckoo</h2>
+                                <p>The current page is attached to the following page:</p>
+                                <div class="page-links" id="page_cuckoos_parent_list">
+                                </div>
+                            </div>
+                            <div id="page_cuckoos_attached">
+                                <h2>Cuckoo pages</h2>
+                                <p>These pages are foreign pages attached to the current page.</p>
+                                <div class="page-links" id="page_cuckoos_attached_list">
+                                </div>
                             </div>
                         </section>
                     </div>

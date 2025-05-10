@@ -1491,3 +1491,7 @@ span:not(.status-pill).status-connected {
 .page-id {
     font-family: monospace;
 }
+
+.page-links ul {
+    margin-left: 1.5em;
+}

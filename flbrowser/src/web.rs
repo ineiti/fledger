@@ -168,10 +168,10 @@ impl Web {
         self.set_id_inner("connected_stats", &val.connected_stats());
     }
 
-    pub fn set_editable_pages(&mut self, pages: &Vec<FloBlobPage>) {
+    pub fn set_editable_pages(&mut self, pages: &Vec<(String, FloID)>) {
         let pages_li = pages
             .iter()
-            .map(|page| {
+            .map(|(path, id)| {
                 format!(
                     r#"
             <li>
@@ -180,8 +180,8 @@ impl Web {
                 <button class="view-btn" title="View Page" onclick="jsi.button_page_view('{1:x}')"><i class="fas fa-eye"></i></button>
             </li>
         "#,
-                    page.get_path().unwrap_or(&"unknown".to_string()),
-                    page.flo_id()
+                    path,
+                    id
                 )
             })
             .join("");
@@ -216,9 +216,56 @@ impl Web {
         for t in Tab::all() {
             let id = t.to_id();
             let class = (t == tab).then_some("active").unwrap_or("");
-            self.get_el(&format!("{id}-module")).set_class_name(&format!("{class} module-content"));
+            self.get_el(&format!("{id}-module"))
+                .set_class_name(&format!("{class} module-content"));
             self.get_el(&format!("menu-{id}")).set_class_name(class);
         }
+    }
+
+    pub fn page_family(&mut self, parents: &[&FloBlobPage], children: &[&FloBlobPage]) {
+        if self.hide_empty("page_family", parents.is_empty() && children.is_empty()) {
+            return;
+        }
+        self.page_fill_list("page_family_parents", parents);
+        self.page_fill_list("page_family_children", children);
+    }
+
+    pub fn page_cuckoos(&mut self, parent: Option<&FloBlobPage>, attached: &[&FloBlobPage]) {
+        if self.hide_empty("page_cuckoos", parent.is_none() && attached.is_empty()) {
+            return;
+        }
+        self.page_fill_list(
+            "page_cuckoos_parent",
+            &parent.as_ref().map(|&p| vec![p]).unwrap_or(vec![]),
+        );
+        self.page_fill_list("page_cuckoos_attached", attached);
+    }
+
+    fn hide_empty(&mut self, id: &str, empty: bool) -> bool {
+        self.get_el(id)
+            .set_class_name(empty.then(|| "hidden").unwrap_or(""));
+        empty
+    }
+
+    fn page_fill_list(&mut self, id: &str, pages: &[&FloBlobPage]) {
+        if !self.hide_empty(id, pages.is_empty()) {
+            let pages_ul = pages
+                .iter()
+                .map(|c| LI::new(&Self::get_page_link(c)))
+                .collect::<Vec<_>>();
+            self.set_id_inner(&format!("{id}_list"), &UL::new(pages_ul).to_string());
+        }
+    }
+
+    fn get_page_link(dp: &FloBlobPage) -> String {
+        let path = dp
+            .get_path()
+            .unwrap_or(&format!("{}", dp.flo_id()))
+            .to_string();
+        format!(
+            "<a href='#web/{path}' onclick='jsi.button_page_view(\"{:x}\")'>{path}</a>",
+            dp.flo_id()
+        )
     }
 }
 
@@ -259,7 +306,7 @@ pub struct UL(Vec<LI>);
 pub struct LI(String, Option<UL>);
 
 impl UL {
-    pub fn _new(lis: Vec<LI>) -> Self {
+    pub fn new(lis: Vec<LI>) -> Self {
         Self(lis)
     }
 
