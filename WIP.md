@@ -11,7 +11,6 @@ This file is in place of github issues, as currently I'm mostly developing on my
 ### User-facing
 
 Implement [DHT_STORAGE.md](./DHT_STORAGE.md):
-- updating RealmView to remove the Option<RealmStorage>
 - add editing of new pages
 - link browser and cli using a badge
 - add handling of pages with cybernode code
@@ -24,13 +23,13 @@ Implement [DHT_STORAGE.md](./DHT_STORAGE.md):
   - Don't send full list of nodes
 - Node
   - Create events when something happens, either:
-    - poll the structures, and send events through 
+    - poll the structures, and send events through
 - DHT Storage
   - add own Flos to DHTConfig.owned
   - verify Flos when they enter the system
 - DHT_router
   - check disconnection of nodes when no pings received - doesn't seem to disconnect
-  - change broadcast: 
+  - change broadcast:
     - add NeighborMessage which is not forwarded
     - DHTRouterIn::Broadcast sends to all active nodes a NeighborMessage
     - The answer is also a NeighborMessage
@@ -87,6 +86,7 @@ Added fledger to blog: https://ineiti.ch/projects/fledger/
 # Some things done
 
 ### Done
+- updating RealmView to remove the Option<RealmStorage>
 - DHTRouter: also ask other nodes for their list of nodes, so the node can connect there
 - update page in the cli
 - Flo
@@ -208,7 +208,7 @@ Added fledger to blog: https://ineiti.ch/projects/fledger/
 - replace local "femme" with fixed upstream
 
 2022-05-11:
-- Fast reconnection between to CLIs does not work - "DataChannel is not opened" 
+- Fast reconnection between to CLIs does not work - "DataChannel is not opened"
 
 2022-05-05:
 - Display some of the statistics in the browser

@@ -28,6 +28,7 @@ pub enum GossipIn {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum GossipOut {
     ToNetwork(NodeID, ModuleMessage),
+    NewEvent(Event),
 }
 
 /// The first module to use the random_connections is a copy of the previous
@@ -177,6 +178,7 @@ impl Messages {
                     ),
                 )
             })
+            .chain(events.iter().map(|e| GossipOut::NewEvent(e.clone())))
             .collect()
     }
 

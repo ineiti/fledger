@@ -2,13 +2,22 @@ use std::collections::HashMap;
 
 use flarch::{
     broker::{Broker, SubsystemHandler},
-    nodeids::U256,
+    nodeids::{NodeID, U256},
     platform_async_trait,
 };
-use flmodules::network::broker::{BrokerNetwork, NetworkConnectionState, NetworkIn, NetworkOut};
+use flmodules::{
+    network::broker::{BrokerNetwork, NetworkConnectionState, NetworkIn, NetworkOut},
+    nodeconfig::NodeInfo,
+};
 use tokio::sync::watch;
 
-pub type NetStats = HashMap<U256, NetworkConnectionState>;
+#[derive(Default, Debug, Clone)]
+pub struct NetStats {
+    pub states: HashMap<U256, NetworkConnectionState>,
+    pub connected: Vec<NodeID>,
+    pub online: Vec<NodeID>,
+    pub node_infos: HashMap<NodeID, NodeInfo>,
+}
 
 /// Collects the statistics of the connections sent by the network broker.
 pub struct NetworkStats {
@@ -38,13 +47,38 @@ impl NetworkStats {
 impl SubsystemHandler<NetworkOut, NetworkIn> for NetworkStats {
     async fn messages(&mut self, msgs: Vec<NetworkOut>) -> Vec<NetworkIn> {
         for msg in msgs {
-            if let NetworkOut::ConnectionState(state) = msg {
-                self.stats.insert(state.id, state);
-                self.tx
-                    .clone()
-                    .map(|tx| tx.send(self.stats.clone()).is_err().then(|| self.tx = None));
+            match msg {
+                NetworkOut::NodeListFromWS(node_infos) => {
+                    self.stats.online = node_infos.iter().map(|ni| ni.get_id()).collect();
+                    for info in node_infos {
+                        self.stats.node_infos.insert(info.get_id(), info);
+                    }
+                }
+                NetworkOut::ConnectionState(state) => {
+                    self.stats.states.insert(state.id, state);
+                }
+                NetworkOut::Connected(id) => {
+                    self.stats.connected.push(id);
+                }
+                NetworkOut::Disconnected(id) => {
+                    self.stats.connected.retain(|i| i != &id);
+                }
+                _ => {}
             }
         }
+        self.tx
+            .clone()
+            .map(|tx| tx.send(self.stats.clone()).is_err().then(|| self.tx = None));
         vec![]
+    }
+}
+
+impl NetStats {
+    pub fn node_infos_connected(&self) -> Vec<NodeInfo> {
+        self.connected
+            .iter()
+            .filter_map(|id| self.node_infos.get(id))
+            .cloned()
+            .collect()
     }
 }

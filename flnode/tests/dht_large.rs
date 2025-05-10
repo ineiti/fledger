@@ -8,7 +8,8 @@ use flarch::{
 };
 use flcrypto::access::Condition;
 use flmodules::{
-    dht_storage::realm_view::RealmView,
+    dht_storage::core::RealmConfig,
+    flo::realm::FloRealm,
     network::{
         network_start,
         signal::{
@@ -77,13 +78,20 @@ async fn dht_large() -> anyhow::Result<()> {
     }
     log::info!("Total Connections: {connections}");
 
-    RealmView::new_create_realm(
-        nodes[0].dht_storage.as_mut().unwrap().clone(),
+    let realm = FloRealm::new(
         "root",
         Condition::Pass,
+        RealmConfig {
+            max_space: 1_000_000,
+            max_flo_size: 10_000,
+        },
         &[],
-    )
-    .await?;
+    )?;
+    nodes[0]
+        .dht_storage
+        .as_mut()
+        .unwrap()
+        .store_flo(realm.clone().into())?;
 
     let mut count = 1;
     loop {
@@ -171,7 +179,13 @@ async fn start_signal() -> anyhow::Result<Signal> {
             if let SignalOut::WSServer(WSServerIn::Message(ch, msg_str)) = &msg {
                 if let Ok(msg_ws) = serde_json::from_str::<WSSignalMessageFromNode>(&msg_str) {
                     if let WSSignalMessageFromNode::PeerSetup(msg_peer) = msg_ws {
-                        log::trace!("{}: {} {} -> {}", ch, msg_peer.message, msg_peer.id_init, msg_peer.id_follow);
+                        log::trace!(
+                            "{}: {} {} -> {}",
+                            ch,
+                            msg_peer.message,
+                            msg_peer.id_init,
+                            msg_peer.id_follow
+                        );
                     }
                 }
             }

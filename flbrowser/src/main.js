@@ -1,13 +1,13 @@
 export function downloadFile(fileName, data) {
-    console.dir(fileName);
-    console.dir(data);
-    const aElement = document.createElement('a');
-    aElement.setAttribute('download', fileName);
-    const href = URL.createObjectURL(new Blob([data]));
-    aElement.href = href;
-    aElement.setAttribute('target', '_blank');
-    aElement.click();
-    URL.revokeObjectURL(href);
+  console.dir(fileName);
+  console.dir(data);
+  const aElement = document.createElement('a');
+  aElement.setAttribute('download', fileName);
+  const href = URL.createObjectURL(new Blob([data]));
+  aElement.href = href;
+  aElement.setAttribute('target', '_blank');
+  aElement.click();
+  URL.revokeObjectURL(href);
 };
 
 export function getEditorContent() {
@@ -16,4 +16,11 @@ export function getEditorContent() {
     return editor.getValue();
   }
   return "";
+}
+
+export function setEditorContent(data) {
+  if (typeof ace !== 'undefined' && ace.edit) {
+    const editor = ace.edit("editor");
+    editor.setValue(data);
+  }
 }

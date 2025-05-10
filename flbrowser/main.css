@@ -6,6 +6,7 @@
     --background-color: #f9f9f9;
     --stats-bg-color: #f1f1f1;
     --card-bg-color: #ffffff;
+    --highlight-bg-color: #e0e0e0;
     --text-color: #333;
     --text-secondary: #666;
     --text-muted: #777;
@@ -29,9 +30,10 @@
     :root {
         --primary-color: #5dade2;
         --secondary-color: #a3c6e9;
-        --background-color: #1a1a1a;
-        --stats-bg-color: #2a2a2a;
+        --background-color: #0a0a0a;
+        --stats-bg-color: #1a1a1a;
         --card-bg-color: #2c2c2c;
+        --highlight-bg-color: #3c3c3c;
         --text-color: #e0e0e0;
         --text-secondary: #b0b0b0;
         --text-muted: #9e9e9e;
@@ -48,13 +50,14 @@
     }
 }
 
-/* Override with user preference when explicitly set */
+Override with user preference when explicitly set
 [data-theme="dark"] {
     --primary-color: #5dade2;
     --secondary-color: #a3c6e9;
-    --background-color: #1a1a1a;
-    --stats-bg-color: #2a2a2a;
+    --background-color: #0a0a0a;
+    --stats-bg-color: #1a1a1a;
     --card-bg-color: #2c2c2c;
+    --highlight-bg-color: #3c3c3c;
     --text-color: #e0e0e0;
     --text-secondary: #b0b0b0;
     --text-muted: #9e9e9e;
@@ -79,6 +82,7 @@
     --background-color: #f9f9f9;
     --stats-bg-color: #f1f1f1;
     --card-bg-color: #ffffff;
+    --highlight-bg-color: #e0e0e0;
     --text-color: #333;
     --text-secondary: #666;
     --text-muted: #777;
@@ -1454,7 +1458,8 @@ span:not(.status-pill).status-connected {
     margin-right: 0.5rem;
 }
 
-.primary-button {
+.primary-button,
+.secondary-button {
     background-color: var(--primary-color);
     color: white;
     border: none;
@@ -1467,4 +1472,26 @@ span:not(.status-pill).status-connected {
 
 .primary-button:hover {
     background-color: #2980b9;
+}
+
+.secondary-button {
+    background-color: var(--secondary-color);
+}
+
+.secondary-button:hover {
+    background-color: #2980b9;
+}
+
+.page-id-label {
+    margin-top: 1em;
+    padding: 0.2em;
+    background-color: var(--highlight-bg-color);
+}
+
+.page-id {
+    font-family: monospace;
+}
+
+.page-links ul {
+    margin-left: 1.5em;
 }
