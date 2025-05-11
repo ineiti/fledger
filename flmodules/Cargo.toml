@@ -16,7 +16,7 @@ testing = []
 [dependencies]
 flarch = { path = "../flarch", version = "0.9" }
 flcrypto = { path = "../flcrypto", version = "0.9" }
-flmacro = { path = "../flmacro", version = "0.9.1" }
+flmacro = { path = "../flmacro", version = "0.9" }
 
 anyhow = { version = "1", features = ["backtrace"] }
 async-recursion = "1"
