@@ -234,11 +234,11 @@ impl RealmView {
     }
 
     pub async fn fetch_page(&mut self, id: BlobID) -> anyhow::Result<()> {
-        self.pages.update_blobs_from_ds(&id).await
+        self.pages.update_cuckoos(&id).await
     }
 
     pub async fn fetch_tag(&mut self, id: BlobID) -> anyhow::Result<()> {
-        self.tags.update_blobs_from_ds(&id).await
+        self.tags.update_cuckoos(&id).await
     }
 
     pub async fn update_pages(&mut self) -> anyhow::Result<()> {
@@ -410,7 +410,7 @@ where
             cuckoos: HashMap::new(),
             dht_storage,
         };
-        rs.update_blobs_from_ds(&rs.root.clone()).await?;
+        rs.update_cuckoos(&rs.root.clone()).await?;
         Ok(rs)
     }
 
@@ -442,7 +442,7 @@ where
     /// return either the blob and its cuckoos, or just the cuckoos.
     pub async fn get_cuckoos(&mut self, bid: BlobID) -> anyhow::Result<Vec<&FloWrapper<T>>> {
         // if self.storage.get(&bid).is_none() {
-        self.update_blobs_from_ds(&bid).await?;
+        self.update_cuckoos(&bid).await?;
         // }
         Ok(once(&bid)
             .chain(self.cuckoos.get(&bid).unwrap_or(&Vec::new()))
@@ -478,7 +478,7 @@ where
         Err(anyhow::anyhow!("Couldn't find page"))
     }
 
-    async fn update_blobs_from_ds(&mut self, bid: &BlobID) -> anyhow::Result<()> {
+    async fn update_cuckoos(&mut self, bid: &BlobID) -> anyhow::Result<()> {
         for id in self
             .dht_storage
             .get_cuckoos(&self.realm.global_id((**bid).into()))
@@ -508,7 +508,7 @@ where
     async fn update_blobs(&mut self) -> anyhow::Result<()> {
         let bids = self.storage.keys().cloned().collect::<Vec<_>>();
         for bid in bids {
-            self.update_blobs_from_ds(&bid).await?;
+            self.update_cuckoos(&bid).await?;
         }
         Ok(())
     }

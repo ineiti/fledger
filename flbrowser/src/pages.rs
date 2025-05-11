@@ -93,10 +93,12 @@ impl Pages {
                     log::info!("Page is: {page:?}");
                 }
             }
-            Button::VisitPage(path) => match self.rv.get_page_from_path(&path).cloned() {
-                Ok(page) => self.show_home_page(&page).await,
-                Err(e) => log::warn!("Couldn't visit {path}: {e:?}"),
-            },
+            Button::AnchorPage(path) => {
+                match self.rv.get_page_from_path(&path).cloned() {
+                    Ok(page) => self.show_home_page(&page).await,
+                    Err(e) => log::warn!("Couldn't visit {path}: {e:?}"),
+                }
+            }
             _ => {}
         }
     }
@@ -131,6 +133,7 @@ impl Pages {
             Ok(page) => self.edit_page(&page.flo_id()),
             Err(e) => log::error!("While saving page: {e:?}"),
         }
+        self.rv.update_pages().await.expect("Updating pages");
         self.set_editable_pages().await;
     }
 

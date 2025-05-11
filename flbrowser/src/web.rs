@@ -38,7 +38,7 @@ pub enum Button {
     EditPage(FloID),
     ViewPage(FloID),
     DebugPage(FloID),
-    VisitPage(String),
+    AnchorPage(String),
 }
 
 #[derive(PartialEq)]
@@ -273,10 +273,7 @@ impl Web {
             .get_path()
             .unwrap_or(&format!("{}", dp.flo_id()))
             .to_string();
-        format!(
-            "<a href='#web/{path}' onclick='jsi.button_page_view(\"{:x}\")'>{path}</a>",
-            dp.flo_id()
-        )
+        format!("<a href='#web/{path}'>{path}</a>")
     }
 }
 

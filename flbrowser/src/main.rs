@@ -77,7 +77,7 @@ impl JSInterface {
     pub fn visit_page(&mut self, path_js: JsString) {
         let path_hash = path_js.as_string().expect("Convert JsString");
         let path = path_hash.trim_start_matches("#web").to_string();
-        self.send_button(Button::VisitPage(path));
+        self.send_button(Button::AnchorPage(path));
     }
 
     pub fn button_click(&mut self, btn: JsString) {
