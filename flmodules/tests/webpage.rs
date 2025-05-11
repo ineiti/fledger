@@ -16,7 +16,7 @@ use flmodules::{
     dht_storage::{
         broker::DHTStorage,
         core::{Cuckoo, DHTConfig, RealmConfig},
-        realm_view::RealmView,
+        realm_view::{RealmView, RealmViewBuilder},
     },
     flo::{
         blob::{FloBlobPage, FloBlobTag},
@@ -134,13 +134,13 @@ impl Simul {
         self.settle().await
     }
 
-    async fn set_realm_id(&mut self, rid: RealmID) {
+    async fn _set_realm_id(&mut self, rid: RealmID) {
         for node in &mut self.nodes {
             node.wallet.set_realm_id(rid.clone());
         }
     }
 
-    async fn store_verifiers(&mut self) -> anyhow::Result<()> {
+    async fn _store_verifiers(&mut self) -> anyhow::Result<()> {
         for node in &mut self.nodes {
             node.dht_storage
                 .store_flo(node.wallet.get_verifier_flo().into())?;
@@ -360,63 +360,62 @@ async fn page_full() -> anyhow::Result<()> {
             .collect(),
     ));
 
-    let root_signers = &[&root_nodes[0].wallet.get_signer()];
-    let mut rv_root = RealmView::new_create_realm_config(
+    let root_signers_val = vec![root_nodes[0].wallet.get_signer().clone()];
+
+    let rv_builder = RealmViewBuilder::new(
         root_nodes[0].dht_storage.clone(),
-        "root",
+        "root".to_string(),
         wallet_root.get_badge_cond(),
-        RealmConfig {
-            max_space: 12e3 as u64,
-            max_flo_size: 4e3 as u32,
-        },
-        root_signers,
+        root_signers_val.clone(),
     )
-    .await?;
-
-    simul.set_realm_id(rv_root.realm.realm_id()).await;
-    simul.sync_check(&rv_root.realm).await?;
-    simul.store_verifiers().await?;
-
-    let root_http = rv_root.create_http(
-        "fledger",
+    .config(RealmConfig {
+        max_space: 12e3 as u64,
+        max_flo_size: 4e3 as u32,
+    })
+    .root_http(
+        "fledger".to_string(),
         INDEX_HTML.to_string(),
         None,
         wallet_root.get_badge_cond(),
-        root_signers,
-    ).await?;
-    let signers_val = vec![root_nodes[0].wallet.get_signer()];
-    let signers = signers_val.iter().collect::<Vec<_>>();
-    rv_root
-        .set_realm_http(root_http.blob_id(), &signers)
-        .await?;
-    let root_tag =
-        rv_root.create_tag("fledger", None, wallet_root.get_badge_cond(), root_signers)?;
-    rv_root.set_realm_tag(root_tag.blob_id(), &signers).await?;
+        root_signers_val.clone(),
+    )
+    .root_tag(
+        "fledger".to_string(),
+        None,
+        wallet_root.get_badge_cond(),
+        root_signers_val.clone(),
+    );
+    let rv_root = rv_builder.build().await?;
+    let root_page = rv_root.get_root_page().expect("Getting root page");
+    let root_tag = rv_root.get_root_tag().expect("Getting root tag");
 
     log::info!("Setting up noise nodes and fetching realm, page, and tag");
     let noise_nodes = simul.new_nodes(nbr_noise).await?;
     simul.log_connections();
     simul.sync_check(&rv_root.realm).await?;
     simul.sync_check(&root_tag).await?;
-    simul.sync_check(&root_http).await?;
+    simul.sync_check(&root_page).await?;
 
     let mut rv_noise = RealmView::new_first(noise_nodes[0].dht_storage.clone()).await?;
-    assert!(rv_noise.pages.as_ref().unwrap().storage.len() > 0);
-    assert!(rv_noise.tags.as_ref().unwrap().storage.len() > 0);
-    assert_eq!(root_http.blob_id(), rv_noise.pages.as_ref().unwrap().root);
-    assert_eq!(root_tag.blob_id(), rv_noise.tags.as_ref().unwrap().root);
+    assert!(rv_noise.pages.storage.len() > 0);
+    assert!(rv_noise.tags.storage.len() > 0);
+    assert_eq!(root_page.blob_id(), rv_noise.pages.root);
+    assert_eq!(root_tag.blob_id(), rv_noise.tags.root);
 
     let cuckoo_nbr: usize = 3;
+    let root_signers = &root_signers_val.iter().collect::<Vec<_>>();
     for nbr in 0..cuckoo_nbr {
         log::info!("Adding cuckoo page and tag #{nbr}");
-        let cuckoo_page = rv_noise.create_http_cuckoo(
-            &format!("cuckoo_{nbr}"),
-            "<html><h1>Cuckoo".to_string(),
-            None,
-            wallet_root.get_badge_cond(),
-            Cuckoo::Parent(root_http.flo_id()),
-            root_signers,
-        ).await?;
+        let cuckoo_page = rv_noise
+            .create_http_cuckoo(
+                &format!("cuckoo_{nbr}"),
+                "<html><h1>Cuckoo".to_string(),
+                None,
+                wallet_root.get_badge_cond(),
+                Cuckoo::Parent(root_page.flo_id()),
+                root_signers,
+            )
+            .await?;
         let cuckoo_tag = rv_noise.create_tag_cuckoo(
             &format!("cuckoo_{nbr}"),
             None,
@@ -434,11 +433,11 @@ async fn page_full() -> anyhow::Result<()> {
     let new_node = simul.new_node().await?;
     simul.log_connections();
     simul.sync_check(&rv_root.realm).await?;
-    simul.sync_check_cuckoos(&root_http, cuckoo_nbr).await?;
+    simul.sync_check_cuckoos(&root_page, cuckoo_nbr).await?;
     simul.sync_check_cuckoos(&root_tag, cuckoo_nbr).await?;
     let rv_new = RealmView::new_first(new_node.dht_storage.clone()).await?;
-    assert_eq!(cuckoo_nbr + 1, rv_new.pages.as_ref().unwrap().storage.len());
-    assert_eq!(cuckoo_nbr + 1, rv_new.tags.as_ref().unwrap().storage.len());
+    assert_eq!(cuckoo_nbr + 1, rv_new.pages.storage.len());
+    assert_eq!(cuckoo_nbr + 1, rv_new.tags.storage.len());
 
     Ok(())
 }

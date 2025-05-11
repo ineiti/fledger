@@ -16,13 +16,14 @@ testing = []
 [dependencies]
 flarch = { path = "../flarch", version = "0.9" }
 flcrypto = { path = "../flcrypto", version = "0.9" }
-flmacro = { path = "../flmacro", version = "0.9.1" }
+flmacro = { path = "../flmacro", version = "0.9" }
 
 anyhow = { version = "1", features = ["backtrace"] }
 async-recursion = "1"
 bimap = "0.6"
 bitflags = { version = "2", features = ["serde"] }
 getrandom = { version = "0.2" }
+regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
 # serde_yaml 0.9 uses tags in yaml, which fails here

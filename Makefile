@@ -50,7 +50,7 @@ cargo_build:
 	set -e; \
 	for c in ${CARGO_LOCKS}; do \
 		echo Building $$c; \
-		(cd $$c && cargo build ) || exit 1; \
+		(cd $$c && cargo build --tests ) || exit 1; \
 	done
 
 cargo_unused:
@@ -110,9 +110,12 @@ serve_two: kill build_cli
 	( cd cli && ( $(call FLEDGER,1) & $(call FLEDGER,2) & ) )
 
 serve_local: kill build_local_web serve_two
-	cd flbrowser && RUST_BACKTRACE=1 trunk serve --features local &
+	cd flbrowser && RUST_BACKTRACE=1 trunk serve --features local -w . -w ../flmodules &
 	sleep 2
 	open http://localhost:8080
+
+create_local_realm:
+	cd cli/fledger && cargo run -- -c test03 -n Local03 -s ws://localhost:8765 --disable-turn-stun realm create danu_realm
 
 docker_dev:
 	for cli in fledger flsignal; do \

@@ -8,11 +8,26 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 ## [0.9.3] - Pending
 
+### Added
+
+- flbrowser
+  - add editing of new pages
+  - show cuckoo pages on the bottom
+
 ### Changed
 
+- `RealmView` is now tied to have a `root-page` and a `root-tag`
 - added configuration options to `cli/fledger` for local run only
+- DHT_router
+  - change broadcast:
+    - add NeighborMessage which is not forwarded
+    - DHTRouterIn::Broadcast sends to all active nodes a NeighborMessage
+    - The answer is also a NeighborMessage
+- FLSignal
+  - Don't send full list of nodes
+- UI chat scrolls to the bottom when showing the first message.
 
-## [0.9.2] - Released
+## [0.9.1] - 2025-03-17
 
 ### Added
 

@@ -533,10 +533,13 @@ impl MessageNeighbour {
 
 #[cfg(test)]
 mod tests {
-    use flarch::data_storage::DataStorageTemp;
-    use flcrypto::access::Condition;
+    use flarch::{data_storage::DataStorageTemp, start_logging};
+    use flcrypto::{access::Condition, signer_ed25519::SignerEd25519};
 
-    use crate::{flo::realm::Realm, testing::wallet::Wallet};
+    use crate::{
+        flo::realm::Realm,
+        testing::wallet::{FloTesting, Wallet},
+    };
 
     use super::*;
 
@@ -589,6 +592,53 @@ mod tests {
         } else {
             return Err(anyhow::anyhow!("Didn't find message"));
         }
+        Ok(())
+    }
+
+    // Verify that a cuckoo page is correctly stored and retrievable as a cuckoo page.
+    #[test]
+    fn store_cuckoos() -> anyhow::Result<()> {
+        start_logging();
+        let mut msg = Messages::new(
+            DataStorageTemp::new_box(),
+            DHTConfig::default(),
+            NodeID::rnd(),
+        )
+        .0;
+        let fr = FloRealm::from_type(
+            RealmID::rnd(),
+            Condition::Pass,
+            Realm::new(
+                "root".into(),
+                RealmConfig {
+                    max_space: 10000,
+                    max_flo_size: 1000,
+                },
+            ),
+            &[],
+        )?;
+        msg.msg_dht_storage(DHTStorageIn::StoreFlo(fr.clone().into()));
+
+        let signer = SignerEd25519::new();
+        let fb_root =
+            FloTesting::new_cuckoo(fr.realm_id(), "data", Cuckoo::Duration(100000), &signer);
+        msg.msg_dht_storage(DHTStorageIn::StoreFlo(fb_root.clone().into()));
+        let fb_cu = FloTesting::new_cuckoo(
+            fr.realm_id(),
+            "data2",
+            Cuckoo::Parent(fb_root.flo_id()),
+            &signer,
+        );
+        let ans = msg.msg_dht_storage(DHTStorageIn::StoreFlo(fb_cu.clone().into()));
+        log::info!("{ans:?}");
+
+        let ans = msg.msg_dht_storage(DHTStorageIn::ReadCuckooIDs(fb_root.global_id()));
+        if let Some(InternOut::Storage(DHTStorageOut::CuckooIDs(_, cs))) = ans.get(0) {
+            assert_eq!(Some(&fb_cu.flo_id()), cs.get(0));
+        } else {
+            assert!(false, "Answer should be CuckooIDs");
+        }
+
         Ok(())
     }
 }

@@ -8,6 +8,17 @@
     <title>Danu - Decentralized Resource Sharing</title>
     <link data-trunk rel="css" href="main.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <script>
+        function init_jsi() {
+            if (window.wasmBindings) {
+                new window.wasmBindings.JSInterface().then((res) => { jsi = res });
+            } else {
+                setTimeout(init_jsi, 500);
+            }
+        }
+        window.addEventListener("load", (event) => { init_jsi(); });
+    </script>
 </head>
 
 <body>
@@ -20,13 +31,17 @@
     <nav class="main-nav">
         <div class="nav-container">
             <ul class="module-tabs">
-                <li class="active"><a href="#" data-module="home" class="module-link"><i class="fas fa-home"></i>
+                <li class="active" id="menu-home"><a href="#" data-module="home" class="module-link"><i
+                            class="fas fa-home"></i>
                         Home</a></li>
-                <!-- <li><a href="#" data-module="sharing" class="module-link"><i class="fas fa-share-alt"></i> Store
-                        webpage</a></li> -->
-                <li><a href="#" data-module="chat" class="module-link"><i class="fas fa-comments"></i> Global Chat</a>
+                <li class="hidden" id="menu-page-edit"><a href="#" data-module="page-edit" class="module-link"><i
+                            class="fas fa-share-alt"></i> Store
+                        webpage</a></li>
+                <li class="hidden" id="menu-chat"><a href="#" data-module="chat" class="module-link"><i
+                            class="fas fa-comments"></i> Global Chat</a>
                 </li>
-                <li><a href="#" data-module="proxy" class="module-link"><i class="fas fa-globe"></i> Web Proxy</a></li>
+                <li class="hidden" id="menu-proxy"><a href="#" data-module="proxy" class="module-link"><i
+                            class="fas fa-globe"></i> Web Proxy</a></li>
             </ul>
             <div class="external-links">
                 <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode">
@@ -147,6 +162,34 @@
                                 <p>Loading available pages...</p>
                             </div>
                         </section>
+                        <section id="page_family">
+                            <div id="page_family_parents">
+                                <h2>Parent pages</h2>
+                                <p>The following pages point to this page as child:</p>
+                                <div class="page-links" id="page_family_parents_list">
+                                </div>
+                            </div>
+                            <div id="page_family_children">
+                                <h2>Children pages</h2>
+                                <p>The current page points to the following pages as children:</p>
+                                <div class="page-links" id="page_family_children_list">
+                                </div>
+                            </div>
+                        </section>
+                        <section id="page_cuckoos">
+                            <div id="page_cuckoos_parent">
+                                <h2>Parent cuckoo</h2>
+                                <p>The current page is attached to the following page:</p>
+                                <div class="page-links" id="page_cuckoos_parent_list">
+                                </div>
+                            </div>
+                            <div id="page_cuckoos_attached">
+                                <h2>Cuckoo pages</h2>
+                                <p>These pages are foreign pages attached to the current page.</p>
+                                <div class="page-links" id="page_cuckoos_attached_list">
+                                </div>
+                            </div>
+                        </section>
                     </div>
                 </div>
 
@@ -163,23 +206,31 @@
                             <div class="message-input">
                                 <textarea type="text" id="your_message" placeholder="Type your message..."
                                     onkeydown="if(event.key === 'Enter' && (event.metaKey || event.ctrlKey)) document.getElementById('send_message').click();"></textarea>
-                                <button id="send_message"><i class="fas fa-paper-plane"></i></button>
+                                <button id="send_message" onclick="jsi.button_click('send-message')"><i
+                                        class="fas fa-paper-plane"></i></button>
                             </div>
                         </div>
                     </section>
                 </div>
 
-                <!-- Web Sharing Module Content -->
-                <div id="sharing-module" class="module-content">
+                <!-- Page Sharing Module Content -->
+                <div id="page-edit-module" class="module-content">
                     <section class="module-header">
                         <h2>Store Webpage</h2>
                         <p>Edit and save HTML content for your webpage.</p>
                     </section>
                     <section class="editor-section">
                         <div id="editor" class="editor-container"></div>
+                        <div id="page-id-div" class="page-id-label hidden">Page-ID: <span id="page-id"
+                                class="page-id">deadbeef</span></div>
                         <div class="editor-controls">
                             <input type="text" id="page-path" placeholder="Enter path">
-                            <button id="save-page" class="primary-button">Save Page</button>
+                            <button id="create-page" class="primary-button"
+                                onclick="jsi.button_click('create-page')">Create Page</button>
+                            <button id="update-page" class="primary-button hidden"
+                                onclick="jsi.button_click('update-page')">Update Page</button>
+                            <button id="reset-page" class="secondary-button hidden"
+                                onclick="jsi.button_click('reset-page')">Reset Page</button>
                         </div>
                         <section class="editable-pages">
                             <h3>Editable Pages</h3>
@@ -203,7 +254,8 @@
                                 <input type="url" id="proxy_url" placeholder="Enter URL to browse via proxy"
                                     value="https://lobste.rs/"
                                     onkeypress="if(event.key === 'Enter') document.getElementById('proxy_request').click();" />
-                                <button class="browse-btn" id="proxy_request">Browse</button>
+                                <button class="browse-btn" id="proxy_request"
+                                    onclick="jsi.button_click('proxy-request')">Browse</button>
                             </div>
                         </div>
                         <!-- Updated proxy display with border and an example page -->
@@ -272,6 +324,10 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
     <script>
+        window.addEventListener('hashchange', function () {
+            jsi.visit_page(window.location.hash);
+        });
+
         // Define toggle_div function globally
         function toggle_div(id, caller) {
             const statsContent = document.getElementById(id);
@@ -360,7 +416,6 @@
                     // Show the selected module content
                     document.getElementById(`${moduleId}-module`).classList.add('active');
 
-                    console.log(moduleId);
                     if (moduleId == "chat") {
                         document.getElementById('your_message').focus();
                         let msgs = document.getElementById('messages');
@@ -373,13 +428,13 @@
             // Chat module functionality
             const chatInput = document.getElementById('chat-input');
             const sendButton = document.getElementById('send-message-btn');
-    
+
             function sendMessage() {
                 if (chatInput.value.trim() !== '') {
                     const messageContainer = document.getElementById('message-container');
                     const now = new Date();
                     const timeString = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
+
                     const messageHTML = `
                         <div class="message-item sent">
                             <div class="message-sender">You</div>
@@ -387,17 +442,17 @@
                             <div class="message-time">${timeString}</div>
                         </div>
                     `;
-    
+
                     messageContainer.innerHTML += messageHTML;
                     messageContainer.scrollTop = messageContainer.scrollHeight;
                     chatInput.value = '';
                 }
             }
-    
+
             if (sendButton) {
                 sendButton.addEventListener('click', sendMessage);
             }
-    
+
             if (chatInput) {
                 chatInput.addEventListener('keypress', function (e) {
                     if (e.key === 'Enter') {
@@ -506,25 +561,14 @@
             editor.setTheme("ace/theme/monokai");
             editor.session.setMode("ace/mode/html");
             // Set default content with a simple "Hello Danu" page
-            editor.setValue(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Hello Danu</title>
-</head>
-<body>
-  <h1>Hello Danu</h1>
-  <p>Welcome to Danu.</p>
-</body>
-</html>`, -1);
-            // Add event listener for cmd+enter or ctrl+enter in the editor
-            editor.commands.addCommand({
-                name: "savePageShortcut",
-                bindKey: { win: "Ctrl-Enter", mac: "Cmd-Enter" },
-                exec: function () {
-                    document.getElementById('save-page').click();
-                }
-            });
+            // // Add event listener for cmd+enter or ctrl+enter in the editor
+            // editor.commands.addCommand({
+            //     name: "savePageShortcut",
+            //     bindKey: { win: "Ctrl-Enter", mac: "Cmd-Enter" },
+            //     exec: function () {
+            //         document.getElementById('update-page').click();
+            //     }
+            // });
 
         });
     </script>

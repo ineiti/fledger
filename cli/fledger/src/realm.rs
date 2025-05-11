@@ -1,8 +1,8 @@
 use clap::Subcommand;
 use flcrypto::{access::Condition, signer::SignerTrait};
 use flmodules::{
-    dht_storage::{core::RealmConfig, realm_view::RealmView},
-    flo::{crypto::FloVerifier, realm::Realm},
+    dht_storage::{core::RealmConfig, realm_view::RealmViewBuilder},
+    flo::realm::Realm,
 };
 
 use crate::{Fledger, FledgerState};
@@ -55,24 +55,20 @@ impl RealmHandler {
             config.max_flo_size
         );
         let signer = f.node.crypto_storage.get_signer();
-        let signers = &[&signer];
         let cond = Condition::Verifier(signer.verifier());
-        let mut rv =
-            RealmView::new_create_realm_config(f.ds.clone(), &name, cond.clone(), config, signers)
-                .await?;
-        f.ds.store_flo(FloVerifier::new(rv.realm.realm_id(), signer.verifier()).into())?;
-        let root_http = rv
-            .create_http(
-                "fledger",
+        let signers = vec![signer];
+        RealmViewBuilder::new(f.ds.clone(), name, cond.clone(), signers.clone())
+            .config(config)
+            .root_http(
+                "danu".to_string(),
                 INDEX_HTML.to_string(),
                 None,
                 cond.clone(),
-                signers,
+                signers.clone(),
             )
+            .root_tag("danu".to_string(), None, cond.clone(), signers)
+            .build()
             .await?;
-        rv.set_realm_http(root_http.blob_id(), signers).await?;
-        let root_tag = rv.create_tag("fledger", None, cond.clone(), signers)?;
-        rv.set_realm_tag(root_tag.blob_id(), signers).await?;
 
         f.loop_node(FledgerState::Sync(3)).await?;
 

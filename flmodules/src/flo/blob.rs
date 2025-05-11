@@ -55,7 +55,7 @@ impl FloBlobPage {
         signers: &[&Signer],
     ) -> anyhow::Result<Self> {
         let links = parent
-            .map(|p| [("parent".to_string(), vec![p])].into_iter().collect())
+            .map(|p| [("parents".to_string(), vec![p])].into_iter().collect())
             .unwrap_or(HashMap::new());
         Self::from_type_cuckoo(
             realm,
@@ -72,10 +72,7 @@ impl FloBlobPage {
     }
 
     pub fn get_index(&self) -> String {
-        self.cache()
-            .0
-            .datas
-            .get("index.html")
+        self.get_data("index.html")
             .map(|b| String::from_utf8(b.to_vec()).unwrap_or_default())
             .unwrap_or("".into())
     }
@@ -155,7 +152,7 @@ impl FloBlobTag {
         signers: &[&Signer],
     ) -> anyhow::Result<Self> {
         let links = parent
-            .map(|p| [("parent".to_string(), vec![p])].into_iter().collect())
+            .map(|p| [("parents".to_string(), vec![p])].into_iter().collect())
             .unwrap_or(HashMap::new());
         Self::from_type_cuckoo(
             realm,
@@ -200,18 +197,18 @@ impl Blob {
     }
 }
 
-impl BlobAccess for Blob {
+impl BlobFamily for FloBlob {}
+impl BlobPath for FloBlob {}
+
+impl BlobAccess for FloBlob {
     fn get_blob(&self) -> &Blob {
-        &self
+        self.cache()
     }
 
     fn get_blob_mut(&mut self) -> &mut Blob {
-        self
+        self.cache_mut()
     }
 }
-
-impl BlobFamily for Blob {}
-impl BlobPath for Blob {}
 
 pub trait BlobAccess {
     fn get_blob(&self) -> &Blob;
@@ -227,6 +224,14 @@ pub trait BlobAccess {
 
     fn datas(&self) -> &HashMap<String, Bytes> {
         &self.get_blob().datas
+    }
+
+    fn get_data(&self, key: &str) -> Option<&Bytes> {
+        self.datas().get(key)
+    }
+
+    fn set_data(&mut self, key: String, value: Bytes) {
+        self.datas_mut().insert(key, value);
     }
 
     fn links_mut(&mut self) -> &mut HashMap<String, Vec<BlobID>> {
@@ -252,6 +257,11 @@ pub trait BlobFamily: BlobAccess {
             .or_insert_with(Vec::new)
             .push(parent);
     }
+    fn rm_parent(&mut self, parent: &BlobID) {
+        self.links_mut()
+            .get_mut("parents")
+            .map(|parents| parents.retain(|p| p != parent));
+    }
     fn get_parents(&self) -> Vec<BlobID> {
         self.links().get("parents").unwrap_or(&vec![]).clone()
     }
@@ -263,6 +273,11 @@ pub trait BlobFamily: BlobAccess {
             .entry("children".into())
             .or_insert_with(Vec::new)
             .push(child);
+    }
+    fn rm_child(&mut self, child: &BlobID) {
+        self.links_mut()
+            .get_mut("children")
+            .map(|children| children.retain(|c| c != child));
     }
     fn get_children(&self) -> Vec<BlobID> {
         self.links().get("children").unwrap_or(&vec![]).clone()
@@ -277,6 +292,49 @@ pub trait BlobPath: BlobAccess {
         self.values().get("path")
     }
 }
+
+impl BlobAccess for Blob {
+    fn get_blob(&self) -> &Blob {
+        &self
+    }
+
+    fn get_blob_mut(&mut self) -> &mut Blob {
+        self
+    }
+}
+
+impl BlobAccess for BlobPage {
+    fn get_blob(&self) -> &Blob {
+        &self.0
+    }
+
+    fn get_blob_mut(&mut self) -> &mut Blob {
+        &mut self.0
+    }
+}
+
+impl BlobAccess for BlobTag {
+    fn get_blob(&self) -> &Blob {
+        &self.0
+    }
+
+    fn get_blob_mut(&mut self) -> &mut Blob {
+        &mut self.0
+    }
+}
+
+impl BlobPath for Blob {}
+impl BlobFamily for Blob {}
+
+impl BlobPath for BlobPage {}
+impl BlobFamily for BlobPage {}
+
+impl BlobPath for BlobTag {}
+impl BlobFamily for BlobTag {}
+
+pub trait BlobPathFamily: BlobPath + BlobFamily {}
+
+impl<T: BlobPath + BlobFamily> BlobPathFamily for T {}
 
 #[cfg(test)]
 mod test {
@@ -301,7 +359,7 @@ mod test {
 
         let flb2 = flb.edit_data_signers(
             Condition::Verifier(wallet.get_verifier()),
-            |bp| bp.0.set_parents(vec![BlobID::rnd()]),
+            |bp| bp.set_parents(vec![BlobID::rnd()]),
             &[&mut wallet.get_signer()],
         )?;
 

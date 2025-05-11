@@ -98,16 +98,14 @@ impl Page {
         for (rid, rv) in &self.realms {
             log::info!("\nRealm: {}", rid);
             let vid = self.f.node.crypto_storage.get_signer().verifier().get_id();
-            if let Some(storage) = rv.pages.as_ref().map(|p| &p.storage) {
-                for (_, page) in storage.iter() {
-                    println!(
-                        "{page}\n    editable: {}",
-                        self.ds
-                            .convert(page.cond(), &page.realm_id())
-                            .await
-                            .can_verify(&[&vid])
-                    );
-                }
+            for (_, page) in rv.pages.storage.iter() {
+                println!(
+                    "{page}\n    editable: {}",
+                    self.ds
+                        .convert(page.cond(), &page.realm_id())
+                        .await
+                        .can_sign(&[&vid])
+                );
             }
         }
         Ok(())
@@ -126,11 +124,11 @@ impl Page {
                 None
             } else {
                 let parent_path = parts.join("/");
-                let parent = rv.get_page_path(&parent_path)?;
+                let parent = rv.get_page_from_path(&parent_path)?;
                 Some(parent.blob_id())
             };
             let cuckoo = if parts.is_empty() {
-                Cuckoo::Parent((*rv.pages.as_ref().unwrap().root).into())
+                Cuckoo::Parent((*rv.pages.root).into())
             } else {
                 Cuckoo::None
             };
@@ -157,11 +155,11 @@ impl Page {
         command: ModifyCommands,
     ) -> anyhow::Result<()> {
         let rv = self.get_rv(&realm)?;
-        let page = rv.get_page_path(&path)?;
+        let page = rv.get_page_from_path(&path)?;
         let signer = self.f.node.crypto_storage.get_signer();
         self.f.loop_node(FledgerState::Connected(2)).await?;
         let cond = self.ds.convert(page.cond(), &rv.realm.realm_id()).await;
-        if !cond.can_verify(&[&signer.get_id()]) {
+        if !cond.can_sign(&[&signer.get_id()]) {
             return Err(anyhow!("Our signer is not allowed to modify this page!"));
         }
         match command {
@@ -199,7 +197,7 @@ impl Page {
 
     async fn print(&mut self, realm: String, path: String, file: String) -> anyhow::Result<()> {
         let rv = self.get_rv(&realm)?;
-        let page = rv.get_page_path(&path)?;
+        let page = rv.get_page_from_path(&path)?;
         log::info!("Printing {page}");
         if let Some(content) = page.datas().get(&file) {
             println!(
