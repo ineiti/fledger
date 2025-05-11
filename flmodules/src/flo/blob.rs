@@ -257,6 +257,11 @@ pub trait BlobFamily: BlobAccess {
             .or_insert_with(Vec::new)
             .push(parent);
     }
+    fn rm_parent(&mut self, parent: &BlobID) {
+        self.links_mut()
+            .get_mut("parents")
+            .map(|parents| parents.retain(|p| p != parent));
+    }
     fn get_parents(&self) -> Vec<BlobID> {
         self.links().get("parents").unwrap_or(&vec![]).clone()
     }
@@ -268,6 +273,11 @@ pub trait BlobFamily: BlobAccess {
             .entry("children".into())
             .or_insert_with(Vec::new)
             .push(child);
+    }
+    fn rm_child(&mut self, child: &BlobID) {
+        self.links_mut()
+            .get_mut("children")
+            .map(|children| children.retain(|c| c != child));
     }
     fn get_children(&self) -> Vec<BlobID> {
         self.links().get("children").unwrap_or(&vec![]).clone()

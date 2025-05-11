@@ -114,6 +114,9 @@ serve_local: kill build_local_web serve_two
 	sleep 2
 	open http://localhost:8080
 
+create_local_realm:
+	cd cli/fledger && cargo run -- -c test03 -n Local03 -s ws://localhost:8765 --disable-turn-stun realm create danu_realm
+
 docker_dev:
 	for cli in fledger flsignal; do \
 		docker build --target $$cli --platform linux/amd64 -t fledgre/$$cli:dev . -f Dockerfile.dev --progress plain; \

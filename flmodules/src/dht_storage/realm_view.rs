@@ -1,4 +1,7 @@
-use std::{collections::HashMap, iter::once};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::once,
+};
 
 use crate::{
     dht_storage::{
@@ -23,8 +26,9 @@ use flcrypto::{
 use regex::Regex;
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
+use tokio::sync::mpsc::UnboundedReceiver;
 
-use super::broker::StorageError;
+use super::broker::{DHTStorageOut, StorageError};
 
 /// A RealmView is a wrapper for the dht_storage, FloRealm, FloBlob{Page,Tag}.
 /// It offers a simpler interface to interact with these elements using paths
@@ -32,7 +36,7 @@ use super::broker::StorageError;
 /// If you want to have a RealmView for a new Realm, please use [RealmViewBuilder].
 #[derive(Debug, Clone)]
 pub struct RealmView {
-    pub dht_storage: DHTStorage,
+    dht_storage: DHTStorage,
     pub realm: FloRealm,
     pub pages: RealmStorage<BlobPage>,
     pub tags: RealmStorage<BlobTag>,
@@ -41,6 +45,7 @@ pub struct RealmView {
 #[derive(Debug, Clone)]
 pub struct RealmStorage<T> {
     realm: RealmID,
+    dht_storage: DHTStorage,
     pub root: BlobID,
     pub storage: HashMap<BlobID, FloWrapper<T>>,
     pub cuckoos: HashMap<BlobID, Vec<BlobID>>,
@@ -89,14 +94,11 @@ impl RealmView {
     /// Uses the given realm.
     ///
     /// Error: if there is no page and/or tag service in the given realm.
-    pub async fn new_from_realm(
-        mut dht_storage: DHTStorage,
-        realm: FloRealm,
-    ) -> anyhow::Result<Self> {
-        let pages = RealmStorage::from_service(&mut dht_storage, &realm, "http")
+    pub async fn new_from_realm(dht_storage: DHTStorage, realm: FloRealm) -> anyhow::Result<Self> {
+        let pages = RealmStorage::from_service(dht_storage.clone(), &realm, "http")
             .await?
             .ok_or(anyhow::anyhow!("Didn't find the root page"))?;
-        let tags = RealmStorage::from_service(&mut dht_storage, &realm, "tag")
+        let tags = RealmStorage::from_service(dht_storage.clone(), &realm, "tag")
             .await?
             .ok_or(anyhow::anyhow!("Didn't find the root tag"))?;
         Ok(Self {
@@ -142,8 +144,7 @@ impl RealmView {
             cuckoo.clone(),
             signers,
         )?;
-        self.dht_storage.store_flo(fp.clone().into())?;
-        self.pages.storage.insert(fp.blob_id(), fp.clone());
+        self.store_page(fp.clone())?;
         if let Some(parent_page) = parent.clone().and_then(|p| self.pages.storage.get_mut(&p)) {
             let cond = self
                 .dht_storage
@@ -153,7 +154,7 @@ impl RealmView {
                 .iter()
                 .map(|sig| sig.verifier().get_id())
                 .collect::<Vec<_>>();
-            if !cond.can_verify(&verifiers.iter().collect::<Vec<_>>()) {
+            if !cond.can_sign(&verifiers.iter().collect::<Vec<_>>()) {
                 if !matches!(cuckoo, Cuckoo::Parent(_)) {
                     log::warn!("Cannot update parent with this signer - so this page will be difficult to find!");
                 } else {
@@ -165,10 +166,7 @@ impl RealmView {
                     |page| page.add_child(fp.blob_id()),
                     signers,
                 )?;
-                self.dht_storage.store_flo(parent_update.clone().into())?;
-                self.pages
-                    .storage
-                    .insert(parent_update.blob_id(), parent_update);
+                self.store_page(parent_update)?;
             }
         } else if parent.is_some() {
             log::warn!("Couldn't get parent page to update 'children'");
@@ -207,7 +205,7 @@ impl RealmView {
     ) -> anyhow::Result<FloBlobTag> {
         let ft =
             FloBlobTag::new_cuckoo(self.realm.realm_id(), cond, name, parent, cuckoo, signers)?;
-        self.dht_storage.store_flo(ft.clone().into())?;
+        self.store_tag(ft.clone())?;
         Ok(ft)
     }
 
@@ -236,23 +234,19 @@ impl RealmView {
     }
 
     pub async fn fetch_page(&mut self, id: BlobID) -> anyhow::Result<()> {
-        self.pages
-            .update_blobs_from_ds(&mut self.dht_storage, &id)
-            .await
+        self.pages.update_blobs_from_ds(&id).await
     }
 
     pub async fn fetch_tag(&mut self, id: BlobID) -> anyhow::Result<()> {
-        self.tags
-            .update_blobs_from_ds(&mut self.dht_storage, &id)
-            .await
+        self.tags.update_blobs_from_ds(&id).await
     }
 
     pub async fn update_pages(&mut self) -> anyhow::Result<()> {
-        self.pages.update_blobs(&mut self.dht_storage).await
+        self.pages.update_blobs().await
     }
 
     pub async fn update_tags(&mut self) -> anyhow::Result<()> {
-        self.tags.update_blobs(&mut self.dht_storage).await
+        self.tags.update_blobs().await
     }
 
     pub fn get_blob_path_family(&self, id: &BlobID) -> Option<&(dyn BlobPathFamily)> {
@@ -322,14 +316,85 @@ impl RealmView {
             .storage
             .get(id)
             .ok_or(anyhow::anyhow!("Couldn't get page"))?;
+        let parents_before: HashSet<BlobID> = page.get_parents().into_iter().collect();
         let cond = self
             .dht_storage
             .convert(page.cond(), &page.realm_id())
             .await;
         let new_page = page.edit_data_signers(cond, edit, signers)?;
-        self.dht_storage.store_flo(new_page.clone().into())?;
-        self.pages.storage.insert(id.clone(), new_page.clone());
+        self.store_page(new_page.clone())?;
+
+        // Make sure the parent.children links get correctly updated.
+        let parents_after: HashSet<BlobID> = new_page.get_parents().into_iter().collect();
+        self.update_child_links(
+            parents_before.clone(),
+            parents_after.clone(),
+            |pb| pb.rm_child(id),
+            signers,
+        )
+        .await;
+        self.update_child_links(
+            parents_after,
+            parents_before,
+            |pb| {
+                pb.rm_child(id);
+                pb.add_child(id.clone())
+            },
+            signers,
+        )
+        .await;
         Ok(new_page)
+    }
+
+    async fn update_child_links(
+        &mut self,
+        before: HashSet<BlobID>,
+        after: HashSet<BlobID>,
+        mut edit: impl FnMut(&mut BlobPage),
+        signers: &[&Signer],
+    ) {
+        for pid in before.difference(&after) {
+            if let Some(parent) = self.pages.storage.get(pid) {
+                let cond = self
+                    .dht_storage
+                    .convert(parent.cond(), &parent.realm_id())
+                    .await;
+                if cond.can_signers(signers) {
+                    match parent.edit_data_signers(cond, &mut edit, signers) {
+                        Ok(new_parent) => {
+                            self.store_page(new_parent.clone())
+                                .expect("Storing new parent");
+                        }
+                        Err(e) => log::warn!("Couldn't update parent: {e:?}"),
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn store_page(&mut self, page: FloBlobPage) -> anyhow::Result<()> {
+        self.dht_storage.store_flo(page.clone().into())?;
+        self.pages.storage.insert(page.blob_id(), page);
+        Ok(())
+    }
+
+    pub fn store_tag(&mut self, tag: FloBlobTag) -> anyhow::Result<()> {
+        self.dht_storage.store_flo(tag.clone().into())?;
+        self.tags.storage.insert(tag.blob_id(), tag);
+        Ok(())
+    }
+
+    pub async fn get_tap_out(
+        &mut self,
+    ) -> anyhow::Result<(UnboundedReceiver<DHTStorageOut>, usize)> {
+        Ok(self.dht_storage.broker.get_tap_out().await?)
+    }
+
+    pub async fn get_cond<T: Serialize + DeserializeOwned + Clone + std::fmt::Debug>(
+        &mut self,
+        flo: &FloWrapper<T>,
+    ) -> Condition {
+        self.dht_storage.convert(flo.cond(), &flo.realm_id()).await
     }
 }
 
@@ -337,19 +402,20 @@ impl<T: Serialize + DeserializeOwned + Clone + std::fmt::Debug> RealmStorage<T>
 where
     FloWrapper<T>: BlobPath + BlobFamily,
 {
-    async fn from_root(ds: &mut DHTStorage, root: GlobalID) -> anyhow::Result<Self> {
+    async fn from_root(dht_storage: DHTStorage, root: GlobalID) -> anyhow::Result<Self> {
         let mut rs = Self {
             realm: root.realm_id().clone(),
             root: (*root.flo_id().clone()).into(),
             storage: HashMap::new(),
             cuckoos: HashMap::new(),
+            dht_storage,
         };
-        rs.update_blobs_from_ds(ds, &rs.root.clone()).await?;
+        rs.update_blobs_from_ds(&rs.root.clone()).await?;
         Ok(rs)
     }
 
     async fn from_service(
-        ds: &mut DHTStorage,
+        ds: DHTStorage,
         fr: &FloRealm,
         service: &str,
     ) -> anyhow::Result<Option<Self>>
@@ -364,20 +430,19 @@ where
     }
 
     pub fn get_path(&self, path: &str) -> anyhow::Result<&FloWrapper<T>> {
-        self.get_path_internal(path.split('/').collect::<Vec<_>>(), vec![&self.root])
+        self.get_path_internal(
+            path.trim_start_matches("/").split('/').collect::<Vec<_>>(),
+            vec![&self.root],
+        )
     }
 
     /// Returns the Blob and its cuckoos.
     /// If no blob with this ID is stored, it starts by fetching this blob and its cuckoos.
     /// If the blob doesn't exist, but its cuckoos, then it will try to fetch the blob, and then
     /// return either the blob and its cuckoos, or just the cuckoos.
-    pub async fn get_cuckoos(
-        &mut self,
-        ds: &mut DHTStorage,
-        bid: BlobID,
-    ) -> anyhow::Result<Vec<&FloWrapper<T>>> {
+    pub async fn get_cuckoos(&mut self, bid: BlobID) -> anyhow::Result<Vec<&FloWrapper<T>>> {
         // if self.storage.get(&bid).is_none() {
-        self.update_blobs_from_ds(ds, &bid).await?;
+        self.update_blobs_from_ds(&bid).await?;
         // }
         Ok(once(&bid)
             .chain(self.cuckoos.get(&bid).unwrap_or(&Vec::new()))
@@ -413,19 +478,20 @@ where
         Err(anyhow::anyhow!("Couldn't find page"))
     }
 
-    async fn update_blobs_from_ds(
-        &mut self,
-        ds: &mut DHTStorage,
-        bid: &BlobID,
-    ) -> anyhow::Result<()> {
-        for id in ds
+    async fn update_blobs_from_ds(&mut self, bid: &BlobID) -> anyhow::Result<()> {
+        for id in self
+            .dht_storage
             .get_cuckoos(&self.realm.global_id((**bid).into()))
             .await
             .unwrap_or_default()
             .into_iter()
             .chain(std::iter::once((**bid).into()))
         {
-            if let Ok(flo) = ds.get_flo::<T>(&self.realm.global_id(id.clone())).await {
+            if let Ok(flo) = self
+                .dht_storage
+                .get_flo::<T>(&self.realm.global_id(id.clone()))
+                .await
+            {
                 self.storage.insert((*flo.flo_id()).into(), flo.clone());
                 let blob_id: BlobID = (*flo.flo_id()).into();
                 if *bid != blob_id {
@@ -439,10 +505,10 @@ where
         Ok(())
     }
 
-    async fn update_blobs(&mut self, ds: &mut DHTStorage) -> anyhow::Result<()> {
+    async fn update_blobs(&mut self) -> anyhow::Result<()> {
         let bids = self.storage.keys().cloned().collect::<Vec<_>>();
         for bid in bids {
-            self.update_blobs_from_ds(ds, &bid).await?;
+            self.update_blobs_from_ds(&bid).await?;
         }
         Ok(())
     }
@@ -599,6 +665,10 @@ impl RealmViewBuilder {
 mod test {
     use std::str::FromStr;
 
+    use flarch::{broker::Broker, data_storage::DataStorageTemp, nodeids::NodeID};
+
+    use crate::{dht_storage::core::DHTConfig, timer::Timer};
+
     use super::*;
 
     fn add_page(
@@ -634,13 +704,21 @@ mod test {
         page
     }
 
-    #[test]
-    fn get_path() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn get_path() -> anyhow::Result<()> {
         let mut rs: RealmStorage<BlobPage> = RealmStorage {
             realm: RealmID::from_str("00")?,
             root: BlobID::from_str("00")?,
             storage: HashMap::new(),
             cuckoos: HashMap::new(),
+            dht_storage: DHTStorage::start(
+                DataStorageTemp::new_box(),
+                NodeID::rnd(),
+                DHTConfig::default(),
+                Broker::new(),
+                &mut Timer::start().await?,
+            )
+            .await?,
         };
         let root = add_page(&mut rs, "danu", None, Cuckoo::Duration(1000));
         rs.root = root.blob_id();

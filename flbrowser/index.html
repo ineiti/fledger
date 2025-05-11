@@ -324,6 +324,10 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
     <script>
+        window.addEventListener('hashchange', function () {
+            jsi.visit_page(window.location.hash);
+        });
+
         // Define toggle_div function globally
         function toggle_div(id, caller) {
             const statsContent = document.getElementById(id);

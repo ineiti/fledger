@@ -11,16 +11,12 @@ This file is in place of github issues, as currently I'm mostly developing on my
 ### User-facing
 
 Implement [DHT_STORAGE.md](./DHT_STORAGE.md):
-- add editing of new pages
 - link browser and cli using a badge
 - add handling of pages with cybernode code
 - add FloAlias/FloUser/FloName/FloIdentity/FloSomething and use it in the chat
-- show cuckoo pages on the bottom
 
 ### Backend
 
-- FLSignal
-  - Don't send full list of nodes
 - Node
   - Create events when something happens, either:
     - poll the structures, and send events through
@@ -29,10 +25,6 @@ Implement [DHT_STORAGE.md](./DHT_STORAGE.md):
   - verify Flos when they enter the system
 - DHT_router
   - check disconnection of nodes when no pings received - doesn't seem to disconnect
-  - change broadcast:
-    - add NeighborMessage which is not forwarded
-    - DHTRouterIn::Broadcast sends to all active nodes a NeighborMessage
-    - The answer is also a NeighborMessage
 
 ### Testing
 
@@ -60,7 +52,6 @@ DHT_Router:
 
 - flmodules/web_proxy has horrible error handling - too many `expect`s
   - show an error if no nodes are connected
-- UI chat should scroll to the bottom when showing the first message.
 - flarch/webrtc errors - perhaps not necessary to fix if matchbox works:
   - Find why the network stalls after some time
   - Doesn't work in EPFL network
@@ -83,9 +74,21 @@ DHT_Router:
 
 Added fledger to blog: https://ineiti.ch/projects/fledger/
 
-# Some things done
+# Dates
 
-### Done
+2025-05-11:
+There has been lots of work throughout the last 6 months
+- DHT_router
+  - change broadcast:
+    - add NeighborMessage which is not forwarded
+    - DHTRouterIn::Broadcast sends to all active nodes a NeighborMessage
+    - The answer is also a NeighborMessage
+- flbrowser
+  - add editing of new pages
+  - show cuckoo pages on the bottom
+- FLSignal
+  - Don't send full list of nodes
+- UI chat should scroll to the bottom when showing the first message.
 - updating RealmView to remove the Option<RealmStorage>
 - DHTRouter: also ask other nodes for their list of nodes, so the node can connect there
 - update page in the cli
@@ -143,8 +146,6 @@ Added fledger to blog: https://ineiti.ch/projects/fledger/
     - `core` does the core business
 - [flmodules::random_connections::messages] 0x6000007c4ab0 Dropping message to unconnected node f88f09414a048f67
   - fixed it, but there might still be some random droppings around. Keeping the log for the moment.
-
-# Dates
 
 2024-09-12:
 - update to latest versions of wasm libraries

@@ -37,6 +37,8 @@ pub enum Button {
     ResetPage,
     EditPage(FloID),
     ViewPage(FloID),
+    DebugPage(FloID),
+    VisitPage(String),
 }
 
 #[derive(PartialEq)]
@@ -76,6 +78,14 @@ impl Web {
         Ok(Self {
             document: window.document().expect("should have a document on window"),
         })
+    }
+
+    pub fn get_hash(&self) -> Option<String> {
+        self.document.location().and_then(|l| l.hash().ok())
+    }
+
+    pub fn set_hash(&mut self, path: &str) {
+        self.document.location().map(|l| l.set_hash(path));
     }
 
     pub fn set_id_inner(&self, id: &str, inner_html: &str) {
@@ -176,6 +186,7 @@ impl Web {
                     r#"
             <li>
                 <span>{}</span>
+                <button class="edit-btn" title="Debug Page" onclick="jsi.button_page_debug('{1:x}')"><i class="fas fa-cog"></i></button>
                 <button class="edit-btn" title="Edit Page" onclick="jsi.button_page_edit('{1:x}')"><i class="fas fa-edit"></i></button>
                 <button class="view-btn" title="View Page" onclick="jsi.button_page_view('{1:x}')"><i class="fas fa-eye"></i></button>
             </li>

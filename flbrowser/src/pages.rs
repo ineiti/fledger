@@ -8,35 +8,17 @@ use flmodules::{
     flo::{
         blob::{BlobAccess, BlobFamily, BlobID, BlobPath, FloBlobPage},
         flo::FloID,
-        realm::RealmID,
     },
 };
 use tokio::sync::broadcast;
 
 use crate::web::{getEditorContent, setEditorContent, Button, Tab, Web};
 
-#[derive(Debug)]
-pub struct DhtPage {
-    pub realm: RealmID,
-    pub page: FloBlobPage,
-    pub path: String,
-}
-
-impl From<FloBlobPage> for DhtPage {
-    fn from(value: FloBlobPage) -> Self {
-        DhtPage {
-            realm: value.realm_id(),
-            // TODO: this will not work for paths with multiple elements
-            path: value.get_path().unwrap_or(&"".to_string()).into(),
-            page: value,
-        }
-    }
-}
-
 pub struct Pages {
     rv: RealmView,
     web: Web,
     edit_id: Option<BlobID>,
+    home_id: BlobID,
     verifier: Verifier,
     signers: Vec<Signer>,
 }
@@ -47,17 +29,19 @@ impl Pages {
         mut rx: broadcast::Receiver<Button>,
         signer: Signer,
     ) -> anyhow::Result<()> {
-        let mut tap = rv.dht_storage.broker.get_tap_out().await?.0;
+        let mut tap = rv.get_tap_out().await?.0;
+        let web = Web::new()?;
+        let page = Self::get_home_page(&rv, &web)?;
         let mut p = Pages {
+            home_id: page.blob_id(),
             rv,
-            web: Web::new()?,
+            web,
             edit_id: None,
             verifier: signer.verifier(),
             signers: vec![signer],
         };
 
-        p.show_home_page(&p.get_dht_page(&p.rv.pages.root).unwrap())
-            .await;
+        p.show_home_page(&page).await;
         p.reset_page();
         p.set_editable_pages().await;
 
@@ -73,19 +57,46 @@ impl Pages {
         Ok(())
     }
 
+    fn get_home_page(rv: &RealmView, web: &Web) -> anyhow::Result<FloBlobPage> {
+        if let Some(hash) = web.get_hash() {
+            if hash.starts_with("#web") {
+                if let Ok(page) = rv
+                    .get_page_from_path(&hash.trim_start_matches("#web"))
+                    .cloned()
+                {
+                    return Ok(page);
+                }
+            }
+        }
+        rv.pages
+            .storage
+            .get(&rv.pages.root)
+            .cloned()
+            .ok_or(anyhow::anyhow!("Didn't find page"))
+    }
+
     async fn clicked(&mut self, btn: Button) {
         match btn {
             Button::CreatePage => self.create_page().await,
-            Button::UpdatePage => self.update_page().await.expect("Updating the page"),
+            Button::UpdatePage => self.store_edit_page().await.expect("Updating the page"),
             Button::ResetPage => self.reset_page(),
             Button::EditPage(id) => {
                 self.edit_page(&id);
             }
             Button::ViewPage(id) => {
-                if let Some(page) = self.get_dht_page(&(*id).into()) {
+                if let Some(page) = self.get_page(&(*id).into()) {
                     self.show_home_page(&page).await;
                 }
             }
+            Button::DebugPage(id) => {
+                if let Some(page) = self.get_page(&(*id).into()) {
+                    log::info!("Page is: {page:?}");
+                }
+            }
+            Button::VisitPage(path) => match self.rv.get_page_from_path(&path).cloned() {
+                Ok(page) => self.show_home_page(&page).await,
+                Err(e) => log::warn!("Couldn't visit {path}: {e:?}"),
+            },
             _ => {}
         }
     }
@@ -131,13 +142,8 @@ impl Pages {
             .to_string();
 
         if let Ok(pp) = self.rv.get_page_parent_remaining(&path) {
-            let cond = self
-                .rv
-                .dht_storage
-                .convert(pp.0.cond(), &pp.0.realm_id())
-                .await;
-            let signer_ids = self.signers.iter().map(|s| s.get_id()).collect::<Vec<_>>();
-            if cond.can_verify(&signer_ids.iter().collect::<Vec<_>>()) {
+            let cond = self.rv.get_cond(&pp.0).await;
+            if cond.can_signers(&self.signers.iter().collect::<Vec<_>>()) {
                 return (Some(pp.0), pp.1);
             }
             log::warn!(
@@ -150,7 +156,7 @@ impl Pages {
         return (None, path.trim_start_matches("/").replace("/", "_"));
     }
 
-    async fn update_page(&mut self) -> anyhow::Result<()> {
+    async fn store_edit_page(&mut self) -> anyhow::Result<()> {
         let id = self
             .edit_id
             .as_ref()
@@ -176,8 +182,8 @@ impl Pages {
             )
             .await?;
         self.set_editable_pages().await;
-        if let Some(dp) = self.get_dht_page(&id) {
-            self.update_home_page(&dp).await;
+        if self.home_id == id {
+            self.update_home_page().await;
         }
 
         Ok(())
@@ -191,45 +197,61 @@ impl Pages {
         }
     }
 
-    async fn show_home_page(&mut self, dp: &DhtPage) {
-        self.update_home_page(dp).await;
+    async fn show_home_page(&mut self, fp: &FloBlobPage) {
+        self.home_id = fp.blob_id();
+        self.update_home_page().await;
+        let full_path = format!(
+            "#web{}",
+            self.rv
+                .get_full_path_blob(fp)
+                .unwrap_or("Unknown".to_string())
+        );
+        if self.web.get_hash().unwrap_or("".to_string()) != full_path {
+            self.web.set_hash(&full_path);
+        }
         self.web.set_tab(Tab::Home);
     }
 
-    async fn update_home_page(&mut self, dp: &DhtPage) {
-        self.web.set_id_inner("dht_page", &dp.page.get_index());
+    async fn update_home_page(&mut self) {
+        let home_page = self
+            .rv
+            .pages
+            .storage
+            .get(&self.home_id)
+            .expect("Getting home page")
+            .clone();
+        self.web.set_id_inner("dht_page", &home_page.get_index());
         self.web.set_id_inner(
             "dht_page_path",
             &format!(
                 "{}{}",
-                dp.realm,
+                home_page.realm_id(),
                 self.rv
-                    .get_full_path_blob(&dp.page)
+                    .get_full_path_blob(&home_page)
                     .unwrap_or("Unknown".to_string())
             ),
         );
-        let parent = match &dp.page.flo().flo_config().cuckoo {
+
+        let parent = match &home_page.flo().flo_config().cuckoo {
             Cuckoo::Parent(p) => self.rv.pages.storage.get(&(**p).into()).cloned(),
             _ => None,
         };
         let attached = self
             .rv
             .pages
-            .get_cuckoos(&mut self.rv.dht_storage, dp.page.blob_id())
+            .get_cuckoos(home_page.blob_id())
             .await
             .expect("getting cuckoos")
             .into_iter()
-            .filter(|fp| fp.flo_id() != dp.page.flo_id())
+            .filter(|fp| home_page.flo_id() != fp.flo_id())
             .collect::<Vec<_>>();
         self.web.page_cuckoos(parent.as_ref(), &attached);
-        let parents = dp
-            .page
+        let parents = home_page
             .get_parents()
             .iter()
             .filter_map(|id| self.rv.pages.storage.get(id))
             .collect::<Vec<_>>();
-        let children = dp
-            .page
+        let children = home_page
             .get_children()
             .iter()
             .filter_map(|id| self.rv.pages.storage.get(id))
@@ -239,10 +261,9 @@ impl Pages {
 
     async fn set_editable_pages(&mut self) {
         let mut our_pages = vec![];
-        let signers = self.signers.iter().map(|s| s.get_id()).collect::<Vec<_>>();
-        for (_, fp) in &self.rv.pages.storage {
-            let cond = self.rv.dht_storage.convert(fp.cond(), &fp.realm_id()).await;
-            if cond.can_verify(&signers.iter().collect::<Vec<_>>()) {
+        for (_, fp) in &self.rv.pages.storage.clone() {
+            let cond = self.rv.get_cond(&fp).await;
+            if cond.can_signers(&self.signers.iter().collect::<Vec<_>>()) {
                 our_pages.push((
                     self.rv
                         .get_full_path_blob(fp)
@@ -295,24 +316,19 @@ impl Pages {
         }
     }
 
-    fn get_dht_page(&self, id: &BlobID) -> Option<DhtPage> {
-        self.rv
-            .pages
-            .storage
-            .get(&(**id).into())
-            .map(|root_page| root_page.clone().into())
+    fn get_page(&self, id: &BlobID) -> Option<FloBlobPage> {
+        self.rv.pages.storage.get(&(**id).into()).cloned()
     }
 
     fn edit_page(&mut self, id: &FloID) {
         self.edit_id = Some((*id.clone()).into());
-        if let Some(dp) = self.get_dht_page(&(**id).into()) {
-            log::info!("{:?}", dp.page);
-            setEditorContent(dp.page.get_index().into());
-            self.set_editor_id_buttons(Some(dp.page.flo_id()), false, true, true);
+        if let Some(dp) = self.get_page(&(**id).into()) {
+            setEditorContent(dp.get_index().into());
+            self.set_editor_id_buttons(Some(dp.flo_id()), false, true, true);
             let path = self
                 .rv
-                .get_full_path_blob(&dp.page)
-                .unwrap_or(dp.path.to_string());
+                .get_full_path_blob(&dp)
+                .unwrap_or(dp.get_path().unwrap_or(&"Unknown".to_string()).to_string());
             self.web.get_input("page-path").set_value(&path);
             return;
         }

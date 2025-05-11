@@ -74,6 +74,12 @@ impl JSInterface {
         }
     }
 
+    pub fn visit_page(&mut self, path_js: JsString) {
+        let path_hash = path_js.as_string().expect("Convert JsString");
+        let path = path_hash.trim_start_matches("#web").to_string();
+        self.send_button(Button::VisitPage(path));
+    }
+
     pub fn button_click(&mut self, btn: JsString) {
         Button::try_from(btn.as_string().expect("JsString to String conversion"))
             .ok()
@@ -88,6 +94,10 @@ impl JSInterface {
         Self::js_to_id(id).map(|fid| self.send_button(Button::ViewPage(fid)));
     }
 
+    pub fn button_page_debug(&mut self, id: JsString) {
+        Self::js_to_id(id).map(|fid| self.send_button(Button::DebugPage(fid)));
+    }
+    
     fn js_to_id(id: JsString) -> Option<FloID> {
         FloID::from_str(&id.as_string().expect("id to string")).ok()
     }

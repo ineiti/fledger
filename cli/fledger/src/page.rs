@@ -104,7 +104,7 @@ impl Page {
                     self.ds
                         .convert(page.cond(), &page.realm_id())
                         .await
-                        .can_verify(&[&vid])
+                        .can_sign(&[&vid])
                 );
             }
         }
@@ -159,7 +159,7 @@ impl Page {
         let signer = self.f.node.crypto_storage.get_signer();
         self.f.loop_node(FledgerState::Connected(2)).await?;
         let cond = self.ds.convert(page.cond(), &rv.realm.realm_id()).await;
-        if !cond.can_verify(&[&signer.get_id()]) {
+        if !cond.can_sign(&[&signer.get_id()]) {
             return Err(anyhow!("Our signer is not allowed to modify this page!"));
         }
         match command {
