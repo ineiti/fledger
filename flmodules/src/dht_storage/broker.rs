@@ -164,6 +164,14 @@ impl DHTStorage {
         &mut self,
         id: &GlobalID,
     ) -> anyhow::Result<FloWrapper<T>> {
+        Ok(self.get_flo_timeout(id, self.config.timeout).await?)
+    }
+
+    pub async fn get_flo_timeout<T: Serialize + DeserializeOwned + Clone>(
+        &mut self,
+        id: &GlobalID,
+        timeout: u64,
+    ) -> anyhow::Result<FloWrapper<T>> {
         // log::info!(
         //     "Getting {}: {}/{}",
         //     std::any::type_name::<T>(),
@@ -171,22 +179,30 @@ impl DHTStorage {
         //     id.flo_id()
         // );
         Ok(self
-            .send_wait(DHTStorageIn::ReadFlo(id.clone()), &|msg| match msg {
-                DHTStorageOut::FloValue((flo, _)) => (flo.global_id() == *id).then_some(flo),
-                _ => None,
-            })
+            .send_wait_timeout(
+                DHTStorageIn::ReadFlo(id.clone()),
+                &|msg| match msg {
+                    DHTStorageOut::FloValue((flo, _)) => (flo.global_id() == *id).then_some(flo),
+                    _ => None,
+                },
+                timeout,
+            )
             .await?
             .try_into()?)
     }
 
     pub async fn get_flos(&mut self) -> anyhow::Result<Vec<Flo>> {
         Ok(self
-            .send_wait(DHTStorageIn::GetFlos, &|msg| match msg {
-                DHTStorageOut::FloValues(flos) => {
-                    Some(flos.iter().map(|f| f.0.clone()).collect::<Vec<_>>())
-                }
-                _ => None,
-            })
+            .send_wait_timeout(
+                DHTStorageIn::GetFlos,
+                &|msg| match msg {
+                    DHTStorageOut::FloValues(flos) => {
+                        Some(flos.iter().map(|f| f.0.clone()).collect::<Vec<_>>())
+                    }
+                    _ => None,
+                },
+                1000,
+            )
             .await?)
     }
 
@@ -261,10 +277,21 @@ impl DHTStorage {
         msg_in: DHTStorageIn,
         check: &(dyn Fn(DHTStorageOut) -> Option<T> + Sync),
     ) -> anyhow::Result<T> {
+        Ok(self
+            .send_wait_timeout(msg_in, check, self.config.timeout)
+            .await?)
+    }
+
+    async fn send_wait_timeout<T>(
+        &mut self,
+        msg_in: DHTStorageIn,
+        check: &(dyn Fn(DHTStorageOut) -> Option<T> + Sync),
+        timeout: u64,
+    ) -> anyhow::Result<T> {
         let (mut tap, tap_id) = self.intern.get_tap_out().await?;
         self.intern.emit_msg_in(InternIn::Storage(msg_in))?;
         let res = select! {
-            _ = wait_ms(self.config.timeout) => Err(StorageError::TimeoutError.into()),
+            _ = wait_ms(timeout) => Err(StorageError::TimeoutError.into()),
             res = Self::wait_tap(&mut tap, check) => res
         };
         self.intern.remove_subsystem(tap_id).await?;

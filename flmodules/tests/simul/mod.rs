@@ -52,7 +52,7 @@ impl Node {
                 DHTConfig {
                     realms: vec![],
                     owned: vec![],
-                    timeout: 1000,
+                    timeout: 10,
                 },
                 dht_router.broker.clone(),
                 timer,
@@ -195,7 +195,7 @@ impl Simul {
                     matches += 1
                 }
             }
-            log::debug!(
+            let log_msg = format!(
                 "{}: step {step} matches {matches}/{}",
                 format!(
                     "version {}/{}/{}",
@@ -205,6 +205,11 @@ impl Simul {
                 ),
                 self.nodes.len()
             );
+            if step == 0 {
+                log::debug!("{log_msg}");
+            } else {
+                log::info!("{log_msg}");
+            }
             if matches == self.nodes.len() {
                 return Ok(step + 1);
             }
