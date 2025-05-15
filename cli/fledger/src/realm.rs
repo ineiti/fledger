@@ -20,6 +20,9 @@ pub enum RealmCommands {
         max_space: Option<u64>,
         /// The maximum size of a single object in this realm.
         max_flo_size: Option<u32>,
+        /// Sets the condition to Condition::Pass - useful for testing
+        #[clap(long, default_value_t = false)]
+        cond_pass: bool,
     },
 }
 
@@ -33,7 +36,8 @@ impl RealmHandler {
                 name,
                 max_space,
                 max_flo_size,
-            } => Self::realm_create(f, name.clone(), max_space, max_flo_size).await,
+                cond_pass,
+            } => Self::realm_create(f, name.clone(), max_space, max_flo_size, cond_pass).await,
         }
     }
 
@@ -42,6 +46,7 @@ impl RealmHandler {
         name: String,
         max_space: Option<u64>,
         max_flo_size: Option<u32>,
+        cond_pass: bool,
     ) -> anyhow::Result<()> {
         f.loop_node(crate::FledgerState::Connected(1)).await?;
 
@@ -55,7 +60,9 @@ impl RealmHandler {
             config.max_flo_size
         );
         let signer = f.node.crypto_storage.get_signer();
-        let cond = Condition::Verifier(signer.verifier());
+        let cond = cond_pass
+            .then(|| Condition::Pass)
+            .unwrap_or(Condition::Verifier(signer.verifier()));
         let signers = vec![signer];
         RealmViewBuilder::new(f.ds.clone(), name, cond.clone(), signers.clone())
             .config(config)
