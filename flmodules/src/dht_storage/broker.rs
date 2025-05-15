@@ -39,6 +39,7 @@ pub enum DHTStorageIn {
     StoreFlo(Flo),
     ReadFlo(GlobalID),
     ReadCuckooIDs(GlobalID),
+    GetFlos,
     GetRealms,
     /// Ask all neighbors for their realms and Flos.
     SyncFromNeighbors,
@@ -47,6 +48,7 @@ pub enum DHTStorageIn {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTStorageOut {
     FloValue(FloCuckoo),
+    FloValues(Vec<FloCuckoo>),
     RealmIDs(Vec<RealmID>),
     CuckooIDs(GlobalID, Vec<FloID>),
     ValueMissing(GlobalID),
@@ -175,6 +177,17 @@ impl DHTStorage {
             })
             .await?
             .try_into()?)
+    }
+
+    pub async fn get_flos(&mut self) -> anyhow::Result<Vec<Flo>> {
+        Ok(self
+            .send_wait(DHTStorageIn::GetFlos, &|msg| match msg {
+                DHTStorageOut::FloValues(flos) => {
+                    Some(flos.iter().map(|f| f.0.clone()).collect::<Vec<_>>())
+                }
+                _ => None,
+            })
+            .await?)
     }
 
     pub async fn get_cuckoos(&mut self, id: &GlobalID) -> anyhow::Result<Vec<FloID>> {
@@ -434,14 +447,8 @@ mod tests {
         router.simul.send_node_info().await?;
         ds_2.sync()?;
         router.settle_all().await;
-        assert!(ds_2
-            .get_flo::<Testing>(&t0.flo().global_id())
-            .await
-            .is_ok());
-        assert!(ds_2
-            .get_flo::<Testing>(&t1.flo().global_id())
-            .await
-            .is_ok());
+        assert!(ds_2.get_flo::<Testing>(&t0.flo().global_id()).await.is_ok());
+        assert!(ds_2.get_flo::<Testing>(&t1.flo().global_id()).await.is_ok());
 
         Ok(())
     }

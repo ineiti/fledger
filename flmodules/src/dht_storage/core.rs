@@ -87,7 +87,7 @@ pub struct RealmStorage {
     root: U256,
     flos: HashMap<FloID, FloStorage>,
     distances: HashMap<usize, Vec<FloID>>,
-    size: usize,
+    pub size: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -151,6 +151,13 @@ impl RealmStorage {
             .map(|fs| (fs.flo.clone(), fs.cuckoos.clone()))
     }
 
+    pub fn get_all_flo_cuckoos(&self) -> Vec<FloCuckoo> {
+        self.flos
+            .iter()
+            .map(|f| (f.1.flo.clone(), f.1.cuckoos.clone()))
+            .collect::<Vec<_>>()
+    }
+
     pub fn get_cuckoo_ids(&self, key: &FloID) -> Option<Vec<FloID>> {
         self.flos
             .get(key)
@@ -174,9 +181,13 @@ impl RealmStorage {
         }
     }
     pub fn store_cuckoo_id(&mut self, parent: &FloID, cuckoo: FloID) {
-        self.flos
-            .get_mut(parent)
-            .map(|fs| (!fs.cuckoos.contains(&cuckoo)).then(|| fs.cuckoos.push(cuckoo)));
+        if let Some(fs) = self.flos.get_mut(parent) {
+            if !fs.cuckoos.contains(&cuckoo) {
+                self.size -= fs.size() as u64;
+                fs.cuckoos.push(cuckoo);
+                self.size += fs.size() as u64;
+            }
+        }
     }
 
     /// TODO: decide which IDs need to be stored.
@@ -196,6 +207,7 @@ impl RealmStorage {
     }
 
     pub fn upsert_flo(&mut self, flo: Flo) -> bool {
+        // flo.size() * 3 is the approximate size as a json.
         if flo.size() as u64 * 3 > self.realm_config.max_space {
             log::warn!(
                 "Cannot store flo of size {} > max_space({}) / 3",
@@ -221,8 +233,18 @@ impl RealmStorage {
             updated = true;
         }
 
-        while self.size as u64 > self.realm_config.max_space {
+        while self.size > self.realm_config.max_space {
             self.remove_furthest(&flo_id);
+            updated = true;
+        }
+        let size_verify: usize = self.flos.iter().map(|f| f.1.size()).sum();
+        if size_verify as u64 > self.realm_config.max_space {
+            log::warn!(
+                "Size not respected: {}, {} > {}",
+                self.size,
+                size_verify,
+                self.realm_config.max_space
+            );
         }
         updated
     }
@@ -243,7 +265,7 @@ impl RealmStorage {
             .or_insert_with(Vec::new)
             .push(id.clone());
         let df: FloStorage = flo.into();
-        self.size += df.size();
+        self.size += df.size() as u64;
         self.flos.insert(id, df);
     }
 
@@ -253,7 +275,7 @@ impl RealmStorage {
             self.distances
                 .entry(distance)
                 .and_modify(|v| v.retain(|i| i != id));
-            self.size -= df.size();
+            self.size -= df.size() as u64;
         }
     }
 

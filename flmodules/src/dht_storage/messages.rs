@@ -80,7 +80,8 @@ pub enum MessageNeighbour {
 
 #[derive(Debug, Clone)]
 pub struct RealmStats {
-    pub size: usize,
+    pub real_size: usize,
+    pub size: u64,
     pub flos: usize,
     pub distribution: Vec<usize>,
     pub config: RealmConfig,
@@ -182,6 +183,14 @@ impl Messages {
                 .expect("Creating Request broadcast")],
             DHTStorageIn::GetRealms => {
                 vec![DHTStorageOut::RealmIDs(self.realms.keys().cloned().collect()).into()]
+            }
+            DHTStorageIn::GetFlos => {
+                vec![DHTStorageOut::FloValues(
+                    self.realms
+                        .iter()
+                        .flat_map(|realm| realm.1.get_all_flo_cuckoos())
+                        .collect::<Vec<_>>(),
+                ).into()]
             }
         }
     }
@@ -465,7 +474,8 @@ impl Stats {
 impl RealmStats {
     fn from_realm(realm: &RealmStorage) -> Self {
         Self {
-            size: realm.size(),
+            real_size: realm.size(),
+            size: realm.size,
             flos: realm.flo_count(),
             distribution: realm.flo_distribution(),
             config: realm.realm_config().clone(),

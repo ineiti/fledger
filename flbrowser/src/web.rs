@@ -414,7 +414,7 @@ impl Values {
         self.dht_storage
             .realm_stats
             .iter()
-            .map(|s| s.1.size)
+            .map(|s| s.1.size as usize)
             .sum::<usize>()
     }
 
