@@ -234,7 +234,7 @@ impl RealmStorage {
         }
 
         while self.size > self.realm_config.max_space {
-            self.remove_furthest(&flo_id);
+            self.remove_furthest();
             updated = true;
         }
         let size_verify: usize = self.flos.iter().map(|f| f.1.size()).sum();
@@ -279,17 +279,12 @@ impl RealmStorage {
         }
     }
 
-    fn remove_furthest(&mut self, not_delete: &FloID) {
+    fn remove_furthest(&mut self) {
         if let Some(furthest) = self
             .distances
             .iter()
             .filter_map(|(dist, flos)| {
-                (flos
-                    .iter()
-                    .filter(|&id| id != not_delete && **id != *self.realm_id)
-                    .count()
-                    > 0)
-                .then(|| dist)
+                (flos.iter().filter(|&id| **id != *self.realm_id).count() > 0).then(|| dist)
             })
             .sorted()
             .unique()
@@ -300,7 +295,7 @@ impl RealmStorage {
                 .get(furthest)
                 .and_then(|ids| {
                     ids.iter()
-                        .filter(|&id| id != not_delete && **id != *self.realm_id)
+                        .filter(|&id| **id != *self.realm_id)
                         .collect::<Vec<&FloID>>()
                         .first()
                         .cloned()
@@ -497,7 +492,7 @@ mod tests {
         assert!(storage.size > size);
         let size = storage.size;
 
-        storage.remove_furthest(&root.into());
+        storage.remove_furthest();
         assert_eq!(4, storage.distances.len());
         assert_eq!(1, storage.distances.get(&1).unwrap().len());
         assert_eq!(2, storage.distances.get(&2).unwrap().len());
@@ -506,7 +501,7 @@ mod tests {
         assert!(storage.size < size);
         let size = storage.size;
 
-        storage.remove_furthest(&root.into());
+        storage.remove_furthest();
         assert_eq!(4, storage.distances.len());
         assert_eq!(0, storage.distances.get(&1).unwrap().len());
         assert_eq!(2, storage.distances.get(&2).unwrap().len());
@@ -515,7 +510,7 @@ mod tests {
         assert!(storage.size < size);
         let size = storage.size;
 
-        storage.remove_furthest(&root.into());
+        storage.remove_furthest();
         assert_eq!(4, storage.distances.len());
         assert_eq!(0, storage.distances.get(&1).unwrap().len());
         assert_eq!(1, storage.distances.get(&2).unwrap().len());
