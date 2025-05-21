@@ -28,7 +28,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            k: 2,
+            k: 1,
             ping_interval: 10,
             ping_timeout: 30,
         }
