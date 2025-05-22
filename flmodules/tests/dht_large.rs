@@ -17,15 +17,16 @@ async fn dht_large() -> anyhow::Result<()> {
     start_logging_filter_level(vec!["flmodules", "dht_large"], log::LevelFilter::Info);
 
     log::info!("Setting up nodes.");
+    let nbr_nodes = 20;
+    let max_space = 20_000;
+    let html_size = 1500;
+    let prob_no_fail = 0.99;
 
     let mut simul = Simul::new().await?;
-    let nbr_nodes = 20;
     let mut nodes = simul.new_nodes_raw(nbr_nodes - 1).await?;
     let mut root = simul.new_nodes(1).await?.get(0).unwrap().clone();
     nodes.push(root.clone());
 
-    let max_space = 20_000;
-    let html_size = 1500;
     let rv_builder = RealmViewBuilder::new(
         root.dht_storage.clone(),
         "root".to_string(),
@@ -63,7 +64,7 @@ async fn dht_large() -> anyhow::Result<()> {
             let p = (1f64
                 - (1f64 - (flo_per_node as f64) / (total_flos as f64)).powi(nbr_nodes as i32))
             .powi(total_flos as i32);
-            if p > 0.99 {
+            if p > prob_no_fail {
                 return (total_flos, p);
             }
             total_flos -= 1;
@@ -160,8 +161,7 @@ async fn dht_large() -> anyhow::Result<()> {
     log::debug!("Flos: {:?}", node.dht_storage.get_flos().await?);
 
     log::info!("Fetching all pages from root");
-    // TODO: fetch all pages from all nodes
-    for id in page_ids {
+    for id in &page_ids {
         log::debug!("Getting page {id}");
         if root
             .dht_storage
@@ -172,7 +172,7 @@ async fn dht_large() -> anyhow::Result<()> {
             log::warn!("Failed to fetch page {id}");
             for node in &mut nodes {
                 let flos = node.dht_storage.get_flos().await?;
-                if flos.iter().any(|f| f.flo_id() == id) {
+                if flos.iter().any(|f| &f.flo_id() == id) {
                     log::warn!("Page {id} found in node!");
                     if root
                         .dht_storage
@@ -183,6 +183,36 @@ async fn dht_large() -> anyhow::Result<()> {
                         log::warn!("And now the page is found also with get_flo");
                     }
                     break;
+                }
+            }
+        }
+    }
+
+    log::info!("Getting all pages from all nodes and verifying if they were accessible locally.");
+    for node in &mut nodes {
+        let local_ids = node.dht_storage.get_flos().await?;
+        log::trace!(
+            "Node {} fetches all {} pages, and has {} local page_ids",
+            node._config.info.get_id(),
+            page_ids.len(),
+            local_ids.len() - 3
+        );
+        for id in &page_ids {
+            let is_local = local_ids.iter().any(|i| &i.flo_id() == id);
+
+            // Get the page from the DHT
+            if node
+                .dht_storage
+                .get_flo::<BlobPage>(&rid.global_id(id.clone()))
+                .await
+                .is_ok()
+            {
+                let local_ids = node.dht_storage.get_flos().await?;
+                if is_local != local_ids.iter().any(|i| &i.flo_id() == id) {
+                    log::warn!(
+                        "Node {} got {id} inverted from is_local = {is_local}",
+                        node._config.info.get_id()
+                    );
                 }
             }
         }

@@ -207,7 +207,7 @@ impl RealmStorage {
     }
 
     pub fn upsert_flo(&mut self, flo: Flo) -> bool {
-        // flo.size() * 3 is the approximate size as a json.
+        // TODO: think how to better calculate this - flo.size() * 3 is the approximate size as a json.
         if flo.size() as u64 * 3 > self.realm_config.max_space {
             log::warn!(
                 "Cannot store flo of size {} > max_space({}) / 3",
@@ -217,25 +217,35 @@ impl RealmStorage {
             return false;
         }
 
-        let mut updated = false;
         let flo_id = flo.flo_id();
         flo.flo_config()
             .cuckoo_parent()
             .map(|pid| self.store_cuckoo_id(pid, flo_id.clone()));
 
+        let mut is_new_flo = true;
         if let Some(old) = self.flos.get(&flo.flo_id()) {
             if old.version() < flo.version() {
                 self.put(flo);
-                updated = true;
+            } else {
+                is_new_flo = false;
             }
         } else {
-            self.put(flo);
-            updated = true;
+            let flo_size = FloStorage::from(flo.clone()).size() as u64;
+            if self.size + flo_size <= self.realm_config.max_space {
+                self.put(flo);
+            } else {
+                // What [remove_furthest] can free.
+                let size_above: u64 = (0..KNode::get_depth(&self.root, *flo_id))
+                    .map(|depth| self.size_at_depth(depth))
+                    .sum();
+                if flo_size <= size_above {
+                    self.put(flo);
+                }
+            }
         }
 
         while self.size > self.realm_config.max_space {
             self.remove_furthest();
-            updated = true;
         }
         let size_verify: usize = self.flos.iter().map(|f| f.1.size()).sum();
         if size_verify as u64 > self.realm_config.max_space {
@@ -246,20 +256,30 @@ impl RealmStorage {
                 self.realm_config.max_space
             );
         }
-        updated
+        is_new_flo
+    }
+
+    fn size_at_depth(&self, distance: usize) -> u64 {
+        self.distances
+            .get(&distance)
+            .map(|ids| {
+                ids.iter()
+                    .map(|id| self.flos.get(id).map(|flo| flo.size()).unwrap_or(0))
+                    .sum::<usize>() as u64
+            })
+            .unwrap_or(0)
     }
 
     fn put(&mut self, flo: Flo) {
         let id = flo.flo_id();
-        // log::trace!(
-        //     "{} Storing {}/{}/{}",
+        self.remove_entry(&id);
+        let depth = KNode::get_depth(&self.root, *id);
+        // log::info!(
+        //     "{} Storing id({id}) / version({}) / flo_type({}) at depth {depth}",
         //     self.root,
-        //     id,
         //     flo.version(),
         //     flo.flo_type()
         // );
-        self.remove_entry(&id);
-        let depth = KNode::get_depth(&self.root, *id);
         self.distances
             .entry(depth)
             .or_insert_with(Vec::new)
@@ -297,16 +317,16 @@ impl RealmStorage {
                     ids.iter()
                         .filter(|&id| **id != *self.realm_id)
                         .collect::<Vec<&FloID>>()
-                        .first()
+                        .last()
                         .cloned()
                 })
                 .cloned()
             {
-                log::trace!(
-                    "{}: Removing furthest {id}/{}",
-                    self.root,
-                    KNode::get_depth(&self.root, *id.clone())
-                );
+                // log::info!(
+                //     "{}: Removing furthest {id}/{}",
+                //     self.root,
+                //     KNode::get_depth(&self.root, *id.clone())
+                // );
 
                 self.remove_entry(&id);
             }
