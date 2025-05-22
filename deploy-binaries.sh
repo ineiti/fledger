@@ -17,8 +17,18 @@ if ! test -f "target-common/x86_64-unknown-linux-musl/release/fledger"; then
   exit 1
 fi
 
-echo "Copying fledger and flsignal binaries..."
+echo "Uploading fledger and flsignal binaries..."
 scp \
   target-common/x86_64-unknown-linux-musl/release/fledger \
   target-common/x86_64-unknown-linux-musl/release/flsignal \
-  sphere-fledger:
+  sphere-fledger:/usr/share/caddy/
+
+# echo "Pushing fledger and flsignal binaries to github..."
+# cp \
+#   target-common/x86_64-unknown-linux-musl/release/fledger \
+#   target-common/x86_64-unknown-linux-musl/release/flsignal \
+#   ../fledger-binaries/
+# cd ../fledger-binaries/ || exit 1
+# git add . || exit 1
+# git commit -m "deploy" || exit 1
+# git push || exit 1
