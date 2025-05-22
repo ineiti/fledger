@@ -1290,6 +1290,7 @@ dependencies = [
  "log",
  "metrics",
  "metrics-exporter-influx",
+ "rand 0.9.1",
  "thiserror 2.0.12",
  "tokio",
  "webrtc-util",

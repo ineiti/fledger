@@ -91,6 +91,14 @@ pub struct Args {
     #[arg(long, default_value = "0")]
     bootwait_max: u64,
 
+    /// Run the node but refuse to forward data
+    #[arg(long, default_value = "false")]
+    evil_noforward: bool,
+
+    /// Sampling rate for metrics
+    #[arg(long, default_value = "1000")]
+    sampling_rate_ms: u32,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -139,7 +147,7 @@ async fn main() -> anyhow::Result<()> {
 
     // necessary to grab the variable for lifetime purposes.
     let node_name = args.name.clone().unwrap_or("unknown".into());
-    let _influx = Metrics::setup(node_name);
+    let _influx = Metrics::setup(node_name, args.sampling_rate_ms);
 
     log::info!(
         "Starting app with version {}/{}",
@@ -164,6 +172,14 @@ async fn main() -> anyhow::Result<()> {
             _ => {}
         }
     }
+
+    unsafe {
+        flmodules::dht_storage::messages::EVIL_NO_FORWARD = args.evil_noforward;
+    }
+    absolute_counter!(
+        "fledger_evil_noforward",
+        if args.evil_noforward { 1 } else { 0 }
+    );
 
     let cc = if args.disable_turn_stun {
         ConnectionConfig::from_signal(&args.signal_url)
@@ -197,7 +213,7 @@ impl Fledger {
             ds: node.dht_storage.as_ref().unwrap().clone(),
             dr: node.dht_router.as_ref().unwrap().clone(),
             node,
-            args,
+            args: args.clone(),
         };
 
         match f.args.command.clone() {
@@ -206,7 +222,9 @@ impl Fledger {
                 Commands::Crypto {} => todo!(),
                 Commands::Stats {} => todo!(),
                 Commands::Page { command } => Page::run(f, command).await,
-                Commands::Simulation(command) => SimulationHandler::run(f, command).await,
+                Commands::Simulation(command) => {
+                    SimulationHandler::run(f, command, args.sampling_rate_ms).await
+                }
             },
             None => f.loop_node(FledgerState::Forever).await,
         }
