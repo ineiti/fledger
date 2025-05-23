@@ -196,9 +196,6 @@ impl Messages {
                 )
                 .into()]
             }
-            DHTStorageIn::ReadFlos(realm_id) => {
-                vec![DHTStorageOut::Flos(self.realms.get(&realm_id).unwrap().get_flos()).into()]
-            }
         }
     }
 
@@ -373,6 +370,7 @@ impl Messages {
     }
 
     fn store_flo(&mut self, flo: Flo) -> Vec<InternOut> {
+        increment_counter!("fledger_ds_store_flo_total");
         let mut res = vec![];
         if self.upsert_flo(flo.clone()) {
             // log::info!("{}: store_flo", self.our_id);
