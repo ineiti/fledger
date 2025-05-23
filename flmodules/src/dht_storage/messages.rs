@@ -196,9 +196,6 @@ impl Messages {
                 )
                 .into()]
             }
-            DHTStorageIn::ReadFlos(realm_id) => {
-                vec![DHTStorageOut::Flos(self.realms.get(&realm_id).unwrap().get_flos()).into()]
-            }
         }
     }
 

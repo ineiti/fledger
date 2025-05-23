@@ -1,5 +1,5 @@
 use clap::Subcommand;
-use flcrypto::access::Condition;
+use flcrypto::{access::Condition, signer::SignerTrait};
 use flmodules::{
     dht_storage::{core::RealmConfig, realm_view::RealmViewBuilder},
     flo::realm::Realm,

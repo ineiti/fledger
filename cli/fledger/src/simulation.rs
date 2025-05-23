@@ -188,23 +188,19 @@ impl SimulationHandler {
         log::info!("SIMULATION END");
         absolute_counter!("fledger_simulation_end", 1);
 
-        ds.get_flos(&rv.realm.realm_id())
-            .await
-            .unwrap()
-            .iter()
-            .for_each(|flo| {
-                let flo_type = type_name::<BlobTag>();
-                if flo.flo_type() == flo_type {
-                    let tag = BlobTag::from_rmp_bytes(flo_type, &flo.data()).unwrap();
-                    log::info!(
-                        "tag found {}/{}/{} | {}",
-                        flo.flo_id(),
-                        flo.realm_id(),
-                        flo.version(),
-                        tag.0.values().iter().next().unwrap().1,
-                    )
-                }
-            });
+        ds.get_flos().await.unwrap().iter().for_each(|flo| {
+            let flo_type = type_name::<BlobTag>();
+            if flo.flo_type() == flo_type {
+                let tag = BlobTag::from_rmp_bytes(flo_type, &flo.data()).unwrap();
+                log::info!(
+                    "tag found {}/{}/{} | {}",
+                    flo.flo_id(),
+                    flo.realm_id(),
+                    flo.version(),
+                    tag.0.values().iter().next().unwrap().1,
+                )
+            }
+        });
 
         let tags = rv.tags;
 
@@ -246,7 +242,7 @@ impl SimulationHandler {
 
             rv.update_tags().await?;
 
-            let flos = ds.get_flos(&rv.realm.realm_id()).await.unwrap().clone();
+            let flos = ds.get_flos().await.unwrap().clone();
             // flos.iter().for_each(|flo| {
             //     log::info!(
             //         "flo found {}/{}/{} [{}]",
@@ -430,6 +426,7 @@ impl SimulationHandler {
                 log::warn!("SIMULATION TIMEOUT REACHED ({}ms)", timeout_ms);
                 log::info!("SIMULATION END");
                 absolute_counter!("fledger_simulation_timeout", 1);
+                absolute_counter!("fledger_simulation_success", 0);
                 f.loop_node(crate::FledgerState::Forever).await?;
 
                 return Ok(());
@@ -441,20 +438,27 @@ impl SimulationHandler {
 
             let rv = RealmView::new_first(ds.clone()).await?;
 
-            let pages = ds.get_flos(&rv.realm.realm_id()).await.unwrap().clone();
+            let pages = ds.get_flos().await.unwrap().clone();
             let pages = pages
                 .iter()
                 .filter(|flo| flo.flo_type() == type_name::<BlobPage>())
                 .map(|flo| BlobPage::from_rmp_bytes(&flo.flo_type(), &flo.data()).unwrap());
 
-            let mut had_simulation_page_before_fetch = false;
+            let mut simulation_page_stored_this_iteration = false;
             pages.clone().for_each(|page| {
                 let page_name = page.0.values().iter().next().unwrap().1;
                 log::info!("page found {}", page_name);
                 if page_name == "simulation-page" {
-                    had_simulation_page_before_fetch = true;
+                    simulation_page_stored_this_iteration = true;
                 }
             });
+
+            if simulation_page_stored_this_iteration {
+                absolute_counter!("fledger_simulation_page_stored", 1);
+            } else {
+                absolute_counter!("fledger_simulation_page_stored", 0);
+            }
+
             absolute_counter!("fledger_pages_total", pages.count() as u64);
 
             let ds_size = ds.stats.borrow().realm_stats.iter().next().unwrap().1.size;
@@ -488,7 +492,7 @@ impl SimulationHandler {
                         page_content.chars().take(50).collect::<String>()
                     );
 
-                    if had_simulation_page_before_fetch {
+                    if simulation_page_stored_this_iteration {
                         log::warn!("had simulation page before fetch");
                         absolute_counter!("fledger_simulation_stored_before_fetch", 1);
                     } else {
