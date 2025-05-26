@@ -66,6 +66,13 @@ pub enum SimulationSubcommand {
         #[arg(long, default_value = "20000")]
         timeout_ms: u32,
     },
+    WaitPages {
+        #[arg(long, default_value = "20000")]
+        timeout_ms: u32,
+
+        #[arg(long, default_value = "10")]
+        amount: u32,
+    },
 }
 
 pub struct SimulationHandler {}
@@ -93,6 +100,9 @@ impl SimulationHandler {
             }
             SimulationSubcommand::FetchPage { timeout_ms } => {
                 Self::run_dht_fetch_simulation_page(f, sampling_rate_ms, timeout_ms).await
+            }
+            SimulationSubcommand::WaitPages { timeout_ms, amount } => {
+                Self::run_dht_wait_for_pages(f, sampling_rate_ms, timeout_ms, amount).await
             }
         }
     }
@@ -293,18 +303,6 @@ impl SimulationHandler {
         }
     }
 
-    // async fn run_dht_request_random_flow(mut f: Fledger) -> anyhow::Result<()> {
-    //     let ds = f.node.dht_storage.unwrap();
-    //     let rv = RealmView::new_first(ds.clone()).await?;
-    //
-    //     // To send requests for random floID
-    //     // let realm_id = ds.get_realm_ids().await?.first().unwrap();
-    //     let realm_id = rv.realm.realm_id();
-    //     let res = ds.get_flo(&GlobalID::new(realm_id, FloID::rnd())).await;
-    //
-    //     return Ok(());
-    // }
-
     async fn run_dht_create_page_with_fillers(
         mut f: Fledger,
         filler_amount: u32,
@@ -352,7 +350,15 @@ impl SimulationHandler {
         log::info!("[Waiting for fillers to settle]");
         log::info!("{} ms", settling_delay);
 
-        wait_ms(settling_delay as u64).await;
+        let settling_seconds = settling_delay / 1000;
+        for _ in 0..settling_seconds {
+            ds.propagate()?;
+            ds.sync()?;
+            ds.broker.settle(Vec::new()).await?;
+            wait_ms(1000).await;
+        }
+
+        wait_ms((settling_delay % 1000) as u64).await;
 
         log::info!("[Sending simulation flo page]");
         let flo_page = rv
@@ -383,8 +389,19 @@ impl SimulationHandler {
         let signer = f.node.crypto_storage.get_signer();
         rv.set_realm_service("simulation-page", flo_page.blob_id(), &[&signer])
             .await?;
+
         ds.store_flo(flo_page.flo().clone())?;
         ds.propagate()?;
+        ds.store_flo(flo_page.flo().clone())?;
+        ds.propagate()?;
+        ds.store_flo(flo_page.flo().clone())?;
+        ds.propagate()?;
+        ds.store_flo(flo_page.flo().clone())?;
+        ds.propagate()?;
+
+        ds.sync()?;
+        ds.sync()?;
+
         ds.broker.settle(Vec::new()).await?;
 
         log::info!("SIMULATION END");
@@ -394,12 +411,16 @@ impl SimulationHandler {
         return Ok(());
     }
 
-    async fn run_dht_fetch_simulation_page(
+    async fn run_dht_wait_for_pages(
         mut f: Fledger,
         sampling_rate_ms: u32,
         timeout_ms: u32,
+        amount: u32,
     ) -> anyhow::Result<()> {
         let start_instant = Instant::now();
+        absolute_counter!("fledger_simulation_success", 0);
+        absolute_counter!("fledger_dht_connected", 0);
+        absolute_counter!("fledger_connected_total", 0);
 
         let timeout_result = timeout(
             Duration::from_millis(timeout_ms.into()),
@@ -418,15 +439,13 @@ impl SimulationHandler {
         log::info!("DHT CONNECTED");
 
         let ds = f.node.dht_storage.as_mut().unwrap();
+        let mut rv = RealmView::new_first(ds.clone()).await?;
 
         loop {
-            ds.sync()?;
-
             if start_instant.elapsed().as_millis() > timeout_ms as u128 {
                 log::warn!("SIMULATION TIMEOUT REACHED ({}ms)", timeout_ms);
                 log::info!("SIMULATION END");
                 absolute_counter!("fledger_simulation_timeout", 1);
-                absolute_counter!("fledger_simulation_success", 0);
                 f.loop_node(crate::FledgerState::Forever).await?;
 
                 return Ok(());
@@ -436,7 +455,85 @@ impl SimulationHandler {
 
             increment_counter!("fledger_iterations_total");
 
-            let rv = RealmView::new_first(ds.clone()).await?;
+            absolute_counter!(
+                "fledger_connected_total",
+                f.node.nodes_connected()?.len() as u64
+            );
+
+            rv.update_all().await?;
+            f.node.dht_storage.as_mut().unwrap().sync()?;
+            f.node.dht_storage.as_mut().unwrap().propagate()?;
+
+            let pages = f
+                .node
+                .dht_storage
+                .as_mut()
+                .unwrap()
+                .get_flos()
+                .await
+                .unwrap()
+                .clone();
+            let pages = pages
+                .iter()
+                .filter(|flo| flo.flo_type() == type_name::<BlobPage>())
+                .map(|flo| BlobPage::from_rmp_bytes(&flo.flo_type(), &flo.data()).unwrap());
+
+            let page_count = pages.count();
+            absolute_counter!("fledger_pages_total", page_count as u64);
+
+            if page_count >= amount as usize {
+                log::info!("enough pages received");
+                log::info!("SIMULATION END");
+                f.loop_node(crate::FledgerState::Forever).await?;
+                return Ok(());
+            } else {
+                log::info!("NOT enough pages received...");
+            }
+        }
+    }
+
+    async fn run_dht_fetch_simulation_page(
+        mut f: Fledger,
+        sampling_rate_ms: u32,
+        timeout_ms: u32,
+    ) -> anyhow::Result<()> {
+        let start_instant = Instant::now();
+        absolute_counter!("fledger_simulation_success", 0);
+
+        let timeout_result = timeout(
+            Duration::from_millis(timeout_ms.into()),
+            f.loop_node(crate::FledgerState::DHTAvailable),
+        )
+        .await;
+
+        if timeout_result.is_err() {
+            log::warn!("SIMULATION TIMEOUT WHILE CONNECTING TO DHT");
+            log::info!("SIMULATION END");
+            absolute_counter!("fledger_simulation_timeout", 1);
+        }
+
+        absolute_counter!("fledger_dht_connected", 1);
+
+        log::info!("DHT CONNECTED");
+
+        let ds = f.node.dht_storage.as_mut().unwrap();
+        let mut rv = RealmView::new_first(ds.clone()).await?;
+
+        loop {
+            if start_instant.elapsed().as_millis() > timeout_ms as u128 {
+                log::warn!("SIMULATION TIMEOUT REACHED ({}ms)", timeout_ms);
+                log::info!("SIMULATION END");
+                absolute_counter!("fledger_simulation_timeout", 1);
+                f.loop_node(crate::FledgerState::Forever).await?;
+
+                return Ok(());
+            }
+
+            wait_ms(sampling_rate_ms.into()).await;
+
+            increment_counter!("fledger_iterations_total");
+
+            rv.update_all().await?;
 
             let pages = ds.get_flos().await.unwrap().clone();
             let pages = pages
@@ -491,13 +588,6 @@ impl SimulationHandler {
                         "simulation page found with content: {}",
                         page_content.chars().take(50).collect::<String>()
                     );
-
-                    if simulation_page_stored_this_iteration {
-                        log::warn!("had simulation page before fetch");
-                        absolute_counter!("fledger_simulation_stored_before_fetch", 1);
-                    } else {
-                        absolute_counter!("fledger_simulation_stored_before_fetch", 0);
-                    }
 
                     log::info!("SIMULATION END");
                     absolute_counter!("fledger_simulation_success", 1);
