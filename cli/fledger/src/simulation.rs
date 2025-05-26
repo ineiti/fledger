@@ -390,16 +390,8 @@ impl SimulationHandler {
         rv.set_realm_service("simulation-page", flo_page.blob_id(), &[&signer])
             .await?;
 
-        ds.store_flo(flo_page.flo().clone())?;
-        ds.propagate()?;
-        ds.store_flo(flo_page.flo().clone())?;
-        ds.propagate()?;
-        ds.store_flo(flo_page.flo().clone())?;
-        ds.propagate()?;
-        ds.store_flo(flo_page.flo().clone())?;
-        ds.propagate()?;
+        //ds.store_flo(flo_page.flo().clone())?;
 
-        ds.sync()?;
         ds.sync()?;
 
         ds.broker.settle(Vec::new()).await?;
@@ -457,12 +449,11 @@ impl SimulationHandler {
 
             absolute_counter!(
                 "fledger_connected_total",
-                f.node.nodes_connected()?.len() as u64
+                f.node.dht_router.as_ref().unwrap().stats.borrow().active as u64
             );
 
             rv.update_all().await?;
             f.node.dht_storage.as_mut().unwrap().sync()?;
-            f.node.dht_storage.as_mut().unwrap().propagate()?;
 
             let pages = f
                 .node
