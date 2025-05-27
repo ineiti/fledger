@@ -42,10 +42,10 @@ export function embedPage(data) {
 
   const shadowRoot = wrapper.attachShadow({ mode: 'open' });
 
-  const styles = doc.querySelector('style');
-  if (styles) {
-      shadowRoot.appendChild(styles.cloneNode(true));
-  }
+  const styles = doc.querySelectorAll('style');
+  styles.forEach(style => {
+      shadowRoot.appendChild(style.cloneNode(true));
+  });
 
   const body = doc.querySelector('body');
   if (body) {
@@ -59,11 +59,16 @@ export function embedPage(data) {
   allScripts.forEach(originalScript => {
       if (originalScript.src) {
           // Handle external scripts
-          const script = document.createElement('script');
-          script.src = originalScript.src;
-          script.async = false;
-          console.log("Appending script", script);
-          shadowRoot.appendChild(script);
+          fetch(originalScript.src)
+              .then(response => response.text())
+              .then(scriptContent => {
+                  const rewrittenContent = rewriteSelectors(scriptContent);
+                  const script = document.createElement('script');
+                  script.textContent = rewrittenContent;
+                  console.log("Appending rewritten external script", script);
+                  shadowRoot.appendChild(script);
+              })
+              .catch(error => console.error("Failed to fetch external script:", error));
       } else {
           // Handle inline scripts
           const script = document.createElement('script');
