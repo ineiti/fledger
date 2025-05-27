@@ -44,49 +44,59 @@ export function embedPage(data) {
 
   const styles = doc.querySelectorAll('style');
   styles.forEach(style => {
-      shadowRoot.appendChild(style.cloneNode(true));
+    shadowRoot.appendChild(style.cloneNode(true));
   });
 
   const body = doc.querySelector('body');
   if (body) {
-      const bodyClone = body.cloneNode(true);
-      const scripts = bodyClone.querySelectorAll('script');
-      scripts.forEach(script => script.remove());
-      shadowRoot.appendChild(bodyClone);
+    const bodyClone = body.cloneNode(true);
+    const scripts = bodyClone.querySelectorAll('script');
+    scripts.forEach(script => script.remove());
+    shadowRoot.appendChild(bodyClone);
   }
 
+  // Handle external scripts
   const allScripts = doc.querySelectorAll('script');
+  const externalScripts = [];
   allScripts.forEach(originalScript => {
-      if (originalScript.src) {
-          // Handle external scripts
-          fetch(originalScript.src)
-              .then(response => response.text())
-              .then(scriptContent => {
-                  const rewrittenContent = rewriteSelectors(scriptContent);
-                  const script = document.createElement('script');
-                  script.textContent = rewrittenContent;
-                  console.log("Appending rewritten external script", script);
-                  shadowRoot.appendChild(script);
-              })
-              .catch(error => console.error("Failed to fetch external script:", error));
-      } else {
-          // Handle inline scripts
-          const script = document.createElement('script');
-
-          script.textContent = `
-          documentRoot = document.getElementById("dht_page").firstChild.shadowRoot;
-          ${rewriteSelectors(originalScript.textContent)}
-          `;
-
-          console.log(script);
-          shadowRoot.appendChild(script);
-      }
+    if (originalScript.src) {
+      externalScripts.push(fetch(originalScript.src)
+        .then(response => response.text())
+        .then(scriptContent => {
+          appendScript(shadowRoot, scriptContent);
+        })
+        .catch(error => console.error("Failed to fetch external script:", error)));
+    }
   });
+
+  // Wait for external scripts to load, or timeout.
+  Promise.race([
+    Promise.all(externalScripts),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Timeout while loading scripts")), 1000);
+    })]
+  ).then(() => {
+    // Finally handle inline scripts
+    allScripts.forEach(originalScript => {
+      if (originalScript.src.length == 0) {
+        appendScript(shadowRoot, originalScript.textContent);
+      }
+    });
+  }).catch((e) => {
+    alert(`Couldn't load scripts: ${e}`);
+  })
 }
 
-function rewriteSelectors(script) {
-  return script
-      .replace(/document\.getElementById\(/g, 'documentRoot.getElementById(')
-      .replace(/document\.querySelector\(/g, 'documentRoot.querySelector(')
-      .replace(/document\.querySelectorAll\(/g, 'documentRoot.querySelectorAll(');
+function appendScript(shadowRoot, source) {
+  const rewritten = source
+    .replace(/document\.getElementById\(/g, 'documentRoot.getElementById(')
+    .replace(/document\.querySelector\(/g, 'documentRoot.querySelector(')
+    .replace(/document\.querySelectorAll\(/g, 'documentRoot.querySelectorAll(');
+
+  const script = document.createElement('script');
+  script.textContent = `
+      documentRoot = document.getElementById("dht_page").firstChild.shadowRoot;
+      ${rewritten}
+      `;
+  shadowRoot.appendChild(script);
 }
