@@ -12,7 +12,7 @@ use flmodules::{
 };
 use tokio::sync::broadcast;
 
-use crate::web::{getEditorContent, setEditorContent, Button, Tab, Web};
+use crate::web::{embedPage, getEditorContent, setEditorContent, Button, Tab, Web};
 
 pub struct Pages {
     rv: RealmView,
@@ -93,12 +93,10 @@ impl Pages {
                     log::info!("Page is: {page:?}");
                 }
             }
-            Button::AnchorPage(path) => {
-                match self.rv.get_page_from_path(&path).cloned() {
-                    Ok(page) => self.show_home_page(&page).await,
-                    Err(e) => log::warn!("Couldn't visit {path}: {e:?}"),
-                }
-            }
+            Button::AnchorPage(path) => match self.rv.get_page_from_path(&path).cloned() {
+                Ok(page) => self.show_home_page(&page).await,
+                Err(e) => log::warn!("Couldn't visit {path}: {e:?}"),
+            },
             _ => {}
         }
     }
@@ -188,6 +186,7 @@ impl Pages {
         if self.home_id == id {
             self.update_home_page().await;
         }
+        self.edit_page(&(*id).into());
 
         Ok(())
     }
@@ -223,7 +222,7 @@ impl Pages {
             .get(&self.home_id)
             .expect("Getting home page")
             .clone();
-        self.web.set_id_inner("dht_page", &home_page.get_index());
+        embedPage(home_page.get_index().into());
         self.web.set_id_inner(
             "dht_page_path",
             &format!(
@@ -298,12 +297,13 @@ impl Pages {
         let path = format!("/{}", names::Generator::default().next().unwrap());
         self.web.get_input("page-path").set_value(&path);
 
-        self.set_editor_id_buttons(None, true, false, false);
+        self.set_editor_id_buttons(None, None, true, false, false);
     }
 
     fn set_editor_id_buttons(
         &mut self,
         id: Option<FloID>,
+        version: Option<u32>,
         create: bool,
         update: bool,
         reset: bool,
@@ -312,10 +312,16 @@ impl Pages {
         self.web.set_visible("update-page", update);
         self.web.set_visible("reset-page", reset);
         self.web.set_visible("page-id-div", id.is_some());
+        self.web.set_visible("page-version-div", id.is_some());
         if let Some(id) = id {
             self.web
                 .get_el("page-id")
                 .set_inner_html(&format!("{id:x}"));
+        }
+        if let Some(ver) = version {
+            self.web
+                .get_el("page-version")
+                .set_inner_html(&format!("{ver}"));
         }
     }
 
@@ -327,7 +333,7 @@ impl Pages {
         self.edit_id = Some((*id.clone()).into());
         if let Some(dp) = self.get_page(&(**id).into()) {
             setEditorContent(dp.get_index().into());
-            self.set_editor_id_buttons(Some(dp.flo_id()), false, true, true);
+            self.set_editor_id_buttons(Some(dp.flo_id()), Some(dp.version()), false, true, true);
             let path = self
                 .rv
                 .get_full_path_blob(&dp)
