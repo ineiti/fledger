@@ -25,6 +25,7 @@ extern "C" {
     pub fn downloadFile(fileName: JsString, data: JsString);
     pub fn getEditorContent() -> JsString;
     pub fn setEditorContent(data: JsString);
+    pub fn embedPage(data: JsString);
 }
 
 #[derive(Debug, Clone)]
