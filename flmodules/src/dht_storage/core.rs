@@ -260,11 +260,11 @@ impl RealmStorage {
                 self.realm_config.max_space
             );
         }
-        log::warn!(
-            "realm storage : current({}) / max({})",
-            self.size,
-            self.realm_config.max_space
-        );
+        // log::warn!(
+        //     "realm storage : current({}) / max({})",
+        //     self.size,
+        //     self.realm_config.max_space
+        // );
         is_new_flo
     }
 

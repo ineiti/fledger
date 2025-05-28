@@ -24,7 +24,7 @@ pub struct U256(#[serde_as(as = "Hex")] [u8; 32]);
 
 impl fmt::Display for U256 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for index in 0..8 {
+        for index in 0..32 {
             f.write_fmt(format_args!("{:02x}", self.0[index]))?;
         }
         Ok(())

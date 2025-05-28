@@ -199,6 +199,20 @@ impl Blob {
             datas: HashMap::new(),
         }
     }
+
+    pub fn make(
+        blob_type: String,
+        links: HashMap<String, Vec<BlobID>>,
+        values: HashMap<String, String>,
+        datas: HashMap<String, Bytes>,
+    ) -> Self {
+        Self {
+            blob_type,
+            links,
+            values,
+            datas,
+        }
+    }
 }
 
 impl BlobFamily for FloBlob {}

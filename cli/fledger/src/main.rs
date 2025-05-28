@@ -175,6 +175,7 @@ async fn main() -> anyhow::Result<()> {
 
     unsafe {
         flmodules::dht_storage::messages::EVIL_NO_FORWARD = args.evil_noforward;
+        flmodules::dht_router::messages::EVIL_NO_FORWARD = args.evil_noforward;
     }
     absolute_counter!(
         "fledger_evil_noforward",
