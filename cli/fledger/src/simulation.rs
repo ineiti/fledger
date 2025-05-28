@@ -60,7 +60,10 @@ pub enum SimulationSubcommand {
         page_size: u32,
 
         #[arg(long)]
-        settling_delay: u32,
+        pages_propagation_delay: u32,
+
+        #[arg(long)]
+        connection_delay: u32,
     },
     FetchPage {
         #[arg(long, default_value = "20000")]
@@ -93,10 +96,17 @@ impl SimulationHandler {
             SimulationSubcommand::CreatePageWithFillers {
                 filler_amount,
                 page_size,
-                settling_delay,
+                pages_propagation_delay,
+                connection_delay,
             } => {
-                Self::run_dht_create_page_with_fillers(f, filler_amount, page_size, settling_delay)
-                    .await
+                Self::run_dht_create_page_with_fillers(
+                    f,
+                    filler_amount,
+                    page_size,
+                    pages_propagation_delay,
+                    connection_delay,
+                )
+                .await
             }
             SimulationSubcommand::FetchPage { timeout_ms } => {
                 Self::run_dht_fetch_simulation_page(f, sampling_rate_ms, timeout_ms).await
@@ -307,12 +317,17 @@ impl SimulationHandler {
         mut f: Fledger,
         filler_amount: u32,
         page_size: u32,
-        settling_delay: u32,
+        pages_propagation_delay: u32,
+        connection_delay: u32,
     ) -> anyhow::Result<()> {
         f.loop_node(crate::FledgerState::DHTAvailable).await?;
         absolute_counter!("fledger_dht_connected", 1);
 
         log::info!("DHT CONNECTED");
+
+        log::info!("[Waiting for connections to settle]");
+        log::info!("{} ms", connection_delay);
+        wait_ms(connection_delay as u64).await;
 
         //let router = f.node.dht_router.unwrap();
         let ds = f.node.dht_storage.as_mut().unwrap();
@@ -348,9 +363,9 @@ impl SimulationHandler {
         }
 
         log::info!("[Waiting for fillers to settle]");
-        log::info!("{} ms", settling_delay);
+        log::info!("{} ms", pages_propagation_delay);
 
-        let settling_seconds = settling_delay / 1000;
+        let settling_seconds = pages_propagation_delay / 1000;
         for _ in 0..settling_seconds {
             ds.propagate()?;
             ds.sync()?;
@@ -358,7 +373,7 @@ impl SimulationHandler {
             wait_ms(1000).await;
         }
 
-        wait_ms((settling_delay % 1000) as u64).await;
+        wait_ms((pages_propagation_delay % 1000) as u64).await;
 
         log::info!("[Sending simulation flo page]");
         let flo_page = rv
@@ -390,7 +405,10 @@ impl SimulationHandler {
         rv.set_realm_service("simulation-page", flo_page.blob_id(), &[&signer])
             .await?;
 
-        //ds.store_flo(flo_page.flo().clone())?;
+        for _ in 0..120 {
+            ds.store_flo(flo_page.flo().clone())?;
+            wait_ms(1000).await;
+        }
 
         ds.sync()?;
 
@@ -475,6 +493,7 @@ impl SimulationHandler {
             if page_count >= amount as usize {
                 log::info!("enough pages received");
                 log::info!("SIMULATION END");
+                absolute_counter!("fledger_simulation_success", 1);
                 f.loop_node(crate::FledgerState::Forever).await?;
                 return Ok(());
             } else {
@@ -490,6 +509,7 @@ impl SimulationHandler {
     ) -> anyhow::Result<()> {
         let start_instant = Instant::now();
         absolute_counter!("fledger_simulation_success", 0);
+        absolute_counter!("fledger_connected_total", 0);
 
         let timeout_result = timeout(
             Duration::from_millis(timeout_ms.into()),
@@ -524,6 +544,10 @@ impl SimulationHandler {
 
             increment_counter!("fledger_iterations_total");
 
+            absolute_counter!(
+                "fledger_connected_total",
+                f.node.dht_router.as_ref().unwrap().stats.borrow().active as u64
+            );
             rv.update_all().await?;
 
             let pages = ds.get_flos().await.unwrap().clone();

@@ -309,7 +309,6 @@ impl Messages {
                     .collect()
             }
             MessageNeighbour::AvailableFlos(realm_id, flo_metas) => {
-                log::info!("AvailableFlos: {}", flo_metas.len());
                 absolute_counter!(
                     "fledger_flos_metas_received_from_neighbour",
                     flo_metas.len() as u64
@@ -341,7 +340,6 @@ impl Messages {
                 }
             }
             MessageNeighbour::RequestFlos(realm_id, flo_ids) => {
-                log::info!("RequestFlos: {flo_ids:?}");
                 absolute_counter!(
                     "fledger_flos_ids_received_from_neighbour", // requested
                     flo_ids.len() as u64
@@ -368,7 +366,6 @@ impl Messages {
                 }
             }
             MessageNeighbour::Flos(flo_cuckoos) => {
-                log::info!("Flos: {}", flo_cuckoos.len());
                 absolute_counter!(
                     "fledger_flos_received_from_neighbour", // received
                     flo_cuckoos.len() as u64
