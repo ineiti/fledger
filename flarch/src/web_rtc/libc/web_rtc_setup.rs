@@ -490,7 +490,9 @@ impl SubsystemHandler<WebRTCInput, WebRTCOutput> for WebRTCConnectionSetupLibc {
                     // Trade-off between very spammy messages which come at the end of a simulation,
                     // and still important messages.
                     // If other spammy messages pop up, add them here to be traced only.
-                    if e.to_string().contains("DataChannel is not opened") {
+                    if e.to_string().contains("DataChannel is not opened")
+                        || e.to_string().contains("channel closed")
+                    {
                         log::trace!(
                             "WebRTC({:p}): Error processing message {msg:?}: {e:?}",
                             self
