@@ -625,6 +625,22 @@ impl SimulationHandler {
             let pages_csv = page_list.clone().join(", ");
             log::info!("pages stored: {pages_csv}");
 
+            let mut data = HashMap::new();
+            data.insert("pages", pages_csv.clone());
+            let node_name = f.node.node_config.info.name.clone();
+            let response = reqwest::Client::new()
+                .post(format!(
+                    "https://fledger.yohan.ch/api/experiments/{experiment_id}/nodes/{node_name}"
+                ))
+                .json(&data)
+                .header("Accept", "application/json")
+                .header(
+                    "Authorization",
+                    "Bearer 1|d4EeHkRPlqwpgLpALyTor5FxHI4NWg1LXJtf5NZBfd82aa17",
+                )
+                .send()
+                .await?;
+
             if simulation_page_stored_this_iteration {
                 absolute_counter!("fledger_simulation_page_stored", 1);
             } else {

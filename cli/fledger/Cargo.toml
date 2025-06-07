@@ -28,3 +28,5 @@ webrtc-util = "0.10"
 metrics = "0.21.1"
 metrics-exporter-influx = { version = "0.2.2", path = "../../metrics-exporter-influx" }
 rand = "0.9.1"
+
+reqwest = { version = "0.12.19", features = ["json"] }
