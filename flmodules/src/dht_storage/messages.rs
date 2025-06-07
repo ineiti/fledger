@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{any::type_name, collections::HashMap};
 
 use flarch::{
     broker::SubsystemHandler,
@@ -7,6 +7,7 @@ use flarch::{
     platform_async_trait,
 };
 use flcrypto::tofrombytes::ToFromBytes;
+use metrics::{absolute_counter, increment_counter};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
@@ -103,6 +104,8 @@ pub struct Messages {
     tx: Option<watch::Sender<Stats>>,
 }
 
+pub static mut EVIL_NO_FORWARD: bool = false;
+
 impl Messages {
     /// Returns a new chat module.
     pub fn new(
@@ -190,7 +193,8 @@ impl Messages {
                         .iter()
                         .flat_map(|realm| realm.1.get_all_flo_cuckoos())
                         .collect::<Vec<_>>(),
-                ).into()]
+                )
+                .into()]
             }
         }
     }
@@ -222,10 +226,16 @@ impl Messages {
                     .and_then(|realm| realm.get_flo_cuckoo(&fid))
                 {
                     // log::info!("sends flo {:?}", fc.0);
-                    return MessageDest::FloValue(fc)
-                        .to_intern_out(origin)
-                        // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
-                        .map_or(vec![], |msg| vec![msg]);
+                    if unsafe { !EVIL_NO_FORWARD } {
+                        increment_counter!("fledger_flo_value_sent_total");
+                        return MessageDest::FloValue(fc)
+                            .to_intern_out(origin)
+                            // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
+                            .map_or(vec![], |msg| vec![msg]);
+                    } else {
+                        increment_counter!("fledger_flo_value_blocked_total");
+                        return vec![];
+                    }
                 }
             }
             MessageClosest::GetCuckooIDs(rid) => {
@@ -304,31 +314,78 @@ impl Messages {
                     )
                     .collect()
             }
-            MessageNeighbour::RequestFloMetas(realm_id) => self
-                .realms
-                .get(&realm_id)
-                .map(|realm| realm.get_flo_metas())
-                .map_or(vec![], |fm| {
-                    vec![MessageNeighbour::AvailableFlos(realm_id, fm)]
-                }),
-            MessageNeighbour::AvailableFlos(realm_id, flo_metas) => self
-                .realms
-                .get(&realm_id)
-                .and_then(|realm| realm.sync_available(&flo_metas))
-                .map_or(vec![], |needed| {
-                    vec![MessageNeighbour::RequestFlos(realm_id, needed)]
-                }),
-            MessageNeighbour::RequestFlos(realm_id, flo_ids) => self
-                .realms
-                .get(&realm_id)
-                .map(|realm| {
-                    flo_ids
-                        .iter()
-                        .filter_map(|id| realm.get_flo_cuckoo(id))
-                        .collect::<Vec<_>>()
-                })
-                .map_or(vec![], |flos| vec![MessageNeighbour::Flos(flos)]),
+            MessageNeighbour::RequestFloMetas(realm_id) => {
+                if unsafe { !EVIL_NO_FORWARD } {
+                    increment_counter!("fledger_forwarded_flo_meta_requests_total");
+                    self.realms
+                        .get(&realm_id)
+                        .map(|realm| realm.get_flo_metas())
+                        .map_or(vec![], |fm| {
+                            vec![MessageNeighbour::AvailableFlos(realm_id, fm)]
+                        })
+                } else {
+                    increment_counter!("fledger_blocked_flo_meta_requests_total");
+                    vec![]
+                }
+            }
+            MessageNeighbour::AvailableFlos(realm_id, flo_metas) => {
+                absolute_counter!(
+                    "fledger_flos_metas_received_from_neighbour",
+                    flo_metas.len() as u64
+                );
+                self.realms
+                    .get(&realm_id)
+                    .and_then(|realm| realm.sync_available(&flo_metas))
+                    .map_or(vec![], |needed| {
+                        //log::info!("Needed flos: {}", needed.len());
+                        absolute_counter!(
+                            "fledger_flos_requested_from_neighbour",
+                            needed.len() as u64
+                        );
+                        vec![MessageNeighbour::RequestFlos(realm_id, needed)]
+                    })
+            }
+            MessageNeighbour::RequestFlos(realm_id, flo_ids) => {
+                absolute_counter!(
+                    "fledger_flos_ids_received_from_neighbour", // requested
+                    flo_ids.len() as u64
+                );
+                if unsafe { !EVIL_NO_FORWARD } {
+                    increment_counter!("fledger_forwarded_flo_requests_total");
+                    self.realms
+                        .get(&realm_id)
+                        .map(|realm| {
+                            let flos = flo_ids
+                                .iter()
+                                .filter_map(|id| realm.get_flo_cuckoo(id))
+                                .collect::<Vec<_>>();
+
+                            let realm = flos
+                                .iter()
+                                .find(|flo| flo.0.flo_type() == type_name::<FloRealm>());
+
+                            let flo_to_forward = realm.or(flos.last());
+                            if let Some(flo) = flo_to_forward {
+                                return vec![flo.clone()];
+                            } else {
+                                return vec![];
+                            }
+                        })
+                        .map_or(vec![], |flos| {
+                            //log::info!("Flos to send: {}", flos.len());
+                            absolute_counter!("fledger_flos_sent_to_neighbour", flos.len() as u64);
+                            vec![MessageNeighbour::Flos(flos)]
+                        })
+                } else {
+                    increment_counter!("fledger_blocked_flo_requests_total");
+                    vec![]
+                }
+            }
             MessageNeighbour::Flos(flo_cuckoos) => {
+                absolute_counter!(
+                    "fledger_flos_received_from_neighbour", // received
+                    flo_cuckoos.len() as u64
+                );
                 for (flo, cuckoos) in flo_cuckoos {
                     self.store_flo(flo.clone());
                     self.realms.get_mut(&flo.realm_id()).map(|realm| {
@@ -352,6 +409,7 @@ impl Messages {
     }
 
     fn store_flo(&mut self, flo: Flo) -> Vec<InternOut> {
+        increment_counter!("fledger_ds_store_flo_total");
         let mut res = vec![];
         if self.upsert_flo(flo.clone()) {
             // log::info!("{}: store_flo", self.our_id);
@@ -372,7 +430,7 @@ impl Messages {
     // Either its realm is already known, or it is a new realm.
     // When 'true' is returned, then the flo has been stored.
     fn upsert_flo(&mut self, flo: Flo) -> bool {
-        // log::trace!(
+        // log::info!(
         //     "{} store_flo {}({}/{}) {}",
         //     self.our_id,
         //     flo.flo_type(),
@@ -454,7 +512,7 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
                         .map_or(vec![], |msg| vec![msg])
                 }
             })
-            // .inspect(|msg| log::debug!("{_id}: Out: {msg:?}"))
+            //.inspect(|msg| log::debug!("{_id}: Out: {msg:?}"))
             .collect()
     }
 }

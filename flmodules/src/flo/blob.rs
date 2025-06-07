@@ -171,6 +171,10 @@ impl FloBlobTag {
     pub fn blob_id(&self) -> BlobID {
         (*self.flo_id()).into()
     }
+
+    pub fn values(&self) -> &HashMap<String, String> {
+        (&(*self.get_blob().values())).into()
+    }
 }
 
 impl BlobAccess for FloBlobTag {
@@ -193,6 +197,20 @@ impl Blob {
             links: HashMap::new(),
             values: HashMap::new(),
             datas: HashMap::new(),
+        }
+    }
+
+    pub fn make(
+        blob_type: String,
+        links: HashMap<String, Vec<BlobID>>,
+        values: HashMap<String, String>,
+        datas: HashMap<String, Bytes>,
+    ) -> Self {
+        Self {
+            blob_type,
+            links,
+            values,
+            datas,
         }
     }
 }
