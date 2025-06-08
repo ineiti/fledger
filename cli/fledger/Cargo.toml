@@ -28,5 +28,11 @@ webrtc-util = "0.10"
 metrics = "0.21.1"
 metrics-exporter-influx = { version = "0.2.2", path = "../../metrics-exporter-influx" }
 rand = "0.9.1"
+serde_json = "1.0.140"
 
-reqwest = { version = "0.12.19", features = ["json"] }
+#openssl = { version = "0.10.73", features = ["vendored"] }
+reqwest = { version = "0.12.19", features = [
+  "json",
+  "rustls-tls",
+  "blocking",
+], default-features = false }

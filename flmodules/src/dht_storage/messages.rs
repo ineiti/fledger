@@ -89,9 +89,16 @@ pub struct RealmStats {
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct ExperimentStats {
+    amount_flo_value_sent: u32,
+    amount_request_flo_metas_received: u32,
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct Stats {
     pub realm_stats: HashMap<RealmID, RealmStats>,
     pub system_realms: Vec<RealmID>,
+    pub experiment_stats: ExperimentStats,
 }
 
 /// The message handling part, but only for DHTStorage messages.
@@ -102,6 +109,8 @@ pub struct Messages {
     our_id: NodeID,
     ds: Box<dyn DataStorage + Send>,
     tx: Option<watch::Sender<Stats>>,
+
+    experiment_stats: ExperimentStats,
 }
 
 pub static mut EVIL_NO_FORWARD: bool = false;
@@ -123,6 +132,8 @@ impl Messages {
             nodes: vec![],
             ds,
             tx: Some(tx),
+
+            experiment_stats: ExperimentStats::new(),
         };
         msgs.store();
         (msgs, rx)
@@ -228,6 +239,7 @@ impl Messages {
                     // log::info!("sends flo {:?}", fc.0);
                     if unsafe { !EVIL_NO_FORWARD } {
                         increment_counter!("fledger_flo_value_sent_total");
+                        self.incr_flo_value_sent();
                         return MessageDest::FloValue(fc)
                             .to_intern_out(origin)
                             // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
@@ -317,6 +329,7 @@ impl Messages {
             MessageNeighbour::RequestFloMetas(realm_id) => {
                 if unsafe { !EVIL_NO_FORWARD } {
                     increment_counter!("fledger_forwarded_flo_meta_requests_total");
+                    self.incr_request_flo_metas_received();
                     self.realms
                         .get(&realm_id)
                         .map(|realm| realm.get_flo_metas())
@@ -485,14 +498,32 @@ impl Messages {
     }
 
     fn store(&mut self) {
-        self.tx.clone().map(|tx| {
-            tx.send(Stats::from_realms(&self.realms, self.config.realms.clone()))
-                .is_err()
-                .then(|| self.tx = None)
-        });
+        self.refresh_stats();
         serde_yaml::to_string(&self.realms)
             .ok()
             .map(|s| (*self.ds).set(MODULE_NAME, &s));
+    }
+
+    fn incr_request_flo_metas_received(&mut self) {
+        self.experiment_stats.incr_request_flo_metas_received();
+        self.refresh_stats();
+    }
+
+    fn incr_flo_value_sent(&mut self) {
+        self.experiment_stats.incr_flo_value_sent();
+        self.refresh_stats();
+    }
+
+    fn refresh_stats(&mut self) {
+        self.tx.clone().map(|tx| {
+            tx.send(Stats::from_realms(
+                &self.realms,
+                self.config.realms.clone(),
+                self.experiment_stats.clone(),
+            ))
+            .is_err()
+            .then(|| self.tx = None)
+        });
     }
 }
 
@@ -517,14 +548,44 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
     }
 }
 
+impl ExperimentStats {
+    fn new() -> Self {
+        Self {
+            amount_flo_value_sent: 0,
+            amount_request_flo_metas_received: 0,
+        }
+    }
+
+    pub fn amount_flo_value_sent(&self) -> u32 {
+        self.amount_flo_value_sent
+    }
+
+    pub fn amount_request_flo_metas_received(&self) -> u32 {
+        self.amount_request_flo_metas_received
+    }
+
+    fn incr_flo_value_sent(&mut self) {
+        self.amount_flo_value_sent += 1;
+    }
+
+    fn incr_request_flo_metas_received(&mut self) {
+        self.amount_request_flo_metas_received += 1;
+    }
+}
+
 impl Stats {
-    fn from_realms(realms: &HashMap<RealmID, RealmStorage>, system_realms: Vec<RealmID>) -> Self {
+    fn from_realms(
+        realms: &HashMap<RealmID, RealmStorage>,
+        system_realms: Vec<RealmID>,
+        experiment_stats: ExperimentStats,
+    ) -> Self {
         Self {
             realm_stats: realms
                 .iter()
                 .map(|(id, realm)| (id.clone(), RealmStats::from_realm(realm)))
                 .collect(),
             system_realms,
+            experiment_stats,
         }
     }
 }

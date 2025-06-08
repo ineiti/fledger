@@ -95,9 +95,9 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     evil_noforward: bool,
 
-    /// Sampling rate for metrics
+    /// Delay between loop iterations in ms
     #[arg(long, default_value = "1000")]
-    sampling_rate_ms: u32,
+    loop_delay: u32,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -147,7 +147,7 @@ async fn main() -> anyhow::Result<()> {
 
     // necessary to grab the variable for lifetime purposes.
     let node_name = args.name.clone().unwrap_or("unknown".into());
-    let _influx = Metrics::setup(node_name, args.sampling_rate_ms);
+    let _influx = Metrics::setup(node_name);
 
     log::info!(
         "Starting app with version {}/{}",
@@ -224,7 +224,7 @@ impl Fledger {
                 Commands::Stats {} => todo!(),
                 Commands::Page { command } => Page::run(f, command).await,
                 Commands::Simulation(command) => {
-                    SimulationHandler::run(f, command, args.sampling_rate_ms).await
+                    SimulationHandler::run(f, command, args.loop_delay).await
                 }
             },
             None => f.loop_node(FledgerState::Forever).await,

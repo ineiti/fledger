@@ -1,6 +1,6 @@
 use std::{any::type_name, collections::HashMap, str::FromStr, time::Duration, vec};
 
-use crate::Fledger;
+use crate::{metrics::Metrics, Fledger};
 use anyhow::Error;
 use clap::{arg, Args, Subcommand};
 use flarch::{nodeids::U256, tasks::wait_ms};
@@ -69,6 +69,9 @@ pub enum SimulationSubcommand {
         #[arg(long, default_value = "20000")]
         timeout_ms: u32,
 
+        #[arg(long, default_value = "false")]
+        enable_sync: bool,
+
         #[arg(long)]
         experiment_id: u32,
     },
@@ -113,10 +116,17 @@ impl SimulationHandler {
             }
             SimulationSubcommand::FetchPage {
                 timeout_ms,
+                enable_sync,
                 experiment_id,
             } => {
-                Self::run_dht_fetch_simulation_page(f, sampling_rate_ms, timeout_ms, experiment_id)
-                    .await
+                Self::run_dht_fetch_simulation_page(
+                    f,
+                    sampling_rate_ms,
+                    enable_sync,
+                    timeout_ms,
+                    experiment_id,
+                )
+                .await
             }
             SimulationSubcommand::WaitPages { timeout_ms, amount } => {
                 Self::run_dht_wait_for_pages(f, sampling_rate_ms, timeout_ms, amount).await
@@ -530,6 +540,7 @@ impl SimulationHandler {
     async fn run_dht_fetch_simulation_page(
         mut f: Fledger,
         sampling_rate_ms: u32,
+        enable_sync: bool,
         timeout_ms: u32,
         experiment_id: u32,
     ) -> anyhow::Result<()> {
@@ -542,6 +553,8 @@ impl SimulationHandler {
         absolute_counter!("fledger_flo_value_sent_total", 0);
         absolute_counter!("fledger_flo_value_blocked_total", 0);
 
+        let metrics = Metrics::new(experiment_id, f.node.node_config.info.name.clone());
+
         let timeout_result = timeout(
             Duration::from_millis(timeout_ms.into()),
             f.loop_node(crate::FledgerState::DHTAvailable),
@@ -552,28 +565,34 @@ impl SimulationHandler {
             log::warn!("SIMULATION TIMEOUT WHILE CONNECTING TO DHT");
             log::info!("SIMULATION END");
             absolute_counter!("fledger_simulation_timeout", 1);
+            metrics.timeout();
+            return Err(timeout_result.unwrap_err().into());
         }
 
         absolute_counter!("fledger_dht_connected", 1);
 
         log::info!("DHT CONNECTED");
 
-        let ds = f.node.dht_storage.as_mut().unwrap();
-        let mut rv = RealmView::new_first(ds.clone()).await?;
+        let mut rv = RealmView::new_first(f.node.dht_storage.as_ref().unwrap().clone()).await?;
 
         let mut page_service: Option<&FloID>;
 
+        let mut iteration = 0 as u32;
         loop {
             if start_instant.elapsed().as_millis() > timeout_ms as u128 {
                 log::warn!("SIMULATION TIMEOUT REACHED ({}ms)", timeout_ms);
                 log::info!("SIMULATION END");
                 absolute_counter!("fledger_simulation_timeout", 1);
+                metrics.timeout();
                 f.loop_node(crate::FledgerState::Forever).await?;
 
                 return Ok(());
             }
 
+            let ds = f.node.dht_storage.as_mut().unwrap();
+
             wait_ms(sampling_rate_ms.into()).await;
+            iteration += 1;
 
             increment_counter!("fledger_iterations_total");
 
@@ -582,7 +601,9 @@ impl SimulationHandler {
                 f.node.dht_router.as_ref().unwrap().stats.borrow().active as u64
             );
 
-            //ds.sync()?;
+            if enable_sync {
+                ds.sync()?;
+            }
             // let _ = rv
             //     .update_all()
             //     .await
@@ -617,29 +638,13 @@ impl SimulationHandler {
                 })
                 .collect::<Vec<String>>();
 
-            page_list.clone().iter().for_each(|page| {
-                let metric = format!("fledger_page_stored_{}", page.replace("-", "_"));
-                absolute_counter!(metric, 1);
-            });
-
             let pages_csv = page_list.clone().join(", ");
             log::info!("pages stored: {pages_csv}");
 
-            let mut data = HashMap::new();
-            data.insert("pages", pages_csv.clone());
-            let node_name = f.node.node_config.info.name.clone();
-            let response = reqwest::Client::new()
-                .post(format!(
-                    "https://fledger.yohan.ch/api/experiments/{experiment_id}/nodes/{node_name}"
-                ))
-                .json(&data)
-                .header("Accept", "application/json")
-                .header(
-                    "Authorization",
-                    "Bearer 1|d4EeHkRPlqwpgLpALyTor5FxHI4NWg1LXJtf5NZBfd82aa17",
-                )
-                .send()
-                .await?;
+            if iteration % 10 == 0 {
+                let ds_stats = ds.stats.borrow().experiment_stats.clone();
+                metrics.update(pages_csv.clone(), ds_stats);
+            }
 
             if simulation_page_stored_this_iteration {
                 absolute_counter!("fledger_simulation_page_stored", 1);
@@ -697,6 +702,11 @@ impl SimulationHandler {
 
                     log::info!("SIMULATION END");
                     absolute_counter!("fledger_simulation_success", 1);
+                    metrics.update(
+                        pages_csv.clone(),
+                        ds.stats.borrow().experiment_stats.clone(),
+                    );
+                    metrics.success();
                     f.loop_node(crate::FledgerState::Forever).await?;
 
                     return Ok(());
