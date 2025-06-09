@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fs::File, time::Duration};
 
+use crate::api::influx::InfluxApi;
 use crate::simulation_dht_target::stats::SimulationStats;
 use anyhow::Error;
 use metrics_exporter_influx::{InfluxBuilder, InfluxRecorderHandle};
@@ -13,6 +14,7 @@ pub struct Metrics {
     node_id: Option<String>,
 
     client: reqwest::blocking::Client,
+    influx_api: InfluxApi,
 }
 
 impl Metrics {
@@ -22,6 +24,7 @@ impl Metrics {
             node_name,
             node_id: None,
             client: reqwest::blocking::Client::new(),
+            influx_api: InfluxApi::new(),
         };
 
         let _ = metrics.api_create_node();
@@ -95,7 +98,7 @@ impl Metrics {
         );
         self.api_post_timeless_datapoints(timeless_datapoints);
 
-        self.influx_push(stats)
+        self.influx_write(stats)
     }
 
     pub fn upload_target_page_id(&self, target_page_id: String) {
@@ -265,7 +268,7 @@ impl Metrics {
         format!("{measurement},node_name={node_name} value={value}")
     }
 
-    fn influx_push(&self, stats: SimulationStats) {
+    fn make_influx_data(&self, stats: SimulationStats) -> String {
         let mut lines = Vec::new();
         lines.push(self.create_influx_line(
             "fledger_realm_storage_bytes".to_string(),
@@ -351,21 +354,10 @@ impl Metrics {
             stats.ds_experiment_stats.store_flo_total,
         ));
 
-        let influx_data = lines.join("\n");
+        lines.join("\n")
+    }
 
-        let start = Instant::now();
-        match self.
-            client
-            .post("https://influxdb.abehssera.com/api/v2/write?org=fledger&bucket=fledger&precision=ns")
-            .body(influx_data)
-            .header(
-                "Authorization",
-                "Token F7y_RJHnXA0szQHDhEiuRDAw7B2etGywSc-wdMK-BJtkXwplqXe5ogCcXDEJJR18ZvWJ87kwxckl6n1lFu9B-Q==",
-            )
-            .send()
-        {
-            Ok(resp) => log::info!("Successful write to influxdb ({}ms): {}", start.elapsed().as_millis(),resp.text().unwrap()),
-            Err(err) => log::error!("Error when writing to influxdb: {}", err),
-        };
+    fn influx_write(&self, stats: SimulationStats) -> () {
+        let _ = self.influx_api.write(self.make_influx_data(stats));
     }
 }

@@ -18,6 +18,7 @@ use page::{Page, PageCommands};
 use realm::{RealmCommands, RealmHandler};
 use simulation::{SimulationCommand, SimulationHandler};
 
+mod api;
 mod metrics;
 mod page;
 mod realm;
@@ -213,17 +214,19 @@ impl Fledger {
         match args.command.clone() {
             Some(cmd) => match cmd {
                 Commands::Realm { command } => {
-                    RealmHandler::run(Self::make_fledger(args)?, command).await
+                    RealmHandler::run(Self::make_fledger(args).await?, command).await
                 }
                 Commands::Crypto {} => todo!(),
                 Commands::Stats {} => todo!(),
-                Commands::Page { command } => Page::run(Self::make_fledger(args)?, command).await,
+                Commands::Page { command } => {
+                    Page::run(Self::make_fledger(args).await?, command).await
                 Commands::Simulation(command) => {
-                    SimulationHandler::run(Self::make_fledger(args)?, command).await
+                    SimulationHandler::run(Self::make_fledger(args).await?, command).await
                 }
             },
             None => {
                 Self::make_fledger(args)
+                    .await?
                     .loop_node(FledgerState::Forever)
                     .await
             }

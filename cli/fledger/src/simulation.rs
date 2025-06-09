@@ -66,7 +66,7 @@ impl SimulationHandler {
         // wait a random amount of time before running a simulation
         // to avoid overloading the signaling server
         if f.args.bootwait_max != 0 {
-            let randtime = random::<u64>() % args.bootwait_max;
+            let randtime = random::<u64>() % f.args.bootwait_max;
             log::info!("Waiting {}ms before running this node...", randtime);
             wait_ms(randtime).await;
         }
