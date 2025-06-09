@@ -32,7 +32,7 @@ pub enum GossipOut {
 }
 
 /// The first module to use the random_connections is a copy of the previous
-/// chat.
+/// simulation_chat.
 /// Now it holds events of multiple categories and exchanges them between the
 /// nodes.
 pub struct Messages {
@@ -57,7 +57,7 @@ impl std::fmt::Debug for Messages {
 }
 
 impl Messages {
-    /// Returns a new chat module.
+    /// Returns a new simulation_chat module.
     pub fn new(
         id: NodeID,
         storage: Box<dyn DataStorage + Send>,

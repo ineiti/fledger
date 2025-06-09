@@ -1,9 +1,10 @@
 use std::{collections::HashMap, fs::File, time::Duration};
 
 use anyhow::Error;
-use flmodules::dht_storage::messages::ExperimentStats;
 use metrics_exporter_influx::{InfluxBuilder, InfluxRecorderHandle};
 use serde_json::Value;
+
+use crate::simulation_dht_target::stats::SimulationStats;
 
 #[derive(Clone)]
 pub struct Metrics {
@@ -36,39 +37,69 @@ impl Metrics {
             .expect("could not setup influx recorder");
     }
 
-    pub fn update(&self, pages_csv: String, experiment_stats: ExperimentStats) {
+    pub fn upload(&self, simulation_metrics: SimulationStats) {
         let mut data = HashMap::new();
-        data.insert("pages", pages_csv.clone());
-        data.insert(
-            "amount_flo_value_sent",
-            experiment_stats.amount_flo_value_sent().to_string(),
-        );
-        data.insert(
-            "amount_request_flo_metas_received",
-            experiment_stats
-                .amount_request_flo_metas_received()
-                .to_string(),
-        );
+        data.insert("pages", simulation_metrics.pages.clone());
         self.api_put_data(data);
 
         let mut datapoints = HashMap::new();
         datapoints.insert(
-            "amount_request_flo_metas_received",
-            experiment_stats
-                .amount_request_flo_metas_received()
-                .to_string(),
+            "connected_nodes_total",
+            simulation_metrics.connected_nodes_total.to_string(),
         );
         self.api_post_datapoints(datapoints);
 
         let mut timeless_datapoints = HashMap::new();
         timeless_datapoints.insert(
-            "amount_flo_value_sent",
-            experiment_stats.amount_flo_value_sent().to_string(),
+            "target_page_stored_bool",
+            simulation_metrics.target_page_stored_bool.to_string(),
         );
         timeless_datapoints.insert(
-            "amount_request_flo_metas_received",
-            experiment_stats
-                .amount_request_flo_metas_received()
+            "connected_nodes_total",
+            simulation_metrics.connected_nodes_total.to_string(),
+        );
+        timeless_datapoints.insert(
+            "pages_stored_total",
+            simulation_metrics.pages_stored_total.to_string(),
+        );
+        timeless_datapoints.insert(
+            "ds_size_bytes",
+            simulation_metrics.ds_size_bytes.to_string(),
+        );
+
+        timeless_datapoints.insert(
+            "flos_sent_total",
+            simulation_metrics
+                .ds_experiment_stats
+                .max_flos_sent_in_flos
+                .to_string(),
+        );
+        timeless_datapoints.insert(
+            "available_flos_sent_total",
+            simulation_metrics
+                .ds_experiment_stats
+                .flo_value_sent_total
+                .to_string(),
+        );
+        timeless_datapoints.insert(
+            "available_flos_sent_blocked_total",
+            simulation_metrics
+                .ds_experiment_stats
+                .flo_value_sent_blocked_total
+                .to_string(),
+        );
+        timeless_datapoints.insert(
+            "max_flo_metas_received_in_available_flos",
+            simulation_metrics
+                .ds_experiment_stats
+                .max_flo_metas_received_in_available_flos
+                .to_string(),
+        );
+        timeless_datapoints.insert(
+            "max_flo_metas_requested_in_request_flos",
+            simulation_metrics
+                .ds_experiment_stats
+                .max_flo_metas_requested_in_request_flos
                 .to_string(),
         );
         self.api_post_timeless_datapoints(timeless_datapoints);
@@ -77,12 +108,14 @@ impl Metrics {
     pub fn timeout(&self) {
         let mut data = HashMap::new();
         data.insert("status", "timeout".to_string());
+        //absolute_counter!("fledger_simulation_timeout", 1);
         self.api_put_data(data);
     }
 
     pub fn success(&self) {
         let mut data = HashMap::new();
         data.insert("status", "success".to_string());
+        //absolute_counter!("fledger_simulation_success", 1);
         self.api_put_data(data);
     }
 

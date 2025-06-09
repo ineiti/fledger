@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand};
 
-use ::metrics::absolute_counter;
 use flarch::{
     data_storage::{DataStorage, DataStorageFile},
     random,
@@ -13,6 +12,7 @@ use flmodules::{
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
+use ::metrics::absolute_counter;
 use metrics::Metrics;
 use page::{Page, PageCommands};
 use realm::{RealmCommands, RealmHandler};
@@ -22,6 +22,9 @@ mod metrics;
 mod page;
 mod realm;
 mod simulation;
+mod simulation_chat;
+mod simulation_dht_target;
+mod simulation_realm;
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug, Clone)]
