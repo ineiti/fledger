@@ -142,62 +142,23 @@ async fn main() -> anyhow::Result<()> {
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
 
-    let storage = DataStorageFile::new(args.config.clone(), "fledger".into());
-    let mut node_config = Node::get_config(storage.clone_box())?;
-    args.name
-        .as_ref()
-        .map(|name| node_config.info.name = name.clone());
-
-    // necessary to grab the variable for lifetime purposes.
-    let node_name = args.name.clone().unwrap_or("unknown".into());
-    let _influx = Metrics::setup(node_name);
-
     log::info!(
         "Starting app with version {}/{}",
         SIGNAL_VERSION,
         VERSION_STRING
     );
 
-    // wait a random amount of time before running a simulation
-    // to avoid overloading the signaling server
-    if !args.bootwait_max != 0 {
-        match args.command.clone() {
-            Some(cmd) => match cmd {
-                Commands::Simulation(_) => {
-                    if args.bootwait_max != 0 {
-                        let randtime = random::<u64>() % args.bootwait_max;
-                        log::info!("Waiting {}ms before running this node...", randtime);
-                        wait_ms(randtime).await;
-                    }
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-    }
-
     unsafe {
         flmodules::dht_storage::messages::EVIL_NO_FORWARD = args.evil_noforward;
         flmodules::dht_router::messages::EVIL_NO_FORWARD = args.evil_noforward;
     }
+
     absolute_counter!(
         "fledger_evil_noforward",
         if args.evil_noforward { 1 } else { 0 }
     );
 
-    let cc = if args.disable_turn_stun {
-        ConnectionConfig::from_signal(&args.signal_url)
-    } else {
-        ConnectionConfig::new(
-            args.signal_url.clone().into(),
-            Some(HostLogin::from_url(&args.stun_url)),
-            Some(HostLogin::from_login_url(&args.turn_url)?),
-        )
-    };
-    log::debug!("Connecting to websocket at {:?}", cc);
-    let network = network_start(node_config.clone(), cc).await?;
-    let node = Node::start(Box::new(storage), node_config, network.broker).await?;
-    Fledger::run(node, args).await
+    Fledger::run(args).await
 }
 
 pub enum FledgerState {
@@ -209,28 +170,63 @@ pub enum FledgerState {
 }
 
 impl Fledger {
-    async fn run(node: Node, args: Args) -> anyhow::Result<()> {
+    async fn make_node(args: Args) -> anyhow::Result<Node> {
+        let storage = DataStorageFile::new(args.config.clone(), "fledger".into());
+        let mut node_config = Node::get_config(storage.clone_box())?;
+        args.name
+            .as_ref()
+            .map(|name| node_config.info.name = name.clone());
+
+        // necessary to grab the variable for lifetime purposes.
+        let node_name = args.name.clone().unwrap_or("unknown".into());
+        let _influx = Metrics::setup(node_name);
+
+        let cc = if args.disable_turn_stun {
+            ConnectionConfig::from_signal(&args.signal_url)
+        } else {
+            ConnectionConfig::new(
+                args.signal_url.clone().into(),
+                Some(HostLogin::from_url(&args.stun_url)),
+                Some(HostLogin::from_login_url(&args.turn_url)?),
+            )
+        };
+        log::debug!("Connecting to websocket at {:?}", cc);
+        let network = network_start(node_config.clone(), cc).await?;
+        let node = Node::start(Box::new(storage), node_config, network.broker).await?;
+        Ok(node)
+    }
+
+    async fn make_fledger(args: Args) -> anyhow::Result<Fledger> {
+        let node = Self::make_node(args.clone()).await?;
         let nc = &node.node_config.info;
         log::info!("Started node {}: {}", nc.get_id(), nc.name);
 
-        let mut f = Fledger {
+        Ok(Fledger {
             ds: node.dht_storage.as_ref().unwrap().clone(),
             dr: node.dht_router.as_ref().unwrap().clone(),
             node,
-            args: args.clone(),
-        };
+            args,
+        })
+    }
 
-        match f.args.command.clone() {
+    async fn run(args: Args) -> anyhow::Result<()> {
+        match args.command.clone() {
             Some(cmd) => match cmd {
-                Commands::Realm { command } => RealmHandler::run(f, command).await,
+                Commands::Realm { command } => {
+                    RealmHandler::run(Self::make_fledger(args)?, command).await
+                }
                 Commands::Crypto {} => todo!(),
                 Commands::Stats {} => todo!(),
-                Commands::Page { command } => Page::run(f, command).await,
+                Commands::Page { command } => Page::run(Self::make_fledger(args)?, command).await,
                 Commands::Simulation(command) => {
-                    SimulationHandler::run(f, command, args.loop_delay).await
+                    SimulationHandler::run(Self::make_fledger(args)?, command).await
                 }
             },
-            None => f.loop_node(FledgerState::Forever).await,
+            None => {
+                Self::make_fledger(args)
+                    .loop_node(FledgerState::Forever)
+                    .await
+            }
         }
     }
 

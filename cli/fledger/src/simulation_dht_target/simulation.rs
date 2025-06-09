@@ -1,22 +1,16 @@
 use anyhow::Error;
-use flarch::{
-    nodeids::U256,
-    tasks::{time::timeout, wait_ms},
-};
+use flarch::tasks::{time::timeout, wait_ms};
 use flcrypto::tofrombytes::ToFromBytes;
 use flmodules::{
-    dht_storage::{core::FloConfig, realm_view::RealmView},
+    dht_storage::realm_view::RealmView,
     flo::{
-        blob::{Blob, BlobAccess, BlobID, BlobPage},
+        blob::{BlobAccess, BlobPage},
         flo::{FloID, FloWrapper},
         realm::GlobalID,
     },
 };
 use std::str::FromStr;
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use crate::simulation_dht_target::stats::SimulationStats;
 use crate::{metrics::Metrics, Fledger};
@@ -86,45 +80,15 @@ impl SimulationDhtTarget {
         wait_ms(pages_propagation_delay as u64).await;
 
         log::info!("[Sending simulation flo page]");
-        let page_content = String::from_utf8(vec![b'o'; page_size as usize])?;
-        let page_links: HashMap<String, Vec<BlobID>> = HashMap::new();
-        let page_path = "simulation-page";
-        let page_id = U256::zero();
-
-        let flo_page = FloWrapper::from_type_config(
-            rv.realm.realm_id(),
-            flcrypto::access::Condition::Pass,
-            FloConfig {
-                cuckoo: flmodules::dht_storage::core::Cuckoo::None,
-                force_id: Some(page_id),
-            },
-            BlobPage(Blob::make(
-                "re.fledg.page".into(),
-                page_links,
-                [("path".to_string(), page_path.into())].into(),
-                [("index.html".to_string(), page_content.into())].into(),
-            )),
-            &[],
-        )?;
-        // let flo_page = FloBlobPage::new_cuckoo(
-        //     rv.realm.realm_id(),
-        //     flcrypto::access::Condition::Pass,
-        //     &format!("simulation-filler-{}", i.to_string()),
-        //     Bytes::from(page_content),
-        //     None,
-        //     flmodules::dht_storage::core::Cuckoo::None.clone(),
-        //     &[],
-        // )?;
-        // let flo_page = rv
-        //     .create_http(
-        //         "simulation-page",
-        //         String::from_utf8(vec![b'o'; page_size as usize])?,
-        //         None,
-        //         flcrypto::access::Condition::Pass,
-        //         &[],
-        //     )
-        //     .await
-        //     .unwrap();
+        let flo_page = rv
+            .create_http(
+                "simulation-page",
+                String::from_utf8(vec![b'o'; page_size as usize])?,
+                None,
+                flcrypto::access::Condition::Pass,
+                &[],
+            )
+            .await?;
 
         let page_content =
             String::from_utf8(flo_page.datas().iter().next().unwrap().1.clone().to_vec()).unwrap();
@@ -140,15 +104,14 @@ impl SimulationDhtTarget {
             flo_page.size(),
         );
 
-        let signer = f.node.crypto_storage.get_signer();
-        rv.set_realm_service("simulation-page", flo_page.blob_id(), &[&signer])
-            .await?;
-
         f.node
             .dht_storage
             .as_mut()
             .unwrap()
             .store_flo(flo_page.flo().clone())?;
+
+        metrics.upload_target_page_id(flo_page.flo_id().to_string());
+
         wait_ms(1000).await;
 
         // ds.broker.settle, ds.sync
@@ -201,6 +164,10 @@ impl SimulationDhtTarget {
             .realm_id();
 
         let mut iteration = 0u32;
+        let mut page_id_opt: Option<String> = None;
+
+        // Loop until page_id found
+
         loop {
             if start_instant.elapsed().as_millis() > timeout_ms as u128 {
                 log::warn!("SIMULATION TIMEOUT REACHED ({}ms)", timeout_ms);
@@ -227,13 +194,21 @@ impl SimulationDhtTarget {
                 metrics.upload(simulation_metrics.clone());
             }
 
-            let page_id = FloID::from_str(
-                "c9e737fc7c55f404388d3eda20d5a047adc3b50e4ac59f25c0f9d8ce23d5fb94",
-            )?;
+            // Stop here each iteration
+            // until page id is known
+            if page_id_opt.is_none() {
+                page_id_opt = metrics.pull_page_id();
+                if page_id_opt.is_none() {
+                    log::info!("failed to get page id");
+                    continue;
+                }
+            }
 
             // todo!("test this");
-            // continue; // Testing whether pages propagate with no
+            //continue; // Testing whether pages propagate with no
             // get_flo
+
+            let page_id = FloID::from_str(&page_id_opt.clone().unwrap())?;
 
             let page_global_id = GlobalID::new(realm_id.clone(), page_id.clone());
             let page_flo_wrapper_result: Result<FloWrapper<BlobPage>, Error> = f

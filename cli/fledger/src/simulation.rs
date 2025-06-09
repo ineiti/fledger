@@ -2,6 +2,8 @@ use crate::simulation_chat::simulation::SimulationChat;
 use crate::simulation_realm::simulation::SimulationRealm;
 use crate::{simulation_dht_target::simulation::SimulationDhtTarget, Fledger};
 use clap::{arg, Args, Subcommand};
+use flarch::random;
+use flarch::tasks::wait_ms;
 
 #[derive(Args, Debug, Clone)]
 pub struct SimulationCommand {
@@ -60,11 +62,16 @@ pub enum SimulationSubcommand {
 pub struct SimulationHandler {}
 
 impl SimulationHandler {
-    pub async fn run(
-        f: Fledger,
-        command: SimulationCommand,
-        loop_delay: u32,
-    ) -> anyhow::Result<()> {
+    pub async fn run(f: Fledger, command: SimulationCommand) -> anyhow::Result<()> {
+        // wait a random amount of time before running a simulation
+        // to avoid overloading the signaling server
+        if f.args.bootwait_max != 0 {
+            let randtime = random::<u64>() % args.bootwait_max;
+            log::info!("Waiting {}ms before running this node...", randtime);
+            wait_ms(randtime).await;
+        }
+
+        let loop_delay = f.args.loop_delay;
         match command.subcommand.clone() {
             SimulationSubcommand::Chat { send_msg, recv_msg } => {
                 SimulationChat::run_chat(f, command, send_msg, recv_msg).await
