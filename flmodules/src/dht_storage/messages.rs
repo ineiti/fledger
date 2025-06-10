@@ -87,8 +87,8 @@ pub struct RealmStats {
     pub config: RealmConfig,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct ExperimentStats {
+#[derive(Serialize, Debug, Default, Clone)]
+pub struct DsMetrics {
     pub store_flo_total: u32,
     pub flo_value_sent_total: u32,
     pub flo_value_sent_blocked_total: u32,
@@ -138,7 +138,7 @@ macro_rules! max_stat {
 pub struct Stats {
     pub realm_stats: HashMap<RealmID, RealmStats>,
     pub system_realms: Vec<RealmID>,
-    pub experiment_stats: ExperimentStats,
+    pub experiment_stats: DsMetrics,
 }
 
 /// The message handling part, but only for DHTStorage messages.
@@ -150,7 +150,7 @@ pub struct Messages {
     ds: Box<dyn DataStorage + Send>,
     tx: Option<watch::Sender<Stats>>,
 
-    experiment_stats: ExperimentStats,
+    experiment_stats: DsMetrics,
 }
 
 pub static mut EVIL_NO_FORWARD: bool = false;
@@ -173,7 +173,7 @@ impl Messages {
             ds,
             tx: Some(tx),
 
-            experiment_stats: ExperimentStats::new(),
+            experiment_stats: DsMetrics::new(),
         };
         msgs.store();
         (msgs, rx)
@@ -589,7 +589,7 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
     }
 }
 
-impl ExperimentStats {
+impl DsMetrics {
     pub fn new() -> Self {
         Self::default()
     }
@@ -599,7 +599,7 @@ impl Stats {
     fn from_realms(
         realms: &HashMap<RealmID, RealmStorage>,
         system_realms: Vec<RealmID>,
-        experiment_stats: ExperimentStats,
+        experiment_stats: DsMetrics,
     ) -> Self {
         Self {
             realm_stats: realms

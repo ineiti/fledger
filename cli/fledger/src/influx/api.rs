@@ -1,17 +1,11 @@
 use tokio::time::Instant;
 
-#[derive(Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct InfluxApi {
     client: reqwest::blocking::Client,
 }
 
 impl InfluxApi {
-    pub fn new() -> Self {
-        InfluxApi {
-            client: reqwest::blocking::Client::new(),
-        }
-    }
-
     pub fn write(&self, influx_data: String) -> Result<String, reqwest::Error> {
         let start = Instant::now();
         match self.

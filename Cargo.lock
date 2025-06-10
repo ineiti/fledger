@@ -1280,7 +1280,6 @@ name = "fledger"
 version = "0.9.2"
 dependencies = [
  "anyhow",
- "chrono",
  "clap",
  "clap-verbosity-flag",
  "env_logger",
@@ -1289,14 +1288,10 @@ dependencies = [
  "flmodules",
  "flnode",
  "log",
- "metrics",
- "metrics-exporter-influx",
- "rand 0.9.1",
  "reqwest",
+ "serde",
  "serde_json",
- "thiserror 2.0.12",
  "tokio",
- "webrtc-util",
 ]
 
 [[package]]

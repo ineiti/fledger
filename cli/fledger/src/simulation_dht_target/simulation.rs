@@ -12,8 +12,8 @@ use flmodules::{
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 
-use crate::simulation_dht_target::stats::SimulationStats;
-use crate::{metrics::Metrics, Fledger};
+use crate::state::SimulationState;
+use crate::Fledger;
 
 #[derive(Clone)]
 pub struct SimulationDhtTarget {}
@@ -27,7 +27,7 @@ impl SimulationDhtTarget {
         connection_delay: u32,
         experiment_id: u32,
     ) -> anyhow::Result<()> {
-        let metrics = Metrics::new(experiment_id, f.node.node_config.info.name.clone());
+        let mut state = SimulationState::new(experiment_id, f.node.node_config.info.name.clone());
 
         f.loop_node(crate::FledgerState::DHTAvailable).await?;
         log::info!("DHT CONNECTED");
@@ -110,7 +110,8 @@ impl SimulationDhtTarget {
             .unwrap()
             .store_flo(flo_page.flo().clone())?;
 
-        metrics.upload_target_page_id(flo_page.flo_id().to_string());
+        state.target_page_id = Some(flo_page.flo_id().to_string());
+        state.update_and_upload(&mut f).await;
 
         wait_ms(1000).await;
 
@@ -125,7 +126,8 @@ impl SimulationDhtTarget {
         f.node.dht_storage.as_mut().unwrap().sync()?;
 
         log::info!("SIMULATION END");
-        metrics.success();
+        state.success();
+        state.update_and_upload(&mut f).await;
 
         f.loop_node(crate::FledgerState::Forever).await?;
         Ok(())
@@ -140,8 +142,8 @@ impl SimulationDhtTarget {
     ) -> anyhow::Result<()> {
         let start_instant = Instant::now();
 
-        let metrics = Metrics::new(experiment_id, f.node.node_config.info.name.clone());
-        let mut simulation_metrics = SimulationStats::new();
+        let node_name = f.node.node_config.info.name.clone();
+        let mut state = SimulationState::new(experiment_id, node_name);
 
         let timeout_result = timeout(
             Duration::from_millis(timeout_ms.into()),
@@ -152,7 +154,7 @@ impl SimulationDhtTarget {
         if timeout_result.is_err() {
             log::warn!("SIMULATION TIMEOUT WHILE CONNECTING TO DHT");
             log::info!("SIMULATION END");
-            metrics.timeout();
+            state.timeout();
             return Err(timeout_result.unwrap_err().into());
         }
 
@@ -172,7 +174,8 @@ impl SimulationDhtTarget {
             if start_instant.elapsed().as_millis() > timeout_ms as u128 {
                 log::warn!("SIMULATION TIMEOUT REACHED ({}ms)", timeout_ms);
                 log::info!("SIMULATION END");
-                metrics.timeout();
+                state.timeout();
+                state.update_and_upload(&mut f).await;
                 f.loop_node(crate::FledgerState::Forever).await?;
 
                 return Ok(());
@@ -190,18 +193,15 @@ impl SimulationDhtTarget {
             //     .inspect_err(|e| log::error!("error when doing rv.update_all(): {e}"));
 
             if iteration % 10 == 0 {
-                simulation_metrics.refresh(&mut f).await;
-                metrics.upload(simulation_metrics.clone());
+                let response = state.update_and_upload(&mut f).await;
+                page_id_opt = response.target_page_id;
             }
 
             // Stop here each iteration
             // until page id is known
             if page_id_opt.is_none() {
-                page_id_opt = metrics.pull_page_id();
-                if page_id_opt.is_none() {
-                    log::info!("failed to get page id");
-                    continue;
-                }
+                log::info!("failed to get page id");
+                continue;
             }
 
             // todo!("test this");
@@ -241,9 +241,8 @@ impl SimulationDhtTarget {
                 );
 
                 log::info!("SIMULATION END");
-                simulation_metrics.refresh(&mut f).await;
-                metrics.upload(simulation_metrics.clone());
-                metrics.success();
+                state.success();
+                state.update_and_upload(&mut f).await;
                 f.loop_node(crate::FledgerState::Forever).await?;
 
                 return Ok(());

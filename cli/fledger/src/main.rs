@@ -2,7 +2,6 @@ use clap::{Parser, Subcommand};
 
 use flarch::{
     data_storage::{DataStorage, DataStorageFile},
-    random,
     tasks::wait_ms,
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
@@ -12,20 +11,19 @@ use flmodules::{
     network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
-use ::metrics::absolute_counter;
-use metrics::Metrics;
 use page::{Page, PageCommands};
 use realm::{RealmCommands, RealmHandler};
 use simulation::{SimulationCommand, SimulationHandler};
 
-mod api;
-mod metrics;
+mod hermes;
+mod influx;
 mod page;
 mod realm;
 mod simulation;
 mod simulation_chat;
 mod simulation_dht_target;
 mod simulation_realm;
+mod state;
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug, Clone)]
@@ -154,11 +152,6 @@ async fn main() -> anyhow::Result<()> {
         flmodules::dht_router::messages::EVIL_NO_FORWARD = args.evil_noforward;
     }
 
-    absolute_counter!(
-        "fledger_evil_noforward",
-        if args.evil_noforward { 1 } else { 0 }
-    );
-
     Fledger::run(args).await
 }
 
@@ -177,10 +170,6 @@ impl Fledger {
         args.name
             .as_ref()
             .map(|name| node_config.info.name = name.clone());
-
-        // necessary to grab the variable for lifetime purposes.
-        let node_name = args.name.clone().unwrap_or("unknown".into());
-        let _influx = Metrics::setup(node_name);
 
         let cc = if args.disable_turn_stun {
             ConnectionConfig::from_signal(&args.signal_url)
@@ -220,6 +209,7 @@ impl Fledger {
                 Commands::Stats {} => todo!(),
                 Commands::Page { command } => {
                     Page::run(Self::make_fledger(args).await?, command).await
+                }
                 Commands::Simulation(command) => {
                     SimulationHandler::run(Self::make_fledger(args).await?, command).await
                 }
@@ -250,16 +240,6 @@ impl Fledger {
             count += 1;
 
             wait_ms(1000).await;
-
-            absolute_counter!("fledger_iterations_total", count as u64);
-
-            if !self.ds.stats.borrow().realm_stats.is_empty() {
-                let allstats = self.ds.stats.borrow();
-                let stats = allstats.realm_stats.iter().next().unwrap().1;
-
-                absolute_counter!("dht_storage_flos_total", stats.flos as u64);
-                absolute_counter!("dht_storage_size_bytes", stats.size as u64)
-            }
 
             if match state {
                 FledgerState::Connected(i) => self.dr.stats.borrow().active >= i,
