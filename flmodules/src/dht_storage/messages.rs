@@ -1,4 +1,4 @@
-use std::{any::type_name, collections::HashMap};
+use std::collections::HashMap;
 
 use flarch::{
     broker::SubsystemHandler,
@@ -90,11 +90,11 @@ pub struct RealmStats {
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct DsMetrics {
     pub store_flo_total: u32,
+    pub request_flo_metas_sent_total: u32, // TODO: what?
     pub flo_value_sent_total: u32,
     pub flo_value_sent_blocked_total: u32,
     pub available_flos_sent_total: u32,
     pub available_flos_sent_blocked_total: u32,
-    pub request_flos_sent_total: u32,
     pub flos_sent_total: u32,
     pub flos_sent_blocked_total: u32,
     pub max_flo_metas_received_in_available_flos: u32,
@@ -350,6 +350,7 @@ impl Messages {
                 self.realms.keys().cloned().collect(),
             )],
             MessageNeighbour::AvailableRealmIDs(realm_ids) => {
+                increment_stat!(self, self.experiment_stats.request_flo_metas_sent_total);
                 let accepted_realms = realm_ids
                     .into_iter()
                     .filter(|rid| self.config.accepts_realm(&rid))
@@ -414,21 +415,10 @@ impl Messages {
                     self.realms
                         .get(&realm_id)
                         .map(|realm| {
-                            let flos = flo_ids
+                            flo_ids
                                 .iter()
                                 .filter_map(|id| realm.get_flo_cuckoo(id))
-                                .collect::<Vec<_>>();
-
-                            let realm = flos
-                                .iter()
-                                .find(|flo| flo.0.flo_type() == type_name::<FloRealm>());
-
-                            let flo_to_forward = realm.or(flos.last());
-                            if let Some(flo) = flo_to_forward {
-                                return vec![flo.clone()];
-                            } else {
-                                return vec![];
-                            }
+                                .collect::<Vec<_>>()
                         })
                         .map_or(vec![], |flos| {
                             //log::info!("Flos to send: {}", flos.len());

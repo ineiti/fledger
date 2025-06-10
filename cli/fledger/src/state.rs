@@ -10,6 +10,12 @@ use flmodules::flo::blob::{BlobAccess, BlobPage};
 use std::any::type_name;
 
 #[derive(Clone, Debug, Default)]
+pub struct Page {
+    pub name: String,
+    pub id: String,
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct SimulationState {
     pub experiment_id: u32,
     pub node_id: u32,
@@ -17,6 +23,7 @@ pub struct SimulationState {
     pub node_status: String,
 
     pub pages_stored: Vec<String>,
+    pub pages_created: Vec<Page>,
     pub connected_nodes_total: u32,
     pub ds_size_bytes: u64,
     pub evil_no_forward: bool,
@@ -92,6 +99,7 @@ impl SimulationState {
         self.ds_metrics = ds.stats.borrow().experiment_stats.clone();
         self.connected_nodes_total = connected_nodes_total;
         self.ds_size_bytes = ds_size;
+        self.evil_no_forward = f.args.evil_noforward.clone();
         self.refresh_pages(ds).await;
 
         self.upload()

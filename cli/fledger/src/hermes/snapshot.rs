@@ -54,16 +54,42 @@ impl Snapshot {
             simulation_state.ds_size_bytes as u32,
         );
         timeless_metrics.add_metric(
-            "flos_sent_total".to_string(),
-            simulation_state.ds_metrics.max_flos_sent_in_flos,
+            "evil_no_forward".to_string(),
+            simulation_state.evil_no_forward as u32,
         );
         timeless_metrics.add_metric(
-            "available_flos_sent_total".to_string(),
+            "store_flo_total".to_string(),
+            simulation_state.ds_metrics.store_flo_total,
+        );
+        timeless_metrics.add_metric(
+            "request_flo_metas_sent_total".to_string(),
+            simulation_state.ds_metrics.request_flo_metas_sent_total,
+        );
+        timeless_metrics.add_metric(
+            "flo_value_sent_total".to_string(),
             simulation_state.ds_metrics.flo_value_sent_total,
         );
         timeless_metrics.add_metric(
-            "available_flos_sent_blocked_total".to_string(),
+            "flo_value_sent_blocked_total".to_string(),
             simulation_state.ds_metrics.flo_value_sent_blocked_total,
+        );
+        timeless_metrics.add_metric(
+            "available_flos_sent_total".to_string(),
+            simulation_state.ds_metrics.available_flos_sent_total,
+        );
+        timeless_metrics.add_metric(
+            "available_flos_sent_blocked_total".to_string(),
+            simulation_state
+                .ds_metrics
+                .available_flos_sent_blocked_total,
+        );
+        timeless_metrics.add_metric(
+            "flos_sent_total".to_string(),
+            simulation_state.ds_metrics.flos_sent_total,
+        );
+        timeless_metrics.add_metric(
+            "flos_sent_blocked_total".to_string(),
+            simulation_state.ds_metrics.flos_sent_blocked_total,
         );
         timeless_metrics.add_metric(
             "max_flo_metas_received_in_available_flos".to_string(),
@@ -76,6 +102,20 @@ impl Snapshot {
             simulation_state
                 .ds_metrics
                 .max_flo_metas_requested_in_request_flos,
+        );
+        timeless_metrics.add_metric(
+            "max_flo_ids_received_in_request_flos".to_string(),
+            simulation_state
+                .ds_metrics
+                .max_flo_ids_received_in_request_flos,
+        );
+        timeless_metrics.add_metric(
+            "max_flos_sent_in_flos".to_string(),
+            simulation_state.ds_metrics.max_flos_sent_in_flos,
+        );
+        timeless_metrics.add_metric(
+            "max_flos_received_in_flos".to_string(),
+            simulation_state.ds_metrics.max_flos_received_in_flos,
         );
 
         if let Some(target_page_stored_bool) = simulation_state.target_page_stored_bool {

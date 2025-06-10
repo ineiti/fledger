@@ -147,11 +147,6 @@ async fn main() -> anyhow::Result<()> {
         VERSION_STRING
     );
 
-    unsafe {
-        flmodules::dht_storage::messages::EVIL_NO_FORWARD = args.evil_noforward;
-        flmodules::dht_router::messages::EVIL_NO_FORWARD = args.evil_noforward;
-    }
-
     Fledger::run(args).await
 }
 

@@ -99,12 +99,14 @@ impl SimulationHandler {
                 enable_sync,
                 experiment_id,
             } => {
+                let evil_noforward = f.args.evil_noforward.clone();
                 SimulationDhtTarget::fetch_target(
                     f,
                     loop_delay,
                     enable_sync,
                     timeout_ms,
                     experiment_id,
+                    evil_noforward,
                 )
                 .await
             }

@@ -19,6 +19,47 @@ use crate::Fledger;
 pub struct SimulationDhtTarget {}
 
 impl SimulationDhtTarget {
+    fn log_page_info(flo_page: &FloWrapper<BlobPage>) {
+        let page_content =
+            String::from_utf8(flo_page.datas().iter().next().unwrap().1.clone().to_vec())
+                .unwrap_or_default();
+        log::info!(
+            "page {}/{}/{} | {} | {} ({}B -> {}B)",
+            flo_page.flo_id(),
+            flo_page.realm_id(),
+            flo_page.version(),
+            flo_page.values().iter().next().unwrap().1,
+            page_content.chars().take(50).collect::<String>(),
+            page_content.size(),
+            flo_page.size(),
+        );
+    }
+
+    async fn create_flo_page(
+        rv: &mut RealmView,
+        name: &str,
+        content: String,
+    ) -> anyhow::Result<FloWrapper<BlobPage>> {
+        let flo_page = rv
+            .create_http(name, content, None, flcrypto::access::Condition::Pass, &[])
+            .await?;
+        Self::log_page_info(&flo_page);
+        Ok(flo_page)
+    }
+
+    async fn settle_and_sync(f: &mut Fledger) -> anyhow::Result<()> {
+        // ds.settle, ds.sync
+        f.node
+            .dht_storage
+            .as_mut()
+            .unwrap()
+            .broker
+            .settle(Vec::new())
+            .await?;
+        f.node.dht_storage.as_mut().unwrap().sync()?;
+        Ok(())
+    }
+
     pub async fn run_create_fillers_and_target(
         mut f: Fledger,
         filler_amount: u32,
@@ -41,89 +82,39 @@ impl SimulationDhtTarget {
 
         log::info!("[Create filler pages]");
         for i in 0..filler_amount {
-            let page_content = String::from_utf8(vec![b'-'; page_size as usize])?;
-            let flo_page = rv
-                .create_http(
-                    &format!("simulation-filler-{}", i.to_string()),
-                    page_content.clone(),
-                    None,
-                    flcrypto::access::Condition::Pass,
-                    &[],
-                )
-                .await
-                .unwrap();
-
-            log::info!(
-                "page {}/{}/{} | {} | {} ({}B -> {}B)",
-                flo_page.flo_id(),
-                flo_page.realm_id(),
-                flo_page.version(),
-                flo_page.values().iter().next().unwrap().1,
-                page_content.clone().chars().take(50).collect::<String>(),
-                page_content.size(),
-                flo_page.size(),
-            );
+            wait_ms(500).await;
+            Self::create_flo_page(
+                &mut rv,
+                &format!("simulation-filler-{}", i.to_string()),
+                String::from_utf8(vec![b'-'; page_size as usize])?,
+            )
+            .await?;
         }
 
         log::info!("[Waiting for fillers to settle]");
         log::info!("{} ms", pages_propagation_delay);
 
-        // ds.broker.settle, ds.sync
-        f.node
-            .dht_storage
-            .as_mut()
-            .unwrap()
-            .broker
-            .settle(Vec::new())
-            .await?;
-        f.node.dht_storage.as_mut().unwrap().sync()?;
+        Self::settle_and_sync(&mut f).await?;
         wait_ms(pages_propagation_delay as u64).await;
 
         log::info!("[Sending simulation flo page]");
-        let flo_page = rv
-            .create_http(
-                "simulation-page",
-                String::from_utf8(vec![b'o'; page_size as usize])?,
-                None,
-                flcrypto::access::Condition::Pass,
-                &[],
-            )
-            .await?;
+        let flo_page = Self::create_flo_page(
+            &mut rv,
+            "simulation-page",
+            String::from_utf8(vec![b'o'; page_size as usize])?,
+        )
+        .await?;
 
-        let page_content =
-            String::from_utf8(flo_page.datas().iter().next().unwrap().1.clone().to_vec()).unwrap();
-
-        log::info!(
-            "page {}/{}/{} | {} | {} ({}B -> {}B)",
-            flo_page.flo_id(),
-            flo_page.realm_id(),
-            flo_page.version(),
-            flo_page.values().iter().next().unwrap().1,
-            page_content.chars().take(50).collect::<String>(),
-            page_content.size(),
-            flo_page.size(),
-        );
-
-        f.node
-            .dht_storage
-            .as_mut()
-            .unwrap()
-            .store_flo(flo_page.flo().clone())?;
+        log::info!("[Waiting for target page to propagate]");
+        log::info!("5000 ms");
+        wait_ms(5000).await;
 
         state.target_page_id = Some(flo_page.flo_id().to_string());
         state.update_and_upload(&mut f).await;
 
         wait_ms(1000).await;
 
-        // ds.broker.settle, ds.sync
-        f.node
-            .dht_storage
-            .as_mut()
-            .unwrap()
-            .broker
-            .settle(Vec::new())
-            .await?;
-        f.node.dht_storage.as_mut().unwrap().sync()?;
+        Self::settle_and_sync(&mut f).await?;
 
         log::info!("SIMULATION END");
         state.success();
@@ -139,6 +130,7 @@ impl SimulationDhtTarget {
         enable_sync: bool,
         timeout_ms: u32,
         experiment_id: u32,
+        evil_noforward: bool,
     ) -> anyhow::Result<()> {
         let start_instant = Instant::now();
 
@@ -195,6 +187,16 @@ impl SimulationDhtTarget {
             if iteration % 10 == 0 {
                 let response = state.update_and_upload(&mut f).await;
                 page_id_opt = response.target_page_id;
+
+                if page_id_opt.is_some() {
+                    // this node shall become malicious now if the flag is set
+                    // because the target page was propagated
+                    log::info!("(re)becoming malicious node");
+                    unsafe {
+                        flmodules::dht_storage::messages::EVIL_NO_FORWARD = evil_noforward;
+                        flmodules::dht_router::messages::EVIL_NO_FORWARD = evil_noforward;
+                    }
+                }
             }
 
             // Stop here each iteration
@@ -203,10 +205,6 @@ impl SimulationDhtTarget {
                 log::info!("failed to get page id");
                 continue;
             }
-
-            // todo!("test this");
-            //continue; // Testing whether pages propagate with no
-            // get_flo
 
             let page_id = FloID::from_str(&page_id_opt.clone().unwrap())?;
 
