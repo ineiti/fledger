@@ -13,9 +13,17 @@ use flmodules::{
 use flnode::{node::Node, version::VERSION_STRING};
 use page::{Page, PageCommands};
 use realm::{RealmCommands, RealmHandler};
+use simulation::{SimulationCommand, SimulationHandler};
 
+mod hermes;
+mod influx;
 mod page;
 mod realm;
+mod simulation;
+mod simulation_chat;
+mod simulation_dht;
+mod simulation_realm;
+mod state;
 
 /// Fledger node CLI binary
 #[derive(Parser, Debug, Clone)]
@@ -62,6 +70,10 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     log_gossip: bool,
 
+    /// Log dht connections
+    #[arg(long, default_value = "false")]
+    log_dht_connections: bool,
+
     /// Log random router
     #[arg(long, default_value = "false")]
     log_random: bool,
@@ -73,6 +85,21 @@ pub struct Args {
     /// Log dht-storage stats
     #[arg(long, default_value = "false")]
     log_dht_storage: bool,
+
+    /// Wait a random amount of ms, bounded by
+    /// bootwait_max, before starting the node.
+    /// This allows the signaling server to be
+    /// less overwhelmed
+    #[arg(long, default_value = "0")]
+    bootwait_max: u64,
+
+    /// Run the node but refuse to forward data
+    #[arg(long, default_value = "false")]
+    evil_noforward: bool,
+
+    /// Delay between loop iterations in ms
+    #[arg(long, default_value = "1000")]
+    loop_delay: u32,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -94,6 +121,8 @@ enum Commands {
     Crypto {},
     /// Prints the statistics of the different modules and then quits
     Stats {},
+    /// Simulation tasks
+    Simulation(SimulationCommand),
 }
 
 struct Fledger {
@@ -112,31 +141,13 @@ async fn main() -> anyhow::Result<()> {
     logger.parse_env("RUST_LOG");
     logger.try_init().expect("Failed to initialize logger");
 
-    let storage = DataStorageFile::new(args.config.clone(), "fledger".into());
-    let mut node_config = Node::get_config(storage.clone_box())?;
-    args.name
-        .as_ref()
-        .map(|name| node_config.info.name = name.clone());
-
     log::info!(
         "Starting app with version {}/{}",
         SIGNAL_VERSION,
         VERSION_STRING
     );
 
-    let cc = if args.disable_turn_stun {
-        ConnectionConfig::from_signal(&args.signal_url)
-    } else {
-        ConnectionConfig::new(
-            args.signal_url.clone().into(),
-            Some(HostLogin::from_url(&args.stun_url)),
-            Some(HostLogin::from_login_url(&args.turn_url)?),
-        )
-    };
-    log::debug!("Connecting to websocket at {:?}", cc);
-    let network = network_start(node_config.clone(), cc).await?;
-    let node = Node::start(Box::new(storage), node_config, network.broker).await?;
-    Fledger::run(node, args).await
+    Fledger::run(args).await
 }
 
 pub enum FledgerState {
@@ -148,25 +159,62 @@ pub enum FledgerState {
 }
 
 impl Fledger {
-    async fn run(node: Node, args: Args) -> anyhow::Result<()> {
+    async fn make_node(args: Args) -> anyhow::Result<Node> {
+        let storage = DataStorageFile::new(args.config.clone(), "fledger".into());
+        let mut node_config = Node::get_config(storage.clone_box())?;
+        args.name
+            .as_ref()
+            .map(|name| node_config.info.name = name.clone());
+
+        let cc = if args.disable_turn_stun {
+            ConnectionConfig::from_signal(&args.signal_url)
+        } else {
+            ConnectionConfig::new(
+                args.signal_url.clone().into(),
+                Some(HostLogin::from_url(&args.stun_url)),
+                Some(HostLogin::from_login_url(&args.turn_url)?),
+            )
+        };
+        log::debug!("Connecting to websocket at {:?}", cc);
+        let network = network_start(node_config.clone(), cc).await?;
+        let node = Node::start(Box::new(storage), node_config, network.broker).await?;
+        Ok(node)
+    }
+
+    async fn make_fledger(args: Args) -> anyhow::Result<Fledger> {
+        let node = Self::make_node(args.clone()).await?;
         let nc = &node.node_config.info;
         log::info!("Started node {}: {}", nc.get_id(), nc.name);
 
-        let mut f = Fledger {
+        Ok(Fledger {
             ds: node.dht_storage.as_ref().unwrap().clone(),
             dr: node.dht_router.as_ref().unwrap().clone(),
             node,
             args,
-        };
+        })
+    }
 
-        match f.args.command.clone() {
+    async fn run(args: Args) -> anyhow::Result<()> {
+        match args.command.clone() {
             Some(cmd) => match cmd {
-                Commands::Realm { command } => RealmHandler::run(f, command).await,
+                Commands::Realm { command } => {
+                    RealmHandler::run(Self::make_fledger(args).await?, command).await
+                }
                 Commands::Crypto {} => todo!(),
                 Commands::Stats {} => todo!(),
-                Commands::Page { command } => Page::run(f, command).await,
+                Commands::Page { command } => {
+                    Page::run(Self::make_fledger(args).await?, command).await
+                }
+                Commands::Simulation(command) => {
+                    SimulationHandler::run(Self::make_fledger(args).await?, command).await
+                }
             },
-            None => f.loop_node(FledgerState::Forever).await,
+            None => {
+                Self::make_fledger(args)
+                    .await?
+                    .loop_node(FledgerState::Forever)
+                    .await
+            }
         }
     }
 
@@ -182,6 +230,7 @@ impl Fledger {
             FledgerState::Duration(i) => log::info!("Just hanging around {i} seconds"),
             FledgerState::Forever => log::info!("Looping forever"),
         }
+
         loop {
             count += 1;
 
@@ -209,19 +258,22 @@ impl Fledger {
             } {
                 return Ok(());
             }
+
             self.ds.sync()?;
-            println!(
-                "dht-connections: {}/{}",
-                self.dr.stats.borrow().active,
-                self.dr
-                    .stats
-                    .borrow()
-                    .all_nodes
-                    .iter()
-                    .map(|n| n.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
+            if self.args.log_dht_connections {
+                log::info!(
+                    "dht-connections: {}/{}",
+                    self.dr.stats.borrow().active,
+                    self.dr
+                        .stats
+                        .borrow()
+                        .all_nodes
+                        .iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
         }
     }
 
@@ -231,7 +283,7 @@ impl Fledger {
                 log::info!(
                     "Nodes are: {}",
                     self.node
-                        .nodes_online()?
+                        .nodes_connected()?
                         .iter()
                         .map(|n| format!("{}/{}", n.name, n.get_id()))
                         .collect::<Vec<_>>()

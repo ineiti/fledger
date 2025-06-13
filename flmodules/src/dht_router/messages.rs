@@ -18,6 +18,8 @@ use super::{
     kademlia::*,
 };
 
+pub static mut EVIL_NO_FORWARD: bool = false;
+
 /// These are the messages which will be exchanged between the nodes for this
 /// module.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

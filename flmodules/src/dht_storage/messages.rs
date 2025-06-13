@@ -87,10 +87,58 @@ pub struct RealmStats {
     pub config: RealmConfig,
 }
 
+#[derive(Serialize, Debug, Default, Clone)]
+pub struct DsMetrics {
+    pub store_flo_total: u32,
+    pub request_flo_metas_sent_total: u32, // TODO: what?
+    pub flo_value_sent_total: u32,
+    pub flo_value_sent_blocked_total: u32,
+    pub available_flos_sent_total: u32,
+    pub available_flos_sent_blocked_total: u32,
+    pub flos_sent_total: u32,
+    pub flos_sent_blocked_total: u32,
+    pub max_flo_metas_received_in_available_flos: u32,
+    pub max_flo_metas_requested_in_request_flos: u32,
+    pub max_flo_ids_received_in_request_flos: u32,
+    pub max_flos_sent_in_flos: u32,
+    pub max_flos_received_in_flos: u32,
+}
+
+/**
+ * It is necessary to call `self.refresh_stats()` after each change of a stat,
+ *   and using methods would surely be worse than using macros, unless
+ *   we would use a method for each stat.
+ *
+ *   Since we want it to be as easy as possible to add new stats, we use macros.
+ */
+macro_rules! increment_stat {
+    ($self:ident, $stat:expr) => {
+        $stat += 1;
+        $self.refresh_stats();
+    };
+}
+
+// macro_rules! absolute_stat {
+//     ($self:ident, $stat:expr, $value:expr) => {
+//         $stat = $value;
+//         $self.refresh_stats();
+//     };
+// }
+
+macro_rules! max_stat {
+    ($self:ident, $stat:expr, $value:expr) => {
+        if $value > $stat {
+            $stat = $value;
+            $self.refresh_stats();
+        }
+    };
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Stats {
     pub realm_stats: HashMap<RealmID, RealmStats>,
     pub system_realms: Vec<RealmID>,
+    pub experiment_stats: DsMetrics,
 }
 
 /// The message handling part, but only for DHTStorage messages.
@@ -101,10 +149,14 @@ pub struct Messages {
     our_id: NodeID,
     ds: Box<dyn DataStorage + Send>,
     tx: Option<watch::Sender<Stats>>,
+
+    experiment_stats: DsMetrics,
 }
 
+pub static mut EVIL_NO_FORWARD: bool = false;
+
 impl Messages {
-    /// Returns a new chat module.
+    /// Returns a new simulation_chat module.
     pub fn new(
         ds: Box<dyn DataStorage + Send>,
         config: DHTConfig,
@@ -120,6 +172,8 @@ impl Messages {
             nodes: vec![],
             ds,
             tx: Some(tx),
+
+            experiment_stats: DsMetrics::new(),
         };
         msgs.store();
         (msgs, rx)
@@ -190,7 +244,8 @@ impl Messages {
                         .iter()
                         .flat_map(|realm| realm.1.get_all_flo_cuckoos())
                         .collect::<Vec<_>>(),
-                ).into()]
+                )
+                .into()]
             }
         }
     }
@@ -222,10 +277,16 @@ impl Messages {
                     .and_then(|realm| realm.get_flo_cuckoo(&fid))
                 {
                     // log::info!("sends flo {:?}", fc.0);
-                    return MessageDest::FloValue(fc)
-                        .to_intern_out(origin)
-                        // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
-                        .map_or(vec![], |msg| vec![msg]);
+                    if unsafe { !EVIL_NO_FORWARD } {
+                        increment_stat!(self, self.experiment_stats.flo_value_sent_total);
+                        return MessageDest::FloValue(fc)
+                            .to_intern_out(origin)
+                            // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
+                            .map_or(vec![], |msg| vec![msg]);
+                    } else {
+                        increment_stat!(self, self.experiment_stats.flo_value_sent_blocked_total);
+                        return vec![];
+                    }
                 }
             }
             MessageClosest::GetCuckooIDs(rid) => {
@@ -289,6 +350,7 @@ impl Messages {
                 self.realms.keys().cloned().collect(),
             )],
             MessageNeighbour::AvailableRealmIDs(realm_ids) => {
+                increment_stat!(self, self.experiment_stats.request_flo_metas_sent_total);
                 let accepted_realms = realm_ids
                     .into_iter()
                     .filter(|rid| self.config.accepts_realm(&rid))
@@ -304,31 +366,80 @@ impl Messages {
                     )
                     .collect()
             }
-            MessageNeighbour::RequestFloMetas(realm_id) => self
-                .realms
-                .get(&realm_id)
-                .map(|realm| realm.get_flo_metas())
-                .map_or(vec![], |fm| {
-                    vec![MessageNeighbour::AvailableFlos(realm_id, fm)]
-                }),
-            MessageNeighbour::AvailableFlos(realm_id, flo_metas) => self
-                .realms
-                .get(&realm_id)
-                .and_then(|realm| realm.sync_available(&flo_metas))
-                .map_or(vec![], |needed| {
-                    vec![MessageNeighbour::RequestFlos(realm_id, needed)]
-                }),
-            MessageNeighbour::RequestFlos(realm_id, flo_ids) => self
-                .realms
-                .get(&realm_id)
-                .map(|realm| {
-                    flo_ids
-                        .iter()
-                        .filter_map(|id| realm.get_flo_cuckoo(id))
-                        .collect::<Vec<_>>()
-                })
-                .map_or(vec![], |flos| vec![MessageNeighbour::Flos(flos)]),
+            MessageNeighbour::RequestFloMetas(realm_id) => {
+                if unsafe { !EVIL_NO_FORWARD } {
+                    increment_stat!(self, self.experiment_stats.available_flos_sent_total);
+                    self.realms
+                        .get(&realm_id)
+                        .map(|realm| realm.get_flo_metas())
+                        .map_or(vec![], |fm| {
+                            vec![MessageNeighbour::AvailableFlos(realm_id, fm)]
+                        })
+                } else {
+                    increment_stat!(
+                        self,
+                        self.experiment_stats.available_flos_sent_blocked_total
+                    );
+                    vec![]
+                }
+            }
+            MessageNeighbour::AvailableFlos(realm_id, flo_metas) => {
+                max_stat!(
+                    self,
+                    self.experiment_stats
+                        .max_flo_metas_received_in_available_flos,
+                    flo_metas.len() as u32
+                );
+
+                self.realms
+                    .get(&realm_id)
+                    .and_then(|realm| realm.sync_available(&flo_metas))
+                    .map_or(vec![], |needed| {
+                        max_stat!(
+                            self,
+                            self.experiment_stats
+                                .max_flo_metas_requested_in_request_flos,
+                            needed.len() as u32
+                        );
+                        vec![MessageNeighbour::RequestFlos(realm_id, needed)]
+                    })
+            }
+            MessageNeighbour::RequestFlos(realm_id, flo_ids) => {
+                max_stat!(
+                    self,
+                    self.experiment_stats.max_flo_ids_received_in_request_flos,
+                    flo_ids.len() as u32
+                );
+                if unsafe { !EVIL_NO_FORWARD } {
+                    increment_stat!(self, self.experiment_stats.flos_sent_total);
+                    self.realms
+                        .get(&realm_id)
+                        .map(|realm| {
+                            flo_ids
+                                .iter()
+                                .filter_map(|id| realm.get_flo_cuckoo(id))
+                                .collect::<Vec<_>>()
+                        })
+                        .map_or(vec![], |flos| {
+                            //log::info!("Flos to send: {}", flos.len());
+                            max_stat!(
+                                self,
+                                self.experiment_stats.max_flos_sent_in_flos,
+                                flos.len() as u32
+                            );
+                            vec![MessageNeighbour::Flos(flos)]
+                        })
+                } else {
+                    increment_stat!(self, self.experiment_stats.flos_sent_blocked_total);
+                    vec![]
+                }
+            }
             MessageNeighbour::Flos(flo_cuckoos) => {
+                max_stat!(
+                    self,
+                    self.experiment_stats.max_flos_received_in_flos,
+                    flo_cuckoos.len() as u32
+                );
                 for (flo, cuckoos) in flo_cuckoos {
                     self.store_flo(flo.clone());
                     self.realms.get_mut(&flo.realm_id()).map(|realm| {
@@ -352,6 +463,7 @@ impl Messages {
     }
 
     fn store_flo(&mut self, flo: Flo) -> Vec<InternOut> {
+        increment_stat!(self, self.experiment_stats.store_flo_total);
         let mut res = vec![];
         if self.upsert_flo(flo.clone()) {
             // log::info!("{}: store_flo", self.our_id);
@@ -372,7 +484,7 @@ impl Messages {
     // Either its realm is already known, or it is a new realm.
     // When 'true' is returned, then the flo has been stored.
     fn upsert_flo(&mut self, flo: Flo) -> bool {
-        // log::trace!(
+        // log::info!(
         //     "{} store_flo {}({}/{}) {}",
         //     self.our_id,
         //     flo.flo_type(),
@@ -427,14 +539,22 @@ impl Messages {
     }
 
     fn store(&mut self) {
-        self.tx.clone().map(|tx| {
-            tx.send(Stats::from_realms(&self.realms, self.config.realms.clone()))
-                .is_err()
-                .then(|| self.tx = None)
-        });
+        self.refresh_stats();
         serde_yaml::to_string(&self.realms)
             .ok()
             .map(|s| (*self.ds).set(MODULE_NAME, &s));
+    }
+
+    fn refresh_stats(&mut self) {
+        self.tx.clone().map(|tx| {
+            tx.send(Stats::from_realms(
+                &self.realms,
+                self.config.realms.clone(),
+                self.experiment_stats.clone(),
+            ))
+            .is_err()
+            .then(|| self.tx = None)
+        });
     }
 }
 
@@ -454,19 +574,30 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
                         .map_or(vec![], |msg| vec![msg])
                 }
             })
-            // .inspect(|msg| log::debug!("{_id}: Out: {msg:?}"))
+            //.inspect(|msg| log::debug!("{_id}: Out: {msg:?}"))
             .collect()
     }
 }
 
+impl DsMetrics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl Stats {
-    fn from_realms(realms: &HashMap<RealmID, RealmStorage>, system_realms: Vec<RealmID>) -> Self {
+    fn from_realms(
+        realms: &HashMap<RealmID, RealmStorage>,
+        system_realms: Vec<RealmID>,
+        experiment_stats: DsMetrics,
+    ) -> Self {
         Self {
             realm_stats: realms
                 .iter()
                 .map(|(id, realm)| (id.clone(), RealmStats::from_realm(realm)))
                 .collect(),
             system_realms,
+            experiment_stats,
         }
     }
 }

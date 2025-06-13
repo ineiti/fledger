@@ -9,6 +9,8 @@ use crate::broker::{Broker, SubsystemHandler};
 use crate::tasks::wait_ms;
 use crate::web_rtc::websocket::{BrokerWSClient, WSClientIn, WSClientOut, WSError};
 
+use metrics::counter;
+
 pub struct WebSocketClient {
     url: String,
     write: Option<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>>,
@@ -76,6 +78,7 @@ impl WebSocketClient {
 impl SubsystemHandler<WSClientIn, WSClientOut> for WebSocketClient {
     async fn messages(&mut self, msgs: Vec<WSClientIn>) -> Vec<WSClientOut> {
         for msg in msgs {
+            counter!("flarch_ws_client_sent_bytes", size_of_val(&msg) as u64);
             match msg {
                 WSClientIn::Message(msg) => {
                     if let Some(mut write) = self.write.as_mut() {

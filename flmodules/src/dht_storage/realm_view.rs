@@ -397,16 +397,16 @@ impl RealmView {
         self.dht_storage.convert(flo.cond(), &flo.realm_id()).await
     }
 
-    pub async fn update_realm(&mut self) -> anyhow::Result<&FloRealm>{
+    pub async fn update_realm(&mut self) -> anyhow::Result<&FloRealm> {
         self.realm = self.dht_storage.get_flo(&self.realm.global_id()).await?;
         Ok(&self.realm)
     }
 
-    pub async fn update_all(&mut self) -> anyhow::Result<()>{
+    pub async fn update_all(&mut self) -> anyhow::Result<()> {
         self.update_pages().await?;
         self.update_tags().await?;
         self.update_realm().await?;
-        
+
         Ok(())
     }
 }
