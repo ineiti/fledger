@@ -1,6 +1,9 @@
-use anyhow::Error;
+use crate::hermes::api::HermesApi;
+use crate::state::{Page, SimulationState};
+use crate::Fledger;
 use flarch::tasks::{time::timeout, wait_ms};
 use flcrypto::tofrombytes::ToFromBytes;
+use flmodules::flo::realm::RealmID;
 use flmodules::{
     dht_storage::realm_view::RealmView,
     flo::{
@@ -9,20 +12,24 @@ use flmodules::{
         realm::GlobalID,
     },
 };
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 
-use crate::state::SimulationState;
-use crate::Fledger;
-
 #[derive(Clone)]
-pub struct SimulationDhtTarget {}
+pub struct SimulationDht {}
 
-impl SimulationDhtTarget {
+impl SimulationDht {
+    fn get_page_content(page: &FloWrapper<BlobPage>) -> String {
+        String::from_utf8(page.datas().iter().next().unwrap().1.clone().to_vec()).unwrap()
+    }
+
+    fn get_page_name(page: &FloWrapper<BlobPage>) -> String {
+        page.values().iter().next().unwrap().1.clone()
+    }
+
     fn log_page_info(flo_page: &FloWrapper<BlobPage>) {
-        let page_content =
-            String::from_utf8(flo_page.datas().iter().next().unwrap().1.clone().to_vec())
-                .unwrap_or_default();
+        let page_content = Self::get_page_content(flo_page);
         log::info!(
             "page {}/{}/{} | {} | {} ({}B -> {}B)",
             flo_page.flo_id(),
@@ -60,16 +67,23 @@ impl SimulationDhtTarget {
         Ok(())
     }
 
-    pub async fn run_create_fillers_and_target(
+    fn make_page_id(realm_id: RealmID, page_id: FloID) -> GlobalID {
+        GlobalID::new(realm_id.clone(), page_id.clone())
+    }
+
+    async fn fetch_page(f: &mut Fledger, id: GlobalID) -> anyhow::Result<FloWrapper<BlobPage>> {
+        f.node.dht_storage.as_mut().unwrap().get_flo(&id).await
+    }
+
+    pub async fn run_create_pages(
         mut f: Fledger,
         filler_amount: u32,
+        target_amount: u32,
         page_size: u32,
-        pages_propagation_delay: u32,
+        propagation_delay: u32,
         connection_delay: u32,
         experiment_id: u32,
     ) -> anyhow::Result<()> {
-        let mut state = SimulationState::new(experiment_id, f.node.node_config.info.name.clone());
-
         f.loop_node(crate::FledgerState::DHTAvailable).await?;
         log::info!("DHT CONNECTED");
 
@@ -85,46 +99,48 @@ impl SimulationDhtTarget {
             wait_ms(500).await;
             Self::create_flo_page(
                 &mut rv,
-                &format!("simulation-filler-{}", i.to_string()),
+                &format!("filler-{}", i.to_string()),
                 String::from_utf8(vec![b'-'; page_size as usize])?,
             )
             .await?;
         }
 
-        log::info!("[Waiting for fillers to settle]");
-        log::info!("{} ms", pages_propagation_delay);
+        log::info!("[Create target_pages simulation flo page]");
+        let mut target_pages = vec![];
+        for i in 0..target_amount {
+            wait_ms(500).await;
+            target_pages.push(
+                Self::create_flo_page(
+                    &mut rv,
+                    &format!("target-{}", i.to_string()),
+                    String::from_utf8(vec![b'o'; page_size as usize])?,
+                )
+                .await?,
+            );
+        }
 
+        log::info!("[Waiting for pages to settle]");
+        log::info!("{} ms", propagation_delay);
         Self::settle_and_sync(&mut f).await?;
-        wait_ms(pages_propagation_delay as u64).await;
+        wait_ms(propagation_delay as u64).await;
 
-        log::info!("[Sending simulation flo page]");
-        let flo_page = Self::create_flo_page(
-            &mut rv,
-            "simulation-page",
-            String::from_utf8(vec![b'o'; page_size as usize])?,
-        )
-        .await?;
+        let pages = target_pages
+            .iter()
+            .map(|page| Page {
+                id: page.flo_id().to_string(),
+                name: Self::get_page_name(page),
+            })
+            .collect::<Vec<Page>>();
 
-        log::info!("[Waiting for target page to propagate]");
-        log::info!("5000 ms");
-        wait_ms(5000).await;
-
-        state.target_page_id = Some(flo_page.flo_id().to_string());
-        state.update_and_upload(&mut f).await;
-
-        wait_ms(1000).await;
-
-        Self::settle_and_sync(&mut f).await?;
+        HermesApi::default().store_target_pages(experiment_id, pages)?;
 
         log::info!("SIMULATION END");
-        state.success();
-        state.update_and_upload(&mut f).await;
 
         f.loop_node(crate::FledgerState::Forever).await?;
         Ok(())
     }
 
-    pub async fn fetch_target(
+    pub async fn run_fetch_pages(
         mut f: Fledger,
         loop_delay: u32,
         enable_sync: bool,
@@ -157,10 +173,10 @@ impl SimulationDhtTarget {
             .realm
             .realm_id();
 
-        let mut iteration = 0u32;
-        let mut page_id_opt: Option<String> = None;
+        let mut target_page_ids = HashSet::new();
+        let mut fetched_page_ids = HashSet::new();
 
-        // Loop until page_id found
+        let mut iteration = 0u32;
 
         loop {
             if start_instant.elapsed().as_millis() > timeout_ms as u128 {
@@ -179,71 +195,50 @@ impl SimulationDhtTarget {
             if enable_sync {
                 f.node.dht_storage.as_mut().unwrap().sync()?;
             }
-            // let _ = rv
-            //     .update_all()
-            //     .await
-            //     .inspect_err(|e| log::error!("error when doing rv.update_all(): {e}"));
 
-            if iteration % 10 == 0 {
+            if iteration % 30 == 0 {
                 let response = state.update_and_upload(&mut f).await;
-                page_id_opt = response.target_page_id;
+                target_page_ids.clear();
+                for target_page_id in response.target_page_ids {
+                    target_page_ids.insert(target_page_id.clone());
+                }
 
-                if page_id_opt.is_some() {
-                    // this node shall become malicious now if the flag is set
-                    // because the target page was propagated
-                    log::info!("(re)becoming malicious node");
+                if !target_page_ids.is_empty() && evil_noforward {
                     unsafe {
-                        flmodules::dht_storage::messages::EVIL_NO_FORWARD = evil_noforward;
-                        flmodules::dht_router::messages::EVIL_NO_FORWARD = evil_noforward;
+                        if evil_noforward && !flmodules::dht_storage::messages::EVIL_NO_FORWARD {
+                            log::info!("becoming a malicious node");
+                            log::info!("SIMULATION END");
+                            flmodules::dht_storage::messages::EVIL_NO_FORWARD = true;
+                            flmodules::dht_router::messages::EVIL_NO_FORWARD = true;
+                        }
                     }
                 }
             }
 
-            // Stop here each iteration
-            // until page id is known
-            if page_id_opt.is_none() {
-                log::info!("failed to get page id");
-                continue;
+            for page_id in target_page_ids.clone() {
+                if fetched_page_ids.contains(&page_id.clone()) {
+                    continue;
+                }
+                let flo_id = FloID::from_str(&page_id.clone())?;
+                let global_page_id = Self::make_page_id(realm_id.clone(), flo_id);
+                let page = Self::fetch_page(&mut f, global_page_id).await;
+                if page.is_ok() {
+                    fetched_page_ids.insert(page_id.clone());
+                }
             }
 
-            let page_id = FloID::from_str(&page_id_opt.clone().unwrap())?;
+            // log fetched and target pages
+            log::info!("fetched pages: {fetched_page_ids:?}");
+            log::info!("target pages: {target_page_ids:?}");
 
-            let page_global_id = GlobalID::new(realm_id.clone(), page_id.clone());
-            let page_flo_wrapper_result: Result<FloWrapper<BlobPage>, Error> = f
-                .node
-                .dht_storage
-                .as_mut()
-                .unwrap()
-                .get_flo(&page_global_id)
-                .await;
+            state.target_successfully_fetched_total = fetched_page_ids.len() as u32;
 
-            if let Ok(page_flo_wrapper) = page_flo_wrapper_result {
-                let page_flo = page_flo_wrapper.flo();
-                let page_blob =
-                    BlobPage::from_rmp_bytes(page_flo.flo_type().as_str(), page_flo.data())?;
-                let page_content = String::from_utf8(
-                    page_blob
-                        .0
-                        .datas()
-                        .iter()
-                        .next()
-                        .unwrap()
-                        .1
-                        .clone()
-                        .to_vec(),
-                )
-                .unwrap_or_default();
-                log::info!(
-                    "simulation page found with content: {}",
-                    page_content.chars().take(50).collect::<String>()
-                );
-
+            if !target_page_ids.is_empty() && fetched_page_ids.is_superset(&target_page_ids) {
+                log::info!("all target pages fetched.");
                 log::info!("SIMULATION END");
                 state.success();
                 state.update_and_upload(&mut f).await;
                 f.loop_node(crate::FledgerState::Forever).await?;
-
-                return Ok(());
             }
         }
     }

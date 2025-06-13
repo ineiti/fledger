@@ -1,12 +1,11 @@
-use crate::state::SimulationState;
+use crate::state::{Page, SimulationState};
 use serde::Serialize;
 
 #[derive(Serialize, Default, Debug, Clone)]
 pub struct Snapshot {
     node_status: String,
-    pages_stored: Vec<String>,
+    pages_stored: Vec<Page>,
     evil_no_forward: bool,
-    target_page_id: Option<String>,
 
     timed_metrics: Vec<(String, u32)>,
     timeless_metrics: Vec<(String, u32)>,
@@ -118,18 +117,15 @@ impl Snapshot {
             simulation_state.ds_metrics.max_flos_received_in_flos,
         );
 
-        if let Some(target_page_stored_bool) = simulation_state.target_page_stored_bool {
-            timeless_metrics.add_metric(
-                "target_page_stored_bool".to_string(),
-                target_page_stored_bool as u32,
-            );
-        }
+        timeless_metrics.add_metric(
+            "target_successfully_fetched_total".to_string(),
+            simulation_state.target_successfully_fetched_total,
+        );
 
         Snapshot {
             node_status: simulation_state.node_status,
             pages_stored: simulation_state.pages_stored,
             evil_no_forward: simulation_state.evil_no_forward,
-            target_page_id: simulation_state.target_page_id,
 
             timed_metrics: timed_metrics.build(),
             timeless_metrics: timeless_metrics.build(),

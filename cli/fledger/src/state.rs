@@ -7,9 +7,10 @@ use flcrypto::tofrombytes::ToFromBytes;
 use flmodules::dht_storage::broker::DHTStorage;
 use flmodules::dht_storage::messages::DsMetrics;
 use flmodules::flo::blob::{BlobAccess, BlobPage};
+use serde::{Deserialize, Serialize};
 use std::any::type_name;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Page {
     pub name: String,
     pub id: String,
@@ -22,17 +23,13 @@ pub struct SimulationState {
     pub node_name: String,
     pub node_status: String,
 
-    pub pages_stored: Vec<String>,
-    pub pages_created: Vec<Page>,
+    pub pages_stored: Vec<Page>,
     pub connected_nodes_total: u32,
     pub ds_size_bytes: u64,
     pub evil_no_forward: bool,
+    pub target_successfully_fetched_total: u32,
 
     pub ds_metrics: DsMetrics,
-
-    // simulation_dht_target specific fields
-    pub target_page_stored_bool: Option<bool>,
-    pub target_page_id: Option<String>,
 
     pub api: HermesApi,
     pub influx: InfluxApi,
@@ -61,19 +58,24 @@ impl SimulationState {
             })
             .iter()
             .filter(|flo| flo.flo_type() == type_name::<BlobPage>())
-            .map(|flo| BlobPage::from_rmp_bytes(&flo.flo_type(), &flo.data()).unwrap())
-            .map(|page| page.0.values().iter().next().unwrap().1.clone())
-            .map(|name| {
-                return name.replace("simulation-filler-", "");
+            .map(|flo| {
+                let page = BlobPage::from_rmp_bytes(&flo.flo_type(), &flo.data()).unwrap();
+                Page {
+                    id: flo.flo_id().to_string(),
+                    name: page.0.values().iter().next().unwrap().1.clone(),
+                }
             })
-            .collect::<Vec<String>>();
-
-        if pages_stored.contains(&"simulation-page".to_string()) {
-            self.target_page_stored_bool = Some(true);
-        }
+            .collect::<Vec<Page>>();
 
         self.pages_stored = pages_stored.clone();
-        log::info!("pages stored: {}", pages_stored.join(", "));
+        log::info!(
+            "pages stored: {}",
+            pages_stored
+                .iter()
+                .map(|page| page.name.clone())
+                .collect::<Vec<String>>()
+                .join(", ")
+        );
     }
 
     pub fn success(&mut self) {

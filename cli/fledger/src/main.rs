@@ -21,7 +21,7 @@ mod page;
 mod realm;
 mod simulation;
 mod simulation_chat;
-mod simulation_dht_target;
+mod simulation_dht;
 mod simulation_realm;
 mod state;
 

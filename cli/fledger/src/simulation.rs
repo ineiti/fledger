@@ -1,6 +1,7 @@
 use crate::simulation_chat::simulation::SimulationChat;
+use crate::simulation_dht::simulation::SimulationDht;
 use crate::simulation_realm::simulation::SimulationRealm;
-use crate::{simulation_dht_target::simulation::SimulationDhtTarget, Fledger};
+use crate::Fledger;
 use clap::{arg, Args, Subcommand};
 use flarch::random;
 use flarch::tasks::wait_ms;
@@ -30,9 +31,12 @@ pub enum SimulationSubcommand {
 
     DhtJoinRealm {},
 
-    DhtCreateFillersAndTarget {
+    DhtCreatePages {
         #[arg(long)]
         filler_amount: u32,
+
+        #[arg(long)]
+        target_amount: u32,
 
         #[arg(long)]
         page_size: u32,
@@ -47,7 +51,7 @@ pub enum SimulationSubcommand {
         experiment_id: u32,
     },
 
-    DhtFetchTarget {
+    DhtFetchPages {
         #[arg(long, default_value = "20000")]
         timeout_ms: u32,
 
@@ -77,16 +81,18 @@ impl SimulationHandler {
                 SimulationChat::run_chat(f, command, send_msg, recv_msg).await
             }
             SimulationSubcommand::DhtJoinRealm {} => SimulationRealm::run_dht_join_realm(f).await,
-            SimulationSubcommand::DhtCreateFillersAndTarget {
+            SimulationSubcommand::DhtCreatePages {
                 filler_amount,
+                target_amount,
                 page_size,
                 pages_propagation_delay,
                 connection_delay,
                 experiment_id,
             } => {
-                SimulationDhtTarget::run_create_fillers_and_target(
+                SimulationDht::run_create_pages(
                     f,
                     filler_amount,
+                    target_amount,
                     page_size,
                     pages_propagation_delay,
                     connection_delay,
@@ -94,13 +100,13 @@ impl SimulationHandler {
                 )
                 .await
             }
-            SimulationSubcommand::DhtFetchTarget {
+            SimulationSubcommand::DhtFetchPages {
                 timeout_ms,
                 enable_sync,
                 experiment_id,
             } => {
                 let evil_noforward = f.args.evil_noforward.clone();
-                SimulationDhtTarget::fetch_target(
+                SimulationDht::run_fetch_pages(
                     f,
                     loop_delay,
                     enable_sync,

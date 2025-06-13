@@ -1,6 +1,6 @@
 use crate::hermes::snapshot::Snapshot;
 use crate::hermes::update_response::UpdateResponse;
-use crate::state::SimulationState;
+use crate::state::{Page, SimulationState};
 use anyhow::Error;
 use reqwest::Method;
 use serde::Serialize;
@@ -43,6 +43,21 @@ impl HermesApi {
         } else {
             id.unwrap() as u32
         }
+    }
+
+    pub fn store_target_pages(
+        &self,
+        experiment_id: u32,
+        target_pages: Vec<Page>,
+    ) -> Result<(), Error> {
+        let mut data = HashMap::new();
+        data.insert("target_pages", target_pages);
+        let url = format!(
+            "https://fledger.yohan.ch/api/experiments/{}/store-target-pages",
+            experiment_id
+        );
+        self.api_request(Method::POST, url, &data)?;
+        Ok(())
     }
 
     fn api_request<T: Serialize + ?Sized>(

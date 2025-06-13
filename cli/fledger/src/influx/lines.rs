@@ -83,13 +83,6 @@ impl InfluxLines {
             stats.ds_metrics.store_flo_total,
         ));
 
-        if let Some(target_page_stored_bool) = stats.target_page_stored_bool {
-            lines.push(generator.create_influx_line(
-                "fledger_simulation_dht_target_state".to_string(),
-                target_page_stored_bool as u32,
-            ));
-        }
-
         lines.join("\n")
     }
 }
