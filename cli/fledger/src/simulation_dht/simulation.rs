@@ -105,10 +105,15 @@ impl SimulationDht {
             .await?;
         }
 
+        log::info!("[Waiting for fillers to settle]");
+        log::info!("{} ms", propagation_delay);
+        Self::settle_and_sync(&mut f).await?;
+        wait_ms(propagation_delay as u64).await;
+
         log::info!("[Create target_pages simulation flo page]");
         let mut target_pages = vec![];
         for i in 0..target_amount {
-            wait_ms(500).await;
+            wait_ms(3000).await;
             target_pages.push(
                 Self::create_flo_page(
                     &mut rv,
@@ -119,7 +124,7 @@ impl SimulationDht {
             );
         }
 
-        log::info!("[Waiting for pages to settle]");
+        log::info!("[Waiting for targets to settle]");
         log::info!("{} ms", propagation_delay);
         Self::settle_and_sync(&mut f).await?;
         wait_ms(propagation_delay as u64).await;
@@ -132,8 +137,41 @@ impl SimulationDht {
             })
             .collect::<Vec<Page>>();
 
-        HermesApi::default().store_target_pages(experiment_id, pages)?;
+        let hermes = HermesApi::default();
+        hermes.store_target_pages(experiment_id, pages)?;
 
+        let mut all_targets_propagated = false;
+        let start_instant = Instant::now();
+        while !all_targets_propagated {
+            let lost_target_pages = hermes.get_lost_target_pages(experiment_id)?;
+
+            if start_instant.elapsed() > Duration::from_secs(60 * 15) {
+                log::warn!("PROPAGATION TIMEOUT REACHED (15min)");
+                log::info!("SIMULATION END");
+                return Err(anyhow::anyhow!("timeout"));
+            }
+
+            if lost_target_pages.lost_target_pages.is_empty() {
+                all_targets_propagated = true;
+            } else {
+                let pages_to_repropagate = target_pages
+                    .iter()
+                    .filter(|page| {
+                        lost_target_pages
+                            .lost_target_pages
+                            .contains(&page.flo_id().to_string().clone())
+                    })
+                    .collect::<Vec<&FloWrapper<BlobPage>>>();
+                for page in pages_to_repropagate {
+                    log::info!("REPROPAGATE: {}", Self::get_page_name(page));
+                    f.ds.store_flo(page.flo().clone())?;
+                    wait_ms(500).await
+                }
+                wait_ms(30000).await;
+            }
+        }
+
+        hermes.start_fetching(experiment_id)?;
         log::info!("SIMULATION END");
 
         f.loop_node(crate::FledgerState::Forever).await?;
@@ -144,11 +182,12 @@ impl SimulationDht {
         mut f: Fledger,
         loop_delay: u32,
         enable_sync: bool,
+        propagation_timeout_ms: u32,
         timeout_ms: u32,
         experiment_id: u32,
         evil_noforward: bool,
     ) -> anyhow::Result<()> {
-        let start_instant = Instant::now();
+        let mut start_instant = Instant::now();
 
         let node_name = f.node.node_config.info.name.clone();
         let mut state = SimulationState::new(experiment_id, node_name);
@@ -179,7 +218,21 @@ impl SimulationDht {
         let mut iteration = 0u32;
 
         loop {
-            if start_instant.elapsed().as_millis() > timeout_ms as u128 {
+            if target_page_ids.is_empty()
+                && start_instant.elapsed().as_millis() > propagation_timeout_ms as u128
+            {
+                log::warn!("PROPAGATION TIMEOUT REACHED ({}ms)", propagation_timeout_ms);
+                log::info!("SIMULATION END");
+                state.timeout();
+                state.update_and_upload(&mut f).await;
+                f.loop_node(crate::FledgerState::Forever).await?;
+
+                return Ok(());
+            }
+
+            if !target_page_ids.is_empty()
+                && start_instant.elapsed().as_millis() > timeout_ms as u128
+            {
                 log::warn!("SIMULATION TIMEOUT REACHED ({}ms)", timeout_ms);
                 log::info!("SIMULATION END");
                 state.timeout();
@@ -198,12 +251,18 @@ impl SimulationDht {
 
             if iteration % 30 == 0 {
                 let response = state.update_and_upload(&mut f).await;
-                target_page_ids.clear();
-                for target_page_id in response.target_page_ids {
-                    target_page_ids.insert(target_page_id.clone());
-                }
+                if target_page_ids.is_empty() && !response.target_page_ids.is_empty() {
+                    // target propagation ended, it's now time to fetch.
+                    // resetting the timeout
+                    log::info!(
+                        "TIMEOUT RESET AFTER {}s, STARTING TO FETCH PAGES",
+                        start_instant.elapsed().as_secs()
+                    );
+                    start_instant = Instant::now();
+                    for target_page_id in response.target_page_ids {
+                        target_page_ids.insert(target_page_id.clone());
+                    }
 
-                if !target_page_ids.is_empty() && evil_noforward {
                     unsafe {
                         if evil_noforward && !flmodules::dht_storage::messages::EVIL_NO_FORWARD {
                             log::info!("becoming a malicious node");

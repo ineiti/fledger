@@ -52,7 +52,10 @@ pub enum SimulationSubcommand {
     },
 
     DhtFetchPages {
-        #[arg(long, default_value = "20000")]
+        #[arg(long, default_value = "1200000")]
+        propagation_timeout_ms: u32,
+
+        #[arg(long, default_value = "600000")]
         timeout_ms: u32,
 
         #[arg(long, default_value = "false")]
@@ -101,6 +104,7 @@ impl SimulationHandler {
                 .await
             }
             SimulationSubcommand::DhtFetchPages {
+                propagation_timeout_ms,
                 timeout_ms,
                 enable_sync,
                 experiment_id,
@@ -110,6 +114,7 @@ impl SimulationHandler {
                     f,
                     loop_delay,
                     enable_sync,
+                    propagation_timeout_ms,
                     timeout_ms,
                     experiment_id,
                     evil_noforward,

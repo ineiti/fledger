@@ -3,7 +3,7 @@ use crate::hermes::update_response::UpdateResponse;
 use crate::state::{Page, SimulationState};
 use anyhow::Error;
 use reqwest::Method;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use tokio::time::Instant;
@@ -16,6 +16,11 @@ use tokio::time::Instant;
 #[derive(Default, Clone, Debug)]
 pub struct HermesApi {
     client: reqwest::blocking::Client,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct LostTargetPagesResponse {
+    pub lost_target_pages: Vec<String>,
 }
 
 impl HermesApi {
@@ -43,6 +48,29 @@ impl HermesApi {
         } else {
             id.unwrap() as u32
         }
+    }
+
+    pub fn get_lost_target_pages(
+        &self,
+        experiment_id: u32,
+    ) -> Result<LostTargetPagesResponse, Error> {
+        let url = format!(
+            "https://fledger.yohan.ch/api/experiments/{}/lost-target-pages",
+            experiment_id,
+        );
+        let response = self.api_request(Method::GET, url, &())?;
+        let lost_target_pages: LostTargetPagesResponse =
+            serde_json::from_str(&response).map_err(|e| Error::new(e))?;
+        Ok(lost_target_pages)
+    }
+
+    pub fn start_fetching(&self, experiment_id: u32) -> Result<(), Error> {
+        let url = format!(
+            "https://fledger.yohan.ch/api/experiments/{}/start-fetching",
+            experiment_id
+        );
+        self.api_request(Method::GET, url, &())?;
+        Ok(())
     }
 
     pub fn store_target_pages(
