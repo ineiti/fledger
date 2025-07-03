@@ -129,6 +129,17 @@ deploy:
 	cd cli && cargo build --release --target=x86_64-unknown-linux-musl -p fledger && cargo build --release --target=x86_64-unknown-linux-musl -p flsignal
 	@./deploy-binaries.sh
 
+test_realm:
+	/usr/bin/mktemp -d -t fledger-XXXX
+	./target-common/x86_64-unknown-linux-musl/release/fledger --config "$(shell /usr/bin/mktemp -d -t fledger-XXXX)" --disable-turn-stun --signal-url ws://localhost:8765 realm create simulation --cond-pass
+
+test_signal:
+	./target-common/x86_64-unknown-linux-musl/release/flsignal -v --max-list-len 25
+
+test_just_fetch_once:
+	rm -rf /tmp/fledger
+	./target-common/x86_64-unknown-linux-musl/release/fledger --config "$(shell /usr/bin/mktemp -d -t fledger-XXXX)" --disable-turn-stun --signal-url ws://localhost:8765 simulation just-fetch-once
+
 clean:
 	for c in ${CARGOS}; do \
 		echo "Cleaning $$c"; \

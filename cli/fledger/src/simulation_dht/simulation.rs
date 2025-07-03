@@ -186,8 +186,17 @@ impl SimulationDht {
         timeout_ms: u32,
         experiment_id: u32,
         evil_noforward: bool,
+        with_local_blacklists: bool,
     ) -> anyhow::Result<()> {
         let mut start_instant = Instant::now();
+
+        unsafe {
+            if with_local_blacklists {
+                log::info!("enabling local blacklists");
+                flmodules::dht_storage::messages::LOCAL_BLACKLISTS = true;
+                flmodules::dht_router::messages::LOCAL_BLACKLISTS = true;
+            }
+        }
 
         let node_name = f.node.node_config.info.name.clone();
         let mut state = SimulationState::new(experiment_id, node_name);
@@ -300,5 +309,35 @@ impl SimulationDht {
                 f.loop_node(crate::FledgerState::Forever).await?;
             }
         }
+    }
+
+    pub async fn just_fetch_once(mut f: Fledger) -> anyhow::Result<()> {
+        f.loop_node(crate::FledgerState::DHTAvailable).await?;
+        f.loop_node(crate::FledgerState::Connected(2)).await?;
+
+        let realm_id = RealmView::new_first(f.node.dht_storage.as_ref().unwrap().clone())
+            .await?
+            .realm
+            .realm_id();
+
+        let flo_id =
+            FloID::from_str("5efe0a6143df5641af9d6036ba8da82222bb30211c21ba5ec236851efda38420")?;
+        let global_page_id = Self::make_page_id(realm_id.clone(), flo_id);
+
+        for i in 0..10 {
+            wait_ms(1000).await;
+
+            let page = Self::fetch_page(&mut f, global_page_id.clone()).await;
+
+            if page.is_ok() {
+                log::info!("God made a miracle");
+            } else {
+                log::info!("Fetch {i} done.");
+            }
+        }
+
+        f.loop_node(crate::FledgerState::Forever).await?;
+
+        Ok(())
     }
 }

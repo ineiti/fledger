@@ -63,7 +63,12 @@ pub enum SimulationSubcommand {
 
         #[arg(long)]
         experiment_id: u32,
+
+        #[arg(long, default_value = "false")]
+        with_local_blacklists: bool,
     },
+
+    JustFetchOnce {},
 }
 
 pub struct SimulationHandler {}
@@ -108,6 +113,7 @@ impl SimulationHandler {
                 timeout_ms,
                 enable_sync,
                 experiment_id,
+                with_local_blacklists,
             } => {
                 let evil_noforward = f.args.evil_noforward.clone();
                 SimulationDht::run_fetch_pages(
@@ -118,9 +124,11 @@ impl SimulationHandler {
                     timeout_ms,
                     experiment_id,
                     evil_noforward,
+                    with_local_blacklists,
                 )
                 .await
             }
+            SimulationSubcommand::JustFetchOnce {} => SimulationDht::just_fetch_once(f).await,
         }
     }
 }

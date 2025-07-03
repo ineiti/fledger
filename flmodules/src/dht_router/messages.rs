@@ -1,13 +1,17 @@
+use std::collections::{HashMap, HashSet};
+
 use flarch::{
     broker::{SubsystemHandler, TranslateFrom, TranslateInto},
     nodeids::{NodeID, U256},
     platform_async_trait,
 };
-use rand::seq::SliceRandom;
+use itertools::Itertools;
+use rand::{seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
 use crate::{
+    dht_storage::messages::MessageClosest,
     nodeconfig::NodeInfo,
     router::messages::{NetworkWrapper, RouterIn, RouterOut},
     timer::TimerMessage,
@@ -19,6 +23,7 @@ use super::{
 };
 
 pub static mut EVIL_NO_FORWARD: bool = false;
+pub static mut LOCAL_BLACKLISTS: bool = false;
 
 /// These are the messages which will be exchanged between the nodes for this
 /// module.
@@ -73,6 +78,11 @@ pub(super) struct Messages {
     // This is different than core.active, because there can be connections from other
     // modules, or connections from another node.
     connected: Vec<NodeID>,
+
+    // readFlo id -> node id
+    requests_in_flight: HashMap<U256, U256>,
+
+    blacklisted_nodes: HashSet<U256>,
 }
 
 impl Messages {
@@ -84,6 +94,8 @@ impl Messages {
                 core: Kademlia::new(root, cfg),
                 tx: Some(tx),
                 connected: vec![],
+                requests_in_flight: HashMap::new(),
+                blacklisted_nodes: HashSet::new(),
             },
             rx,
         )
@@ -233,22 +245,137 @@ impl Messages {
         }
     }
 
+    fn get_readflo_id(&self, msg: NetworkWrapper) -> Option<U256> {
+        if msg.module == "DHTStorage" {
+            match msg.unwrap_yaml("DHTStorage") {
+                Some(msg_readflo) => match msg_readflo {
+                    MessageClosest::ReadFlo(_id, request_id) => {
+                        log::warn!("sending MessageClosest::ReadFlo {}", msg.msg.clone());
+                        Some(request_id.clone())
+                    }
+                    _ => None,
+                },
+                None => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    fn blacklist_bad_nodes(&mut self) {
+        unsafe {
+            if !self::LOCAL_BLACKLISTS {
+                return;
+            }
+        }
+
+        let in_flight = self.requests_in_flight.clone();
+        in_flight
+            .iter()
+            .map(|(_request_id, node_id)| node_id)
+            .counts()
+            .iter()
+            .for_each(|(node_id_request, count)| {
+                let node_id1 = (*node_id_request).clone();
+                if count.clone() > 10 {
+                    // made 10 requests to this node
+                    // remove the node from requests_in_flight to reset the counter
+                    // and blacklist the node
+                    log::warn!("blacklisting {node_id1}.");
+                    let request_ids = self
+                        .requests_in_flight
+                        .clone()
+                        .iter()
+                        .filter(|(_request_id, node_id2)| node_id1 == **node_id2)
+                        .map(|(request_id, _node_id)| request_id)
+                        .copied()
+                        .collect_vec();
+                    for value in request_ids {
+                        self.requests_in_flight.remove_entry(&value);
+                    }
+                    self.core.remove_node(&node_id1);
+                    self.blacklisted_nodes.insert(node_id1);
+                }
+            });
+    }
+
+    fn randomly_whitelist(&mut self) {
+        unsafe {
+            if !self::LOCAL_BLACKLISTS {
+                return;
+            }
+        }
+
+        let mut rng = rand::thread_rng();
+        if !self.blacklisted_nodes.is_empty() && rng.gen_bool(0.05) {
+            let len = self.blacklisted_nodes.len();
+            if len > 0 {
+                let random_index = rng.gen_range(0..len);
+                let node_id_opt = self.blacklisted_nodes.iter().nth(random_index).clone();
+                if let Some(node_id) = node_id_opt {
+                    log::warn!("whitelisting {node_id}.");
+                    self.core.add_node(node_id.clone());
+                    self.blacklisted_nodes.remove(&(node_id.clone()));
+                }
+            }
+        }
+    }
+
+    fn log_requests_in_flight(&self) {
+        unsafe {
+            if !self::LOCAL_BLACKLISTS {
+                return;
+            }
+        }
+
+        log::info!("counts:");
+        self.requests_in_flight
+            .iter()
+            .map(|tuple| tuple.1)
+            .counts()
+            .iter()
+            .for_each(|item| log::info!("    {} -> {}", item.0, item.1))
+    }
+
     fn message_closest(
-        &self,
+        &mut self,
         orig: NodeID,
         last_hop: NodeID,
         key: U256,
         msg: NetworkWrapper,
     ) -> Vec<InternOut> {
-        match self
+        let readflo_id_opt = self.get_readflo_id(msg.clone());
+
+        self.blacklist_bad_nodes();
+
+        let closest = self
             .closest_or_connected(key.clone(), Some(&last_hop))
             .first()
-        {
-            Some(&next_hop) => vec![
-                ModuleMessage::Closest(orig, key, msg.clone()).wrapper_network(next_hop),
-                DHTRouterOut::MessageRouting(orig, last_hop, next_hop, key, msg).into(),
-            ],
+            .copied();
+
+        self.randomly_whitelist();
+
+        match closest.clone() {
+            Some(next_hop) => {
+                if self.blacklisted_nodes.contains(&next_hop) {
+                    log::error!("IMPOSSIBLE?: sending a message to a blacklisted node.");
+                }
+
+                if let Some(readflo_id) = readflo_id_opt {
+                    log::info!("NEXT HOP: {}", next_hop);
+                    self.requests_in_flight
+                        .insert(readflo_id.clone(), next_hop.clone());
+                    self.log_requests_in_flight();
+                }
+                vec![
+                    ModuleMessage::Closest(orig, key, msg.clone()).wrapper_network(next_hop),
+                    DHTRouterOut::MessageRouting(orig, last_hop, next_hop, key, msg).into(),
+                ]
+            }
             None => {
+                if readflo_id_opt.is_some() {
+                    log::warn!("NO NEXT HOP!");
+                }
                 if key == self.core.root {
                     vec![DHTRouterOut::MessageDest(orig, last_hop, msg).into()]
                 } else {

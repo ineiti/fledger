@@ -49,6 +49,7 @@ impl RealmHandler {
         cond_pass: bool,
     ) -> anyhow::Result<()> {
         f.loop_node(crate::FledgerState::Connected(1)).await?;
+        //f.loop_node(crate::FledgerState::Duration(1)).await?;
 
         let config = RealmConfig {
             max_space: max_space.unwrap_or(1000000),

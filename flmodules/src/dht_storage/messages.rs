@@ -47,7 +47,8 @@ pub enum MessageClosest {
     // which have enough place left.
     StoreFlo(Flo),
     // Request a Flo. The FloID is in the DHTRouting::Request.
-    ReadFlo(RealmID),
+    // The U256 is a random id identifying this specific request
+    ReadFlo(RealmID, U256),
     // Request Cuckoos for the given ID. The FloID is in the DHTRouting::Request.
     GetCuckooIDs(RealmID),
     // Store the Cuckoo-ID in the relevant Flo. The DHTRouting::Request(key) is the
@@ -61,7 +62,8 @@ pub enum MessageClosest {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MessageDest {
     // Returns the result of the requested Flo, including any available Cuckoo-IDs.
-    FloValue(FloCuckoo),
+    // The optional u256 is an optional identifier of the readflo request id
+    FloValue(FloCuckoo, Option<U256>),
     // Indicates this Flo is not in the closest node.
     UnknownFlo(GlobalID),
     // The Cuckoo-IDs stored next to the Flo composed of the GlobalID
@@ -154,6 +156,7 @@ pub struct Messages {
 }
 
 pub static mut EVIL_NO_FORWARD: bool = false;
+pub static mut LOCAL_BLACKLISTS: bool = false;
 
 impl Messages {
     /// Returns a new simulation_chat module.
@@ -213,7 +216,7 @@ impl Messages {
             DHTStorageIn::StoreFlo(flo) => self.store_flo(flo),
             DHTStorageIn::ReadFlo(id) => vec![match self.read_flo(&id) {
                 Some(df) => DHTStorageOut::FloValue(df.clone()).into(),
-                None => MessageClosest::ReadFlo(id.realm_id().clone())
+                None => MessageClosest::ReadFlo(id.realm_id().clone(), U256::rnd())
                     .to_intern_out(id.flo_id().clone().into())
                     // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
                     .expect("Creating ReadFlo message"),
@@ -262,7 +265,7 @@ impl Messages {
             MessageClosest::StoreFlo(flo) => {
                 return self.store_flo(flo);
             }
-            MessageClosest::ReadFlo(rid) => {
+            MessageClosest::ReadFlo(rid, request_id) => {
                 // log::info!(
                 //     "{} got request for {}/{} from {}",
                 //     self.our_id,
@@ -279,7 +282,7 @@ impl Messages {
                     // log::info!("sends flo {:?}", fc.0);
                     if unsafe { !EVIL_NO_FORWARD } {
                         increment_stat!(self, self.experiment_stats.flo_value_sent_total);
-                        return MessageDest::FloValue(fc)
+                        return MessageDest::FloValue(fc, Some(request_id))
                             .to_intern_out(origin)
                             // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
                             .map_or(vec![], |msg| vec![msg]);
@@ -312,7 +315,7 @@ impl Messages {
 
     fn msg_dest(&mut self, msg: MessageDest) -> Vec<InternOut> {
         match msg {
-            MessageDest::FloValue(fc) => {
+            MessageDest::FloValue(fc, _) => {
                 // log::info!("{} stores {:?}", self.our_id, flo.0);
                 self.store_flo(fc.0.clone());
                 self.realms
@@ -723,11 +726,11 @@ mod tests {
 
         let out = NetworkWrapper::wrap_yaml(
             MODULE_NAME,
-            &MessageDest::FloValue((fr.flo().clone(), vec![])),
+            &MessageDest::FloValue((fr.flo().clone(), vec![]), None),
         )
         .unwrap();
 
-        if let MessageDest::FloValue(flo) = out.unwrap_yaml(MODULE_NAME).unwrap() {
+        if let MessageDest::FloValue(flo, _) = out.unwrap_yaml(MODULE_NAME).unwrap() {
             let fr2 = TryInto::<FloRealm>::try_into(flo.0)?;
             assert_eq!(fr, fr2);
         } else {
