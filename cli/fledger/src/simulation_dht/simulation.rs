@@ -167,7 +167,7 @@ impl SimulationDht {
                     f.ds.store_flo(page.flo().clone())?;
                     wait_ms(500).await
                 }
-                wait_ms(30000).await;
+                wait_ms(15000).await;
             }
         }
 
@@ -258,9 +258,19 @@ impl SimulationDht {
                 f.node.dht_storage.as_mut().unwrap().sync()?;
             }
 
-            if iteration % 30 == 0 {
-                let response = state.update_and_upload(&mut f).await;
-                if target_page_ids.is_empty() && !response.target_page_ids.is_empty() {
+            if iteration == 1 {
+                // initial full metrics upload, just to get some info on hermes
+                let _ = state.update_and_upload(&mut f).await;
+            }
+
+            if iteration % 10 == 0 && target_page_ids.is_empty() {
+                // target propagation not over
+                // sending light metrics (only stored target pages)
+                // and checking if propagation ended
+                let response = state.send_target_pages(&mut f).await;
+                if response.target_page_ids.is_some()
+                    && !response.target_page_ids.as_ref().unwrap().is_empty()
+                {
                     // target propagation ended, it's now time to fetch.
                     // resetting the timeout
                     log::info!(
@@ -268,7 +278,7 @@ impl SimulationDht {
                         start_instant.elapsed().as_secs()
                     );
                     start_instant = Instant::now();
-                    for target_page_id in response.target_page_ids {
+                    for target_page_id in response.target_page_ids.unwrap() {
                         target_page_ids.insert(target_page_id.clone());
                     }
 
@@ -281,6 +291,11 @@ impl SimulationDht {
                         }
                     }
                 }
+            }
+
+            if iteration % 30 == 0 && !target_page_ids.is_empty() {
+                // fetching phase - full metrics upload
+                let _ = state.update_and_upload(&mut f).await;
             }
 
             for page_id in target_page_ids.clone() {

@@ -16,6 +16,7 @@ use tokio::time::Instant;
 #[derive(Default, Clone, Debug)]
 pub struct HermesApi {
     client: reqwest::blocking::Client,
+    node_id: u32,
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
@@ -32,7 +33,7 @@ impl HermesApi {
         Ok(bot_state)
     }
 
-    pub fn create_node(&self, experiment_id: u32, node_name: String) -> u32 {
+    pub fn create_node(&mut self, experiment_id: u32, node_name: String) -> u32 {
         let mut data = HashMap::new();
         data.insert("name", node_name.clone());
         let url = format!(
@@ -42,12 +43,14 @@ impl HermesApi {
 
         let text = self.api_request(Method::POST, url, &data).unwrap();
         let json: Value = serde_json::from_str(&text).unwrap();
-        let id = json["id"].as_u64();
-        if id.is_none() {
+        let id_opt = json["id"].as_u64();
+        let id = if id_opt.is_none() {
             panic!("Failed to create node: no ID returned");
         } else {
-            id.unwrap() as u32
-        }
+            id_opt.unwrap() as u32
+        };
+        self.node_id = id;
+        id
     }
 
     pub fn get_lost_target_pages(
@@ -86,6 +89,22 @@ impl HermesApi {
         );
         self.api_request(Method::POST, url, &data)?;
         Ok(())
+    }
+
+    pub fn set_node_target_pages(&self, target_pages: Vec<Page>) -> Result<UpdateResponse, Error> {
+        let mut data = HashMap::new();
+        let ids = target_pages
+            .iter()
+            .map(|page| page.id.clone())
+            .collect::<Vec<String>>();
+        data.insert("stored_targets", ids);
+        let url = format!(
+            "https://fledger.yohan.ch/api/nodes/{}/set-target-pages",
+            self.node_id.clone(),
+        );
+        let response = self.api_request(Method::POST, url, &data)?;
+        let target_to_fetch: UpdateResponse = serde_json::from_str(&response)?;
+        Ok(target_to_fetch)
     }
 
     fn api_request<T: Serialize + ?Sized>(
