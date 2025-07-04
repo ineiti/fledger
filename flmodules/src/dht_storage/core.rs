@@ -175,6 +175,10 @@ impl RealmStorage {
             .collect()
     }
 
+    pub fn get_flos(&self) -> Vec<Flo> {
+        return self.flos.iter().map(|flo| flo.1.flo.clone()).collect_vec();
+    }
+
     pub fn store_cuckoo_ids(&mut self, parent: &FloID, cuckoos: Vec<FloID>) {
         for cuckoo in cuckoos {
             self.store_cuckoo_id(parent, cuckoo);
@@ -256,6 +260,11 @@ impl RealmStorage {
                 self.realm_config.max_space
             );
         }
+        // log::warn!(
+        //     "realm storage : current({}) / max({})",
+        //     self.size,
+        //     self.realm_config.max_space
+        // );
         is_new_flo
     }
 

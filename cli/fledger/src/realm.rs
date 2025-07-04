@@ -49,6 +49,7 @@ impl RealmHandler {
         cond_pass: bool,
     ) -> anyhow::Result<()> {
         f.loop_node(crate::FledgerState::Connected(1)).await?;
+        //f.loop_node(crate::FledgerState::Duration(1)).await?;
 
         let config = RealmConfig {
             max_space: max_space.unwrap_or(1000000),
@@ -70,10 +71,10 @@ impl RealmHandler {
                 "danu".to_string(),
                 INDEX_HTML.to_string(),
                 None,
-                cond.clone(),
-                signers.clone(),
+                Condition::Pass,
+                vec![],
             )
-            .root_tag("danu".to_string(), None, cond.clone(), signers)
+            .root_tag("danu".to_string(), None, Condition::Pass, vec![])
             .build()
             .await?;
 

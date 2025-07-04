@@ -59,7 +59,7 @@ pub struct Flo {
     // The data signature is verifiable by the latest cond.
     data_signature: ConditionSignature,
     // Because I thought that ed25519 signatures have a random nonce, when in
-    // fact the implementation of ed25519-dalek uses a nonce derived from the 
+    // fact the implementation of ed25519-dalek uses a nonce derived from the
     // message, probably to avoid nonce-reuse...
     nonce: U256,
     // The first condition of this Flo, together with a signature on itself.
