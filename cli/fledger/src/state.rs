@@ -28,6 +28,7 @@ pub struct SimulationState {
     pub ds_size_bytes: u64,
     pub evil_no_forward: bool,
     pub target_successfully_fetched_total: u32,
+    pub fetch_requests_total: u32,
 
     pub ds_metrics: DsMetrics,
 
@@ -46,6 +47,10 @@ impl SimulationState {
         state.node_name = node_name;
         state.node_status = "active".to_string();
         state
+    }
+
+    pub fn increment_fetch_requests_total(&mut self) {
+        self.fetch_requests_total += 1;
     }
 
     pub async fn refresh_pages(&mut self, ds: &mut DHTStorage) {

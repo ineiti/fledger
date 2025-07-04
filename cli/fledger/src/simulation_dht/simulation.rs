@@ -305,6 +305,7 @@ impl SimulationDht {
                 let flo_id = FloID::from_str(&page_id.clone())?;
                 let global_page_id = Self::make_page_id(realm_id.clone(), flo_id);
                 let page = Self::fetch_page(&mut f, global_page_id).await;
+                state.increment_fetch_requests_total();
                 if page.is_ok() {
                     fetched_page_ids.insert(page_id.clone());
                 }

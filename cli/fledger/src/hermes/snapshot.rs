@@ -122,6 +122,11 @@ impl Snapshot {
             simulation_state.target_successfully_fetched_total,
         );
 
+        timeless_metrics.add_metric(
+            "fetch_requests_total".to_string(),
+            simulation_state.fetch_requests_total,
+        );
+
         Snapshot {
             node_status: simulation_state.node_status,
             pages_stored: simulation_state.pages_stored,
