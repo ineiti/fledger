@@ -22,6 +22,11 @@ async fn dht_large() -> anyhow::Result<()> {
     let html_size = 1500;
     let prob_no_fail = 0.99;
 
+    let nbr_nodes = 10;
+    let max_space = 20_000;
+    let html_size = 1500;
+    let p_success = 0.2;
+
     let mut simul = Simul::new().await?;
     let mut nodes = simul.new_nodes_raw(nbr_nodes - 1).await?;
     let mut root = simul.new_nodes(1).await?.get(0).unwrap().clone();
@@ -64,7 +69,7 @@ async fn dht_large() -> anyhow::Result<()> {
             let p = (1f64
                 - (1f64 - (flo_per_node as f64) / (total_flos as f64)).powi(nbr_nodes as i32))
             .powi(total_flos as i32);
-            if p > prob_no_fail {
+            if p > p_success {
                 return (total_flos, p);
             }
             total_flos -= 1;
@@ -112,6 +117,7 @@ async fn dht_large() -> anyhow::Result<()> {
                     found += 1;
                 }
             }
+            assert_ne!(found, 0, "Page {id} gone missing!");
             id_found.push(found);
         }
         log::info!("Ids found in this many nodes AFTER sync: {:?}", id_found);
@@ -154,6 +160,16 @@ async fn dht_large() -> anyhow::Result<()> {
             max_node_idx = idx;
         }
     }
+
+    let mut conns = vec![];
+    for node in &nodes {
+        conns.push(format!(
+            "{}/{}",
+            node._dht_routing.stats.borrow().active,
+            node._dht_routing.stats.borrow().all_nodes.len()
+        ));
+    }
+    log::info!("Node connections: {}", conns.join(" - "));
 
     log::info!("Maximum numbers of flos: {}", max_flos);
     let node = nodes.get_mut(max_node_idx).unwrap();
