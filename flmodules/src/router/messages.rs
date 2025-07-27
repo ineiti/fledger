@@ -1,4 +1,4 @@
-use flarch::nodeids::{NodeID, NodeIDs, U256};
+use flarch::nodeids::{NodeID, NodeIDs};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{network::signal::FledgerConfig, nodeconfig::NodeInfo};
@@ -29,10 +29,10 @@ pub enum RouterOut {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RouterInternal {
-    Connected(U256),
-    Disconnected(U256),
+    Connected(NodeID),
+    Disconnected(NodeID),
     Available(Vec<NodeInfo>),
-    MessageFromNode(U256, String),
+    MessageFromNode(NodeID, NetworkWrapper),
     SystemConfig(FledgerConfig),
 }
 

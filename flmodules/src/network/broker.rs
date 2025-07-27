@@ -10,8 +10,11 @@
 //! [`crate::network_broker_start`].
 
 use core::panic;
-use itertools::concat;
-use std::{fmt, time::Duration};
+use serde::{Deserialize, Serialize};
+use std::{
+    fmt::{self, Display},
+    time::Duration,
+};
 use thiserror::Error;
 use tokio::sync::{mpsc::UnboundedReceiver, watch};
 use tokio_stream::StreamExt;
@@ -24,21 +27,29 @@ use flarch::{
     web_rtc::{
         messages::{ConnType, PeerInfo, SetupError, SignalingState},
         node_connection::{Direction, NCError, NCInput, NCOutput},
-        websocket::{BrokerWSClient, WSClientIn, WSClientOut},
-        BrokerWebRTCConn, WebRTCConnInput, WebRTCConnOutput,
+        websocket::{BrokerWSClient, WSClientIn, WSClientOut, WSServerIn, WSServerOut},
+        BrokerWebRTCConn, WebRTCConnIn, WebRTCConnOut,
     },
 };
 
 use crate::{
-    network::signal::{
-        MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION,
+    network::{
+        node_signal::NodeSignal,
+        signal::{
+            MessageAnnounce, NodeStat, WSSignalMessageFromNode, WSSignalMessageToNode,
+            SIGNAL_VERSION,
+        },
     },
     nodeconfig::{NodeConfig, NodeInfo},
+    router::messages::NetworkWrapper,
+    timer::Timer,
 };
 
 use super::signal::FledgerConfig;
 
 pub type BrokerNetwork = Broker<NetworkIn, NetworkOut>;
+
+pub const MODULE_NAME: &str = "Network";
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
@@ -49,7 +60,7 @@ pub enum NetworkIn {
     /// The [`Network`] will try to set up a connection with the remote node,
     /// if no such connection exists yet.
     /// If the node is not connected to the signalling handler, nothing happens.
-    MessageToNode(NodeID, String),
+    MessageToNode(NodeID, NetworkWrapper),
     /// Sends some stats to the signalling server to monitor the overall health of
     /// the system.
     StatsToWS(Vec<NodeStat>),
@@ -62,10 +73,6 @@ pub enum NetworkIn {
     /// Manually disconnect from the given node.
     /// If there is no connection to this node, no error is produced.
     Disconnect(NodeID),
-    /// This message should be sent once a second to allow calculations of timeouts.
-    Tick,
-    WebSocket(WSClientOut),
-    WebRTC(WebRTCConnOutput),
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -73,7 +80,7 @@ pub enum NetworkIn {
 /// Messages sent from the [`Network`] to the user.
 pub enum NetworkOut {
     /// A new message has been received from the given node.
-    MessageFromNode(NodeID, String),
+    MessageFromNode(NodeID, NetworkWrapper),
     /// An updated list coming from the signalling server.
     NodeListFromWS(Vec<NodeInfo>),
     /// Whenever the state of a connection changes, this message is
@@ -83,9 +90,6 @@ pub enum NetworkOut {
     Connected(NodeID),
     /// A node has been disconnected.
     Disconnected(NodeID),
-    /// This is used in the From and Into methods
-    WebSocket(WSClientIn),
-    WebRTC(WebRTCConnInput),
     /// Configuration from the signalling server
     SystemConfig(FledgerConfig),
 }
@@ -121,8 +125,6 @@ pub struct Network {
     pub connections: watch::Receiver<Vec<NodeID>>,
 }
 
-const UPDATE_INTERVAL: usize = 10;
-
 impl Network {
     /// Starts a new [`Network`] and returns a [`BrokerNetwork`] which can be linked
     /// to other brokers.
@@ -131,13 +133,16 @@ impl Network {
         node_config: NodeConfig,
         ws: BrokerWSClient,
         web_rtc: BrokerWebRTCConn,
+        timer: &mut Timer,
     ) -> anyhow::Result<Self> {
-        let mut broker = Broker::new();
-        let (messages, connections) = Messages::start(node_config);
-        broker.add_handler(Box::new(messages)).await?;
-
-        broker.link_bi(ws).await?;
-        broker.link_bi(web_rtc).await?;
+        let mut intern = Broker::new();
+        let (messages, connections) = Messages::start(node_config).await?;
+        intern.add_handler(Box::new(messages)).await?;
+        intern.link_bi(ws).await?;
+        intern.link_bi(web_rtc).await?;
+        let broker = Broker::new();
+        intern.link_direct(broker.clone()).await?;
+        timer.tick_second(intern, InternIn::Tick).await?;
 
         Ok(Self {
             broker,
@@ -146,31 +151,61 @@ impl Network {
     }
 }
 
-struct Messages {
+#[derive(Debug, Serialize, Deserialize)]
+pub(super) enum ModuleMessage {
+    String(String),
+    SignalIn(WSClientOut),
+    SignalOut(WSClientIn),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum InternIn {
+    Network(NetworkIn),
+    Signal(WSServerIn),
+    Tick,
+    WebSocket(WSClientOut),
+    WebRTC(WebRTCConnOut),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum InternOut {
+    Network(NetworkOut),
+    Signal(WSServerOut),
+    WebSocket(WSClientIn),
+    WebRTC(WebRTCConnIn),
+}
+
+const UPDATE_INTERVAL: usize = 10;
+
+pub(super) struct Messages {
     node_config: NodeConfig,
     get_update: usize,
     connections: Vec<NodeID>,
     tx: Option<watch::Sender<Vec<NodeID>>>,
+    node_signal: NodeSignal,
 }
 
 impl Messages {
-    pub fn start(node_config: NodeConfig) -> (Self, watch::Receiver<Vec<NodeID>>) {
+    pub async fn start(
+        node_config: NodeConfig,
+    ) -> anyhow::Result<(Self, watch::Receiver<Vec<NodeID>>)> {
         let (tx, rx) = watch::channel(vec![]);
-        (
+        Ok((
             Self {
                 node_config,
                 get_update: UPDATE_INTERVAL,
                 connections: vec![],
                 tx: Some(tx),
+                node_signal: NodeSignal::start().await?,
             },
             rx,
-        )
+        ))
     }
 
     /// Processes incoming messages from the signalling server.
     /// This can be either messages requested by this node, or connection
     /// setup requests from another node.
-    async fn msg_ws(&mut self, msg: WSClientOut) -> Vec<NetworkOut> {
+    fn msg_ws(&mut self, msg: WSClientOut) -> Vec<InternOut> {
         let msg_node_str = match msg {
             WSClientOut::Message(msg) => msg,
             WSClientOut::Error(e) => {
@@ -199,12 +234,13 @@ impl Messages {
                     signature: self.node_config.sign(challenge.to_bytes()),
                 };
                 vec![
-                    WSSignalMessageFromNode::Announce(ma).into(),
-                    WSSignalMessageFromNode::ListIDsRequest.into(),
+                    WSSignalMessageFromNode::Announce(ma),
+                    WSSignalMessageFromNode::ListIDsRequest,
                 ]
+                .into_vec()
             }
             WSSignalMessageToNode::ListIDsReply(list) => {
-                vec![NetworkOut::NodeListFromWS(list)]
+                vec![NetworkOut::NodeListFromWS(list).into()]
             }
             WSSignalMessageToNode::PeerSetup(pi) => {
                 let own_id = self.node_config.info.get_id();
@@ -215,61 +251,85 @@ impl Messages {
                         return vec![];
                     }
                 };
-                concat(vec![
-                    self.assure_connection(&remote_node, Direction::Incoming),
-                    vec![NetworkOut::WebRTC(WebRTCConnInput::Message(
-                        remote_node,
-                        NCInput::Setup(pi.get_direction(&own_id), pi.message),
-                    ))],
-                ])
+                let mut out = vec![];
+                let dir = pi.get_direction(&own_id);
+                if !self.connections.contains(&remote_node) {
+                    out.append(&mut self.connect(&remote_node, dir.clone()));
+                }
+                out.push(InternOut::WebRTC(WebRTCConnIn::Message(
+                    remote_node,
+                    NCInput::Setup(dir, pi.message),
+                )));
+                out
             }
             WSSignalMessageToNode::SystemConfig(fledger_config) => {
-                vec![NetworkOut::SystemConfig(fledger_config)]
+                vec![NetworkOut::SystemConfig(fledger_config)].into_vec()
             }
         }
     }
 
-    async fn msg_call(&mut self, msg: NetworkIn) -> anyhow::Result<Vec<NetworkOut>> {
+    fn msg_net(&mut self, msg: NetworkIn) -> Vec<InternOut> {
         match msg {
-            NetworkIn::MessageToNode(id, msg_str) => {
+            NetworkIn::MessageToNode(id, msg_nw) => {
                 log::trace!(
                     "msg_call: {}->{}: {:?} / {:?}",
                     self.node_config.info.get_id(),
                     id,
-                    msg_str,
+                    msg_nw,
                     self.connections
                 );
 
-                Ok(concat(vec![
-                    self.assure_connection(&id, Direction::Outgoing),
-                    vec![NetworkOut::WebRTC(WebRTCConnInput::Message(
+                let mut out = vec![];
+                if !self.connections.contains(&id) {
+                    out.append(&mut self.connect(&id, Direction::Outgoing));
+                }
+                if let Ok(s) = serde_yaml::to_string(&msg_nw) {
+                    out.push(InternOut::WebRTC(WebRTCConnIn::Message(
                         id,
-                        NCInput::Text(msg_str),
-                    ))],
-                ]))
+                        NCInput::Text(s),
+                    )));
+                }
+                out
             }
             NetworkIn::StatsToWS(ss) => WSSignalMessageFromNode::NodeStats(ss.clone()).into(),
             NetworkIn::WSUpdateListRequest => WSSignalMessageFromNode::ListIDsRequest.into(),
-            NetworkIn::Connect(id) => Ok(self.assure_connection(&id, Direction::Outgoing)),
-            NetworkIn::Disconnect(id) => Ok(self.disconnect(&id).await),
-            NetworkIn::Tick => {
-                self.get_update -= 1;
-                Ok((self.get_update == 0)
-                    .then(|| {
-                        self.get_update = UPDATE_INTERVAL;
-                        vec![WSSignalMessageFromNode::ListIDsRequest.into()]
-                    })
-                    .unwrap_or(vec![]))
-            }
-            _ => Ok(vec![]),
+            NetworkIn::Connect(id) => self.connect(&id, Direction::Outgoing),
+            NetworkIn::Disconnect(id) => self.disconnect(&id),
         }
     }
 
-    async fn msg_node(&mut self, id: U256, msg_nc: NCOutput) -> Vec<NetworkOut> {
+    fn msg_tick(&mut self) -> Vec<InternOut> {
+        self.get_update -= 1;
+        (self.get_update == 0)
+            .then(|| {
+                self.get_update = UPDATE_INTERVAL;
+                vec![WSSignalMessageFromNode::ListIDsRequest.into()]
+            })
+            .unwrap_or(vec![])
+    }
+
+    fn msg_wrapper(&mut self, id: NodeID, msg: String) -> Vec<InternOut> {
+        match serde_yaml::from_str::<NetworkWrapper>(&msg) {
+            Ok(nw) => {
+                if let Some(net_msg) = nw.unwrap_yaml::<ModuleMessage>(MODULE_NAME) {
+                    match net_msg {
+                        ModuleMessage::String(_) => {}
+                        ModuleMessage::SignalIn(_) => todo!(),
+                        ModuleMessage::SignalOut(_) => todo!(),
+                    }
+                }
+                return vec![NetworkOut::MessageFromNode(id, nw).into()];
+            }
+            Err(e) => log::debug!("Couldn't unwrap {msg}: {e:?}"),
+        }
+        vec![]
+    }
+
+    fn msg_rtc(&mut self, id: NodeID, msg_nc: NCOutput) -> Vec<InternOut> {
         match msg_nc {
-            NCOutput::Connected(_) => vec![NetworkOut::Connected(id)],
-            NCOutput::Disconnected(_) => vec![NetworkOut::Disconnected(id)],
-            NCOutput::Text(msg) => vec![NetworkOut::MessageFromNode(id, msg)],
+            NCOutput::Connected(_) => vec![NetworkOut::Connected(id).into()],
+            NCOutput::Disconnected(_) => vec![NetworkOut::Disconnected(id).into()],
+            NCOutput::Text(msg) => self.msg_wrapper(id, msg),
             NCOutput::State(dir, state) => {
                 vec![NetworkOut::ConnectionState(NetworkConnectionState {
                     id,
@@ -282,7 +342,8 @@ impl Messages {
                         tx_bytes: state.tx_bytes,
                         delay_ms: state.delay_ms,
                     },
-                })]
+                })
+                .into()]
             }
             NCOutput::Setup(dir, pm) => {
                 let mut id_init = self.node_config.info.get_id();
@@ -302,25 +363,26 @@ impl Messages {
     }
 
     /// Connect to the given node.
-    fn assure_connection(&mut self, dst: &U256, dir: Direction) -> Vec<NetworkOut> {
+    /// TODO: differentiate connection_setup and connected
+    fn connect(&mut self, dst: &U256, dir: Direction) -> Vec<InternOut> {
         if self.connections.contains(dst) {
             vec![]
         } else {
             self.connections.push(dst.clone());
             self.send_connections();
-            vec![NetworkOut::WebRTC(WebRTCConnInput::Connect(*dst, dir))]
+            vec![InternOut::WebRTC(WebRTCConnIn::Connect(*dst, dir))]
         }
     }
 
     /// Disconnects from a given node.
-    async fn disconnect(&mut self, dst: &U256) -> Vec<NetworkOut> {
-        let mut out = vec![NetworkOut::Disconnected(*dst)];
+    fn disconnect(&mut self, dst: &U256) -> Vec<InternOut> {
+        let mut out = vec![NetworkOut::Disconnected(*dst).into()];
         if !self.connections.contains(dst) {
             log::trace!("Already disconnected from {}", dst);
         } else {
             self.connections.retain(|id| id != dst);
             self.send_connections();
-            out.push(NetworkOut::WebRTC(WebRTCConnInput::Message(
+            out.push(InternOut::WebRTC(WebRTCConnIn::Message(
                 *dst,
                 NCInput::Disconnect,
             )));
@@ -338,23 +400,80 @@ impl Messages {
 }
 
 #[platform_async_trait()]
-impl SubsystemHandler<NetworkIn, NetworkOut> for Messages {
-    async fn messages(&mut self, msgs: Vec<NetworkIn>) -> Vec<NetworkOut> {
-        let mut out = vec![];
-        for msg in msgs {
-            log::trace!(
-                "{}: Processing message {msg}",
-                self.node_config.info.get_id()
-            );
-            match msg {
-                NetworkIn::WebSocket(ws) => out.extend(self.msg_ws(ws).await),
-                NetworkIn::WebRTC(WebRTCConnOutput::Message(id, msg)) => {
-                    out.extend(self.msg_node(id, msg).await)
-                }
-                _ => out.extend(self.msg_call(msg).await.unwrap()),
+impl SubsystemHandler<InternIn, InternOut> for Messages {
+    async fn messages(&mut self, msgs: Vec<InternIn>) -> Vec<InternOut> {
+        let id = self.node_config.info.get_id();
+        msgs.into_iter()
+            .inspect(|msg| log::trace!("{id}: Processing message {msg}",))
+            .flat_map(|msg| match msg {
+                InternIn::WebSocket(ws) => __self.msg_ws(ws),
+                InternIn::WebRTC(WebRTCConnOut::Message(id, msg)) => __self.msg_rtc(id, msg),
+                InternIn::Network(net) => __self.msg_net(net),
+                InternIn::Tick => __self.msg_tick(),
+                InternIn::Signal(wsserver_in) => todo!(),
+            })
+            .collect::<Vec<_>>()
+    }
+}
+
+impl From<NetworkOut> for InternOut {
+    fn from(value: NetworkOut) -> Self {
+        InternOut::Network(value)
+    }
+}
+
+impl From<WSClientIn> for InternOut {
+    fn from(value: WSClientIn) -> Self {
+        InternOut::WebSocket(value)
+    }
+}
+
+impl From<WebRTCConnIn> for InternOut {
+    fn from(value: WebRTCConnIn) -> Self {
+        InternOut::WebRTC(value)
+    }
+}
+
+impl From<WSSignalMessageFromNode> for InternOut {
+    fn from(msg: WSSignalMessageFromNode) -> Self {
+        InternOut::WebSocket(WSClientIn::Message(serde_json::to_string(&msg).unwrap()))
+    }
+}
+
+impl From<WSSignalMessageFromNode> for Vec<InternOut> {
+    fn from(msg: WSSignalMessageFromNode) -> Self {
+        vec![msg.into()]
+    }
+}
+
+impl Display for InternIn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InternIn::Network(network_in) => {
+                write!(f, "InternalIn::Network({})", network_in)
             }
+            InternIn::Tick => write!(f, "InternalIn::Tick"),
+            InternIn::WebSocket(wsclient_out) => {
+                write!(f, "InternalIn::WebSocket({:?})", wsclient_out)
+            }
+            InternIn::WebRTC(web_rtcconn_output) => {
+                write!(f, "InternalIn::WebRTC({:?})", web_rtcconn_output)
+            }
+            InternIn::Signal(wsserver_in) => write!(f, "InternalIn::Signal({:?})", wsserver_in),
         }
-        out
+    }
+}
+
+pub trait IntoVec<D> {
+    fn into_vec(self) -> Vec<D>;
+}
+
+impl<E, D> IntoVec<D> for Vec<E>
+where
+    D: From<E>,
+{
+    fn into_vec(self) -> Vec<D> {
+        self.into_iter().map(std::convert::Into::into).collect()
     }
 }
 
@@ -411,8 +530,11 @@ impl NetworkWebRTC {
     /// Tries to send a text-message to a remote node.
     /// The [`Network`] will start a connection with the node if there is none available.
     /// If the remote node is not available, no error is returned.
-    pub fn send_msg(&mut self, dst: NodeID, msg: String) -> anyhow::Result<()> {
-        self.send(NetworkIn::MessageToNode(dst, msg))
+    pub fn send_str(&mut self, dst: NodeID, msg: String) -> anyhow::Result<()> {
+        self.send(NetworkIn::MessageToNode(
+            dst,
+            NetworkWrapper::wrap_yaml(MODULE_NAME, &ModuleMessage::String(msg))?,
+        ))
     }
 
     /// Requests an updated list of all connected nodes to the signalling server.
@@ -421,42 +543,49 @@ impl NetworkWebRTC {
     }
 }
 
-impl From<WSSignalMessageFromNode> for NetworkOut {
-    fn from(msg: WSSignalMessageFromNode) -> Self {
-        NetworkOut::WebSocket(WSClientIn::Message(serde_json::to_string(&msg).unwrap()))
-    }
-}
-
-impl From<WSSignalMessageFromNode> for anyhow::Result<Vec<NetworkOut>> {
-    fn from(msg: WSSignalMessageFromNode) -> Self {
-        Ok(vec![msg.into()])
-    }
-}
-
-impl TranslateFrom<WSClientOut> for NetworkIn {
+impl TranslateFrom<WSClientOut> for InternIn {
     fn translate(msg: WSClientOut) -> Option<Self> {
-        Some(NetworkIn::WebSocket(msg))
+        Some(InternIn::WebSocket(msg))
     }
 }
-impl TranslateInto<WSClientIn> for NetworkOut {
+impl TranslateInto<WSClientIn> for InternOut {
     fn translate(self) -> Option<WSClientIn> {
         match self {
-            NetworkOut::WebSocket(msg) => Some(msg),
+            InternOut::WebSocket(msg) => Some(msg),
             _ => None,
         }
     }
 }
 
-impl TranslateFrom<WebRTCConnOutput> for NetworkIn {
-    fn translate(msg: WebRTCConnOutput) -> Option<Self> {
-        Some(NetworkIn::WebRTC(msg))
+/*
+the trait bound `network::messages::InternIn: TranslateFrom<NetworkIn>` is not satisfied
+the trait bound `network::messages::InternOut: TranslateInto<NetworkOut>` is not satisfied
+ */
+
+impl TranslateFrom<NetworkIn> for InternIn {
+    fn translate(msg: NetworkIn) -> Option<Self> {
+        Some(InternIn::Network(msg))
+    }
+}
+impl TranslateInto<NetworkOut> for InternOut {
+    fn translate(self) -> Option<NetworkOut> {
+        match self {
+            InternOut::Network(network_out) => Some(network_out),
+            _ => None,
+        }
     }
 }
 
-impl TranslateInto<WebRTCConnInput> for NetworkOut {
-    fn translate(self) -> Option<WebRTCConnInput> {
+impl TranslateFrom<WebRTCConnOut> for InternIn {
+    fn translate(msg: WebRTCConnOut) -> Option<Self> {
+        Some(InternIn::WebRTC(msg))
+    }
+}
+
+impl TranslateInto<WebRTCConnIn> for InternOut {
+    fn translate(self) -> Option<WebRTCConnIn> {
         match self {
-            NetworkOut::WebRTC(msg_webrtc) => Some(msg_webrtc),
+            InternOut::WebRTC(msg_webrtc) => Some(msg_webrtc),
             _ => None,
         }
     }
@@ -470,9 +599,6 @@ impl fmt::Display for NetworkIn {
             NetworkIn::WSUpdateListRequest => write!(f, "WSUpdateListRequest"),
             NetworkIn::Connect(_) => write!(f, "Connect()"),
             NetworkIn::Disconnect(_) => write!(f, "Disconnect()"),
-            NetworkIn::Tick => write!(f, "Tick"),
-            NetworkIn::WebSocket(_) => write!(f, "WebSocket"),
-            NetworkIn::WebRTC(_) => write!(f, "WebRTC"),
         }
     }
 }
@@ -485,8 +611,6 @@ impl fmt::Display for NetworkOut {
             NetworkOut::ConnectionState(_) => write!(f, "ConnectionState()"),
             NetworkOut::Connected(_) => write!(f, "Connected()"),
             NetworkOut::Disconnected(_) => write!(f, "Disconnected()"),
-            NetworkOut::WebSocket(_) => write!(f, "WebSocket"),
-            NetworkOut::WebRTC(_) => write!(f, "WebRTC"),
             NetworkOut::SystemConfig(_) => write!(f, "SystemConfig"),
         }
     }
@@ -523,9 +647,9 @@ pub struct ConnStats {
 
 #[cfg(test)]
 mod tests {
-    use flarch::start_logging;
+    use flarch::{nodeids::U256, start_logging};
 
-    use super::*;
+    use crate::network::signal::WSSignalMessageToNode;
 
     #[test]
     fn test_serialize() -> anyhow::Result<()> {

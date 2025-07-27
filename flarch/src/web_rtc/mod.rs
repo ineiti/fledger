@@ -48,17 +48,17 @@ mod libc;
 #[cfg(target_family = "unix")]
 pub use libc::*;
 
-pub type BrokerWebRTCConn = Broker<WebRTCConnInput, WebRTCConnOutput>;
+pub type BrokerWebRTCConn = Broker<WebRTCConnIn, WebRTCConnOut>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum WebRTCConnInput {
+pub enum WebRTCConnIn {
     Message(NodeID, NCInput),
     Connect(NodeID, Direction),
     Disconnect(NodeID),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum WebRTCConnOutput {
+pub enum WebRTCConnOut {
     Message(NodeID, NCOutput),
 }
 
@@ -90,7 +90,7 @@ impl WebRTCConn {
             self.connections.insert(id.clone(), nc.clone());
             nc.add_translator_o_to(
                 self.broker.clone(),
-                Box::new(move |msg| Some(WebRTCConnOutput::Message(id.clone(), msg))),
+                Box::new(move |msg| Some(WebRTCConnOut::Message(id.clone(), msg))),
             )
             .await?;
             if dir == Direction::Outgoing {
@@ -116,17 +116,17 @@ impl WebRTCConn {
 }
 
 #[platform_async_trait()]
-impl SubsystemHandler<WebRTCConnInput, WebRTCConnOutput> for WebRTCConn {
-    async fn messages(&mut self, msgs: Vec<WebRTCConnInput>) -> Vec<WebRTCConnOutput> {
+impl SubsystemHandler<WebRTCConnIn, WebRTCConnOut> for WebRTCConn {
+    async fn messages(&mut self, msgs: Vec<WebRTCConnIn>) -> Vec<WebRTCConnOut> {
         for msg in msgs {
             match msg {
-                WebRTCConnInput::Message(dst, msg_in) => {
+                WebRTCConnIn::Message(dst, msg_in) => {
                     self.try_send(dst, msg_in);
                 }
-                WebRTCConnInput::Disconnect(dst) => {
+                WebRTCConnIn::Disconnect(dst) => {
                     self.try_send(dst, NCInput::Disconnect);
                 }
-                WebRTCConnInput::Connect(dst, dir) => {
+                WebRTCConnIn::Connect(dst, dir) => {
                     self.ensure_connection(dst.clone(), dir)
                         .await
                         .err()

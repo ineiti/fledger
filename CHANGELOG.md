@@ -8,6 +8,22 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 ## [0.9.3] - Pending
 
+### This PR
+
+- TODO
+  - fix compilation errors
+  - make sure no regressions are inserted
+  - finalize `todo()`s:
+    - Network::NodeSignal
+    - Network::Messages::msg_wrapper
+  - split PR into different commits:
+    - Node::start_network
+    - using NetworkWrapper in NetworkIn::MessageToNode, replace some U256 with NodeID
+    - adding Broker to network_start
+    - WebRTCConnInput, WebRTCConnOutput to WebRTCConnIn, WebRTCConnOut
+    - Modules::stable()
+    - InternIn, InternOut, create flmodules/src/network/messages.rs
+
 ### Added
 
 - flbrowser
@@ -44,7 +60,7 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 ## [0.9.0] - 2025-02-24
 
 This release is mostly for the start of the student project.
-It is a mostly working version of the dht_storage module, but most of the CLI tools 
+It is a mostly working version of the dht_storage module, but most of the CLI tools
 and web-frontend are still missing.
 
 ### Added
