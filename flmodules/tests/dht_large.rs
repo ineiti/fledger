@@ -20,12 +20,7 @@ async fn dht_large() -> anyhow::Result<()> {
     let nbr_nodes = 20;
     let max_space = 20_000;
     let html_size = 1500;
-    let prob_no_fail = 0.99;
-
-    let nbr_nodes = 10;
-    let max_space = 20_000;
-    let html_size = 1500;
-    let p_success = 0.2;
+    let p_success = 0.99;
 
     let mut simul = Simul::new().await?;
     let mut nodes = simul.new_nodes_raw(nbr_nodes - 1).await?;
