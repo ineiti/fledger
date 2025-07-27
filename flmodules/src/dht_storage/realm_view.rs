@@ -97,7 +97,10 @@ impl RealmView {
     pub async fn new_from_realm(dht_storage: DHTStorage, realm: FloRealm) -> anyhow::Result<Self> {
         let pages = RealmStorage::from_service(dht_storage.clone(), &realm, "http")
             .await?
-            .ok_or(anyhow::anyhow!("Didn't find the root page"))?;
+            .ok_or(anyhow::anyhow!(
+                "Didn't find the root page for {}",
+                realm.realm_id()
+            ))?;
         let tags = RealmStorage::from_service(dht_storage.clone(), &realm, "tag")
             .await?
             .ok_or(anyhow::anyhow!("Didn't find the root tag"))?;
@@ -397,16 +400,16 @@ impl RealmView {
         self.dht_storage.convert(flo.cond(), &flo.realm_id()).await
     }
 
-    pub async fn update_realm(&mut self) -> anyhow::Result<&FloRealm>{
+    pub async fn update_realm(&mut self) -> anyhow::Result<&FloRealm> {
         self.realm = self.dht_storage.get_flo(&self.realm.global_id()).await?;
         Ok(&self.realm)
     }
 
-    pub async fn update_all(&mut self) -> anyhow::Result<()>{
+    pub async fn update_all(&mut self) -> anyhow::Result<()> {
         self.update_pages().await?;
         self.update_tags().await?;
         self.update_realm().await?;
-        
+
         Ok(())
     }
 }

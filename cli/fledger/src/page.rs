@@ -70,7 +70,14 @@ impl Page {
         let mut ds = f.node.dht_storage.as_ref().unwrap().clone();
         let mut realms = HashMap::new();
         for rid in ds.get_realm_ids().await? {
-            realms.insert(rid.clone(), ds.get_realm_view(rid).await?);
+            match ds.get_realm_view(rid.clone()).await {
+                Ok(realm) => {
+                    realms.insert(rid.clone(), realm);
+                }
+                Err(e) => {
+                    log::warn!("Couldn't connect to realm {rid}: {e:?}");
+                }
+            }
         }
         let mut page = Page { f, ds, realms };
 
