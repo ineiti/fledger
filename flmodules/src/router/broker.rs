@@ -89,6 +89,11 @@ impl RouterNetwork {
                     NetworkOut::SystemConfig(conf) => {
                         Some(RouterInternal::SystemConfig(conf).into())
                     }
+                    NetworkOut::Error(e) => {
+                        // TODO: propagate this error to the node control or whatever, so that the
+                        // system can be nicely shut down.
+                        panic!("Got a fatal error from the signalling server: {e}");
+                    }
                     _ => None,
                 }),
             )

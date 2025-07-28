@@ -6,6 +6,8 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
+### Current task
+
 ## [0.9.3] - Pending
 
 ### Added
@@ -27,6 +29,9 @@ Following https://keepachangelog.com/en/1.1.0/ and using
   - Don't send full list of nodes
 - UI chat scrolls to the bottom when showing the first message.
 
+### Fixed
+- enforce single tab and only one connection per node-ID
+
 ## [0.9.1] - 2025-03-17
 
 ### Added
@@ -44,7 +49,7 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 ## [0.9.0] - 2025-02-24
 
 This release is mostly for the start of the student project.
-It is a mostly working version of the dht_storage module, but most of the CLI tools 
+It is a mostly working version of the dht_storage module, but most of the CLI tools
 and web-frontend are still missing.
 
 ### Added

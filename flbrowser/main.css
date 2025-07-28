@@ -50,8 +50,7 @@
     }
 }
 
-Override with user preference when explicitly set
-[data-theme="dark"] {
+Override with user preference when explicitly set [data-theme="dark"] {
     --primary-color: #5dade2;
     --secondary-color: #a3c6e9;
     --background-color: #0a0a0a;
@@ -108,11 +107,13 @@ Override with user preference when explicitly set
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     line-height: 1.6;
     color: var(--text-color);
     background-color: var(--background-color);
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition:
+        background-color 0.3s ease,
+        color 0.3s ease;
 }
 
 /* Header styles */
@@ -168,7 +169,7 @@ header h1 {
 }
 
 .module-tabs li.active::after {
-    content: '';
+    content: "";
     position: absolute;
     bottom: -4px;
     left: 50%;
@@ -248,7 +249,10 @@ header h1 {
     background-color: var(--stats-bg-color);
     max-width: 250px;
     /* transition: background-color 0.3s ease; */
-    transition: max-height 0.3s ease-out, transform 1s ease-out, opacity 0.3s ease-out;
+    transition:
+        max-height 0.3s ease-out,
+        transform 1s ease-out,
+        opacity 0.3s ease-out;
     opacity: 0;
 }
 
@@ -364,6 +368,10 @@ section h2 {
     padding: 1rem;
     border-radius: 4px;
     border-left: 4px solid var(--primary-color);
+}
+
+.status-section .error {
+    background-color: rgba(219, 152, 52, 0.05);
 }
 
 #node-status {
@@ -491,7 +499,7 @@ section h2 {
 }
 
 .health-indicator::after {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -1122,7 +1130,7 @@ i.fab {
     right: 0;
     bottom: 0;
     background-color: var(--slider-bg);
-    transition: .3s;
+    transition: 0.3s;
     border-radius: 22px;
 }
 
@@ -1134,15 +1142,15 @@ i.fab {
     left: 3px;
     bottom: 3px;
     background-color: white;
-    transition: .3s;
+    transition: 0.3s;
     border-radius: 50%;
 }
 
-input:checked+.slider {
+input:checked + .slider {
     background-color: var(--primary-color);
 }
 
-input:checked+.slider:before {
+input:checked + .slider:before {
     transform: translateX(18px);
 }
 

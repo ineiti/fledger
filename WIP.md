@@ -60,7 +60,6 @@ This file is in place of github issues, as currently I'm mostly developing on my
 signalling server
 
 ## Bugs
-
 - when opening fledger in more than one tab, it bugs
 - flmodules/web_proxy has horrible error handling - too many `expect`s
   - show an error if no nodes are connected

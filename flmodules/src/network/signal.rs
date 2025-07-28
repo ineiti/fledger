@@ -47,7 +47,7 @@
 //! You can find an example of how the signalling server is used in
 //! <https://github.com/ineiti/fledger/tree/0.7.0/cli/flsignal/src/main.rs>
 
-use bimap::BiMap;
+use bimap::{BiMap, Overwritten};
 use rand::{rngs::StdRng, seq::IteratorRandom, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_with::{hex::Hex, serde_as};
@@ -110,7 +110,8 @@ pub enum SignalOut {
 /// PeerInfo messages between nodes.
 /// It also handles statistics by forwarding NodeStats to a listener.
 pub struct SignalServer {
-    connection_ids: BiMap<U256, usize>,
+    challenges: BiMap<U256, usize>,
+    connection_ids: BiMap<NodeID, usize>,
     info: HashMap<U256, NodeInfo>,
     ttl: HashMap<usize, u16>,
     config: SignalConfig,
@@ -130,6 +131,7 @@ impl SignalServer {
         let mut broker = Broker::new();
         broker
             .add_handler(Box::new(SignalServer {
+                challenges: BiMap::new(),
                 connection_ids: BiMap::new(),
                 info: HashMap::new(),
                 ttl: HashMap::new(),
@@ -202,7 +204,7 @@ impl SignalServer {
     fn msg_ws_connect(&mut self, index: usize) -> Vec<SignalOut> {
         log::trace!("Sending challenge to new connection");
         let challenge = U256::rnd();
-        self.connection_ids.insert(challenge, index);
+        self.challenges.insert(challenge, index);
         self.ttl.insert(index, self.config.ttl_minutes);
         let challenge_msg =
             serde_json::to_string(&WSSignalMessageToNode::Challenge(SIGNAL_VERSION, challenge))
@@ -214,8 +216,8 @@ impl SignalServer {
     }
 
     fn ws_announce(&mut self, index: usize, msg: MessageAnnounce) -> Vec<SignalOut> {
-        let challenge = match self.connection_ids.get_by_right(&index) {
-            Some(id) => id,
+        let challenge = match self.challenges.get_by_right(&index) {
+            Some(id) => id.clone(),
             None => {
                 log::warn!("Got an announcement message without challenge.");
                 return vec![];
@@ -226,16 +228,24 @@ impl SignalServer {
             return vec![];
         }
         let id = msg.node_info.get_id();
-        self.connection_ids.insert(id, index);
+        let mut msgs = vec![];
+        if let Overwritten::Left(_, old) = self.connection_ids.insert(id, index) {
+            log::warn!("The same ID is already connected to this signalling server - sending kill signal to previous connection");
+            msgs.append(&mut self.send_msg_node(
+                old,
+                WSSignalMessageToNode::Error("New Connection with same ID".into()),
+            ))
+        }
 
         log::info!("Registration of node-id {}: {}", id, msg.node_info.name);
         self.info.insert(id, msg.node_info);
-        let mut msgs = self.send_msg_node(
+        self.challenges.remove_by_left(&challenge);
+        msgs.append(&mut self.send_msg_node(
             index,
             WSSignalMessageToNode::SystemConfig(FledgerConfig {
                 system_realm: self.config.system_realm.clone(),
             }),
-        );
+        ));
         msgs.push(SignalOut::NewNode(id));
         msgs
     }
@@ -282,6 +292,7 @@ impl SignalServer {
 
     fn remove_node(&mut self, index: usize) {
         log::info!("Removing node {index} from {:?}", self.info);
+        self.challenges.remove_by_right(&index);
         if let Some((id, _)) = self.connection_ids.remove_by_right(&index) {
             self.info.remove(&id);
         }
@@ -333,6 +344,8 @@ pub enum WSSignalMessageToNode {
     PeerSetup(PeerInfo),
     /// General configuration for the system
     SystemConfig(FledgerConfig),
+    /// An error occured in the signalling server
+    Error(String),
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -357,6 +370,7 @@ impl std::fmt::Display for WSSignalMessageToNode {
             WSSignalMessageToNode::ListIDsReply(_) => write!(f, "ListIDsReply"),
             WSSignalMessageToNode::PeerSetup(_) => write!(f, "PeerSetup"),
             WSSignalMessageToNode::SystemConfig(_) => write!(f, "SystemConfig"),
+            WSSignalMessageToNode::Error(_) => write!(f, "Error"),
         }
     }
 }

@@ -88,6 +88,8 @@ pub enum NetworkOut {
     WebRTC(WebRTCConnInput),
     /// Configuration from the signalling server
     SystemConfig(FledgerConfig),
+    /// A fatal error happened
+    Error(String),
 }
 
 #[derive(Error, Debug)]
@@ -226,6 +228,7 @@ impl Messages {
             WSSignalMessageToNode::SystemConfig(fledger_config) => {
                 vec![NetworkOut::SystemConfig(fledger_config)]
             }
+            WSSignalMessageToNode::Error(e) => vec![NetworkOut::Error(e)],
         }
     }
 
@@ -488,6 +491,7 @@ impl fmt::Display for NetworkOut {
             NetworkOut::WebSocket(_) => write!(f, "WebSocket"),
             NetworkOut::WebRTC(_) => write!(f, "WebRTC"),
             NetworkOut::SystemConfig(_) => write!(f, "SystemConfig"),
+            NetworkOut::Error(_) => write!(f, "Error"),
         }
     }
 }
