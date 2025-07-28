@@ -10,14 +10,43 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
     <script>
-        function init_jsi() {
-            if (window.wasmBindings) {
-                new window.wasmBindings.JSInterface().then((res) => { jsi = res });
-            } else {
-                setTimeout(init_jsi, 500);
+        const channel = new BroadcastChannel('single-tab-check');
+        const msgPing = "ping";
+        const msgPong = "pong";
+        var alone = true;
+
+        function handleTabMessage(event) {
+            switch(event.data.type){
+                case msgPing:
+                    channel.postMessage({ type: msgPong, reason: "Replying to request" });
+                    break;
+                case msgPong:
+                    alone = false;
+                    break;
             }
         }
-        window.addEventListener("load", (event) => { init_jsi(); });
+        channel.addEventListener('message', handleTabMessage);
+
+        window.addEventListener("load", (event) => {
+            channel.postMessage({ type: msgPing });
+        });
+
+        setTimeout(() => {
+            if (!alone) {
+                document.querySelector('.status-section').classList.add('error');
+                document.querySelector('#status-steps').innerHTML = "<li>Other tab with Danu open</li>";
+                channel.removeEventListener('message', handleTabMessage);
+            } else {
+                function init_jsi() {
+                    if (window.wasmBindings) {
+                        new window.wasmBindings.JSInterface().then((res) => { jsi = res });
+                    } else {
+                        setTimeout(init_jsi, 500);
+                    }
+                }
+                init_jsi();
+            }
+        }, 100);
     </script>
 </head>
 
@@ -142,8 +171,8 @@
                                 <li><strong>Proxy Viewing</strong> - Browse webpages through a decentralized proxy</li>
                             </ul>
 
-                            <p>For more information, visit <a href="https://web.fledg.re/"
-                                    target="_blank">web.fledg.re</a>.
+                            <p>For more information, visit <a href="https://github.com/ineiti/fledger/"
+                                    target="_blank">github.com/ineiti/fledger</a>.
                             </p>
                         </section>
 
@@ -426,44 +455,6 @@
                 });
             });
 
-            /*
-            // Chat module functionality
-            const chatInput = document.getElementById('chat-input');
-            const sendButton = document.getElementById('send-message-btn');
-
-            function sendMessage() {
-                if (chatInput.value.trim() !== '') {
-                    const messageContainer = document.getElementById('message-container');
-                    const now = new Date();
-                    const timeString = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-                    const messageHTML = `
-                        <div class="message-item sent">
-                            <div class="message-sender">You</div>
-                            <div class="message-content">${chatInput.value}</div>
-                            <div class="message-time">${timeString}</div>
-                        </div>
-                    `;
-
-                    messageContainer.innerHTML += messageHTML;
-                    messageContainer.scrollTop = messageContainer.scrollHeight;
-                    chatInput.value = '';
-                }
-            }
-
-            if (sendButton) {
-                sendButton.addEventListener('click', sendMessage);
-            }
-
-            if (chatInput) {
-                chatInput.addEventListener('keypress', function (e) {
-                    if (e.key === 'Enter') {
-                        sendMessage();
-                    }
-                });
-            }
-    */
-
             // Mobile layout adjustments
             function handleMobileLayout() {
                 const container = document.querySelector('.container');
@@ -562,16 +553,6 @@
             var editor = ace.edit("editor");
             editor.setTheme("ace/theme/monokai");
             editor.session.setMode("ace/mode/html");
-            // Set default content with a simple "Hello Danu" page
-            // // Add event listener for cmd+enter or ctrl+enter in the editor
-            // editor.commands.addCommand({
-            //     name: "savePageShortcut",
-            //     bindKey: { win: "Ctrl-Enter", mac: "Cmd-Enter" },
-            //     exec: function () {
-            //         document.getElementById('update-page').click();
-            //     }
-            // });
-
         });
     </script>
 

@@ -10,16 +10,8 @@ This file is in place of github issues, as currently I'm mostly developing on my
 
 ### User-facing
 
-Implement [DHT_STORAGE.md](./DHT_STORAGE.md):
-- link browser and cli using a badge
-- add handling of pages with cybernode code
-- add FloAlias/FloUser/FloName/FloIdentity/FloSomething and use it in the chat
-
 ### Backend
 
-- Node
-  - Create events when something happens, either:
-    - poll the structures, and send events through
 - DHT Storage
   - add own Flos to DHTConfig.owned
   - verify Flos when they enter the system
@@ -28,17 +20,29 @@ Implement [DHT_STORAGE.md](./DHT_STORAGE.md):
 
 ### Testing
 
+### Bugs
+
+- test dht_large fails too often
+- cli/fledger seems to remove some of the cuckoos when updating a page
+- under some circumstances, the locally stored pages get lost
+  - probably because the cuckoos are missing, so they are not displayed
+  - update of fledger version?
+  - update of root page?
+
+
 # TODO
 
 ## Features
 
-DHT_Storage:
-- when new FloMetas enter the system, check which are the most probable to be kept:
-  - choose the closest (with the highest depth) not-yet-stored Flos for synching
+### [DHT_STORAGE.md](./DHT_STORAGE.md)
+- Update DHT_STORAGE.md
 - Add a timeout to FloCuckoos when they are purged from the system
 - Add a timeout for Flos to purge them from the system
+- link browser and cli using a badge
+- add handling of pages with cybernode code
+- add FloAlias/FloUser/FloName/FloIdentity/FloSomething and use it in the chat
 
-DHT_Router:
+### DHT_Router
 - KBucket.active is only be populated once a node has been confirmed.
   - Needs more testing if nodes fail and how they will be replaced
     This definitely doesn't work currently
@@ -48,8 +52,15 @@ DHT_Router:
   - active nodes are stored in a global vec
   - each realm-kademlia looks in these nodes first to populate the buckets
 
-## Bugs
+### Broker
+- finish implementing branch broker_logger
 
+### Network
+- finish implementing add_multiple_ws to connect using other nodes instead of the
+signalling server
+
+## Bugs
+- when opening fledger in more than one tab, it bugs
 - flmodules/web_proxy has horrible error handling - too many `expect`s
   - show an error if no nodes are connected
 - flarch/webrtc errors - perhaps not necessary to fix if matchbox works:
@@ -58,8 +69,12 @@ DHT_Router:
 
 ## Cleanups / improvements
 
-- remove all the logging comments
+Documentation:
+- create READMEs in the subdirectories from the mod.rs files
 - update documentation `flmoduls::network`
+
+Various:
+- remove all the logging comments
 - serde_yaml is deprecated
   - use serde_yaml_ng with singleton_map_recursive
 - use matchbox from https://github.com/johanhelsing/matchbox
@@ -75,6 +90,10 @@ DHT_Router:
 Added fledger to blog: https://ineiti.ch/projects/fledger/
 
 # Dates
+
+2025-07-xx:
+- when new FloMetas enter the system, check which are the most probable to be kept:
+  - choose the closest (with the highest depth) not-yet-stored Flos for synching
 
 2025-05-11:
 There has been lots of work throughout the last 6 months

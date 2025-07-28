@@ -109,6 +109,12 @@ serve_two: kill build_cli
 	sleep 4
 	( cd cli && ( $(call FLEDGER,1) & $(call FLEDGER,2) & ) )
 
+node_1:
+	cd cli && $(call FLEDGER,1)
+
+node_2:
+	cd cli && $(call FLEDGER,2)
+
 serve_local: kill build_local_web serve_two
 	cd flbrowser && RUST_BACKTRACE=1 trunk serve --features local -w . -w ../flmodules &
 	sleep 2
