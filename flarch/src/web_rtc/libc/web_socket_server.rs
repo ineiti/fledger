@@ -19,6 +19,8 @@ use crate::{
     web_rtc::websocket::BrokerWSServer,
 };
 
+use metrics::counter;
+
 pub struct WebSocketServer {
     connections: Arc<Mutex<Vec<WSConnection>>>,
     conn_thread: JoinHandle<()>,
@@ -69,6 +71,7 @@ impl WebSocketServer {
 impl SubsystemHandler<WSServerIn, WSServerOut> for WebSocketServer {
     async fn messages(&mut self, from_broker: Vec<WSServerIn>) -> Vec<WSServerOut> {
         for msg in from_broker {
+            counter!("flarch_ws_server_recv_bytes", size_of_val(&msg) as u64);
             match msg {
                 WSServerIn::Message(id, msg) => {
                     let mut connections = self.connections.lock().await;

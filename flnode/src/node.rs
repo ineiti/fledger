@@ -259,7 +259,7 @@ impl Node {
         }
     }
 
-    /// Adds a new chat message that will be broadcasted to the system.
+    /// Adds a new simulation_chat message that will be broadcasted to the system.
     pub async fn add_chat_message(&mut self, msg: String) -> anyhow::Result<()> {
         if let Some(g) = self.gossip.as_mut() {
             let event = core::Event {

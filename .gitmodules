@@ -1,0 +1,3 @@
+[submodule "metrics-exporter-influx"]
+	path = metrics-exporter-influx
+	url = https://github.com/aizensoosuke/metrics-exporter-influx.git

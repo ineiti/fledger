@@ -47,6 +47,7 @@ pub enum DHTStorageIn {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DHTStorageOut {
+    Flos(Vec<Flo>),
     FloValue(FloCuckoo),
     FloValues(Vec<FloCuckoo>),
     RealmIDs(Vec<RealmID>),

@@ -11,6 +11,7 @@
 
 use core::panic;
 use itertools::concat;
+use metrics::counter;
 use std::{fmt, time::Duration};
 use thiserror::Error;
 use tokio::sync::{mpsc::UnboundedReceiver, watch};
@@ -173,6 +174,8 @@ impl Messages {
     /// This can be either messages requested by this node, or connection
     /// setup requests from another node.
     async fn msg_ws(&mut self, msg: WSClientOut) -> Vec<NetworkOut> {
+        counter!("network_broker_recv_ws_bytes", size_of_val(&msg) as u64);
+
         let msg_node_str = match msg {
             WSClientOut::Message(msg) => msg,
             WSClientOut::Error(e) => {
@@ -233,6 +236,8 @@ impl Messages {
     }
 
     async fn msg_call(&mut self, msg: NetworkIn) -> anyhow::Result<Vec<NetworkOut>> {
+        counter!("network_broker_recv_call_bytes", size_of_val(&msg) as u64);
+
         match msg {
             NetworkIn::MessageToNode(id, msg_str) => {
                 log::trace!(
@@ -269,6 +274,11 @@ impl Messages {
     }
 
     async fn msg_node(&mut self, id: U256, msg_nc: NCOutput) -> Vec<NetworkOut> {
+        counter!(
+            "network_broker_recv_node_bytes",
+            size_of_val(&msg_nc) as u64
+        );
+
         match msg_nc {
             NCOutput::Connected(_) => vec![NetworkOut::Connected(id)],
             NCOutput::Disconnected(_) => vec![NetworkOut::Disconnected(id)],
@@ -349,6 +359,7 @@ impl SubsystemHandler<NetworkIn, NetworkOut> for Messages {
                 "{}: Processing message {msg}",
                 self.node_config.info.get_id()
             );
+            counter!("network_recv_bytes", size_of_val(&msg) as u64);
             match msg {
                 NetworkIn::WebSocket(ws) => out.extend(self.msg_ws(ws).await),
                 NetworkIn::WebRTC(WebRTCConnOutput::Message(id, msg)) => {
@@ -399,6 +410,7 @@ impl NetworkWebRTC {
         loop {
             let msg = self.tap.recv().await;
             if let Some(msg_reply) = msg {
+                counter!("network_recv_bytes", size_of_val(&msg_reply) as u64);
                 return msg_reply;
             }
         }
@@ -408,6 +420,7 @@ impl NetworkWebRTC {
     /// The message is of type [`NetworkIn`], as this is what the user can
     /// send to the [`Network`].
     pub fn send(&mut self, msg: NetworkIn) -> anyhow::Result<()> {
+        counter!("network_broker_rtc_sent_bytes", size_of_val(&msg) as u64);
         self.broker_net.emit_msg_in(msg)
     }
 

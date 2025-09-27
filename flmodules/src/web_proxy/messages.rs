@@ -52,7 +52,7 @@ pub struct Messages {
 }
 
 impl Messages {
-    /// Returns a new chat module.
+    /// Returns a new simulation_chat module.
     pub fn new(
         ds: Box<dyn DataStorage + Send>,
         cfg: WebProxyConfig,

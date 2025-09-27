@@ -40,7 +40,7 @@ pub struct Messages {
 }
 
 impl Messages {
-    /// Returns a new chat module.
+    /// Returns a new simulation_chat module.
     pub fn new(
         storage: Box<dyn DataStorage + Send>,
         cfg: TemplateConfig,

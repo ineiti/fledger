@@ -80,7 +80,7 @@ impl Gossip {
         Ok(())
     }
 
-    /// Gets a copy of all chat events stored in the module.
+    /// Gets a copy of all simulation_chat events stored in the module.
     pub fn chat_events(&self) -> Vec<Event> {
         self.storage.borrow().events(Category::TextMessage)
     }
