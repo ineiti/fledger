@@ -313,7 +313,7 @@ impl Messages {
         } else {
             self.connections.push(dst.clone());
             self.send_connections();
-            vec![NetworkOut::WebRTC(WebRTCConnInput::Connect(*dst, dir))]
+            vec![InternOut::WebRTC(WebRTCConnIn::Connect(*dst, dir))]
         }
     }
 
@@ -325,7 +325,7 @@ impl Messages {
         } else {
             self.connections.retain(|id| id != dst);
             self.send_connections();
-            out.push(NetworkOut::WebRTC(WebRTCConnInput::Message(
+            out.push(InternOut::WebRTC(WebRTCConnIn::Message(
                 *dst,
                 NCInput::Disconnect,
             )));
