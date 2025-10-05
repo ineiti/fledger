@@ -6,9 +6,9 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
-### Current task
-
 ## [0.9.3] - Pending
+
+See [WIP.md](./WIP.md) for current work and bugs to fix
 
 ### Added
 
@@ -17,9 +17,21 @@ Following https://keepachangelog.com/en/1.1.0/ and using
   - show cuckoo pages on the bottom
 
 ### Changed
+- webrtc - better error reporting
 
-- `RealmView` is now tied to have a `root-page` and a `root-tag`
-- added configuration options to `cli/fledger` for local run only
+### Fixed
+- enforce single tab and only one connection per node-ID
+- flmodules::network - add chunking of big messages
+- flmodules::realmstorage - avoid cycling of flos when
+flo A and B replace each other
+
+## [0.9.2] - 2025-05-11
+
+### Added
+- flbrowser - page edits, cuckoos, parents, children
+
+### Changed
+- flbrowser - re-arranging files and modularizing a bit more
 - DHT_router
   - change broadcast:
     - add NeighborMessage which is not forwarded
@@ -28,9 +40,8 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - FLSignal
   - Don't send full list of nodes
 - UI chat scrolls to the bottom when showing the first message.
-
-### Fixed
-- enforce single tab and only one connection per node-ID
+- `RealmView` is now tied to have a `root-page` and a `root-tag`
+- added configuration options to `cli/fledger` for local run only
 
 ## [0.9.1] - 2025-03-17
 
