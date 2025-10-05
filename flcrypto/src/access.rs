@@ -13,13 +13,20 @@ use super::signer::KeyPairID;
 #[derive(AsU256, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct BadgeID(U256);
 
-/// A ConditionLink is a boolean combination of verifiers and badges
+/// An Access Control Entry (ACE) is a mapping from paths to conditions.
+/// It is used to define which conditions must be met to access a given path.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct ACE {
+    pub rules: HashMap<String, Condition>
+}
+
+/// A [ConditionLink] is a boolean combination of verifiers and badges
 /// which can verify a given signature.
-/// The ConditionLink only holds the IDs of the Verifiers and the Badges,
+/// The [ConditionLink] only holds the IDs of the Verifiers and the Badges,
 /// and is lightweight.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum ConditionLink {
-    /// A verifier is the only element of a Condition which can be directly
+    /// A verifier is the only element of a [ConditionLink] which can be directly
     /// verified.
     Verifier(KeyPairID),
     Badge(VersionSpec<BadgeID>),
@@ -30,7 +37,7 @@ pub enum ConditionLink {
     Pass,
 }
 
-/// A Condition represents a full ConditinLink with all IDs replaced by
+/// A [Condition] represents a full [ConditionLink] with all IDs replaced by
 /// their actual values.
 /// TODO: Avoid loops
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -42,6 +49,71 @@ pub enum Condition {
     NotAvailable,
     Fail,
     Pass,
+}
+
+/// A [ConditionSignature] represents a signature which can be verified
+/// against a [Condition].
+/// It does not hold the message which was signed.
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
+pub struct ConditionSignature {
+    pub condition: Condition,
+    pub signatures: HashMap<KeyPairID, Signature>,
+}
+
+/// The [BadgeLink] is a lightweight version of a [Badge] which only
+/// holds the ID of the badge and its condition as a [ConditionLink].
+/// It is used to reference badges without having to load the full badge.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct BadgeLink {
+    pub id: BadgeID,
+    pub version: u32,
+    pub condition: ConditionLink,
+}
+
+/// A [Badge] can be viewed as an identity or a root of trust.
+/// It defines one cryptographic actor which can be composed of
+/// many different verifiers and other badges.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct Badge {
+    pub id: BadgeID,
+    pub version: u32,
+    pub condition: Box<Condition>,
+}
+
+/// A [VersionSpec] defines which versions of a given ID are acceptable.
+/// Currently it's only used for the [BadgeID].
+/// TODO: once the U256 becomes a trait that other IDs can inherit,
+/// make T depend on U256.
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug, Eq, Hash)]
+pub enum VersionSpec<T: Serialize + Clone + AsRef<[u8]>> {
+    /// This is the default - everyone should use it and trust future versions.
+    Minimal(T, u32),
+    /// Paranoid version pinning. Also problematic because old versions might get
+    /// forgotten.
+    Exact(T, u32),
+    /// Just for completeness' sake - this version and all lower version. This doesn't
+    /// really make sense.
+    Maximal(T, u32),
+}
+
+unsafe impl<T: Serialize + Clone + AsRef<[u8]>> Send for VersionSpec<T>{}
+
+impl<T: Serialize + Clone + AsRef<[u8]>> VersionSpec<T> {
+    pub fn get_id(&self) -> T {
+        match self {
+            VersionSpec::Minimal(id, _) => id.clone(),
+            VersionSpec::Exact(id, _) => id.clone(),
+            VersionSpec::Maximal(id, _) => id.clone(),
+        }
+    }
+
+    pub fn accepts(&self, version: u32) -> bool {
+        match self {
+            VersionSpec::Minimal(_, v) => v <= &version,
+            VersionSpec::Exact(_, v) => v == &version,
+            VersionSpec::Maximal(_, v) => v >= &version,
+        }
+    }
 }
 
 impl Display for Condition {
@@ -60,64 +132,6 @@ impl Display for ConditionLink {
             ConditionLink::Fail => format!("Fail"),
             ConditionLink::Pass => format!("Pass"),
         })
-    }
-}
-
-/// A badge can be viewed as an identity or a root of trust.
-/// It defines one cryptographic actor which can be composed of
-/// many different verifiers and other badges.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-pub struct BadgeLink {
-    pub id: BadgeID,
-    pub version: u32,
-    pub condition: ConditionLink,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-pub struct Badge {
-    pub id: BadgeID,
-    pub version: u32,
-    pub condition: Box<Condition>,
-}
-
-/// What versions of the ACE or badge are accepted.
-/// TODO: once the U256 becomes a trait that other IDs can inherit,
-/// make T depend on U256.
-#[derive(Clone, Serialize, Deserialize, PartialEq, Debug, Eq, Hash)]
-pub enum VersionSpec<T: Serialize + Clone + AsRef<[u8]>> {
-    /// This is the default - everyone should use it and trust future versions.
-    Minimal(T, u32),
-    /// Paranoid version pinning. Also problematic because old versions might get
-    /// forgotten.
-    Exact(T, u32),
-    /// Just for completeness' sake - this version and all lower version. This doesn't
-    /// really make sense.
-    Maximal(T, u32),
-}
-
-unsafe impl<T: Serialize + Clone + AsRef<[u8]>> Send for VersionSpec<T>{}
-
-#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
-pub struct ConditionSignature {
-    pub condition: Condition,
-    pub signatures: HashMap<KeyPairID, Signature>,
-}
-
-impl<T: Serialize + Clone + AsRef<[u8]>> VersionSpec<T> {
-    pub fn get_id(&self) -> T {
-        match self {
-            VersionSpec::Minimal(id, _) => id.clone(),
-            VersionSpec::Exact(id, _) => id.clone(),
-            VersionSpec::Maximal(id, _) => id.clone(),
-        }
-    }
-
-    pub fn accepts(&self, version: u32) -> bool {
-        match self {
-            VersionSpec::Minimal(_, v) => v <= &version,
-            VersionSpec::Exact(_, v) => v == &version,
-            VersionSpec::Maximal(_, v) => v >= &version,
-        }
     }
 }
 
