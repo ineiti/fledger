@@ -4,7 +4,7 @@ use flarch::web_rtc::{
     web_socket_client::WebSocketClient, WebRTCConn,
 };
 
-use crate::nodeconfig::NodeConfig;
+use crate::{nodeconfig::NodeConfig, timer::Timer};
 
 pub mod broker;
 pub mod messages;
@@ -24,11 +24,12 @@ pub mod messages;
 pub async fn router_broker_start(
     node: NodeConfig,
     connection: ConnectionConfig,
+    timer: &mut Timer,
 ) -> anyhow::Result<BrokerRouter> {
     use crate::network::broker::Network;
 
     let ws = WebSocketClient::connect(&connection.signal()).await?;
     let webrtc = WebRTCConn::new(web_rtc_spawner(connection)).await?;
-    let net = Network::start(node.clone(), ws, webrtc).await?;
+    let net = Network::start(node.clone(), ws, webrtc, timer).await?;
     Ok(RouterNetwork::start(net.broker).await?)
 }

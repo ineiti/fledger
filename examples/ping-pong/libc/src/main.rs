@@ -1,7 +1,7 @@
 use clap::{Parser, ValueEnum};
 
 use flarch::{start_logging_filter, web_rtc::connection::ConnectionConfig};
-use flmodules::nodeconfig::NodeConfig;
+use flmodules::{nodeconfig::NodeConfig, timer::Timer};
 
 use shared::{
     common::{NodeList, PingPongIn, PingPongOut},
@@ -30,9 +30,12 @@ async fn main() -> anyhow::Result<()> {
 
     let nc = NodeConfig::new();
     let name = nc.info.name.clone();
-    let net =
-        flmodules::network::network_start(nc.clone(), ConnectionConfig::from_signal(URL))
-            .await?;
+    let net = flmodules::network::network_start(
+        nc.clone(),
+        ConnectionConfig::from_signal(URL),
+        &mut Timer::start().await?,
+    )
+    .await?;
     let mut list = NodeList::new(vec![]);
 
     let mut pp = match args.code {

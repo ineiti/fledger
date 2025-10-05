@@ -176,7 +176,7 @@ use flarch::{
     },
 };
 
-use crate::nodeconfig::NodeConfig;
+use crate::{nodeconfig::NodeConfig, timer::Timer};
 
 #[derive(Error, Debug)]
 /// Errors when setting up a new network connection
@@ -211,12 +211,13 @@ pub enum NetworkSetupError {
 pub async fn network_start(
     node: NodeConfig,
     connection: ConnectionConfig,
+    timer: &mut Timer,
 ) -> anyhow::Result<Network> {
     use crate::network::broker::Network;
 
     let ws = WebSocketClient::connect(&connection.signal()).await?;
     let webrtc = WebRTCConn::new(web_rtc_spawner(connection)).await?;
-    Ok(Network::start(node.clone(), ws, webrtc).await?)
+    Ok(Network::start(node.clone(), ws, webrtc, timer).await?)
 }
 
 /// Starts a new connection to the signalling server using the `node`-
@@ -228,7 +229,8 @@ pub async fn network_start(
 pub async fn network_webrtc_start(
     node: NodeConfig,
     connection: ConnectionConfig,
+    timer: &mut Timer,
 ) -> anyhow::Result<broker::NetworkWebRTC> {
-    let net = network_start(node, connection).await?;
+    let net = network_start(node, connection, timer).await?;
     Ok(broker::NetworkWebRTC::start(net.broker).await?)
 }
