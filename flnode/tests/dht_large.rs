@@ -143,14 +143,13 @@ async fn dht_large() -> anyhow::Result<()> {
 async fn start_node(i: usize) -> anyhow::Result<Node> {
     let mut nc = NodeConfig::new();
     nc.info.name = format!("{i:2}");
-    // nc.info.modules = Modules::all();
-    nc.info.modules = Modules::all() - Modules::PING - Modules::RAND - Modules::GOSSIP;
-    let net = network_start(
-        nc.clone(),
+    nc.info.modules = Modules::stable() - Modules::RAND - Modules::GOSSIP;
+    Node::start_network(
+        Box::new(DataStorageTemp::new()),
+        nc,
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )
-    .await?;
-    Node::start(Box::new(DataStorageTemp::new()), nc, net.broker).await
+    .await
 }
 
 struct Signal {

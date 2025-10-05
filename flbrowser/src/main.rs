@@ -356,9 +356,8 @@ impl WebNode {
                 .turn_server
                 .and_then(|url| HostLogin::from_login_url(url).ok()),
         );
-        let network = network_start(node_config.clone(), config).await?;
-        node_config.info.modules = Modules::all() - Modules::WEBPROXY_REQUESTS;
-        Ok(Node::start(my_storage, node_config, network.broker)
+        node_config.info.modules = Modules::stable() - Modules::WEBPROXY_REQUESTS;
+        Ok(Node::start_network(my_storage, node_config, config)
             .await
             .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
     }

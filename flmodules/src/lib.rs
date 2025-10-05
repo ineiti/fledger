@@ -14,15 +14,21 @@ bitflags! {
     }
 }
 
+impl Modules {
+    pub fn stable() -> Modules {
+        Modules::all() - Modules::PING
+    }
+}
+
 pub mod dht_router;
 pub mod dht_storage;
 pub mod flo;
 pub mod gossip_events;
 pub mod network;
 pub mod nodeconfig;
-pub mod router;
 pub mod ping;
 pub mod random_connections;
+pub mod router;
 pub mod template;
 pub mod timer;
 pub mod web_proxy;
