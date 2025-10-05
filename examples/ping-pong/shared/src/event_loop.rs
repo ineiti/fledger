@@ -7,10 +7,15 @@ use flarch::{
     nodeids::NodeID,
     tasks::{spawn_local, Interval},
 };
-use flmodules::network::broker::{BrokerNetwork, NetworkIn, NetworkOut};
 use flmodules::nodeconfig::NodeInfo;
+use flmodules::{
+    network::broker::{BrokerNetwork, NetworkIn, NetworkOut},
+    router::messages::NetworkWrapper,
+};
 
 use crate::common::{PPMessageNode, PingPongIn, PingPongOut};
+
+pub const MODULE_NAME: &str = "PingPong";
 
 /// This is a more straightforward use of the network-broker. It loops over incoming
 /// messages and then sends out new messages by sending it over the network-broker.
@@ -60,7 +65,7 @@ fn update_list(id: NodeID, net: &mut BrokerNetwork, nodes: &Vec<NodeInfo>) -> an
         if node.get_id() != id {
             net.emit_msg_in(NetworkIn::MessageToNode(
                 node.get_id(),
-                serde_json::to_string(&PPMessageNode::Ping).unwrap(),
+                NetworkWrapper::wrap_yaml(MODULE_NAME, &PPMessageNode::Ping).expect("Create Ping"),
             ))?;
         }
     }
@@ -76,12 +81,13 @@ fn new_msg(
     if let Some(msg_tap) = msg {
         match msg_tap {
             NetworkOut::MessageFromNode(from, msg_net) => {
-                if let Ok(msg) = serde_json::from_str::<PPMessageNode>(&msg_net) {
+                if let Some(msg) = msg_net.unwrap_yaml::<PPMessageNode>(MODULE_NAME) {
                     ret.emit_msg_in(PingPongIn::FromNetwork(from, msg.clone()))?;
                     if msg == PPMessageNode::Ping {
                         net.emit_msg_in(NetworkIn::MessageToNode(
                             from,
-                            serde_json::to_string(&PPMessageNode::Pong).unwrap(),
+                            NetworkWrapper::wrap_yaml(MODULE_NAME, &PPMessageNode::Pong)
+                                .expect("Create Ping"),
                         ))?;
                     }
                 }

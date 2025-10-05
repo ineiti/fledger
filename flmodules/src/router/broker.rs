@@ -102,11 +102,7 @@ impl RouterNetwork {
             network,
             Box::new(|msg| match msg {
                 RouterIn::NetworkWrapperToNetwork(id, module_message) => {
-                    if let Ok(msg_str) = serde_yaml::to_string(&module_message) {
-                        Some(NetworkIn::MessageToNode(id, msg_str))
-                    } else {
-                        None
-                    }
+                    Some(NetworkIn::MessageToNode(id, module_message))
                 }
                 _ => None,
             }),
@@ -153,10 +149,8 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
                         self.nodes_available = vec;
                         ret = true;
                     }
-                    RouterInternal::MessageFromNode(id, msg_str) => {
-                        serde_yaml::from_str(&msg_str).ok().map(|module_message| {
-                            out.push(RouterOut::NetworkWrapperFromNetwork(id, module_message))
-                        });
+                    RouterInternal::MessageFromNode(id, msg_nw) => {
+                        out.push(RouterOut::NetworkWrapperFromNetwork(id, msg_nw))
                     }
                     RouterInternal::SystemConfig(conf) => out.push(RouterOut::SystemConfig(conf)),
                 }

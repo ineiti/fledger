@@ -42,6 +42,8 @@ use super::signal::FledgerConfig;
 
 pub type BrokerNetwork = Broker<NetworkIn, NetworkOut>;
 
+pub const MODULE_NAME: &str = "Network";
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 /// These are similar to public methods on a structure.
@@ -51,7 +53,7 @@ pub enum NetworkIn {
     /// The [`Network`] will try to set up a connection with the remote node,
     /// if no such connection exists yet.
     /// If the node is not connected to the signalling handler, nothing happens.
-    MessageToNode(NodeID, String),
+    MessageToNode(NodeID, NetworkWrapper),
     /// Sends some stats to the signalling server to monitor the overall health of
     /// the system.
     StatsToWS(Vec<NodeStat>),
@@ -75,7 +77,7 @@ pub enum NetworkIn {
 /// Messages sent from the [`Network`] to the user.
 pub enum NetworkOut {
     /// A new message has been received from the given node.
-    MessageFromNode(NodeID, String),
+    MessageFromNode(NodeID, NetworkWrapper),
     /// An updated list coming from the signalling server.
     NodeListFromWS(Vec<NodeInfo>),
     /// Whenever the state of a connection changes, this message is
@@ -416,8 +418,11 @@ impl NetworkWebRTC {
     /// Tries to send a text-message to a remote node.
     /// The [`Network`] will start a connection with the node if there is none available.
     /// If the remote node is not available, no error is returned.
-    pub fn send_msg(&mut self, dst: NodeID, msg: String) -> anyhow::Result<()> {
-        self.send(NetworkIn::MessageToNode(dst, msg))
+    pub fn send_str(&mut self, dst: NodeID, msg: String) -> anyhow::Result<()> {
+        self.send(NetworkIn::MessageToNode(
+            dst,
+            NetworkWrapper::wrap_yaml(MODULE_NAME, &ModuleMessage::String(msg))?,
+        ))
     }
 
     /// Requests an updated list of all connected nodes to the signalling server.
@@ -529,7 +534,7 @@ pub struct ConnStats {
 
 #[cfg(test)]
 mod tests {
-    use flarch::start_logging;
+    use flarch::{nodeids::U256, start_logging};
 
     use super::*;
 
