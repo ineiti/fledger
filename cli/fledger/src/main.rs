@@ -134,8 +134,7 @@ async fn main() -> anyhow::Result<()> {
         )
     };
     log::debug!("Connecting to websocket at {:?}", cc);
-    let network = network_start(node_config.clone(), cc).await?;
-    let node = Node::start(Box::new(storage), node_config, network.broker).await?;
+    let node = Node::start_network(Box::new(storage), node_config, cc).await?;
     Fledger::run(node, args).await
 }
 

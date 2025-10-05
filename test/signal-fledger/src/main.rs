@@ -8,7 +8,6 @@ use flarch::{
     },
 };
 use flmodules::network::{
-    network_start,
     signal::{SignalConfig, SignalServer},
     NetworkSetupError,
 };
@@ -102,10 +101,10 @@ async fn main() -> anyhow::Result<()> {
 async fn create_node() -> anyhow::Result<Node> {
     let storage = DataStorageTemp::new();
     let node_config = Node::get_config(storage.clone_box())?;
-    let network = network_start(
-        node_config.clone(),
+    Ok(Node::start_network(
+        Box::new(storage),
+        node_config,
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )
-    .await?;
-    Ok(Node::start(Box::new(storage), node_config, network.broker).await?)
+    .await?)
 }

@@ -97,7 +97,7 @@ impl JSInterface {
     pub fn button_page_debug(&mut self, id: JsString) {
         Self::js_to_id(id).map(|fid| self.send_button(Button::DebugPage(fid)));
     }
-    
+
     fn js_to_id(id: JsString) -> Option<FloID> {
         FloID::from_str(&id.as_string().expect("id to string")).ok()
     }

@@ -19,6 +19,7 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
 ### Changed
 - webrtc - better error reporting
 - added Modules::stable for a default of all modules which should be used
+- Using Node::start_network
 
 ### Fixed
 - enforce single tab and only one connection per node-ID

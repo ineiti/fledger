@@ -102,6 +102,16 @@ impl std::fmt::Debug for Node {
 const STORAGE_CONFIG: &str = "nodeConfig";
 
 impl Node {
+    pub async fn start_network(
+        storage: Box<dyn DataStorage + Send>,
+        node_config: NodeConfig,
+        net_config: ConnectionConfig,
+    ) -> anyhow::Result<Self> {
+        let mut timer = Timer::start().await?;
+        let net = network_start(node_config.clone(), net_config, &mut timer).await?;
+        Node::start(storage, node_config, net.broker, timer).await
+    }
+
     /// Create new node by loading the config from the storage.
     /// This also initializes the network and starts listening for
     /// new messages from the signalling server and from other nodes.
