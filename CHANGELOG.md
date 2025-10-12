@@ -17,12 +17,15 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
   - show cuckoo pages on the bottom
 
 ### Changed
+
 - webrtc - better error reporting
 - added Modules::stable for a default of all modules which should be used
 - Using Node::start_network
 - adding TimerBroker to network_start
+- flarch::Browser got macros for handling forward messages
 
 ### Fixed
+
 - enforce single tab and only one connection per node-ID
 - flmodules::network - add chunking of big messages
 - flmodules::realmstorage - avoid cycling of flos when
