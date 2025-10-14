@@ -1,10 +1,6 @@
 use std::{collections::HashMap, sync::mpsc::Receiver};
 
-use flarch::{
-    broker::{Broker, BrokerError},
-    data_storage::DataStorageTemp,
-    nodeids::U256,
-};
+use flarch::{broker::Broker, data_storage::DataStorageTemp, nodeids::U256};
 use flmodules::{
     network::broker::{BrokerNetwork, NetworkIn, NetworkOut},
     timer::{BrokerTimer, Timer},
@@ -15,16 +11,7 @@ use flmodules::{
     Modules,
 };
 
-use flnode::node::{Node, NodeError};
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum NetworkError {
-    #[error(transparent)]
-    Broker(#[from] BrokerError),
-    #[error(transparent)]
-    NodeData(#[from] NodeError),
-}
+use flnode::node::Node;
 
 pub struct NetworkSimul {
     pub nodes: HashMap<U256, NodeTimer>,
