@@ -1,4 +1,3 @@
-use futures::Stream;
 use std::{
     future::Future,
     pin::Pin,
@@ -124,19 +123,16 @@ pub async fn wait(dur: Duration) {
 
 // wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-#[cfg(test)]
-mod test {
-    use futures::{stream::StreamExt, Stream};
+use futures::{stream::StreamExt, Stream};
 
-    #[wasm_bindgen_test::wasm_bindgen_test]
-    async fn test_interval() {
-        web_sys::console::log_1(&"hello".into());
-        let mut interv = Interval::new_interval(Duration::from_millis(100));
-        for i in 0..10 {
-            web_sys::console::log_1(&format!("{i}: {:?}", interv.next().await).into());
-            if i < 7 {
-                wait_ms(i * 20).await;
-            }
+#[wasm_bindgen_test::wasm_bindgen_test]
+async fn test_interval() {
+    web_sys::console::log_1(&"hello".into());
+    let mut interv = Interval::new_interval(Duration::from_millis(100));
+    for i in 0..10 {
+        web_sys::console::log_1(&format!("{i}: {:?}", interv.next().await).into());
+        if i < 7 {
+            wait_ms(i * 20).await;
         }
     }
 }

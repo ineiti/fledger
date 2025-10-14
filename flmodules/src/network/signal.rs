@@ -78,7 +78,7 @@ pub struct SignalConfig {
     pub max_list_len: Option<usize>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 /// Messages for the signalling server
 pub enum SignalIn {
     /// One minute timer clock for removing stale connections
@@ -124,10 +124,20 @@ impl SignalServer {
     /// Creates a new [`SignalServer`].
     /// `ttl_minutes` is the minimum time an idle node will be
     /// kept in the list.
-    pub async fn new(
+    pub async fn start(
         ws_server: BrokerWSServer,
         config: SignalConfig,
     ) -> anyhow::Result<BrokerSignal> {
+        let mut broker = Self::new(config).await?;
+        broker.link_bi(ws_server).await?;
+        Timer::start()
+            .await?
+            .tick_minute(broker.clone(), SignalIn::Timer)
+            .await?;
+        Ok(broker)
+    }
+
+    pub async fn new(config: SignalConfig) -> anyhow::Result<BrokerSignal> {
         let mut broker = Broker::new();
         broker
             .add_handler(Box::new(SignalServer {
@@ -135,15 +145,8 @@ impl SignalServer {
                 connection_ids: BiMap::new(),
                 info: HashMap::new(),
                 ttl: HashMap::new(),
-                // Add 2 to the ttl_minutes to make sure that nodes are kept at least
-                // 1 minute in the list.
                 config,
             }))
-            .await?;
-        broker.link_bi(ws_server).await?;
-        Timer::start()
-            .await?
-            .tick_minute(broker.clone(), SignalIn::Timer)
             .await?;
         Ok(broker)
     }

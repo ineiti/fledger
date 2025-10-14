@@ -1,3 +1,5 @@
+use flarch::web_rtc::connection::ConnectionConfig;
+use flmodules::network::network_start;
 use log::{error, info};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -102,6 +104,16 @@ impl std::fmt::Debug for Node {
 const STORAGE_CONFIG: &str = "nodeConfig";
 
 impl Node {
+    pub async fn start_network(
+        storage: Box<dyn DataStorage + Send>,
+        node_config: NodeConfig,
+        net_config: ConnectionConfig,
+    ) -> anyhow::Result<Self> {
+        let mut timer = Timer::start().await?;
+        let net = network_start(node_config.clone(), net_config, &mut timer).await?;
+        Node::start(storage, node_config, net.broker, timer).await
+    }
+
     /// Create new node by loading the config from the storage.
     /// This also initializes the network and starts listening for
     /// new messages from the signalling server and from other nodes.
@@ -110,6 +122,7 @@ impl Node {
         storage: Box<dyn DataStorage + Send>,
         node_config: NodeConfig,
         broker_net: BrokerNetwork,
+        mut timer: Timer,
     ) -> anyhow::Result<Self> {
         info!(
             "Starting node: {} = {}",
@@ -117,12 +130,7 @@ impl Node {
             node_config.info.get_id()
         );
 
-        let mut timer = Timer::start().await?;
-        timer
-            .tick_second(broker_net.clone(), NetworkIn::Tick)
-            .await?;
         let network_io = RouterNetwork::start(broker_net.clone()).await?;
-
         let modules = node_config.info.modules;
         let id = node_config.info.get_id();
         let mut random = None;
@@ -326,7 +334,13 @@ mod tests {
 
         let storage = DataStorageTemp::new();
         let nc = NodeConfig::new();
-        let mut nd = Node::start(storage.clone_box(), nc.clone(), Broker::new()).await?;
+        let mut nd = Node::start(
+            storage.clone_box(),
+            nc.clone(),
+            Broker::new(),
+            Timer::start().await?,
+        )
+        .await?;
         let event = Event {
             category: Category::TextMessage,
             src: nc.info.get_id(),
@@ -340,7 +354,13 @@ mod tests {
             .settle_msg_in(GossipIn::AddEvent(event.clone()).into())
             .await?;
 
-        let nd2 = Node::start(storage.clone_box(), nc.clone(), Broker::new()).await?;
+        let nd2 = Node::start(
+            storage.clone_box(),
+            nc.clone(),
+            Broker::new(),
+            Timer::start().await?,
+        )
+        .await?;
         let events = nd2
             .gossip
             .unwrap()
@@ -360,6 +380,7 @@ mod tests {
             Box::new(DataStorageTemp::new()),
             NodeConfig::new(),
             Broker::new(),
+            Timer::start().await?,
         )
         .await?;
         node.gossip.as_mut().unwrap().broker.settle(vec![]).await?;

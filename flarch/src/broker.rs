@@ -176,6 +176,14 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         }
     }
 
+    pub async fn new_with_handler(
+        handler: SubsystemHandlerBox<I, O>,
+    ) -> anyhow::Result<(Broker<I, O>, usize)> {
+        let mut b = Broker::new();
+        let id = b.add_subsystem(Subsystem::Handler(handler)).await?;
+        Ok((b, id))
+    }
+
     /// Adds a new subsystem to send and/or receive messages.
     pub async fn add_subsystem(&mut self, ss: Subsystem<I, O>) -> anyhow::Result<usize> {
         let subsystem = {
@@ -394,7 +402,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     }
 
     /// Connects to another Broker, but in a direct way:
-    /// I forwards to TI, O forwards to TO.
+    /// O forwards to TO, TI forwards to I.
     pub async fn link_direct<TI: 'static + Message, TO: 'static + Message>(
         &mut self,
         other: Broker<TI, TO>,

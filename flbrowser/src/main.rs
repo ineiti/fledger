@@ -21,7 +21,6 @@ use flarch::{
     tasks::{spawn_local_nosend, wait_ms},
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
-use flmodules::network::network_start;
 use flnode::{node::Node, stat::NetStats};
 
 mod web;
@@ -97,7 +96,7 @@ impl JSInterface {
     pub fn button_page_debug(&mut self, id: JsString) {
         Self::js_to_id(id).map(|fid| self.send_button(Button::DebugPage(fid)));
     }
-    
+
     fn js_to_id(id: JsString) -> Option<FloID> {
         FloID::from_str(&id.as_string().expect("id to string")).ok()
     }
@@ -229,7 +228,10 @@ impl WebState {
                     rv.realm.realm_id(),
                     self.webn.node.crypto_storage.get_signer().verifier(),
                 );
-                self.webn.dht_storage.store_flo(verifier.into()).expect("Storing verifier");
+                self.webn
+                    .dht_storage
+                    .store_flo(verifier.into())
+                    .expect("Storing verifier");
                 self.web.unhide("menu-page-edit");
                 Pages::new(
                     rv.clone(),
@@ -356,9 +358,8 @@ impl WebNode {
                 .turn_server
                 .and_then(|url| HostLogin::from_login_url(url).ok()),
         );
-        let network = network_start(node_config.clone(), config).await?;
-        node_config.info.modules = Modules::all() - Modules::WEBPROXY_REQUESTS;
-        Ok(Node::start(my_storage, node_config, network.broker)
+        node_config.info.modules = Modules::stable() - Modules::WEBPROXY_REQUESTS;
+        Ok(Node::start_network(my_storage, node_config, config)
             .await
             .map_err(|e| anyhow!("Couldn't create node: {:?}", e))?)
     }

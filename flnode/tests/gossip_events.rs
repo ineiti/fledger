@@ -9,7 +9,7 @@ async fn gossip(nbr_nodes: usize) -> anyhow::Result<()> {
 
     let mut net = NetworkSimul::new();
     log::info!("Creating {nbr_nodes} nodes");
-    net.add_nodes(Modules::all(), nbr_nodes).await?;
+    net.add_nodes(Modules::stable(), nbr_nodes).await?;
     let id = &net.nodes.keys().next().unwrap().clone();
     // Hand-crafted formula that works for 2, 30, 100 nodes
     let steps = ((nbr_nodes as f64).log10() + 5.0) as i32;
@@ -44,7 +44,7 @@ async fn gossip(nbr_nodes: usize) -> anyhow::Result<()> {
                     2 * nbr_nodes
                 );
                 assert_eq!(2 * nbr_nodes, nbr);
-                net.add_nodes(Modules::all(), nbr_nodes).await?;
+                net.add_nodes(Modules::stable(), nbr_nodes).await?;
             }
             s if s == steps * 3 => {
                 log::info!("Checking messages {} == {nbr}", 4 * nbr_nodes);

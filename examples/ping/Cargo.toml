@@ -12,5 +12,6 @@ flmodules = {path = "../../flmodules", version = "0.9"}
 anyhow = {version = "1", features = ["backtrace"]}
 clap = {version = "4", features = ["derive"]}
 log = "0.4"
-tokio = "1"
+serde = "*"
+tokio = {version="1", features = ["rt-multi-thread"]}
 tokio-stream = "0.1"

@@ -252,11 +252,11 @@ impl RealmView {
         self.tags.update_blobs().await
     }
 
-    pub fn get_blob_path_family(&self, id: &BlobID) -> Option<&(dyn BlobPathFamily)> {
+    pub fn get_blob_path_family(&self, id: &BlobID) -> Option<&dyn BlobPathFamily> {
         if let Some(page) = self.pages.storage.get(id) {
-            Some(page as &(dyn BlobPathFamily))
+            Some(page as &dyn BlobPathFamily)
         } else if let Some(tag) = self.tags.storage.get(id) {
-            Some(tag as &(dyn BlobPathFamily))
+            Some(tag as &dyn BlobPathFamily)
         } else {
             None
         }

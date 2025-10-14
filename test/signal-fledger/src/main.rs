@@ -1,38 +1,18 @@
 use flarch::{
-    broker::BrokerError,
     data_storage::{DataStorage, DataStorageTemp},
     start_logging_filter_level,
     tasks::wait_ms,
-    web_rtc::{
-        connection::ConnectionConfig, web_socket_server::WebSocketServer, websocket::WSSError,
-    },
+    web_rtc::{connection::ConnectionConfig, web_socket_server::WebSocketServer},
 };
-use flmodules::network::{
-    network_start,
-    signal::{SignalConfig, SignalServer},
-    NetworkSetupError,
-};
-use flnode::node::{Node, NodeError};
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-enum TestError {
-    #[error(transparent)]
-    Node(#[from] NodeError),
-    #[error(transparent)]
-    WSServer(#[from] WSSError),
-    #[error(transparent)]
-    Broker(#[from] BrokerError),
-    #[error(transparent)]
-    Network(#[from] NetworkSetupError),
-}
+use flmodules::network::signal::{SignalConfig, SignalServer};
+use flnode::node::Node;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     start_logging_filter_level(vec!["signal", "fl"], log::LevelFilter::Info);
 
     let wss = WebSocketServer::new(8765).await?;
-    let mut signal_server = SignalServer::new(
+    let mut signal_server = SignalServer::start(
         wss,
         SignalConfig {
             ttl_minutes: 2,
@@ -102,10 +82,10 @@ async fn main() -> anyhow::Result<()> {
 async fn create_node() -> anyhow::Result<Node> {
     let storage = DataStorageTemp::new();
     let node_config = Node::get_config(storage.clone_box())?;
-    let network = network_start(
-        node_config.clone(),
+    Ok(Node::start_network(
+        Box::new(storage),
+        node_config,
         ConnectionConfig::from_signal("ws://localhost:8765"),
     )
-    .await?;
-    Ok(Node::start(Box::new(storage), node_config, network.broker).await?)
+    .await?)
 }
