@@ -7,10 +7,7 @@ use flarch::{
     },
 };
 use flmodules::{
-    network::{
-        network_start,
-        signal::{BrokerSignal, SignalConfig, SignalIn, SignalOut, SignalServer},
-    },
+    network::signal::{BrokerSignal, SignalConfig, SignalIn, SignalOut, SignalServer},
     nodeconfig::NodeConfig,
     Modules,
 };
@@ -105,7 +102,7 @@ struct Signal {
 }
 
 async fn start_signal() -> anyhow::Result<Signal> {
-    let mut signal_server = SignalServer::new(
+    let mut signal_server = SignalServer::start(
         WebSocketServer::new(8765).await?,
         SignalConfig {
             ttl_minutes: 2,

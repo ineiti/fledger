@@ -4,14 +4,10 @@ use flarch::{
     broker::{Broker, BrokerError},
     data_storage::DataStorageTemp,
     nodeids::U256,
-    web_rtc::{
-        node_connection::{NCInput, NCOutput},
-        WebRTCConnInput, WebRTCConnOutput,
-    },
 };
 use flmodules::{
     network::broker::{BrokerNetwork, NetworkIn, NetworkOut},
-    timer::BrokerTimer,
+    timer::{BrokerTimer, Timer},
 };
 use flmodules::{
     nodeconfig::{NodeConfig, NodeInfo},
@@ -132,15 +128,6 @@ impl NetworkSimul {
             NetworkIn::MessageToNode(from_id, msg_str) => {
                 vec![(from_id, NetworkOut::MessageFromNode(id.clone(), msg_str))]
             }
-            NetworkIn::WebRTC(WebRTCConnOutput::Message(id_dst, NCOutput::Text(msg_node))) => {
-                vec![(
-                    id_dst.clone(),
-                    NetworkOut::WebRTC(WebRTCConnInput::Message(
-                        *id,
-                        NCInput::Text(msg_node.clone()),
-                    )),
-                )]
-            }
             _ => vec![],
         }
     }
@@ -175,6 +162,7 @@ impl NodeTimer {
             Box::new(DataStorageTemp::new()),
             node_config,
             broker_net.clone(),
+            Timer::start().await?,
         )
         .await?;
 

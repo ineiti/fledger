@@ -402,7 +402,7 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
     }
 
     /// Connects to another Broker, but in a direct way:
-    /// I forwards to TI, O forwards to TO.
+    /// O forwards to TO, TI forwards to I.
     pub async fn link_direct<TI: 'static + Message, TO: 'static + Message>(
         &mut self,
         other: Broker<TI, TO>,

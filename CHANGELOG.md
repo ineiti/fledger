@@ -6,9 +6,9 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
-## [0.9.3] - Pending
-
 See [WIP.md](./WIP.md) for current work and bugs to fix
+
+## [0.9.3] - Pending
 
 ### Added
 

@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
     let wss = WebSocketServer::new(8765).await?;
     let system_realm = args.system_realm.and_then(|sr| RealmID::from_str(&sr).ok());
     log::info!("System realm config is: {:?}", system_realm);
-    let mut signal_server = SignalServer::new(
+    let mut signal_server = SignalServer::start(
         wss,
         SignalConfig {
             ttl_minutes: 2,

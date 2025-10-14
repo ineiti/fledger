@@ -60,7 +60,7 @@ async fn start_signal_server() {
         .await
         .expect("Failed to start signalling server");
     log::debug!("Starting signalling server");
-    SignalServer::new(
+    SignalServer::start(
         wss,
         SignalConfig {
             ttl_minutes: 1,
@@ -101,31 +101,30 @@ mod tests {
     use super::*;
     use std::sync::mpsc::Receiver;
 
-    use flarch::tasks::wait_ms;
+    use flarch::{start_logging_filter_level, tasks::wait_ms};
 
-    // #[tokio::test]
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
     async fn test_two_nodes() -> anyhow::Result<()> {
-        start_logging_filter(vec!["fl"]);
+        start_logging_filter_level(vec!["fl", "webrtc_test_libc"], log::LevelFilter::Info);
 
         log::info!("Starting signalling server");
         start_signal_server().await;
-        log::debug!("Starting node 1");
+        log::info!("Starting node 1");
         let (nc1, mut broker1) = spawn_node().await?;
-        log::debug!("Starting node 2");
+        log::info!("Starting node 2");
         let (nc2, mut broker2) = spawn_node().await?;
         let (tap2, _) = broker2.get_tap_out_sync().await.expect("Failed to get tap");
         let (tap1, _) = broker1.get_tap_out_sync().await.expect("Failed to get tap");
-        wait_ms(1000).await;
+        wait_ms(2000).await;
         for _ in 1..=2 {
-            log::debug!("Sending first message");
+            log::info!("Sending first message");
             let msg1 = "Message1".to_string();
             send(&mut broker1, nc2.info.get_id(), &msg1).await;
             wait_msg(&tap2, &msg1).await;
-            log::debug!("Sending second message");
+            log::info!("Sending second message");
             let msg2 = "Message2".to_string();
             send(&mut broker2, nc1.info.get_id(), &msg2).await;
-            wait_msg(&tap1, &msg1).await;
+            wait_msg(&tap1, &msg2).await;
         }
         Ok(())
     }

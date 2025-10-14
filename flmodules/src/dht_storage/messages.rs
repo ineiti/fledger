@@ -26,7 +26,7 @@ use super::{
 
 /// The messages here represent all possible interactions with this module.
 #[derive(Debug, Clone, PartialEq)]
-pub enum InternIn {
+pub(super) enum InternIn {
     Routing(DHTRouterOut),
     Storage(DHTStorageIn),
     /// Ask all neighbors to sync with us.
@@ -34,7 +34,7 @@ pub enum InternIn {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum InternOut {
+pub(super) enum InternOut {
     Routing(DHTRouterIn),
     Storage(DHTStorageOut),
 }

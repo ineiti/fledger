@@ -21,7 +21,6 @@ use flarch::{
     tasks::{spawn_local_nosend, wait_ms},
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
-use flmodules::network::network_start;
 use flnode::{node::Node, stat::NetStats};
 
 mod web;
@@ -229,7 +228,10 @@ impl WebState {
                     rv.realm.realm_id(),
                     self.webn.node.crypto_storage.get_signer().verifier(),
                 );
-                self.webn.dht_storage.store_flo(verifier.into()).expect("Storing verifier");
+                self.webn
+                    .dht_storage
+                    .store_flo(verifier.into())
+                    .expect("Storing verifier");
                 self.web.unhide("menu-page-edit");
                 Pages::new(
                     rv.clone(),

@@ -4,8 +4,6 @@ This file is in place of github issues, as currently I'm mostly developing on my
 
 ## Current high-level goal
 
-- Allow other users to store their webpage in fledger
-
 ## Current concrete goal
 
 ### User-facing
@@ -22,7 +20,9 @@ This file is in place of github issues, as currently I'm mostly developing on my
 
 ### Bugs
 
+- a lot of `node1_1   | [2025-10-05T10:27:46Z WARN  flmodules::dht_router::messages] 63caf70b922a4e25 doesn't have a connection to 0f8beba175ec6085 anymore`
 - test dht_large fails too often
+- tags can get the same name and then overrides other tags with the same name
 - cli/fledger seems to remove some of the cuckoos when updating a page
 - under some circumstances, the locally stored pages get lost
   - probably because the cuckoos are missing, so they are not displayed
@@ -41,8 +41,11 @@ This file is in place of github issues, as currently I'm mostly developing on my
 - link browser and cli using a badge
 - add handling of pages with cybernode code
 - add FloAlias/FloUser/FloName/FloIdentity/FloSomething and use it in the chat
+- add own Flos to DHTConfig.owned
+- verify Flos when they enter the system
 
 ### DHT_Router
+- check disconnection of nodes when no pings received - doesn't seem to disconnect
 - KBucket.active is only be populated once a node has been confirmed.
   - Needs more testing if nodes fail and how they will be replaced
     This definitely doesn't work currently

@@ -8,7 +8,7 @@ use flarch::{
 use flmodules::{
     dht_router::broker::DHTRouter,
     dht_storage::broker::DHTStorage,
-    network::{broker::NetworkIn, network_start, signal::SIGNAL_VERSION},
+    network::{broker::NetworkIn, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
 use page::{Page, PageCommands};

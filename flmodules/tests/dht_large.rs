@@ -16,6 +16,11 @@ use simul::*;
 async fn dht_large() -> anyhow::Result<()> {
     start_logging_filter_level(vec!["flmodules", "dht_large"], log::LevelFilter::Info);
 
+    log::info!("This uses a lot of connections. So be sure to run the following:");
+    log::info!("sudo sysctl -w kern.maxfiles=2048000");
+    log::info!("sudo sysctl -w kern.maxfilesperproc=1048000");
+    log::info!("ulimit -S -n 1000000");
+
     log::info!("Setting up nodes.");
     let nbr_nodes = 20;
     let max_space = 20_000;

@@ -1872,6 +1872,7 @@ dependencies = [
  "flarch",
  "flmodules",
  "log",
+ "serde",
  "tokio",
  "tokio-stream",
 ]

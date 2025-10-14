@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     start_logging_filter_level(vec!["signal", "fl"], log::LevelFilter::Info);
 
     let wss = WebSocketServer::new(8765).await?;
-    let mut signal_server = SignalServer::new(
+    let mut signal_server = SignalServer::start(
         wss,
         SignalConfig {
             ttl_minutes: 2,
