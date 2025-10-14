@@ -166,6 +166,7 @@ use broker::Network;
 use thiserror::Error;
 
 pub mod broker;
+mod local_signal;
 mod messages;
 pub mod signal;
 

@@ -1,7 +1,4 @@
-use thiserror::Error;
-
 use flarch::{
-    broker::BrokerError,
     nodeids::U256,
     start_logging_filter,
     web_rtc::{connection::ConnectionConfig, web_socket_server::WebSocketServer},
@@ -11,7 +8,6 @@ use flmodules::{
         broker::{BrokerNetwork, NetworkIn, NetworkOut},
         network_start,
         signal::{SignalConfig, SignalServer},
-        NetworkSetupError,
     },
     timer::Timer,
 };
@@ -19,14 +15,6 @@ use flmodules::{nodeconfig::NodeConfig, router::messages::NetworkWrapper};
 
 const URL: &str = "ws://127.0.0.1:8765";
 const MODULE_NAME: &str = "LIBC_WASM";
-
-#[derive(Debug, Error)]
-enum MainError {
-    #[error(transparent)]
-    NetworkSetup(#[from] NetworkSetupError),
-    #[error(transparent)]
-    Broker(#[from] BrokerError),
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

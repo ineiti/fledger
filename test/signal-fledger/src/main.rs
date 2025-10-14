@@ -1,30 +1,11 @@
 use flarch::{
-    broker::BrokerError,
     data_storage::{DataStorage, DataStorageTemp},
     start_logging_filter_level,
     tasks::wait_ms,
-    web_rtc::{
-        connection::ConnectionConfig, web_socket_server::WebSocketServer, websocket::WSSError,
-    },
+    web_rtc::{connection::ConnectionConfig, web_socket_server::WebSocketServer},
 };
-use flmodules::network::{
-    signal::{SignalConfig, SignalServer},
-    NetworkSetupError,
-};
-use flnode::node::{Node, NodeError};
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-enum TestError {
-    #[error(transparent)]
-    Node(#[from] NodeError),
-    #[error(transparent)]
-    WSServer(#[from] WSSError),
-    #[error(transparent)]
-    Broker(#[from] BrokerError),
-    #[error(transparent)]
-    Network(#[from] NetworkSetupError),
-}
+use flmodules::network::signal::{SignalConfig, SignalServer};
+use flnode::node::Node;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

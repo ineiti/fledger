@@ -1,17 +1,14 @@
-use std::sync::mpsc::RecvError;
-
-use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
 use flarch::{
-    broker::{BrokerError, Destination},
+    broker::Destination,
     tasks::wait_ms,
     web_rtc::connection::ConnectionConfig,
 };
 use flmodules::{
     network::{
-        broker::{NetworkError, NetworkIn, NetworkOut},
-        network_start, NetworkSetupError,
+        broker::{NetworkIn, NetworkOut},
+        network_start,
     },
     timer::Timer,
 };
@@ -22,18 +19,6 @@ use flmodules::{
 
 const URL: &str = "ws://127.0.0.1:8765";
 const MODULE_NAME: &str = "LIBC_WASM";
-
-#[derive(Debug, Error)]
-enum StartError {
-    #[error(transparent)]
-    NetworkSetup(#[from] NetworkSetupError),
-    #[error(transparent)]
-    Network(#[from] NetworkError),
-    #[error(transparent)]
-    Broker(#[from] BrokerError),
-    #[error(transparent)]
-    Receive(#[from] RecvError),
-}
 
 async fn run_app() -> anyhow::Result<()> {
     log::info!("Starting app");
