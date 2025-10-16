@@ -58,14 +58,12 @@ pub struct Flo {
     data_version: u32,
     // The data signature is verifiable by the latest cond.
     data_signature: ConditionSignature,
+    // Allows for a random ID even for two Flos with the same data.
     // Because I thought that ed25519 signatures have a random nonce, when in
-    // fact the implementation of ed25519-dalek uses a nonce derived from the 
+    // fact the implementation of ed25519-dalek uses a nonce derived from the
     // message, probably to avoid nonce-reuse...
     nonce: U256,
     // The first condition of this Flo, together with a signature on itself.
-    // This makes the ID depend not on the data, but on the random nonce
-    // used for the signature, allowing to store Flos with the same
-    // data, but different IDs.
     cond_genesis: CondVersion,
     // Every new version of the cond is signed by the signers of the previous
     // cond.
@@ -210,6 +208,8 @@ impl Flo {
         FloID::hash_domain_parts("ican.re.fledg.flmodules.flo.Flo", &[&hash.bytes()])
     }
 
+    /// Returns an [UpdateDataSign] to collect all signatures necessary
+    /// for updating the data part of this Flo.
     pub fn start_sign_data<T: Serialize + DeserializeOwned + Clone>(
         &self,
         cond: Condition,
@@ -225,6 +225,7 @@ impl Flo {
         });
     }
 
+    /// Updates the data of this Flow and returns a new Flo.
     pub fn update_data<T: Serialize + DeserializeOwned + Clone>(
         &self,
         update: UpdateDataSign<T>,
@@ -243,6 +244,10 @@ impl Flo {
         Ok(next_version)
     }
 
+    /// Updates the data of this Flo, given the [Condition] and the new
+    /// data [T].
+    /// The signers will all be used to create a signature.
+    /// It returns the new Flo with the updated data and signature.
     pub fn update_data_signers<T: Serialize + DeserializeOwned + Clone>(
         &self,
         cond: Condition,
@@ -254,6 +259,8 @@ impl Flo {
         self.update_data(up_sig)
     }
 
+    /// Returns an [UpdateCondSign] to collect the signatures necessary
+    /// to update the condition of this Flo.
     pub fn start_sign_cond(
         &self,
         cond_old: Condition,
@@ -277,6 +284,8 @@ impl Flo {
         });
     }
 
+    /// Updates the signing condition and returns the new Flo.
+    /// TODO: check that new signature is valid.
     pub fn update_cond(&self, update: UpdateCondSign) -> anyhow::Result<Flo> {
         let mut next_version = self.clone();
         next_version.cond_update.push(CondVersion {
@@ -287,6 +296,8 @@ impl Flo {
         Ok(next_version)
     }
 
+    /// Updates signs a new condition by the previous signers, and returns
+    /// the new Flo.
     pub fn update_cond_signers(
         &self,
         cond_old: Condition,
@@ -305,6 +316,8 @@ impl Flo {
         self.update_cond(update)
     }
 
+    /// Returns true if the signature is correct, else it returns false or a
+    /// more specific error why the signature is wrong.
     pub fn verify(&self) -> anyhow::Result<bool> {
         // Verify the genesis signature is correct
         if !self
