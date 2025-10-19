@@ -1,7 +1,9 @@
-CARGOS := cli/{fledger,flsignal} flarch flbrowser flcrypto flmacro \
+CLIs := fledger flsignal encfs
+CLI_PATHS := $(patsubst %,cli/%,$(CLIs))
+CARGOS := $(CLI_PATHS) flarch flbrowser flcrypto flmacro \
 			flmodules flnode test/{signal-fledger,fledger-nodejs,webrtc-libc-wasm/{libc,wasm}} \
 			examples/ping-pong/{shared,libc,wasm}
-CARGOS_NOWASM := cli/{fledger,flsignal} flarch flbrowser flcrypto flmacro \
+CARGOS_NOWASM := $(CLI_PATHS) flarch flbrowser flcrypto flmacro \
 			flmodules flnode test/{signal-fledger,webrtc-libc-wasm/libc} \
 			examples/ping-pong/{shared,libc}
 CARGO_LOCKS := . test/{fledger-nodejs,webrtc-libc-wasm/wasm} flbrowser examples/ping-pong/wasm
@@ -86,10 +88,14 @@ kill:
 	$(call PKILL,trunk serve)
 
 build_cli:
-	cd cli && cargo build -p fledger && cargo build -p flsignal
+	cd cli && \
+	for cli in ${CLIs}; do \
+	  echo "Building $$cli"; \
+	  cargo build $(CARGO_FLAGS) -p $$cli; \
+	done
 
-build_cli_release:
-	cd cli && cargo build --release -p fledger && cargo build --release -p flsignal
+build_cli_release: CARGO_FLAGS = --release
+build_cli_release: build_cli
 
 build_web_release:
 	cd flbrowser && trunk build --release
@@ -124,7 +130,7 @@ create_local_realm:
 	cd cli/fledger && cargo run -- -c test03 -n Local03 -s ws://localhost:8765 --disable-turn-stun realm create danu_realm
 
 docker_dev:
-	for cli in fledger flsignal; do \
+	for cli in ${CLIs}; do \
 		docker build --target $$cli --platform linux/amd64 -t fledgre/$$cli:dev . -f Dockerfile.dev --progress plain; \
 		docker push fledgre/$$cli:dev; \
 	done

@@ -30,7 +30,10 @@ impl Timer {
             loop {
                 interval.next().await;
                 if now() - last_tick > 2000 {
-                    log::warn!("Timer took {}ms instead of 1000ms, this means the machine is too busy!", now() - last_tick);
+                    log::warn!(
+                        "Timer took {}ms instead of 1000ms, this means the machine is too busy!",
+                        now() - last_tick
+                    );
                 }
                 last_tick = now();
                 seconds += 1;
@@ -54,6 +57,40 @@ impl Timer {
         Timer {
             broker: Broker::new(),
         }
+    }
+
+    pub async fn second<I: Message + 'static, O: Message + 'static>(
+        mut timer: BrokerTimer,
+        broker: Broker<I, O>,
+        msg: I,
+    ) -> anyhow::Result<()> {
+        timer
+            .add_translator_o_ti(
+                broker,
+                Box::new(move |m| match m {
+                    TimerMessage::Second => Some(msg.clone()),
+                    TimerMessage::Minute => None,
+                }),
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn minute<I: Message + 'static, O: Message + 'static>(
+        mut timer: BrokerTimer,
+        broker: Broker<I, O>,
+        msg: I,
+    ) -> anyhow::Result<()> {
+        timer
+            .add_translator_o_ti(
+                broker,
+                Box::new(move |m| match m {
+                    TimerMessage::Second => None,
+                    TimerMessage::Minute => Some(msg.clone()),
+                }),
+            )
+            .await?;
+        Ok(())
     }
 
     pub async fn tick<I: Message + 'static, O: Message + 'static>(

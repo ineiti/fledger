@@ -4,7 +4,15 @@ This file is in place of github issues, as currently I'm mostly developing on my
 
 ## Current high-level goal
 
+Modify flmodules/templates to use the broker-macros
+
 ## Current concrete goal
+
+- Re-implement template/simple and template/message
+- next up: re-implement template/full
+  - copy template/message over
+  - clean up previous elements
+- update READMEs
 
 ### User-facing
 
