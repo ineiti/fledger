@@ -42,7 +42,7 @@ pub(crate) enum InternOut {
 
 // The internal state of this broker.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub struct Message {
+pub struct Intern {
     pub counter: usize,
     pub other: HashMap<NodeID, usize>,
     pub(crate) nodes: Vec<NodeInfo>,
@@ -50,9 +50,9 @@ pub struct Message {
 
 pub(crate) type BrokerIntern = Broker<InternIn, InternOut>;
 
-impl Message {
+impl Intern {
     pub(crate) async fn broker() -> Result<BrokerIntern> {
-        Ok(Broker::new_with_handler(Box::new(Message::default()))
+        Ok(Broker::new_with_handler(Box::new(Intern::default()))
             .await?
             .0)
     }
@@ -116,7 +116,7 @@ impl Message {
 }
 
 #[platform_async_trait()]
-impl SubsystemHandler<InternIn, InternOut> for Message {
+impl SubsystemHandler<InternIn, InternOut> for Intern {
     // The message handler necessary for implementing a broker.
     async fn messages(&mut self, msgs: Vec<InternIn>) -> Vec<InternOut> {
         let out = msgs.into_iter()

@@ -10,7 +10,7 @@ use tokio::sync::watch;
 
 use crate::{
     network::broker::BrokerNetwork,
-    template::multi::message::{InternIn, InternOut, Message},
+    template::multi::intern::{InternIn, InternOut, Intern},
     timer::{BrokerTimer, Timer},
 };
 
@@ -23,7 +23,7 @@ pub enum MultiIn {
 /// The messages this broker outputs.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MultiOut {
-    State(Message),
+    State(Intern),
 }
 
 /// For other brokers who want to connect to this broker.
@@ -32,7 +32,7 @@ pub type BrokerMulti = Broker<MultiIn, MultiOut>;
 /// A structure containing one or more states which are automatically updated.
 pub struct Multi {
     /// The new state of the template.
-    pub state: watch::Receiver<Message>,
+    pub state: watch::Receiver<Intern>,
     /// A broker to be used in other brokers.
     pub broker: BrokerMulti,
 }
@@ -41,7 +41,7 @@ impl Multi {
     /// Returns a [Multi] and starts the broker.
     /// It uses a tap to update the state field of the structure.
     pub async fn state(timer: BrokerTimer, network: BrokerNetwork) -> Result<Multi> {
-        let (tx, state) = watch::channel(Message::default());
+        let (tx, state) = watch::channel(Intern::default());
         let mut state = Multi {
             state,
             broker: Self::broker(timer, network).await?,
@@ -66,7 +66,7 @@ impl Multi {
         let broker = Broker::new();
         // The internal brocker holds all messages - the ones for this module, but also
         // the timer and the network messages.
-        let mut intern = Message::broker().await?;
+        let mut intern = Intern::broker().await?;
         // Every incoming message from the module broker must go to the input of the internal
         // broker, this is a _direct_ connection: input -> input, output -> output.
         add_translator_direct!(intern, broker.clone(), InternIn::Multi, InternOut::Multi);
@@ -87,14 +87,14 @@ mod test {
     use crate::{
         network::broker::{NetworkIn, NetworkOut},
         nodeconfig::NodeInfo,
-        template::multi::message::{ModuleMessage, MODULE_NAME},
+        template::multi::intern::{ModuleMessage, MODULE_NAME},
         timer::TimerMessage,
     };
 
     use super::*;
 
-    fn state_counter(counter: usize) -> Message {
-        let mut m = Message::default();
+    fn state_counter(counter: usize) -> Intern {
+        let mut m = Intern::default();
         m.counter = counter;
         m
     }
@@ -113,7 +113,7 @@ mod test {
         broker.emit_msg_in(MultiIn::Count)?;
         broker.emit_msg_in(MultiIn::Count)?;
         assert_eq!(Some(state_counter_mo(2)), tap.0.recv().await);
-        timer.emit_msg_out(TimerMessage::Second)?;
+        timer.emit_msg_out(TimerMessage::Minute)?;
         assert_eq!(Some(state_counter_mo(0)), tap.0.recv().await);
         Ok(())
     }
@@ -130,7 +130,7 @@ mod test {
         state.broker.emit_msg_in(MultiIn::Count)?;
         tap.0.recv().await;
         assert_eq!(state_counter(2), *state.state.borrow());
-        timer.emit_msg_out(TimerMessage::Second)?;
+        timer.emit_msg_out(TimerMessage::Minute)?;
         tap.0.recv().await;
         assert_eq!(state_counter(0), *state.state.borrow());
 
