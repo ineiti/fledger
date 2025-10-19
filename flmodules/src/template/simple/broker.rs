@@ -43,7 +43,7 @@ pub struct SimpleState {
 impl Simple {
     /// Returns a [SimpleState] and starts the broker.
     /// It uses a tap to update the state field of the structure.
-    pub async fn state() -> Result<SimpleState> {
+    pub async fn start() -> Result<SimpleState> {
         let (tx, state) = watch::channel(0);
         let mut state = SimpleState {
             state,
@@ -108,7 +108,7 @@ mod test {
     #[tokio::test]
     // Testing that the state gets updated correctly.
     async fn test_state() -> Result<()> {
-        let mut state = Simple::state().await?;
+        let mut state = Simple::start().await?;
         let mut tap = state.broker.get_tap_out().await?;
 
         state.broker.emit_msg_in(SimpleIn::Count)?;

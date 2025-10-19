@@ -40,7 +40,7 @@ pub struct Multi {
 impl Multi {
     /// Returns a [Multi] and starts the broker.
     /// It uses a tap to update the state field of the structure.
-    pub async fn state(timer: BrokerTimer, network: BrokerNetwork) -> Result<Multi> {
+    pub async fn start(timer: BrokerTimer, network: BrokerNetwork) -> Result<Multi> {
         let (tx, state) = watch::channel(Intern::default());
         let mut state = Multi {
             state,
@@ -122,7 +122,7 @@ mod test {
     // Testing that the state gets updated correctly.
     async fn test_state() -> Result<()> {
         let mut timer = Broker::new();
-        let mut state = Multi::state(timer.clone(), Broker::new()).await?;
+        let mut state = Multi::start(timer.clone(), Broker::new()).await?;
         let mut tap = state.broker.get_tap_out().await?;
 
         state.broker.emit_msg_in(MultiIn::Count)?;

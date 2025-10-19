@@ -43,7 +43,7 @@ pub struct Persistent {
 impl Persistent {
     /// Returns a [Persistent] and starts the broker.
     /// It uses a tap to update the state field of the structure.
-    pub async fn state(
+    pub async fn start(
         ds: Box<dyn DataStorage + Send>,
         config: PersistentConfig,
         timer: BrokerTimer,
@@ -150,7 +150,7 @@ mod test {
     // Testing that the state gets updated correctly.
     async fn test_state() -> Result<()> {
         let mut timer = Broker::new();
-        let mut state = Persistent::state(
+        let mut state = Persistent::start(
             Box::new(DataStorageTemp::new()),
             PersistentConfig {
                 id: NodeID::rnd(),

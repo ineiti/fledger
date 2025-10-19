@@ -32,10 +32,9 @@ impl Node {
         router_node: RouterNode,
     ) -> anyhow::Result<Self> {
         let dht_router = DHTRouter::start(
-            router_node.config.info.get_id(),
+            kademlia::Config::default(router_node.config.info.get_id()),
+            timer.broker.clone(),
             router_node.router.clone(),
-            timer,
-            kademlia::Config::default(),
         )
         .await?;
 

@@ -12,22 +12,22 @@ pub struct Kademlia {
     buckets: Vec<KBucket>,
     // The home of the root bucket.
     root_bucket: KBucket,
-    // The root node of this Kademlia instance
-    pub root: NodeID,
     // Configuration for the buckets
-    config: Config,
+    pub config: Config,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
 pub struct Config {
+    pub root: NodeID,
     pub k: usize,
     pub ping_interval: u32,
     pub ping_timeout: u32,
 }
 
-impl Default for Config {
-    fn default() -> Self {
+impl Config {
+    pub fn default(root: NodeID) -> Self {
         Self {
+            root,
             k: 1,
             ping_interval: 10,
             ping_timeout: 30,
@@ -36,20 +36,19 @@ impl Default for Config {
 }
 
 impl Kademlia {
-    pub fn new(root: NodeID, config: Config) -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
             buckets: vec![],
             root_bucket: KBucket::new_root(config),
-            root,
             config,
         }
     }
 
     pub fn add_node(&mut self, id: NodeID) {
-        if id == self.root || self.has_node_id(&id) {
+        if id == self.config.root || self.has_node_id(&id) {
             return;
         }
-        let node = KNode::new(&self.root, id);
+        let node = KNode::new(&self.config.root, id);
         if let Some(bucket) = self.buckets.get_mut(node.depth) {
             bucket.add_node(node);
         } else {
@@ -69,7 +68,7 @@ impl Kademlia {
     #[cfg(feature = "testing")]
     pub fn add_nodes_active(&mut self, ids: Vec<NodeID>) {
         for id in ids {
-            let node = KNode::new(&self.root, id);
+            let node = KNode::new(&self.config.root, id);
             if let Some(bucket) = self.buckets.get_mut(node.depth) {
                 bucket.add_node_active(node);
             } else {
@@ -82,7 +81,7 @@ impl Kademlia {
     }
 
     pub fn node_disconnected(&mut self, id: NodeID) {
-        let node = KNode::new(&self.root, id);
+        let node = KNode::new(&self.config.root, id);
         if let Some(bucket) = self.buckets.get_mut(node.depth) {
             bucket.remove_node(&node.id);
             if self.root_bucket.status() == BucketStatus::Wanting {
@@ -92,7 +91,7 @@ impl Kademlia {
     }
 
     pub fn remove_node(&mut self, id: &NodeID) {
-        let node = KNode::new(&self.root, *id);
+        let node = KNode::new(&self.config.root, *id);
         if let Some(bucket) = self.buckets.get_mut(node.depth) {
             bucket.remove_node(id);
         } else {
@@ -106,10 +105,10 @@ impl Kademlia {
     /// Returns the next hop to get the message as close to the destination as possible.
     /// If a needed bucket is empty, the closest nodes on the 'wrong' branch will be returned.
     pub fn route_closest(&self, dst: &NodeID, last: Option<&NodeID>) -> Vec<NodeID> {
-        let depth = KNode::get_depth(&self.root, *dst);
+        let depth = KNode::get_depth(&self.config.root, *dst);
         match last {
             Some(l) => {
-                let depth_last = depth.max(KNode::get_depth(&self.root, *l));
+                let depth_last = depth.max(KNode::get_depth(&self.config.root, *l));
                 let depth_root_last = self.root_bucket.last_depth().unwrap_or(depth_last);
                 for d in std::iter::once(depth).chain(depth_last + 1..depth_root_last) {
                     let ret = self.get_nodes_depth(d);
@@ -126,7 +125,7 @@ impl Kademlia {
     /// Returns the next hop to get the message to the exact destination as possible.
     /// If a needed bucket is empty, an empty vector is returned, and the routing will fail.
     pub fn route_direct(&self, dst: &NodeID) -> Vec<NodeID> {
-        let depth = KNode::get_depth(&self.root, *dst);
+        let depth = KNode::get_depth(&self.config.root, *dst);
         self.get_nodes_depth(depth)
     }
 
@@ -172,7 +171,7 @@ impl Kademlia {
     /// The system received a message from this node, so its considered
     /// active.
     pub fn node_active(&mut self, id: &NodeID) -> bool {
-        let depth = KNode::get_depth(&self.root, *id);
+        let depth = KNode::get_depth(&self.config.root, *id);
         self.buckets
             .get_mut(depth)
             .unwrap_or_else(|| &mut self.root_bucket)
@@ -238,7 +237,7 @@ impl Kademlia {
 
 impl fmt::Display for Kademlia {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("Kademlia root: {}\n", self.root))?;
+        f.write_fmt(format_args!("Kademlia root: {}\n", self.config.root))?;
         f.write_fmt(format_args!("k: {}\n", self.config.k))?;
         for (index, bucket) in self.buckets.iter().enumerate() {
             f.write_fmt(format_args!("Bucket[{index}] = {}\n", bucket))?;
@@ -557,11 +556,14 @@ mod test {
 
     const LOG_LVL: log::LevelFilter = log::LevelFilter::Info;
 
-    const CONFIG: Config = Config {
-        k: 2,
-        ping_interval: 2,
-        ping_timeout: 4,
-    };
+    fn root_config(root: NodeID) -> Config {
+        Config {
+            root,
+            k: 2,
+            ping_interval: 2,
+            ping_timeout: 4,
+        }
+    }
 
     pub fn rnd_node_depth(root: &NodeID, depth: usize) -> NodeID {
         loop {
@@ -583,11 +585,11 @@ mod test {
     }
 
     pub fn kademlia_add_nodes(kademlia: &mut Kademlia, depth: usize, nbr: usize) {
-        kademlia.add_nodes_active(rnd_nodes_depth(&kademlia.root, depth, nbr));
+        kademlia.add_nodes_active(rnd_nodes_depth(&kademlia.config.root, depth, nbr));
     }
 
     pub fn kademlia_add_nodes_cache(kademlia: &mut Kademlia, depth: usize, nbr: usize) {
-        kademlia.add_nodes(rnd_nodes_depth(&kademlia.root, depth, nbr));
+        kademlia.add_nodes(rnd_nodes_depth(&kademlia.config.root, depth, nbr));
     }
 
     #[test]
@@ -667,41 +669,41 @@ mod test {
     fn test_adding_nodes() {
         start_logging_filter_level(vec![], LOG_LVL);
 
-        let root = U256::from_str("00").expect("NodeID init");
-        let mut kademlia = Kademlia::new(root, CONFIG);
-        kademlia_add_nodes(&mut kademlia, 0, CONFIG.k);
-        kademlia_test(&kademlia, 0, CONFIG.k);
+        let config = root_config(U256::from_str("00").expect("NodeID init"));
+        let mut kademlia = Kademlia::new(config);
+        kademlia_add_nodes(&mut kademlia, 0, config.k);
+        kademlia_test(&kademlia, 0, config.k);
 
-        kademlia_add_nodes(&mut kademlia, 2, CONFIG.k);
-        kademlia_test(&kademlia, 1, CONFIG.k);
+        kademlia_add_nodes(&mut kademlia, 2, config.k);
+        kademlia_test(&kademlia, 1, config.k);
 
         kademlia_add_nodes(&mut kademlia, 3, 1);
-        kademlia_test(&kademlia, 1, CONFIG.k + 1);
+        kademlia_test(&kademlia, 1, config.k + 1);
 
-        kademlia_add_nodes(&mut kademlia, 4, CONFIG.k);
-        kademlia_test(&kademlia, 3, CONFIG.k + 1);
+        kademlia_add_nodes(&mut kademlia, 4, config.k);
+        kademlia_test(&kademlia, 3, config.k + 1);
 
-        let mut kademlia = Kademlia::new(root, CONFIG);
-        kademlia_add_nodes(&mut kademlia, 2, 3 * CONFIG.k);
-        kademlia_test(&kademlia, 0, 3 * CONFIG.k);
+        let mut kademlia = Kademlia::new(config);
+        kademlia_add_nodes(&mut kademlia, 2, 3 * config.k);
+        kademlia_test(&kademlia, 0, 3 * config.k);
     }
 
     #[test]
     fn test_removing_nodes() {
-        let root = U256::from_str("00").expect("NodeID init");
-        let mut kademlia = Kademlia::new(root, CONFIG);
-        kademlia_add_nodes(&mut kademlia, 0, CONFIG.k);
-        kademlia_add_nodes(&mut kademlia, 2, CONFIG.k);
+        let config = root_config(U256::from_str("00").expect("NodeID init"));
+        let mut kademlia = Kademlia::new(config);
+        kademlia_add_nodes(&mut kademlia, 0, config.k);
+        kademlia_add_nodes(&mut kademlia, 2, config.k);
         kademlia_add_nodes(&mut kademlia, 3, 1);
-        kademlia_add_nodes(&mut kademlia, 4, CONFIG.k);
+        kademlia_add_nodes(&mut kademlia, 4, config.k);
 
-        kademlia_test(&kademlia, 3, CONFIG.k + 1);
+        kademlia_test(&kademlia, 3, config.k + 1);
         let id = kademlia.root_bucket.active.get(0).unwrap().id;
         kademlia.remove_node(&id);
-        kademlia_test(&kademlia, 3, CONFIG.k);
+        kademlia_test(&kademlia, 3, config.k);
         let id = kademlia.root_bucket.active.get(0).unwrap().id;
         kademlia.remove_node(&id);
-        kademlia_test(&kademlia, 2, CONFIG.k + 1);
+        kademlia_test(&kademlia, 2, config.k + 1);
     }
 
     // Test the standard edge-cases: no nodes, only depth==0 nodes
@@ -710,7 +712,8 @@ mod test {
         start_logging_filter_level(vec![], LOG_LVL);
 
         let root = U256::from_str("00").expect("NodeID init");
-        let mut kademlia = Kademlia::new(root, CONFIG);
+        let config = root_config(root.clone());
+        let mut kademlia = Kademlia::new(config);
 
         let dst_0 = rnd_node_depth(&root, 0);
         let dst_1 = rnd_node_depth(&root, 1);
@@ -729,9 +732,9 @@ mod test {
         let nodes = kademlia.route_closest(&dst_2, None);
         assert_eq!(1, nodes.len());
 
-        kademlia_add_nodes(&mut kademlia, 2, 2 * CONFIG.k);
+        kademlia_add_nodes(&mut kademlia, 2, 2 * config.k);
         let nodes = kademlia.route_closest(&dst_2, None);
-        assert_eq!(2 * CONFIG.k + 1, nodes.len());
+        assert_eq!(2 * config.k + 1, nodes.len());
     }
 
     // Do some more complicated cases
@@ -740,22 +743,23 @@ mod test {
         start_logging_filter_level(vec![], LOG_LVL);
 
         let root = U256::from_str("00").expect("NodeID init");
-        let mut kademlia = Kademlia::new(root, CONFIG);
+        let config = root_config(root);
+        let mut kademlia = Kademlia::new(config);
 
-        kademlia_add_nodes(&mut kademlia, 2, CONFIG.k);
-        kademlia_add_nodes(&mut kademlia, 3, CONFIG.k);
+        kademlia_add_nodes(&mut kademlia, 2, config.k);
+        kademlia_add_nodes(&mut kademlia, 3, config.k);
         // As the depth==4 nodes are entered one-by-one, the first one
         // triggers the overflow, and the second one goes to the cache.
         // So the active KBucket of the root_bucket has a depth 3 and a
         // depth 4 inside.
-        kademlia_add_nodes(&mut kademlia, 4, CONFIG.k + 1);
+        kademlia_add_nodes(&mut kademlia, 4, config.k + 1);
 
         let tests = vec![
-            (0, 2, CONFIG.k),
-            (1, 2, CONFIG.k),
-            (2, 2, CONFIG.k),
-            (3, 3, CONFIG.k),
-            (4, 4, CONFIG.k + 1),
+            (0, 2, config.k),
+            (1, 2, config.k),
+            (2, 2, config.k),
+            (3, 3, config.k),
+            (4, 4, config.k + 1),
             (5, 4, 0),
         ];
 
@@ -799,8 +803,8 @@ mod test {
     fn test_tick() {
         start_logging_filter_level(vec![], LOG_LVL);
 
-        let root = U256::from_str("00").expect("NodeID init");
-        let mut kademlia = Kademlia::new(root, CONFIG);
+        let config = root_config(U256::from_str("00").expect("NodeID init"));
+        let mut kademlia = Kademlia::new(config);
 
         kademlia_add_nodes(&mut kademlia, 2, 10);
         kademlia_add_nodes(&mut kademlia, 3, 10);
@@ -819,14 +823,12 @@ mod test {
         start_logging_filter_level(vec![], LOG_LVL);
 
         let root = NodeID::rnd();
-        let mut kademlia = Kademlia::new(
+        let mut kademlia = Kademlia::new(Config {
             root,
-            Config {
-                k: 2,
-                ping_interval: 10,
-                ping_timeout: 20,
-            },
-        );
+            k: 2,
+            ping_interval: 10,
+            ping_timeout: 20,
+        });
 
         kademlia.add_nodes_active((0..256).map(|_| NodeID::rnd()).collect());
 
@@ -860,17 +862,12 @@ mod test {
     }
 
     fn reach_one(node_nbr: usize, node_visible: usize, max_hops: usize, k: usize) -> usize {
-        let config = Config {
-            k,
-            ping_interval: 10,
-            ping_timeout: 20,
-        };
         let nodes: Vec<NodeID> = (0..node_nbr).map(|_| NodeID::rnd()).collect();
         let rng = &mut rand::thread_rng();
         let kademlias: Vec<Kademlia> = nodes
             .iter()
             .map(|root| {
-                let mut kad = Kademlia::new(*root, config);
+                let mut kad = Kademlia::new(Config::default(*root));
                 let mut shuffled = nodes.clone();
                 shuffled.retain(|id| id != root);
                 kad.add_nodes_active(shuffled.partial_shuffle(rng, node_visible).0.to_vec());
@@ -888,16 +885,16 @@ mod test {
             for hop in 0..max_hops {
                 // log::trace!("{hop_kademlia}");
                 let next_hops =
-                    hop_kademlia.route_closest(node, (hop > 0).then(|| &hop_kademlia.root));
+                    hop_kademlia.route_closest(node, (hop > 0).then(|| &hop_kademlia.config.root));
                 if let Some(next_hop) = next_hops.choose(rng) {
-                    hop_kademlia = kademlias.iter().find(|k| k.root == *next_hop).unwrap();
+                    hop_kademlia = kademlias.iter().find(|k| k.config.root == *next_hop).unwrap();
                     log::trace!("{hop}/{}: {next_hop}", KNode::get_depth(node, *next_hop));
                 } else {
-                    if node != &hop_kademlia.root {
+                    if node != &hop_kademlia.config.root {
                         log::trace!(
                             "{hop}: empty node returned before end: {} != {}",
                             node,
-                            hop_kademlia.root
+                            hop_kademlia.config.root
                         );
                         missing += 1;
                         // log::info!("{}", hop_kademlia);
@@ -919,7 +916,7 @@ mod test {
         }
         log::debug!(
             "Stats for {}: missing, route-length\n{missing} - {:?}",
-            config.k,
+            k,
             hops_stat.iter().counts_by(|u| u).iter().sorted()
         );
 
@@ -950,13 +947,14 @@ mod test {
         start_logging_filter_level(vec![], LOG_LVL);
 
         let root = NodeID::rnd();
-        let mut kademlia = Kademlia::new(root, CONFIG);
+        let config = root_config(root);
+        let mut kademlia = Kademlia::new(config);
 
         // Create some nodes
-        kademlia_add_nodes_cache(&mut kademlia, 2, 2 * CONFIG.k);
-        kademlia_add_nodes_cache(&mut kademlia, 3, 2 * CONFIG.k);
-        kademlia_test_cache(&kademlia, 3, 0, 2 * CONFIG.k);
-        let ticks = tick_len(&mut kademlia, 4 * CONFIG.k, 0);
+        kademlia_add_nodes_cache(&mut kademlia, 2, 2 * config.k);
+        kademlia_add_nodes_cache(&mut kademlia, 3, 2 * config.k);
+        kademlia_test_cache(&kademlia, 3, 0, 2 * config.k);
+        let ticks = tick_len(&mut kademlia, 4 * config.k, 0);
 
         // Ping some of the nodes
         for id in &ticks.ping[0..2] {
@@ -965,18 +963,18 @@ mod test {
         for id in &ticks.ping[6..8] {
             kademlia.node_active(id);
         }
-        kademlia_test_cache(&kademlia, 3, CONFIG.k, CONFIG.k);
-        kademlia_bucket(&kademlia, 2, CONFIG.k, CONFIG.k);
+        kademlia_test_cache(&kademlia, 3, config.k, config.k);
+        kademlia_bucket(&kademlia, 2, config.k, config.k);
 
         // Ping rest of nodes
         for id in &ticks.ping[2..6] {
             kademlia.node_active(id);
         }
-        kademlia_test_cache(&kademlia, 3, 2 * CONFIG.k, 0);
-        kademlia_bucket(&kademlia, 2, CONFIG.k, CONFIG.k);
+        kademlia_test_cache(&kademlia, 3, 2 * config.k, 0);
+        kademlia_bucket(&kademlia, 2, config.k, config.k);
 
         tick_len(&mut kademlia, 0, 0);
         log::info!("{kademlia}");
-        tick_len(&mut kademlia, 3 * CONFIG.k, 0);
+        tick_len(&mut kademlia, 3 * config.k, 0);
     }
 }

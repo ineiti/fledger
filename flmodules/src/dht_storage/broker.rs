@@ -361,7 +361,7 @@ mod tests {
             let n = self.simul.new_node().await?;
             let id = n.config.info.get_id();
             let dht_router =
-                DHTRouter::start(id, n.router, &mut self.tick, Config::default()).await?;
+                DHTRouter::start(Config::default(id), self.tick.broker.clone(), n.router).await?;
             let n_s = DHTStorage::start(
                 Box::new(DataStorageTemp::new()),
                 n.config.info.get_id(),

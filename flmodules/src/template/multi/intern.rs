@@ -17,16 +17,16 @@ use crate::{
 
 // The message sent by this module over the network.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) enum ModuleMessage {
+pub(super) enum ModuleMessage {
     Counter(usize),
 }
 
 // The name of this module - must be unique to the danu system.
-pub(crate) const MODULE_NAME: &str = "TEMPALTE_MULTI";
+pub(super) const MODULE_NAME: &str = "TEMPALTE_MULTI";
 
 // All possible incoming messages wrapped by their source.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum InternIn {
+pub(super) enum InternIn {
     Timer,
     Multi(MultiIn),
     Network(NetworkOut),
@@ -35,7 +35,7 @@ pub(crate) enum InternIn {
 // All possible output messages which will be automatically handled
 // by the broker.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum InternOut {
+pub(super) enum InternOut {
     Multi(MultiOut),
     Network(NetworkIn),
 }
@@ -45,13 +45,13 @@ pub(crate) enum InternOut {
 pub struct Intern {
     pub counter: usize,
     pub other: HashMap<NodeID, usize>,
-    pub(crate) nodes: Vec<NodeInfo>,
+    pub(super) nodes: Vec<NodeInfo>,
 }
 
-pub(crate) type BrokerIntern = Broker<InternIn, InternOut>;
+pub(super) type BrokerIntern = Broker<InternIn, InternOut>;
 
 impl Intern {
-    pub(crate) async fn broker() -> Result<BrokerIntern> {
+    pub(super) async fn broker() -> Result<BrokerIntern> {
         Ok(Broker::new_with_handler(Box::new(Intern::default()))
             .await?
             .0)
