@@ -50,14 +50,14 @@ pub(super) enum InternOut {
 
 const UPDATE_INTERVAL: usize = 10;
 
-pub(super) struct Messages {
+pub(super) struct Intern {
     node_config: NodeConfig,
     get_update: usize,
     connections: HashMap<NodeID, IOConnection>,
     tx: Option<watch::Sender<Vec<NodeID>>>,
 }
 
-impl Messages {
+impl Intern {
     pub async fn start(
         node_config: NodeConfig,
     ) -> anyhow::Result<(Self, watch::Receiver<Vec<NodeID>>)> {
@@ -380,7 +380,7 @@ impl IOConnection {
 }
 
 #[platform_async_trait()]
-impl SubsystemHandler<InternIn, InternOut> for Messages {
+impl SubsystemHandler<InternIn, InternOut> for Intern {
     async fn messages(&mut self, msgs: Vec<InternIn>) -> Vec<InternOut> {
         let id = self.node_config.info.get_id();
         msgs.into_iter()

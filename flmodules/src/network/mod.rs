@@ -166,7 +166,7 @@ use broker::Network;
 use thiserror::Error;
 
 pub mod broker;
-mod messages;
+mod intern;
 pub mod signal;
 
 use flarch::{
