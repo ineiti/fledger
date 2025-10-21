@@ -729,10 +729,9 @@ mod test {
             cuckoos: HashMap::new(),
             dht_storage: DHTStorage::start(
                 DataStorageTemp::new_box(),
-                NodeID::rnd(),
-                DHTConfig::default(),
+                DHTConfig::default(NodeID::rnd()),
+                Timer::start().await?.broker,
                 Broker::new(),
-                &mut Timer::start().await?,
             )
             .await?,
         };

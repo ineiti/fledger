@@ -98,7 +98,6 @@ pub struct Messages {
     realms: HashMap<RealmID, RealmStorage>,
     nodes: Vec<NodeID>,
     config: DHTConfig,
-    our_id: NodeID,
     ds: Box<dyn DataStorage + Send>,
     tx: Option<watch::Sender<Stats>>,
 }
@@ -108,7 +107,6 @@ impl Messages {
     pub fn new(
         ds: Box<dyn DataStorage + Send>,
         config: DHTConfig,
-        our_node: NodeID,
     ) -> (Self, watch::Receiver<Stats>) {
         let str = ds.get(MODULE_NAME).unwrap_or("".into());
         let realms = serde_yaml::from_str(&str).unwrap_or(HashMap::new());
@@ -116,7 +114,6 @@ impl Messages {
         let mut msgs = Self {
             realms,
             config,
-            our_id: our_node,
             nodes: vec![],
             ds,
             tx: Some(tx),
@@ -161,7 +158,7 @@ impl Messages {
                 Some(df) => DHTStorageOut::FloValue(df.clone()).into(),
                 None => MessageClosest::ReadFlo(id.realm_id().clone())
                     .to_intern_out(id.flo_id().clone().into())
-                    // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
+                    // .inspect(|msg| log::info!("{} sends {msg:?}", self.config.our_id))
                     .expect("Creating ReadFlo message"),
             }],
             DHTStorageIn::ReadCuckooIDs(id) => {
@@ -190,7 +187,8 @@ impl Messages {
                         .iter()
                         .flat_map(|realm| realm.1.get_all_flo_cuckoos())
                         .collect::<Vec<_>>(),
-                ).into()]
+                )
+                .into()]
             }
         }
     }
@@ -210,7 +208,7 @@ impl Messages {
             MessageClosest::ReadFlo(rid) => {
                 // log::info!(
                 //     "{} got request for {}/{} from {}",
-                //     self.our_id,
+                //     self.config.our_id,
                 //     key,
                 //     rid,
                 //     origin
@@ -224,7 +222,7 @@ impl Messages {
                     // log::info!("sends flo {:?}", fc.0);
                     return MessageDest::FloValue(fc)
                         .to_intern_out(origin)
-                        // .inspect(|msg| log::info!("{} sends {msg:?}", self.our_id))
+                        // .inspect(|msg| log::info!("{} sends {msg:?}", self.config.our_id))
                         .map_or(vec![], |msg| vec![msg]);
                 }
             }
@@ -252,7 +250,7 @@ impl Messages {
     fn msg_dest(&mut self, msg: MessageDest) -> Vec<InternOut> {
         match msg {
             MessageDest::FloValue(fc) => {
-                // log::info!("{} stores {:?}", self.our_id, flo.0);
+                // log::info!("{} stores {:?}", self.config.our_id, flo.0);
                 self.store_flo(fc.0.clone());
                 self.realms
                     .get_mut(&fc.0.realm_id())
@@ -266,11 +264,11 @@ impl Messages {
     }
 
     fn msg_neighbour(&mut self, origin: NodeID, msg: MessageNeighbour) -> Vec<InternOut> {
-        // log::trace!("{} syncs {:?}", self.our_id, msg);
+        // log::trace!("{} syncs {:?}", self.config.our_id, msg);
         // if let Sync::RequestFloMetas(rid) = &msg {
         //     log::trace!(
         //         "{} receives ReqFloMet from {} and will reply: {}",
-        //         self.our_id,
+        //         self.config.our_id,
         //         origin,
         //         self.realms
         //             .get(rid)
@@ -354,7 +352,7 @@ impl Messages {
     fn store_flo(&mut self, flo: Flo) -> Vec<InternOut> {
         let mut res = vec![];
         if self.upsert_flo(flo.clone()) {
-            // log::info!("{}: store_flo", self.our_id);
+            // log::info!("{}: store_flo", self.config.our_id);
             // TODO: this should not be sent in all cases...
             res.extend(vec![MessageClosest::StoreFlo(flo.clone())
                 .to_intern_out(flo.flo_id().into())
@@ -374,7 +372,7 @@ impl Messages {
     fn upsert_flo(&mut self, flo: Flo) -> bool {
         // log::trace!(
         //     "{} store_flo {}({}/{}) {}",
-        //     self.our_id,
+        //     self.config.our_id,
         //     flo.flo_type(),
         //     flo.flo_id(),
         //     flo.realm_id(),
@@ -382,7 +380,7 @@ impl Messages {
         // );
         // log::info!(
         //     "{} has realm: {}",
-        //     self.our_id,
+        //     self.config.our_id,
         //     self.realms.get(&flo.realm_id()).is_some()
         // );
         // log::info!(
@@ -394,7 +392,7 @@ impl Messages {
         let modification = self
             .realms
             .get_mut(&flo.realm_id())
-            // .inspect(|rs| log::info!("{} has realm", self.our_id))
+            // .inspect(|rs| log::info!("{} has realm", self.config.our_id))
             .map(|dsc| dsc.upsert_flo(flo.clone()))
             .unwrap_or_else(|| {
                 TryInto::<FloRealm>::try_into(flo)
@@ -415,12 +413,12 @@ impl Messages {
         }
         // log::debug!(
         //     "{} creating realm {}/{}",
-        //     self.our_id,
+        //     self.config.our_id,
         //     realm.realm_id(),
         //     realm.version()
         // );
         let id = realm.flo().realm_id();
-        let dsc = RealmStorage::new(self.config.clone(), self.our_id, realm)?;
+        let dsc = RealmStorage::new(self.config.clone(), realm)?;
         self.realms.insert(id.clone(), dsc);
         // log::info!("Realm {}: {}", id, self.realms.get(&id).is_some());
         Ok(())
@@ -441,7 +439,7 @@ impl Messages {
 #[platform_async_trait()]
 impl SubsystemHandler<InternIn, InternOut> for Messages {
     async fn messages(&mut self, inputs: Vec<InternIn>) -> Vec<InternOut> {
-        let _id = self.our_id;
+        let _id = self.config.our_id;
         inputs
             .into_iter()
             // .inspect(|msg| log::debug!("{_id}: In: {msg:?}"))
@@ -556,12 +554,7 @@ mod tests {
     #[test]
     fn test_choice() -> anyhow::Result<()> {
         let our_id = NodeID::rnd();
-        let mut dht = Messages::new(
-            Box::new(DataStorageTemp::new()),
-            DHTConfig::default(),
-            our_id,
-        )
-        .0;
+        let mut dht = Messages::new(Box::new(DataStorageTemp::new()), DHTConfig::default(our_id)).0;
 
         let mut wallet = Wallet::new();
         let realm = wallet.get_realm();
@@ -611,8 +604,7 @@ mod tests {
         start_logging();
         let mut msg = Messages::new(
             DataStorageTemp::new_box(),
-            DHTConfig::default(),
-            NodeID::rnd(),
+            DHTConfig::default(NodeID::rnd()),
         )
         .0;
         let fr = FloRealm::from_type(

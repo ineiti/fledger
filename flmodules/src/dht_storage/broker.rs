@@ -22,13 +22,12 @@ use crate::{
         flo::{Flo, FloError, FloID, FloWrapper, UpdateCondSign},
         realm::{GlobalID, RealmID},
     },
-    timer::Timer,
+    timer::{BrokerTimer, Timer},
 };
-use flarch::nodeids::NodeID;
 
 use super::{
     core::{CoreError, DHTConfig, FloCuckoo},
-    messages::{InternIn, InternOut, Messages, Stats},
+    intern::{InternIn, InternOut, Messages, Stats},
     realm_view::RealmView,
 };
 
@@ -68,7 +67,6 @@ pub struct DHTStorage {
     pub stats: watch::Receiver<Stats>,
     intern: Broker<InternIn, InternOut>,
     config: DHTConfig,
-    _our_id: NodeID,
 }
 
 // unsafe impl Send for DHTStorage {}
@@ -96,12 +94,11 @@ pub enum StorageError {
 impl DHTStorage {
     pub async fn start(
         ds: Box<dyn DataStorage + Send>,
-        our_id: NodeID,
         config: DHTConfig,
+        timer: BrokerTimer,
         dht_router: BrokerDHTRouter,
-        timer: &mut Timer,
     ) -> anyhow::Result<Self> {
-        let (messages, stats) = Messages::new(ds, config.clone(), our_id.clone());
+        let (messages, stats) = Messages::new(ds, config.clone());
         let mut intern = Broker::new();
         intern.add_handler(Box::new(messages)).await?;
 
@@ -127,19 +124,18 @@ impl DHTStorage {
                 Box::new(|msg| Some(InternIn::Storage(msg))),
             )
             .await?;
-        timer
-            .tick_minute(
-                intern.clone(),
-                InternIn::Storage(DHTStorageIn::SyncFromNeighbors),
-            )
-            .await?;
+        Timer::minute(
+            timer,
+            intern.clone(),
+            InternIn::Storage(DHTStorageIn::SyncFromNeighbors),
+        )
+        .await?;
 
         Ok(DHTStorage {
             broker,
             stats,
             intern,
             config,
-            _our_id: our_id,
         })
     }
 
@@ -364,10 +360,9 @@ mod tests {
                 DHTRouter::start(Config::default(id), self.tick.broker.clone(), n.router).await?;
             let n_s = DHTStorage::start(
                 Box::new(DataStorageTemp::new()),
-                n.config.info.get_id(),
-                DHTConfig::default(),
+                DHTConfig::default(n.config.info.get_id()),
+                self.tick.broker.clone(),
                 dht_router.broker.clone(),
-                &mut self.tick,
             )
             .await?;
             self.nodes.push(n_s.clone());

@@ -176,20 +176,18 @@ impl Node {
         }
         if modules.contains(Modules::DHT_ROUTER) {
             let routing = DHTRouter::start(
-                id,
+                kademlia::Config::default(id),
+                timer.broker.clone(),
                 network_io.clone(),
-                &mut timer,
-                kademlia::Config::default(),
             )
             .await?;
             if modules.contains(Modules::DHT_STORAGE) {
                 dht_storage = Some(
                     DHTStorage::start(
                         storage.clone_box(),
-                        id,
-                        DHTConfig::default(),
+                        DHTConfig::default(id),
+                        timer.broker.clone(),
                         routing.broker.clone(),
-                        &mut timer,
                     )
                     .await?,
                 );

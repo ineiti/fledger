@@ -30,6 +30,7 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
 - created different templates
 - updated flmodules to match templates:
   - dht_router
+  - dht_storage
 
 ### Fixed
 

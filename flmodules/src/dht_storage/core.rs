@@ -35,6 +35,7 @@ pub struct FloMeta {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DHTConfig {
+    pub our_id: NodeID,
     // Realms allowed in this instance. If the Vec is empty, all new realms are
     // allowed.
     pub realms: Vec<RealmID>,
@@ -44,9 +45,10 @@ pub struct DHTConfig {
     pub timeout: u64,
 }
 
-impl Default for DHTConfig {
-    fn default() -> Self {
+impl DHTConfig {
+    pub fn default(our_id: NodeID) -> Self {
         Self {
+            our_id,
             realms: vec![],
             owned: vec![],
             timeout: 1000,
@@ -84,7 +86,6 @@ pub struct RealmStorage {
     dht_config: DHTConfig,
     realm_config: RealmConfig,
     realm_id: RealmID,
-    root: U256,
     flos: HashMap<FloID, FloStorage>,
     distances: HashMap<usize, Vec<FloID>>,
     pub size: u64,
@@ -113,14 +114,13 @@ pub enum CoreError {
 }
 
 impl RealmStorage {
-    pub fn new(dht_config: DHTConfig, root: NodeID, realm: FloRealm) -> anyhow::Result<Self> {
+    pub fn new(dht_config: DHTConfig, realm: FloRealm) -> anyhow::Result<Self> {
         let realm_config = realm.cache().get_config();
         let realm_id = realm.flo().realm_id();
         let mut s = Self {
             dht_config,
             realm_config,
             realm_id,
-            root,
             flos: HashMap::new(),
             distances: HashMap::new(),
             size: 0,
@@ -235,7 +235,7 @@ impl RealmStorage {
                 self.put(flo);
             } else {
                 // What [remove_furthest] can free.
-                let size_above: u64 = (0..KNode::get_depth(&self.root, *flo_id))
+                let size_above: u64 = (0..KNode::get_depth(&self.dht_config.our_id, *flo_id))
                     .map(|depth| self.size_at_depth(depth))
                     .sum();
                 if flo_size <= size_above {
@@ -273,10 +273,10 @@ impl RealmStorage {
     fn put(&mut self, flo: Flo) {
         let id = flo.flo_id();
         self.remove_entry(&id);
-        let depth = KNode::get_depth(&self.root, *id);
+        let depth = KNode::get_depth(&self.dht_config.our_id, *id);
         // log::info!(
         //     "{} Storing id({id}) / version({}) / flo_type({}) at depth {depth}",
-        //     self.root,
+        //     self.dht_config.our_id,
         //     flo.version(),
         //     flo.flo_type()
         // );
@@ -291,7 +291,7 @@ impl RealmStorage {
 
     fn remove_entry(&mut self, id: &FloID) {
         if let Some(df) = self.flos.remove(id) {
-            let distance = KNode::get_depth(&self.root, **id);
+            let distance = KNode::get_depth(&self.dht_config.our_id, **id);
             self.distances
                 .entry(distance)
                 .and_modify(|v| v.retain(|i| i != id));
@@ -324,8 +324,8 @@ impl RealmStorage {
             {
                 // log::info!(
                 //     "{}: Removing furthest {id}/{}",
-                //     self.root,
-                //     KNode::get_depth(&self.root, *id.clone())
+                //     self.dht_config.our_id,
+                //     KNode::get_depth(&self.dht_config.our_id, *id.clone())
                 // );
 
                 self.remove_entry(&id);
@@ -408,7 +408,7 @@ mod tests {
             &[],
         )?;
         let rid = fr.realm_id();
-        let mut storage = RealmStorage::new(DHTConfig::default(), root.into(), fr.clone())?;
+        let mut storage = RealmStorage::new(DHTConfig::default(root.into()), fr.clone())?;
 
         let data = &("".to_string());
         let fp = Flo::new_signer(
@@ -477,7 +477,7 @@ mod tests {
         let root = U256::from_str("00")?;
         let realm = get_realm_depth(&root, 0);
         let rid = realm.realm_id();
-        let mut storage = RealmStorage::new(DHTConfig::default(), root, realm.clone())?;
+        let mut storage = RealmStorage::new(DHTConfig::default(root), realm.clone())?;
         assert_eq!(1, storage.distances.len());
         log::info!(
             "{} / {} / {:?}",
@@ -556,7 +556,7 @@ mod tests {
             &[],
         )?;
         let rid = realm.realm_id();
-        let mut storage = RealmStorage::new(DHTConfig::default(), root, realm)?;
+        let mut storage = RealmStorage::new(DHTConfig::default(root), realm)?;
 
         let fw = FloBlob::from_type(rid.clone(), Condition::Pass, Blob::new("test"), &[])?;
         storage.put(fw.flo().clone());
