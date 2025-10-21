@@ -33,6 +33,7 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
   - dht_storage
   - gossip_events
   - network
+- removed ping module
 
 ### Fixed
 

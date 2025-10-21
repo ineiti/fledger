@@ -68,10 +68,6 @@ pub struct Args {
     #[arg(long, default_value = "false")]
     log_random: bool,
 
-    /// Log countdown router
-    #[arg(long, default_value = "false")]
-    log_countdown: bool,
-
     /// Log dht-storage stats
     #[arg(long, default_value = "false")]
     log_dht_storage: bool,
@@ -261,11 +257,6 @@ impl Fledger {
                         .collect::<Vec<_>>()
                         .join(" - ")
                 );
-            }
-
-            if self.args.log_countdown {
-                let ping = &self.node.ping.as_ref().unwrap().storage.borrow();
-                log::info!("Nodes countdowns are: {:?}", ping.stats);
             }
 
             if self.args.log_gossip {

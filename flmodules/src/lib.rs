@@ -6,7 +6,8 @@ bitflags! {
         const STAT = 0x1;
         const RAND = 0x2;
         const GOSSIP = 0x4;
-        const PING = 0x8;
+        // This doesn't exist anymore
+        // const PING = 0x8;
         const WEBPROXY = 0x10;
         const WEBPROXY_REQUESTS = 0x20;
         const DHT_ROUTER = 0x40;
@@ -16,7 +17,7 @@ bitflags! {
 
 impl Modules {
     pub fn stable() -> Modules {
-        Modules::all() - Modules::PING
+        Modules::all()
     }
 }
 
@@ -26,7 +27,6 @@ pub mod flo;
 pub mod gossip_events;
 pub mod network;
 pub mod nodeconfig;
-pub mod ping;
 pub mod random_connections;
 pub mod router;
 pub mod template;

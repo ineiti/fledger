@@ -31,15 +31,6 @@ async fn main() -> anyhow::Result<()> {
 
     for i in 0..5 {
         log::info!("Running step {i}");
-        log::info!(
-            "Node 1: {:?}",
-            node1.ping.as_ref().unwrap().storage.borrow().stats
-        );
-
-        log::info!(
-            "Node 2: {:?}",
-            node2.ping.as_ref().unwrap().storage.borrow().stats
-        );
 
         for msg in msgs_signal.try_iter() {
             log::debug!("Signal: {msg:?}");
@@ -48,33 +39,7 @@ async fn main() -> anyhow::Result<()> {
         wait_ms(1000).await;
     }
 
-    let ping1 = node1
-        .ping
-        .as_ref()
-        .unwrap()
-        .storage
-        .borrow()
-        .stats
-        .get(&node2.node_config.info.get_id())
-        .unwrap()
-        .clone();
-    assert_eq!(1, ping1.tx);
-    assert_eq!(1, ping1.rx);
-
-    let ping2 = node2
-        .ping
-        .as_ref()
-        .unwrap()
-        .storage
-        .borrow()
-        .stats
-        .get(&node1.node_config.info.get_id())
-        .unwrap()
-        .clone();
-    assert_eq!(1, ping2.tx);
-    assert_eq!(1, ping2.rx);
-
-    log::info!("All seems well and ping messages have been passed");
+    log::info!("All seems well");
 
     Ok(())
 }

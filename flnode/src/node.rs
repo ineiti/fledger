@@ -20,7 +20,6 @@ use flmodules::{
     },
     network::broker::{BrokerNetwork, NetworkError, NetworkIn},
     nodeconfig::{ConfigError, NodeConfig, NodeInfo},
-    ping::broker::Ping,
     random_connections::broker::RandomBroker,
     router::broker::{BrokerRouter, RouterNetwork, RouterRandom},
     timer::Timer,
@@ -77,8 +76,6 @@ pub struct Node {
     pub random: Option<RandomBroker>,
     /// Gossip-events sent and received
     pub gossip: Option<Gossip>,
-    /// Pings all connected nodes and informs about failing nodes
-    pub ping: Option<Ping>,
     /// Answers GET requests from another node
     pub webproxy: Option<WebProxy>,
     /// Sets up a dht routing system using Kademlia
@@ -135,7 +132,6 @@ impl Node {
         let id = node_config.info.get_id();
         let mut random = None;
         let mut gossip = None;
-        let ping = None;
         let mut webproxy = None;
         let mut stat = None;
         let mut dht_router = None;
@@ -152,11 +148,6 @@ impl Node {
                     )
                     .await?,
                 );
-            }
-            if modules.contains(Modules::PING) {
-                // log::warn!("Ping is disabled");
-                // ping =
-                //     Some(Ping::start(PingConfig::default(), rnd.broker.clone(), &mut timer).await?);
             }
             if modules.contains(Modules::WEBPROXY) {
                 webproxy = Some(
@@ -205,7 +196,6 @@ impl Node {
             stat,
             random,
             gossip,
-            ping,
             webproxy,
             dht_router,
             dht_storage,
