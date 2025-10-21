@@ -1,3 +1,3 @@
 pub mod broker;
 pub mod core;
-pub mod messages;
+pub mod intern;

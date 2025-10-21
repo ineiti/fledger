@@ -147,8 +147,8 @@ impl Node {
                     Gossip::start(
                         storage.clone(),
                         node_config.info.clone(),
+                        timer.broker.clone(),
                         rnd.broker.clone(),
-                        &mut timer,
                     )
                     .await?,
                 );
@@ -320,8 +320,8 @@ mod tests {
         broker::Broker, data_storage::DataStorageTemp, start_logging, start_logging_filter_level,
     };
     use flmodules::gossip_events::{
+        broker::GossipIn,
         core::{Category, Event},
-        messages::GossipIn,
     };
 
     use super::*;

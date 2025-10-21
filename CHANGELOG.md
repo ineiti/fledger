@@ -31,6 +31,7 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
 - updated flmodules to match templates:
   - dht_router
   - dht_storage
+  - gossip_events
 
 ### Fixed
 
