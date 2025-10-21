@@ -8,7 +8,7 @@ pub struct NodeTime {
     pub ticks: u32,
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Nodes(pub Vec<NodeTime>);
 
 impl Nodes {

@@ -1,5 +1,6 @@
 use flarch::web_rtc::connection::ConnectionConfig;
 use flmodules::network::network_start;
+use flmodules::timer::BrokerTimer;
 use log::{error, info};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -65,7 +66,7 @@ pub struct Node {
     /// Network IO broker
     pub network_io: BrokerRouter,
     /// Timer broker
-    pub timer: Timer,
+    pub timer: BrokerTimer,
     /// Storing all the signers and ACEs
     pub crypto_storage: CryptoStorage,
 
@@ -108,7 +109,7 @@ impl Node {
     ) -> anyhow::Result<Self> {
         let mut timer = Timer::start().await?;
         let net = network_start(node_config.clone(), net_config, &mut timer).await?;
-        Node::start(storage, node_config, net.broker, timer).await
+        Node::start(storage, node_config, net.broker, timer.broker).await
     }
 
     /// Create new node by loading the config from the storage.
@@ -119,7 +120,7 @@ impl Node {
         storage: Box<dyn DataStorage + Send>,
         node_config: NodeConfig,
         broker_net: BrokerNetwork,
-        mut timer: Timer,
+        timer: BrokerTimer,
     ) -> anyhow::Result<Self> {
         info!(
             "Starting node: {} = {}",
@@ -137,13 +138,13 @@ impl Node {
         let mut dht_router = None;
         let mut dht_storage = None;
         if modules.contains(Modules::RAND) {
-            let rnd = RandomBroker::start(id, broker_net.clone(), &mut timer).await?;
+            let rnd = RandomBroker::start(id, timer.clone(), broker_net.clone()).await?;
             if modules.contains(Modules::GOSSIP) {
                 gossip = Some(
                     Gossip::start(
                         storage.clone(),
                         node_config.info.clone(),
-                        timer.broker.clone(),
+                        timer.clone(),
                         rnd.broker.clone(),
                     )
                     .await?,
@@ -168,7 +169,7 @@ impl Node {
         if modules.contains(Modules::DHT_ROUTER) {
             let routing = DHTRouter::start(
                 kademlia::Config::default(id),
-                timer.broker.clone(),
+                timer.clone(),
                 network_io.clone(),
             )
             .await?;
@@ -177,7 +178,7 @@ impl Node {
                     DHTStorage::start(
                         storage.clone_box(),
                         DHTConfig::default(id),
-                        timer.broker.clone(),
+                        timer.clone(),
                         routing.broker.clone(),
                     )
                     .await?,
@@ -220,7 +221,7 @@ impl Node {
     /// currently connected to, and can be shorter than the list of all nodes in the system.
     pub fn nodes_connected(&self) -> anyhow::Result<Vec<NodeInfo>> {
         if let Some(r) = self.random.as_ref() {
-            return self.nodes_info(r.storage.borrow().connected.get_nodes().0);
+            return self.nodes_info(r.stats.borrow().connected.get_nodes().0);
         }
         Err(NodeError::Missing("Random".into()).into())
     }
@@ -229,7 +230,7 @@ impl Node {
     /// to a subset of these nodes, which can be get with `nodes_connected`.
     pub fn nodes_online(&self) -> anyhow::Result<Vec<NodeInfo>> {
         if let Some(r) = self.random.as_ref() {
-            return self.nodes_info(r.storage.borrow().known.0.clone());
+            return self.nodes_info(r.stats.borrow().known.0.clone());
         }
         Err(NodeError::Missing("Random".into()).into())
     }
@@ -326,7 +327,7 @@ mod tests {
             storage.clone_box(),
             nc.clone(),
             Broker::new(),
-            Timer::start().await?,
+            Timer::start().await?.broker,
         )
         .await?;
         let event = Event {
@@ -346,7 +347,7 @@ mod tests {
             storage.clone_box(),
             nc.clone(),
             Broker::new(),
-            Timer::start().await?,
+            Timer::start().await?.broker,
         )
         .await?;
         let events = nd2
@@ -368,7 +369,7 @@ mod tests {
             Box::new(DataStorageTemp::new()),
             NodeConfig::new(),
             Broker::new(),
-            Timer::start().await?,
+            Timer::start().await?.broker,
         )
         .await?;
         node.gossip.as_mut().unwrap().broker.settle(vec![]).await?;

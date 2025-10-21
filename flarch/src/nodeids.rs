@@ -173,7 +173,7 @@ impl fmt::LowerHex for U256 {
 /// A node ID for a node, which is a U256.
 pub type NodeID = U256;
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Default)]
 /// A list of node IDs with some useful methods.
 pub struct NodeIDs(pub Vec<NodeID>);
 

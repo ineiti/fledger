@@ -9,26 +9,15 @@ use crate::nodeconfig::NodeInfo;
 use super::nodes::Nodes;
 use flarch::nodeids::{NodeIDs, U256};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct RandomStorage {
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+pub struct RandomStats {
     pub connected: Nodes,
     pub connecting: Nodes,
     pub known: NodeIDs,
     pub infos: Vec<NodeInfo>,
 }
 
-impl Default for RandomStorage {
-    fn default() -> Self {
-        Self {
-            connected: Nodes::new(),
-            connecting: Nodes::new(),
-            known: NodeIDs::empty(),
-            infos: vec![],
-        }
-    }
-}
-
-impl RandomStorage {
+impl RandomStats {
     pub fn new() -> Self {
         Self::default()
     }
@@ -150,7 +139,7 @@ mod tests {
     #[test]
     fn test_list() {
         let nodes = NodeIDs::new(4);
-        let mut s = RandomStorage::default();
+        let mut s = RandomStats::default();
         s.new_list(nodes.slice(0, 2));
         assert_eq!(2, s.known.0.len());
         s.new_list(nodes.slice(1, 2));
@@ -160,7 +149,7 @@ mod tests {
     #[test]
     fn test_connect() {
         let nodes = NodeIDs::new(4);
-        let mut s = RandomStorage::default();
+        let mut s = RandomStats::default();
 
         s.new_list(nodes.slice(0, 1));
         s.connect(nodes.slice(0, 2));
@@ -171,7 +160,7 @@ mod tests {
     #[test]
     fn choose_new() {
         let nodes = NodeIDs::new(40);
-        let mut s = RandomStorage::default();
+        let mut s = RandomStats::default();
 
         s.new_list(nodes.clone());
         s.connecting(nodes.slice(0, 10));
