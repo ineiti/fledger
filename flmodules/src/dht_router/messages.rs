@@ -132,7 +132,7 @@ impl Messages {
                     vec![ModuleMessage::Neighbour(network_wrapper).wrapper_network(dst)]
                 } else {
                     log::warn!(
-                        "{} doesn't have a connection to {} anymore",
+                        "{}: sending to {} failed, as there is no connection anymore. Message: {network_wrapper:?}",
                         self.core.root,
                         dst
                     );
