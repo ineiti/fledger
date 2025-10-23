@@ -134,9 +134,9 @@ impl Intern {
             DHTRouterIn::MessageNeighbour(dst, network_wrapper) => {
                 if !self.connected.contains(&dst) {
                     log::warn!(
-                        "{} doesn't have a connection to {} anymore",
+                        "{} doesn't have a connection to {} anymore to send message {network_wrapper:?}",
                         self.core.config.root,
-                        dst
+                        self.get_id_info(&dst)
                     );
                 }
                 vec![ModuleMessage::Neighbour(network_wrapper).wrapper_network(dst)]

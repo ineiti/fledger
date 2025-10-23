@@ -8,10 +8,8 @@ Modify flmodules/templates to use the broker-macros
 
 ## Current concrete goal
 
-- Re-implement template/simple and template/message
-- next up: re-implement template/full
-  - copy template/message over
-  - clean up previous elements
+- clean up previous elements
+- also create proper "InternIn, InternOut" for flarch-brokers
 - update READMEs
 
 ### User-facing

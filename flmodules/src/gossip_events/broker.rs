@@ -148,6 +148,8 @@ mod tests {
             .settle_msg_out(RandomOut::NodeIDsConnected(vec![id2].into()))
             .await?;
         assert_msg_reid(&tap_rnd, &id2)?;
+        // Drop the following list of eventIDs
+        tap_rnd.recv()?;
 
         let event = Event {
             category: Category::TextMessage,
@@ -167,22 +169,25 @@ mod tests {
             .await?;
         assert_eq!(1, gossip.storage.borrow().events(event.category).len());
 
+        // Need three ticks to request new EventIDs
+        timer.broker.settle_msg_out(TimerMessage::Second).await?;
+        timer.broker.settle_msg_out(TimerMessage::Second).await?;
         timer.broker.settle_msg_out(TimerMessage::Second).await?;
         assert_msg_reid(&tap_rnd, &id2)?;
         Ok(())
     }
 
     fn assert_msg_reid(tap: &mpsc::Receiver<RandomIn>, id2: &NodeID) -> anyhow::Result<()> {
-        for msg in tap.try_iter() {
-            if let RandomIn::NetworkWrapperToNetwork(id, msg_mod) = msg {
-                assert_eq!(id2, &id);
-                assert_eq!(MODULE_NAME.to_string(), msg_mod.module);
-                let msg_yaml = serde_yaml::from_str(&msg_mod.msg)?;
-                assert_eq!(ModuleMessage::RequestEventIDs, msg_yaml);
-            } else {
-                assert!(false);
-            }
+        let msg = tap.recv()?;
+        log::info!("Message is: {msg:?}");
+        if let RandomIn::NetworkWrapperToNetwork(id, msg_mod) = msg {
+            assert_eq!(id2, &id);
+            assert_eq!(MODULE_NAME.to_string(), msg_mod.module);
+            let msg_yaml = serde_yaml::from_str(&msg_mod.msg)?;
+            assert_eq!(ModuleMessage::RequestEventIDs, msg_yaml);
+            Ok(())
+        } else {
+            anyhow::bail!("Message was {msg:?} instead of RequestEventIDs")
         }
-        Ok(())
     }
 }
