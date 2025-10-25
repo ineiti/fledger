@@ -9,15 +9,13 @@ use flmodules::{
 };
 use itertools::Itertools;
 use js_sys::JsString;
-use regex::Regex;
 use std::collections::HashMap;
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast};
 use web_sys::{
-    window, Document, HtmlButtonElement, HtmlDivElement, HtmlElement, HtmlInputElement,
-    HtmlTextAreaElement,
+    Document, HtmlButtonElement, HtmlDivElement, HtmlElement, HtmlInputElement, HtmlTextAreaElement,
 };
 
-use flarch::{data_storage::DataStorageLocal, nodeids::U256};
+use flarch::nodeids::U256;
 use flnode::{node::Node, stat::NetStats, version::VERSION_STRING};
 
 #[wasm_bindgen(module = "/src/main.js")]
@@ -73,8 +71,6 @@ pub struct Web {
 
 impl Web {
     pub fn new() -> Result<Self> {
-        Web::set_data_storage();
-
         let window = web_sys::window().expect("no global `window` exists");
         Ok(Self {
             document: window.document().expect("should have a document on window"),
@@ -198,23 +194,6 @@ impl Web {
             })
             .join("");
         self.set_id_inner("editable-pages", &pages_li);
-    }
-
-    fn set_data_storage() {
-        if let Ok(loc) = window().unwrap().location().href() {
-            if loc.contains('#') {
-                let reg = Regex::new(r".*?#").unwrap();
-                let data_enc = reg.replace(&loc, "");
-                if data_enc != "" {
-                    if let Ok(data) = urlencoding::decode(&data_enc) {
-                        if let Err(err) = Node::set_config(DataStorageLocal::new("fledger"), &data)
-                        {
-                            log::warn!("Got error while saving config: {}", err);
-                        }
-                    }
-                }
-            }
-        }
     }
 
     pub fn get_chat_msg(&self) -> String {

@@ -25,6 +25,7 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
 - flarch::Browser got macros for handling forward messages
 - WebRTCConnInput, WebRTCConnOutput to WebRTCConnIn, WebRTCConnOut
 - Adding NetworkMessage to NetworkOut
+- removed possibility to give configuration on the URL
 
 ### Fixed
 
