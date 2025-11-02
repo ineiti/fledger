@@ -104,10 +104,9 @@ pub enum Direction {
 
 impl Direction {
     pub fn other(&self) -> Direction {
-        if self == &Direction::Incoming {
-            Direction::Outgoing
-        } else {
-            Direction::Incoming
+        match self {
+            Direction::Incoming => Direction::Outgoing,
+            Direction::Outgoing => Direction::Incoming,
         }
     }
 }

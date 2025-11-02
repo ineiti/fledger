@@ -1,5 +1,5 @@
 use std::sync::{
-    atomic::{AtomicU32, Ordering},
+    atomic::{AtomicU32, AtomicBool, Ordering},
     Arc,
 };
 
@@ -377,7 +377,7 @@ impl WebRTCConnectionSetupLibc {
         let mut broker_cl = broker.clone();
         let resets_current = resets.load(Ordering::Relaxed);
         let resets_cl = Arc::clone(&resets);
-        let is_open = Arc::new(AtomicU32::new(0));
+        let is_open = Arc::new(AtomicBool::new(false));
         let is_open_cl = Arc::clone(&is_open);
         data_channel.on_open(Box::new(move || {
             if resets_cl.load(Ordering::Relaxed) != resets_current {
@@ -386,7 +386,7 @@ impl WebRTCConnectionSetupLibc {
             }
 
             log::trace!("DataChannel is opened");
-            is_open.store(1, Ordering::Relaxed);
+            is_open.store(true, Ordering::Relaxed);
             Box::pin(async move {
                 broker_cl
                     .emit_msg_out(WebRTCOutput::Connected)
@@ -404,7 +404,7 @@ impl WebRTCConnectionSetupLibc {
                 return Box::pin(async {});
             }
             let mut msgs = vec![];
-            if is_open_cl.load(Ordering::Relaxed) == 0 {
+            if !is_open_cl.load(Ordering::Relaxed) {
                 // Unfortunately this seems to be the case with the current webrtc library:
                 // the first message is sent before the data channel is opened.
                 log::trace!("Got message before channel is opened!");

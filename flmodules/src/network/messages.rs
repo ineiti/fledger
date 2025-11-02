@@ -270,7 +270,7 @@ impl Messages {
                     "Asking to connect to {dst} while connection setup is in place - starting new setup"
                 );
             } else {
-                self.connection_state_set(*dst, &Direction::Incoming, ConnectionState::Setup);
+                self.connection_state_set(*dst, &Direction::Outgoing, ConnectionState::Setup);
             }
             vec![InternOut::WebRTC(WebRTCConnIn::Connect(*dst))]
         }
