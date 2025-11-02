@@ -10,7 +10,10 @@
 //!
 //! _If you come here, I hope you're not trying to debug something that doesn't work.
 //! This code is quite obscure, and should be rewritten for the 5th time or so._
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+};
 
 use crate::{
     broker::{Broker, BrokerError, SubsystemHandler},
@@ -76,13 +79,37 @@ pub enum NCOutput {
     Outgoing(WebRTCInput),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl Display for NCOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NCOutput::Connected(dir) => write!(f, "Connected({dir})"),
+            NCOutput::Disconnected(dir) => write!(f, "Disconnected({dir})"),
+            NCOutput::Text(_) => write!(f, "Text()"),
+            NCOutput::State(dir, _) => write!(f, "State({dir})"),
+            NCOutput::Setup(dir, _) => write!(f, "Setup({dir})"),
+            NCOutput::Incoming(msg) => write!(f, "Incoming({msg})"),
+            NCOutput::Outgoing(msg) => write!(f, "Outgoing({msg})"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, EnumDisplay)]
 /// One of the directions for a connection
 pub enum Direction {
     /// Being initiated by the remote peer
     Incoming,
     /// Being initiated by this peer
     Outgoing,
+}
+
+impl Direction {
+    pub fn other(&self) -> Direction {
+        if self == &Direction::Incoming {
+            Direction::Outgoing
+        } else {
+            Direction::Incoming
+        }
+    }
 }
 
 /// A Packet is used to split a big NC*::Text into smaller parts, so
@@ -226,9 +253,7 @@ impl NodeConnection {
                     Direction::Incoming => self.state_incoming = state,
                     Direction::Outgoing => self.state_outgoing = state,
                 }
-                let mut out = vec![NCOutput::Connected(dir)];
-                out.extend(self.send_queue());
-                out
+                [vec![NCOutput::Connected(dir)], self.send_queue()].concat()
             }
             WebRTCOutput::Setup(pm) => vec![NCOutput::Setup(dir, pm)],
             WebRTCOutput::Text(msg_str) => self
@@ -377,7 +402,10 @@ mod tests {
         let packet_max_p1 = Packet::split_msg(string_max_p1.clone());
         assert_eq!(packet_max_p1.len(), 2);
         assert_eq!(pc.new_packet_str(&packet_max_p1[0]), None);
-        assert_eq!(pc.new_packet_str(&packet_max_p1[1]), Some(string_max_p1.clone()));
+        assert_eq!(
+            pc.new_packet_str(&packet_max_p1[1]),
+            Some(string_max_p1.clone())
+        );
         assert_eq!(pc.packets.len(), 0);
 
         assert_eq!(pc.new_packet_str(&packet_max_p1[1]), None);

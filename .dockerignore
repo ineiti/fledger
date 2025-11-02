@@ -5,4 +5,3 @@ test
 Dockerfile*
 Makefile
 *.md
-target-common

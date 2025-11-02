@@ -377,6 +377,8 @@ impl WebRTCConnectionSetupLibc {
         let mut broker_cl = broker.clone();
         let resets_current = resets.load(Ordering::Relaxed);
         let resets_cl = Arc::clone(&resets);
+        let is_open = Arc::new(AtomicU32::new(0));
+        let is_open_cl = Arc::clone(&is_open);
         data_channel.on_open(Box::new(move || {
             if resets_cl.load(Ordering::Relaxed) != resets_current {
                 log::warn!("Got message for deprecated on_open");
@@ -384,6 +386,7 @@ impl WebRTCConnectionSetupLibc {
             }
 
             log::trace!("DataChannel is opened");
+            is_open.store(1, Ordering::Relaxed);
             Box::pin(async move {
                 broker_cl
                     .emit_msg_out(WebRTCOutput::Connected)
@@ -400,13 +403,23 @@ impl WebRTCConnectionSetupLibc {
                 log::warn!("Got message for deprecated on_message");
                 return Box::pin(async {});
             }
+            let mut msgs = vec![];
+            if is_open_cl.load(Ordering::Relaxed) == 0 {
+                // Unfortunately this seems to be the case with the current webrtc library:
+                // the first message is sent before the data channel is opened.
+                log::trace!("Got message before channel is opened!");
+                msgs.push(WebRTCOutput::Connected);
+            }
             let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
             let mut broker = broker.clone();
             Box::pin(async move {
-                broker
-                    .emit_msg_out(WebRTCOutput::Text(msg_str))
-                    .err()
-                    .map(|e| log::warn!("Text queued but not processed: {:?}", e));
+                msgs.push(WebRTCOutput::Text(msg_str));
+                for msg in msgs {
+                    broker
+                        .emit_msg_out(msg)
+                        .err()
+                        .map(|e| log::warn!("Text queued but not processed: {:?}", e));
+                }
             })
         }));
         if let Some(dc) = rtc_data.lock().await.take() {
