@@ -2,12 +2,14 @@ use clap::{Parser, Subcommand};
 
 use flarch::{
     data_storage::{DataStorage, DataStorageFile},
+    nodeids::NodeID,
     tasks::wait_ms,
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
 use flmodules::{
     dht_router::broker::DHTRouter,
     dht_storage::broker::DHTStorage,
+    flo::realm::RealmID,
     network::{broker::NetworkIn, signal::SIGNAL_VERSION},
 };
 use flnode::{node::Node, version::VERSION_STRING};
@@ -101,6 +103,7 @@ struct Fledger {
     ds: DHTStorage,
     dr: DHTRouter,
     args: Args,
+    realm_ids: Option<Vec<RealmID>>,
 }
 
 #[tokio::main]
@@ -156,6 +159,7 @@ impl Fledger {
             dr: node.dht_router.as_ref().unwrap().clone(),
             node,
             args,
+            realm_ids: None,
         };
 
         match f.args.command.clone() {
@@ -181,6 +185,8 @@ impl Fledger {
             FledgerState::Duration(i) => log::info!("Just hanging around {i} seconds"),
             FledgerState::Forever => log::info!("Looping forever"),
         }
+
+        let mut stats = self.dr.stats.borrow().clone();
         loop {
             count += 1;
 
@@ -209,19 +215,38 @@ impl Fledger {
                 return Ok(());
             }
             self.ds.sync()?;
-            println!(
-                "dht-connections: {}/{}",
-                self.dr.stats.borrow().active,
-                self.dr
-                    .stats
-                    .borrow()
+            let stats_new = self.dr.stats.borrow().clone();
+            if stats != stats_new {
+                stats = stats_new;
+                let active = stats.bucket_nodes.iter().flatten().collect::<Vec<_>>();
+                let rest = stats
                     .all_nodes
                     .iter()
-                    .map(|n| n.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
+                    .filter(|id| !active.contains(id))
+                    .collect::<Vec<_>>();
+                println!(
+                    "dht-connections:   active({}): {}\n                 inactive({}): {}",
+                    stats.active,
+                    self.print_nodes(active),
+                    rest.len(),
+                    self.print_nodes(rest)
+                );
+            }
         }
+    }
+
+    fn print_nodes(&self, ids: Vec<&NodeID>) -> String {
+        let mut ret = vec![];
+        for id in ids {
+            let mut one = format!("{id}");
+            if let Ok(list) = self.node.nodes_info_all() {
+                if let Some(info) = list.get(id) {
+                    one += &format!("('{}')", info.name);
+                }
+            }
+            ret.push(one);
+        }
+        ret.join(" - ")
     }
 
     pub async fn log(&mut self, i: u32) -> anyhow::Result<()> {
@@ -257,13 +282,18 @@ impl Fledger {
                         log::info!("No realms found.");
                         return Ok(());
                     }
-                    log::info!(
-                        "Realm-IDs are: {}",
-                        rids.iter()
-                            .map(|rid| format!("{rid}"))
-                            .collect::<Vec<_>>()
-                            .join(" :: ")
-                    );
+                    if let Some(rids_old) = &self.realm_ids {
+                        if rids_old != &rids {
+                            log::info!(
+                                "Realm-IDs are: {}",
+                                rids.iter()
+                                    .map(|rid| format!("{rid}"))
+                                    .collect::<Vec<_>>()
+                                    .join(" :: ")
+                            );
+                            self.realm_ids = Some(rids);
+                        }
+                    }
                 }
             }
         }
