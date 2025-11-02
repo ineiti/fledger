@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use flarch::{
     broker::{SubsystemHandler, TranslateFrom, TranslateInto},
     nodeids::{NodeID, U256},
@@ -56,7 +58,7 @@ pub(super) enum InternOut {
     Network(RouterIn),
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Stats {
     pub all_nodes: Vec<NodeID>,
     pub bucket_nodes: Vec<Vec<NodeID>>,
@@ -71,6 +73,7 @@ pub(super) struct Messages {
     // This is different than core.active, because there can be connections from other
     // modules, or connections from another node.
     connected: Vec<NodeID>,
+    infos: HashMap<NodeID, NodeInfo>,
 }
 
 impl Messages {
@@ -82,6 +85,7 @@ impl Messages {
                 core: Kademlia::new(root, cfg),
                 tx: Some(tx),
                 connected: vec![],
+                infos: HashMap::new(),
             },
             rx,
         )
@@ -166,6 +170,9 @@ impl Messages {
 
     // Stores the new node list, excluding the ID of this node.
     fn add_node_infos(&mut self, infos: Vec<NodeInfo>) -> Vec<InternOut> {
+        for info in &infos {
+            self.infos.insert(info.get_id(), info.clone());
+        }
         self.add_nodes(infos.iter().map(|i| i.get_id()).collect())
     }
 

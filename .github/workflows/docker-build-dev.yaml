@@ -32,10 +32,10 @@ jobs:
     - name: Update build tag
       run: devbox run -- make update_version
 
-    - name: Build servers
+    - name: Build binaries
       run: devbox run -- make build_cli_release build_web_release
 
-    - name: Docker build signal
+    - name: Docker push signal
       uses: mr-smithers-excellent/docker-build-push@v6
       with:
         image: fledgre/flsignal
@@ -45,7 +45,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB }}
         tags: dev
 
-    - name: Docker build fledger
+    - name: Docker push fledger
       uses: mr-smithers-excellent/docker-build-push@v6
       with:
         image: fledgre/fledger
@@ -55,7 +55,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB }}
         tags: dev
 
-    - name: Docker build web
+    - name: Docker push web
       uses: mr-smithers-excellent/docker-build-push@v6
       with:
         image: fledgre/web
