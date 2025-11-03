@@ -132,17 +132,23 @@ impl Messages {
             DHTRouterIn::MessageClosest(key, msg) => self.new_closest(key, msg),
             DHTRouterIn::MessageDirect(key, msg) => self.new_direct(key, msg),
             DHTRouterIn::MessageNeighbour(dst, network_wrapper) => {
-                if self.connected.contains(&dst) {
-                    vec![ModuleMessage::Neighbour(network_wrapper).wrapper_network(dst)]
-                } else {
+                if !self.connected.contains(&dst) {
                     log::warn!(
-                        "{}: sending to {} failed, as there is no connection anymore. Message: {network_wrapper:?}",
+                        "{}: no connection to {}, trying anyway. Message: {network_wrapper:?}",
                         self.core.root,
-                        dst
+                        self.get_id_info(&dst),
                     );
-                    vec![]
                 }
+                vec![ModuleMessage::Neighbour(network_wrapper).wrapper_network(dst)]
             }
+        }
+    }
+
+    fn get_id_info(&self, id: &NodeID) -> String {
+        if let Some(info) = self.infos.get(id) {
+            format!("{id}/{}", info.name)
+        } else {
+            format!("{id}")
         }
     }
 

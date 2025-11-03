@@ -110,16 +110,6 @@ impl RouterNetwork {
         .await?;
         Ok(b)
     }
-
-    fn available_connected(&self, id: U256) -> (bool, bool) {
-        (
-            self.nodes_available
-                .iter()
-                .find(|info| info.get_id() == id)
-                .is_some(),
-            self.nodes_connected.contains(&id),
-        )
-    }
 }
 
 #[platform_async_trait()]
@@ -132,16 +122,16 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
             if let RouterIn::Internal(internal) = msg {
                 match internal {
                     RouterInternal::Connected(id) => {
-                        if !self.available_connected(id).1 {
+                        if !self.nodes_connected.contains(&id) {
                             self.nodes_connected.push(id);
-                            // out.push(RouterOut::Connected(id));
+                            out.push(RouterOut::Connected(id));
                             ret = true;
                         }
                     }
                     RouterInternal::Disconnected(id) => {
-                        if self.available_connected(id).1 == true {
+                        if self.nodes_connected.contains(&id) {
                             self.nodes_connected.retain(|&other| other != id);
-                            // out.push(RouterOut::Disconnected(id));
+                            out.push(RouterOut::Disconnected(id));
                             ret = true;
                         }
                     }
@@ -150,6 +140,12 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
                         ret = true;
                     }
                     RouterInternal::MessageFromNode(id, msg_nw) => {
+                        if !self.nodes_connected.contains(&id) {
+                            log::warn!("Got message from unconnected node {id}: {msg_nw:?}");
+                            self.nodes_connected.push(id);
+                            out.push(RouterOut::Connected(id));
+                            ret = true;
+                        }
                         out.push(RouterOut::NetworkWrapperFromNetwork(id, msg_nw))
                     }
                     RouterInternal::SystemConfig(conf) => out.push(RouterOut::SystemConfig(conf)),
@@ -157,19 +153,24 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
             }
         }
 
-        // If something changed, output all relevant messages.
+        // If something changed, output all relevant messages _before_ the network messages,
+        // so the NodeIDsConnected comes before the node messages.
         if ret {
-            out.extend(vec![
-                RouterOut::NodeInfoAvailable(self.nodes_available.clone()),
-                RouterOut::NodeIDsConnected(self.nodes_connected.clone().into()),
-                RouterOut::NodeInfosConnected(
-                    self.nodes_available
-                        .iter()
-                        .filter(|node| self.nodes_connected.contains(&node.get_id()))
-                        .cloned()
-                        .collect(),
-                ),
-            ]);
+            out = [
+                vec![
+                    RouterOut::NodeInfoAvailable(self.nodes_available.clone()),
+                    RouterOut::NodeIDsConnected(self.nodes_connected.clone().into()),
+                    RouterOut::NodeInfosConnected(
+                        self.nodes_available
+                            .iter()
+                            .filter(|node| self.nodes_connected.contains(&node.get_id()))
+                            .cloned()
+                            .collect(),
+                    ),
+                ],
+                out,
+            ]
+            .concat();
         }
 
         out
@@ -184,8 +185,13 @@ mod test {
 
     use super::*;
 
-    fn check_msgs(msgs: Vec<RouterOut>, available: &[NodeInfo], connected: &[NodeInfo]) {
-        assert_eq!(3, msgs.len());
+    fn check_msgs(
+        msgs: Vec<RouterOut>,
+        available: &[NodeInfo],
+        connected: &[NodeInfo],
+        total: usize,
+    ) {
+        assert_eq!(total, msgs.len());
         assert_eq!(RouterOut::NodeInfoAvailable(available.to_vec()), msgs[0]);
         assert_eq!(
             RouterOut::NodeIDsConnected(
@@ -217,18 +223,18 @@ mod test {
             ])
             .into()])
             .await;
-        check_msgs(msgs, &nodes, &[]);
+        check_msgs(msgs, &nodes, &[], 3);
 
         // Connect first node 0, then node 1
         let msgs = od
             .messages(vec![RouterInternal::Connected(nodes[0].get_id()).into()])
             .await;
-        check_msgs(msgs, &nodes, &[nodes[0].clone()]);
+        check_msgs(msgs, &nodes, &[nodes[0].clone()], 4);
 
         let msgs = od
             .messages(vec![RouterInternal::Connected(nodes[1].get_id()).into()])
             .await;
-        check_msgs(msgs, &nodes, &nodes);
+        check_msgs(msgs, &nodes, &nodes, 4);
 
         // Re-connect node 1, should do nothing
         let msgs = od
@@ -252,7 +258,7 @@ mod test {
         let msgs = od
             .messages(vec![RouterInternal::Disconnected(nodes[0].get_id()).into()])
             .await;
-        check_msgs(msgs, &nodes, &[nodes[1].clone()]);
+        check_msgs(msgs, &nodes, &[nodes[1].clone()], 4);
 
         // Disconnect an unconnected node
         let msgs = od

@@ -53,7 +53,7 @@ pub type BrokerWebRTCConn = Broker<WebRTCConnIn, WebRTCConnOut>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum WebRTCConnIn {
     Message(NodeID, NCInput),
-    Connect(NodeID, Direction),
+    Connect(NodeID),
     Disconnect(NodeID),
 }
 
@@ -84,7 +84,7 @@ impl WebRTCConn {
     }
 
     /// Ensures that a given connection exists.
-    async fn ensure_connection(&mut self, id: NodeID, dir: Direction) -> anyhow::Result<()> {
+    async fn ensure_connection(&mut self, id: NodeID) -> anyhow::Result<()> {
         if !self.connections.contains_key(&id) {
             let mut nc = NodeConnection::new(&self.web_rtc).await?;
             self.connections.insert(id.clone(), nc.clone());
@@ -93,14 +93,7 @@ impl WebRTCConn {
                 Box::new(move |msg| Some(WebRTCConnOut::Message(id.clone(), msg))),
             )
             .await?;
-            if dir == Direction::Outgoing {
-                self.try_send(
-                    id,
-                    NCInput::Setup(Direction::Outgoing, messages::PeerMessage::Init),
-                );
-            }
         }
-
         Ok(())
     }
 
@@ -121,16 +114,24 @@ impl SubsystemHandler<WebRTCConnIn, WebRTCConnOut> for WebRTCConn {
         for msg in msgs {
             match msg {
                 WebRTCConnIn::Message(dst, msg_in) => {
+                    self.ensure_connection(dst.clone())
+                        .await
+                        .err()
+                        .map(|e| log::error!("When registering webrtc-connection {e:?}"));
                     self.try_send(dst, msg_in);
                 }
                 WebRTCConnIn::Disconnect(dst) => {
                     self.try_send(dst, NCInput::Disconnect);
                 }
-                WebRTCConnIn::Connect(dst, dir) => {
-                    self.ensure_connection(dst.clone(), dir)
+                WebRTCConnIn::Connect(dst) => {
+                    self.ensure_connection(dst.clone())
                         .await
                         .err()
-                        .map(|e| log::error!("When starting webrtc-connection {e:?}"));
+                        .map(|e| log::error!("When registering webrtc-connection {e:?}"));
+                    self.try_send(
+                        dst,
+                        NCInput::Setup(Direction::Outgoing, messages::PeerMessage::Init),
+                    );
                 }
             };
         }

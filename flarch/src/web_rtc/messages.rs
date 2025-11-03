@@ -8,7 +8,7 @@
 use enum_display::EnumDisplay;
 use futures::{channel::oneshot::Canceled, Future};
 use serde::{Deserialize, Serialize};
-use std::sync::mpsc::RecvError;
+use std::{fmt::Display, sync::mpsc::RecvError};
 use thiserror::Error;
 
 use crate::{
@@ -56,6 +56,19 @@ pub enum WebRTCInput {
     Reset,
     /// Disconnect this node
     Disconnect,
+}
+
+impl Display for WebRTCInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WebRTCInput::Text(_) => write!(f, "Text()"),
+            WebRTCInput::Setup(_) => write!(f, "Setup()"),
+            WebRTCInput::Flush => write!(f, "Flush"),
+            WebRTCInput::UpdateState => write!(f, "UpdateState"),
+            WebRTCInput::Reset => write!(f, "Reset"),
+            WebRTCInput::Disconnect => write!(f, "Disconnect"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

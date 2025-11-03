@@ -3,7 +3,7 @@
 
 use core::panic;
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 use tokio::sync::watch;
 
 use flarch::{
@@ -53,7 +53,7 @@ const UPDATE_INTERVAL: usize = 10;
 pub(super) struct Messages {
     node_config: NodeConfig,
     get_update: usize,
-    connections: Vec<NodeID>,
+    connections: HashMap<NodeID, IOConnection>,
     tx: Option<watch::Sender<Vec<NodeID>>>,
 }
 
@@ -66,7 +66,7 @@ impl Messages {
             Self {
                 node_config,
                 get_update: UPDATE_INTERVAL,
-                connections: vec![],
+                connections: HashMap::new(),
                 tx: Some(tx),
             },
             rx,
@@ -124,9 +124,11 @@ impl Messages {
                 };
                 let mut out = vec![];
                 let dir = pi.get_direction(&own_id);
-                if !self.connections.contains(&remote_node) {
-                    out.append(&mut self.connect(&remote_node, dir.clone()));
+                if self.connected_only(&remote_node, &dir) {
+                    out.push(NetworkOut::Disconnected(remote_node.clone()).into());
+                    self.send_connections();
                 }
+                self.connection_state_set(remote_node.clone(), &dir, ConnectionState::Setup);
                 out.push(InternOut::WebRTC(WebRTCConnIn::Message(
                     remote_node,
                     NCInput::Setup(dir, pi.message),
@@ -152,10 +154,10 @@ impl Messages {
                 );
 
                 let mut out = vec![];
-                if !self.connections.contains(&id) {
-                    out.append(&mut self.connect(&id, Direction::Outgoing));
-                }
                 if let Ok(s) = serde_yaml::to_string(&msg_nw) {
+                    if !self.connected(&id) {
+                        out.append(&mut self.connect(&id));
+                    }
                     out.push(InternOut::WebRTC(WebRTCConnIn::Message(
                         id,
                         NCInput::Text(s),
@@ -165,7 +167,7 @@ impl Messages {
             }
             NetworkIn::StatsToWS(ss) => WSSignalMessageFromNode::NodeStats(ss.clone()).into(),
             NetworkIn::WSUpdateListRequest => WSSignalMessageFromNode::ListIDsRequest.into(),
-            NetworkIn::Connect(id) => self.connect(&id, Direction::Outgoing),
+            NetworkIn::Connect(id) => self.connect(&id),
             NetworkIn::Disconnect(id) => self.disconnect(&id),
         }
     }
@@ -197,10 +199,32 @@ impl Messages {
     }
 
     fn msg_rtc(&mut self, id: NodeID, msg_nc: NCOutput) -> Vec<InternOut> {
+        // log::info!("NC Message from {id}: {msg_nc}");
         match msg_nc {
-            NCOutput::Connected(_) => vec![NetworkOut::Connected(id).into()],
-            NCOutput::Disconnected(_) => vec![NetworkOut::Disconnected(id).into()],
-            NCOutput::Text(msg) => self.msg_wrapper(id, msg),
+            NCOutput::Connected(dir) => {
+                let new_connection = !self.connected(&id);
+                self.connection_state_set(id, &dir, ConnectionState::Connected);
+                if new_connection {
+                    vec![NetworkOut::Connected(id).into()]
+                } else {
+                    vec![]
+                }
+            }
+            NCOutput::Disconnected(dir) => {
+                let new_disconnection = self.connected_only(&id, &dir);
+                self.connection_state_set(id, &dir, ConnectionState::None);
+                if new_disconnection {
+                    vec![NetworkOut::Disconnected(id).into()]
+                } else {
+                    vec![]
+                }
+            }
+            NCOutput::Text(msg) => {
+                if !self.connected(&id) {
+                    log::warn!("Got text for unconnected node ({id})");
+                }
+                self.msg_wrapper(id, msg)
+            }
             NCOutput::State(dir, state) => {
                 vec![NetworkOut::ConnectionState(NetworkConnectionState {
                     id,
@@ -234,39 +258,124 @@ impl Messages {
     }
 
     /// Connect to the given node.
-    /// TODO: differentiate connection_setup and connected
-    fn connect(&mut self, dst: &U256, dir: Direction) -> Vec<InternOut> {
-        if self.connections.contains(dst) {
+    fn connect(&mut self, dst: &U256) -> Vec<InternOut> {
+        if self.connected(dst) {
+            log::trace!("Already connected to {}", dst);
             vec![]
         } else {
-            self.connections.push(dst.clone());
-            self.send_connections();
-            vec![InternOut::WebRTC(WebRTCConnIn::Connect(*dst, dir))]
+            if self.connection_state_check(dst, &Direction::Outgoing, &ConnectionState::Setup) {
+                // TODO: with the Helium browser, this message appears a lot. And then Helium doesn't
+                // connect with webrtc.
+                log::warn!(
+                    "Asking to connect to {dst} while connection setup is in place - starting new setup"
+                );
+            } else {
+                self.connection_state_set(*dst, &Direction::Outgoing, ConnectionState::Setup);
+            }
+            vec![InternOut::WebRTC(WebRTCConnIn::Connect(*dst))]
         }
     }
 
     /// Disconnects from a given node.
     fn disconnect(&mut self, dst: &U256) -> Vec<InternOut> {
-        let mut out = vec![NetworkOut::Disconnected(*dst).into()];
-        if !self.connections.contains(dst) {
+        if !self.connected(dst) {
             log::trace!("Already disconnected from {}", dst);
+            vec![]
         } else {
-            self.connections.retain(|id| id != dst);
+            self.connection_state_set(*dst, &Direction::Incoming, ConnectionState::None);
+            self.connection_state_set(*dst, &Direction::Outgoing, ConnectionState::None);
             self.send_connections();
-            out.push(InternOut::WebRTC(WebRTCConnIn::Message(
-                *dst,
-                NCInput::Disconnect,
-            )));
+            return vec![
+                NetworkOut::Disconnected(*dst).into(),
+                InternOut::WebRTC(WebRTCConnIn::Message(*dst, NCInput::Disconnect)),
+            ];
         }
-        out
     }
 
     fn send_connections(&mut self) {
         self.tx.clone().map(|tx| {
-            tx.send(self.connections.clone())
-                .is_err()
-                .then(|| self.tx = None)
+            tx.send(
+                self.connections
+                    .iter()
+                    .filter_map(|(id, _)| self.connected(id).then(|| id.clone()))
+                    .collect::<Vec<_>>(),
+            )
+            .is_err()
+            .then(|| self.tx = None)
         });
+    }
+    fn connected_only(&self, node: &NodeID, dir: &Direction) -> bool {
+        self.connection_state_check(node, dir, &ConnectionState::Connected)
+            && !self.connection_state_check(node, &dir.other(), &ConnectionState::Connected)
+    }
+
+    fn connected(&self, node: &NodeID) -> bool {
+        self.connection_state_check_any(node, &ConnectionState::Connected)
+    }
+
+    fn connection_state_check(
+        &self,
+        node: &NodeID,
+        dir: &Direction,
+        state: &ConnectionState,
+    ) -> bool {
+        self.connections.get(node).map(|ioc| ioc.get(dir)) == Some(state)
+    }
+
+    fn connection_state_check_any(&self, node: &NodeID, state: &ConnectionState) -> bool {
+        self.connection_state_check(node, &Direction::Incoming, state)
+            || self.connection_state_check(node, &Direction::Outgoing, state)
+    }
+
+    fn connection_state_set(&mut self, node: NodeID, dir: &Direction, state: ConnectionState) {
+        // log::info!(
+        //     "New connection-state for node {} in direction {:?} = {:?}",
+        //     node,
+        //     dir,
+        //     state
+        // );
+        self.connections
+            .entry(node)
+            .and_modify(|ioc| ioc.set(dir, state.clone()))
+            .or_insert(IOConnection::new(dir, state));
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum ConnectionState {
+    None,
+    Setup,
+    Connected,
+}
+
+#[derive(Debug, Clone)]
+struct IOConnection {
+    incoming: ConnectionState,
+    outgoing: ConnectionState,
+}
+
+impl IOConnection {
+    fn new(dir: &Direction, state: ConnectionState) -> Self {
+        let mut ioc = IOConnection {
+            incoming: ConnectionState::None,
+            outgoing: ConnectionState::None,
+        };
+        ioc.set(dir, state);
+        ioc
+    }
+
+    fn get(&self, dir: &Direction) -> &ConnectionState {
+        match dir {
+            Direction::Incoming => &self.incoming,
+            Direction::Outgoing => &self.outgoing,
+        }
+    }
+
+    fn set(&mut self, dir: &Direction, state: ConnectionState) {
+        match dir {
+            Direction::Incoming => self.incoming = state,
+            Direction::Outgoing => self.outgoing = state,
+        }
     }
 }
 

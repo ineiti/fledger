@@ -26,6 +26,7 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
 - WebRTCConnInput, WebRTCConnOutput to WebRTCConnIn, WebRTCConnOut
 - Adding NetworkMessage to NetworkOut
 - removed possibility to give configuration on the URL
+- handle connections and disconnections better
 
 ### Fixed
 
@@ -33,6 +34,7 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
 - flmodules::network - add chunking of big messages
 - flmodules::realmstorage - avoid cycling of flos when
 flo A and B replace each other
+- webrtc sends first message before connection setup message
 
 ## [0.9.2] - 2025-05-11
 
