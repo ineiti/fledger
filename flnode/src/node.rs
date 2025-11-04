@@ -1,5 +1,6 @@
 use flarch::web_rtc::connection::ConnectionConfig;
 use flmodules::network::network_start;
+use flmodules::timer::BrokerTimer;
 use log::{error, info};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -20,7 +21,6 @@ use flmodules::{
     },
     network::broker::{BrokerNetwork, NetworkError, NetworkIn},
     nodeconfig::{ConfigError, NodeConfig, NodeInfo},
-    ping::broker::Ping,
     random_connections::broker::RandomBroker,
     router::broker::{BrokerRouter, RouterNetwork, RouterRandom},
     timer::Timer,
@@ -66,7 +66,7 @@ pub struct Node {
     /// Network IO broker
     pub network_io: BrokerRouter,
     /// Timer broker
-    pub timer: Timer,
+    pub timer: BrokerTimer,
     /// Storing all the signers and ACEs
     pub crypto_storage: CryptoStorage,
 
@@ -77,8 +77,6 @@ pub struct Node {
     pub random: Option<RandomBroker>,
     /// Gossip-events sent and received
     pub gossip: Option<Gossip>,
-    /// Pings all connected nodes and informs about failing nodes
-    pub ping: Option<Ping>,
     /// Answers GET requests from another node
     pub webproxy: Option<WebProxy>,
     /// Sets up a dht routing system using Kademlia
@@ -111,7 +109,7 @@ impl Node {
     ) -> anyhow::Result<Self> {
         let mut timer = Timer::start().await?;
         let net = network_start(node_config.clone(), net_config, &mut timer).await?;
-        Node::start(storage, node_config, net.broker, timer).await
+        Node::start(storage, node_config, net.broker, timer.broker).await
     }
 
     /// Create new node by loading the config from the storage.
@@ -122,7 +120,7 @@ impl Node {
         storage: Box<dyn DataStorage + Send>,
         node_config: NodeConfig,
         broker_net: BrokerNetwork,
-        mut timer: Timer,
+        timer: BrokerTimer,
     ) -> anyhow::Result<Self> {
         info!(
             "Starting node: {} = {}",
@@ -135,28 +133,22 @@ impl Node {
         let id = node_config.info.get_id();
         let mut random = None;
         let mut gossip = None;
-        let ping = None;
         let mut webproxy = None;
         let mut stat = None;
         let mut dht_router = None;
         let mut dht_storage = None;
         if modules.contains(Modules::RAND) {
-            let rnd = RandomBroker::start(id, broker_net.clone(), &mut timer).await?;
+            let rnd = RandomBroker::start(id, timer.clone(), broker_net.clone()).await?;
             if modules.contains(Modules::GOSSIP) {
                 gossip = Some(
                     Gossip::start(
                         storage.clone(),
                         node_config.info.clone(),
+                        timer.clone(),
                         rnd.broker.clone(),
-                        &mut timer,
                     )
                     .await?,
                 );
-            }
-            if modules.contains(Modules::PING) {
-                // log::warn!("Ping is disabled");
-                // ping =
-                //     Some(Ping::start(PingConfig::default(), rnd.broker.clone(), &mut timer).await?);
             }
             if modules.contains(Modules::WEBPROXY) {
                 webproxy = Some(
@@ -176,20 +168,18 @@ impl Node {
         }
         if modules.contains(Modules::DHT_ROUTER) {
             let routing = DHTRouter::start(
-                id,
+                kademlia::Config::default(id),
+                timer.clone(),
                 network_io.clone(),
-                &mut timer,
-                kademlia::Config::default(),
             )
             .await?;
             if modules.contains(Modules::DHT_STORAGE) {
                 dht_storage = Some(
                     DHTStorage::start(
                         storage.clone_box(),
-                        id,
-                        DHTConfig::default(),
+                        DHTConfig::default(id),
+                        timer.clone(),
                         routing.broker.clone(),
-                        &mut timer,
                     )
                     .await?,
                 );
@@ -207,7 +197,6 @@ impl Node {
             stat,
             random,
             gossip,
-            ping,
             webproxy,
             dht_router,
             dht_storage,
@@ -232,7 +221,7 @@ impl Node {
     /// currently connected to, and can be shorter than the list of all nodes in the system.
     pub fn nodes_connected(&self) -> anyhow::Result<Vec<NodeInfo>> {
         if let Some(r) = self.random.as_ref() {
-            return self.nodes_info(r.storage.borrow().connected.get_nodes().0);
+            return self.nodes_info(r.stats.borrow().connected.get_nodes().0);
         }
         Err(NodeError::Missing("Random".into()).into())
     }
@@ -241,7 +230,7 @@ impl Node {
     /// to a subset of these nodes, which can be get with `nodes_connected`.
     pub fn nodes_online(&self) -> anyhow::Result<Vec<NodeInfo>> {
         if let Some(r) = self.random.as_ref() {
-            return self.nodes_info(r.storage.borrow().known.0.clone());
+            return self.nodes_info(r.stats.borrow().known.0.clone());
         }
         Err(NodeError::Missing("Random".into()).into())
     }
@@ -322,8 +311,8 @@ mod tests {
         broker::Broker, data_storage::DataStorageTemp, start_logging, start_logging_filter_level,
     };
     use flmodules::gossip_events::{
+        broker::GossipIn,
         core::{Category, Event},
-        messages::GossipIn,
     };
 
     use super::*;
@@ -338,7 +327,7 @@ mod tests {
             storage.clone_box(),
             nc.clone(),
             Broker::new(),
-            Timer::start().await?,
+            Timer::start().await?.broker,
         )
         .await?;
         let event = Event {
@@ -358,7 +347,7 @@ mod tests {
             storage.clone_box(),
             nc.clone(),
             Broker::new(),
-            Timer::start().await?,
+            Timer::start().await?.broker,
         )
         .await?;
         let events = nd2
@@ -380,7 +369,7 @@ mod tests {
             Box::new(DataStorageTemp::new()),
             NodeConfig::new(),
             Broker::new(),
-            Timer::start().await?,
+            Timer::start().await?.broker,
         )
         .await?;
         node.gossip.as_mut().unwrap().broker.settle(vec![]).await?;

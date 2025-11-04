@@ -1,25 +1,32 @@
 use flarch::{
-    broker::{Broker, TranslateFrom, TranslateInto},
-    data_storage::DataStorage,
-    nodeids::U256,
-    tasks::now,
+    add_translator_direct, add_translator_link, broker::Broker, data_storage::DataStorage,
+    nodeids::U256, tasks::now,
 };
 use tokio::sync::watch;
 
 use super::{
     core::{Category, Event, EventsStorage},
-    messages::{GossipIn, GossipOut, Messages},
+    intern::{Intern, InternIn, InternOut},
 };
 use crate::{
     nodeconfig::NodeInfo,
-    random_connections::broker::{BrokerRandom, RandomIn, RandomOut},
-    router::messages::NetworkWrapper,
-    timer::Timer,
+    random_connections::broker::BrokerRandom,
+    timer::{BrokerTimer, Timer},
 };
 
 pub type BrokerGossip = Broker<GossipIn, GossipOut>;
 
 pub(super) const MODULE_NAME: &str = "Gossip";
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GossipIn {
+    AddEvent(Event),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GossipOut {
+    NewEvent(Event),
+}
 
 /// This links the GossipEvent module with a RandomConnections module, so that
 /// all messages are correctly translated from one to the other.
@@ -36,16 +43,18 @@ impl Gossip {
     pub async fn start(
         storage: Box<dyn DataStorage + Send>,
         info: NodeInfo,
+        timer: BrokerTimer,
         rc: BrokerRandom,
-        timer: &mut Timer,
     ) -> anyhow::Result<Self> {
         let src = info.get_id();
-        let (messages, storage) = Messages::new(src.clone(), storage);
-        let mut broker = Broker::new();
-        broker.add_handler(Box::new(messages)).await?;
+        let (messages, storage) = Intern::new(src.clone(), storage);
+        let mut intern = Broker::new_with_handler(Box::new(messages)).await?.0;
 
-        timer.tick_second(broker.clone(), GossipIn::Tick).await?;
-        broker.link_bi(rc).await?;
+        Timer::second(timer, intern.clone(), InternIn::Tick).await?;
+        add_translator_link!(intern, rc, InternIn::Network, InternOut::Network);
+
+        let broker = Broker::new();
+        add_translator_direct!(intern, broker.clone(), InternIn::Gossip, InternOut::Gossip);
 
         let mut gb = Gossip {
             storage,
@@ -101,37 +110,15 @@ impl Gossip {
     }
 }
 
-impl TranslateFrom<RandomOut> for GossipIn {
-    fn translate(msg: RandomOut) -> Option<Self> {
-        match msg {
-            RandomOut::NodeIDsConnected(list) => Some(GossipIn::UpdateNodeList(list.into())),
-            RandomOut::NetworkWrapperFromNetwork(id, msg) => msg
-                .unwrap_yaml(MODULE_NAME)
-                .map(|msg| GossipIn::FromNetwork(id, msg)),
-            _ => None,
-        }
-    }
-}
-
-impl TranslateInto<RandomIn> for GossipOut {
-    fn translate(self) -> Option<RandomIn> {
-        match self {
-            GossipOut::ToNetwork(id, msg_node) => Some(RandomIn::NetworkWrapperToNetwork(
-                id,
-                NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
-            )),
-            _ => None,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::mpsc;
 
     use crate::gossip_events::core::{Category, Event};
-    use crate::gossip_events::messages::ModuleMessage;
+    use crate::gossip_events::intern::ModuleMessage;
     use crate::nodeconfig::NodeConfig;
+    use crate::random_connections::broker::{RandomIn, RandomOut};
+    use crate::router::messages::NetworkWrapper;
     use crate::timer::TimerMessage;
     use flarch::data_storage::DataStorageTemp;
     use flarch::nodeids::NodeID;
@@ -150,8 +137,8 @@ mod tests {
         let gossip = Gossip::start(
             Box::new(DataStorageTemp::new()),
             node_info,
+            timer.broker.clone(),
             broker_rnd.clone(),
-            &mut timer,
         )
         .await?;
 
@@ -161,6 +148,8 @@ mod tests {
             .settle_msg_out(RandomOut::NodeIDsConnected(vec![id2].into()))
             .await?;
         assert_msg_reid(&tap_rnd, &id2)?;
+        // Drop the following list of eventIDs
+        tap_rnd.recv()?;
 
         let event = Event {
             category: Category::TextMessage,
@@ -180,22 +169,25 @@ mod tests {
             .await?;
         assert_eq!(1, gossip.storage.borrow().events(event.category).len());
 
+        // Need three ticks to request new EventIDs
+        timer.broker.settle_msg_out(TimerMessage::Second).await?;
+        timer.broker.settle_msg_out(TimerMessage::Second).await?;
         timer.broker.settle_msg_out(TimerMessage::Second).await?;
         assert_msg_reid(&tap_rnd, &id2)?;
         Ok(())
     }
 
     fn assert_msg_reid(tap: &mpsc::Receiver<RandomIn>, id2: &NodeID) -> anyhow::Result<()> {
-        for msg in tap.try_iter() {
-            if let RandomIn::NetworkWrapperToNetwork(id, msg_mod) = msg {
-                assert_eq!(id2, &id);
-                assert_eq!(MODULE_NAME.to_string(), msg_mod.module);
-                let msg_yaml = serde_yaml::from_str(&msg_mod.msg)?;
-                assert_eq!(ModuleMessage::RequestEventIDs, msg_yaml);
-            } else {
-                assert!(false);
-            }
+        let msg = tap.recv()?;
+        log::info!("Message is: {msg:?}");
+        if let RandomIn::NetworkWrapperToNetwork(id, msg_mod) = msg {
+            assert_eq!(id2, &id);
+            assert_eq!(MODULE_NAME.to_string(), msg_mod.module);
+            let msg_yaml = serde_yaml::from_str(&msg_mod.msg)?;
+            assert_eq!(ModuleMessage::RequestEventIDs, msg_yaml);
+            Ok(())
+        } else {
+            anyhow::bail!("Message was {msg:?} instead of RequestEventIDs")
         }
-        Ok(())
     }
 }

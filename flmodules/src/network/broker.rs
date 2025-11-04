@@ -28,7 +28,7 @@ use flarch::{
 
 use crate::{
     network::{
-        messages::{InternIn, InternOut, Messages},
+        intern::{Intern, InternIn, InternOut},
         signal::NodeStat,
     },
     nodeconfig::{NodeConfig, NodeInfo},
@@ -132,7 +132,7 @@ impl Network {
         timer: &mut Timer,
     ) -> anyhow::Result<Self> {
         let mut intern = Broker::new();
-        let (messages, connections) = Messages::start(node_config).await?;
+        let (messages, connections) = Intern::start(node_config).await?;
         intern.add_handler(Box::new(messages)).await?;
         intern.link_bi(ws).await?;
         intern.link_bi(web_rtc).await?;

@@ -1,0 +1,20 @@
+// Folder-specific settings
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+  "lsp": {
+    "rust-analyzer": {
+      "initialization_options": {
+        "linkedProjects": [
+          "./Cargo.toml",
+          "./flbrowser/Cargo.toml",
+          "./test/fledger-nodejs/Cargo.toml",
+          "./test/signal-fledger/Cargo.toml",
+          "./examples/ping/Cargo.toml",
+          "./examples/ping-pong/*"
+        ]
+      }
+    }
+  }
+}

@@ -270,7 +270,7 @@ impl WebState {
 #[derive(Debug)]
 pub struct WebNode {
     node: Node,
-    _dht_storage_stats: watch::Receiver<dht_storage::messages::Stats>,
+    _dht_storage_stats: watch::Receiver<dht_storage::intern::Stats>,
     realm_views: HashMap<RealmID, Option<RealmView>>,
     rv_root: Option<RealmView>,
     dht_storage: DHTStorage,

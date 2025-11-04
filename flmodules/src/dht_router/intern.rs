@@ -67,7 +67,7 @@ pub struct Stats {
 
 /// The message handling part, but only for DHTRouter messages.
 #[derive(Debug)]
-pub(super) struct Messages {
+pub(super) struct Intern {
     core: Kademlia,
     tx: Option<watch::Sender<Stats>>,
     // This is different than core.active, because there can be connections from other
@@ -76,13 +76,13 @@ pub(super) struct Messages {
     infos: HashMap<NodeID, NodeInfo>,
 }
 
-impl Messages {
+impl Intern {
     /// Returns a new routing module.
-    pub(super) fn new(root: NodeID, cfg: Config) -> (Self, watch::Receiver<Stats>) {
+    pub(super) fn new(cfg: Config) -> (Self, watch::Receiver<Stats>) {
         let (tx, rx) = watch::channel(Stats::default());
         (
             Self {
-                core: Kademlia::new(root, cfg),
+                core: Kademlia::new(cfg),
                 tx: Some(tx),
                 connected: vec![],
                 infos: HashMap::new(),
@@ -134,9 +134,9 @@ impl Messages {
             DHTRouterIn::MessageNeighbour(dst, network_wrapper) => {
                 if !self.connected.contains(&dst) {
                     log::warn!(
-                        "{}: no connection to {}, trying anyway. Message: {network_wrapper:?}",
-                        self.core.root,
-                        self.get_id_info(&dst),
+                        "{} doesn't have a connection to {} anymore to send message {network_wrapper:?}",
+                        self.core.config.root,
+                        self.get_id_info(&dst)
                     );
                 }
                 vec![ModuleMessage::Neighbour(network_wrapper).wrapper_network(dst)]
@@ -195,7 +195,7 @@ impl Messages {
         // if !ping_delete.deleted.is_empty() {
         //     log::info!(
         //         "{} deleted {} nodes",
-        //         self.core.root,
+        //         self.core.config.root,
         //         ping_delete.deleted.len()
         //     );
         // }
@@ -222,11 +222,11 @@ impl Messages {
 
     fn new_closest(&self, key: U256, msg: NetworkWrapper) -> Vec<InternOut> {
         if let Some(&next_hop) = self.closest_or_connected(key.clone(), None).first() {
-            vec![ModuleMessage::Closest(self.core.root, key, msg.clone()).wrapper_network(next_hop)]
+            vec![ModuleMessage::Closest(self.core.config.root, key, msg.clone()).wrapper_network(next_hop)]
         } else {
             // log::trace!(
             //     "{}: key {key} is already at its closest node",
-            //     self.core.root
+            //     self.core.config.root
             // );
             vec![]
         }
@@ -234,11 +234,11 @@ impl Messages {
 
     fn new_direct(&self, dst: NodeID, msg: NetworkWrapper) -> Vec<InternOut> {
         if let Some(&next_hop) = self.closest_or_connected(dst.clone(), None).first() {
-            vec![ModuleMessage::Direct(self.core.root, dst, msg.clone()).wrapper_network(next_hop)]
+            vec![ModuleMessage::Direct(self.core.config.root, dst, msg.clone()).wrapper_network(next_hop)]
         } else {
             // log::trace!(
             //     "{}: couldn't send new request because no hop to {dst} available",
-            //     self.core.root
+            //     self.core.config.root
             // );
             vec![]
         }
@@ -260,7 +260,7 @@ impl Messages {
                 DHTRouterOut::MessageRouting(orig, last_hop, next_hop, key, msg).into(),
             ],
             None => {
-                if key == self.core.root {
+                if key == self.core.config.root {
                     vec![DHTRouterOut::MessageDest(orig, last_hop, msg).into()]
                 } else {
                     vec![DHTRouterOut::MessageClosest(orig, last_hop, key, msg).into()]
@@ -276,12 +276,12 @@ impl Messages {
         dst: NodeID,
         msg: NetworkWrapper,
     ) -> Vec<InternOut> {
-        if dst == self.core.root {
+        if dst == self.core.config.root {
             return vec![DHTRouterOut::MessageDest(orig, last, msg).into()];
         }
         let next_hops = self.closest_or_connected(dst, Some(&last));
         if next_hops.len() == 0 {
-            // log::debug!("{}: cannot hop to {}", self.core.root, dst);
+            // log::debug!("{}: cannot hop to {}", self.core.config.root, dst);
             vec![]
         } else {
             next_hops
@@ -313,9 +313,9 @@ impl Messages {
 }
 
 #[platform_async_trait()]
-impl SubsystemHandler<InternIn, InternOut> for Messages {
+impl SubsystemHandler<InternIn, InternOut> for Intern {
     async fn messages(&mut self, msgs: Vec<InternIn>) -> Vec<InternOut> {
-        let _id = self.core.root.clone();
+        let _id = self.core.config.root.clone();
         let out = msgs
             .into_iter()
             // .inspect(|msg| log::debug!("{_id}: DHTRouterIn: {msg:?}"))
@@ -387,9 +387,9 @@ mod tests {
             .map(|&id| NodeInfo::new_from_id(id))
             .collect();
 
-        let mut msg = Messages::new(
-            root,
+        let mut msg = Intern::new(
             Config {
+                root,
                 k: 1,
                 ping_interval: 2,
                 ping_timeout: 4,

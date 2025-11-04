@@ -149,12 +149,12 @@ impl NodeTimer {
             Box::new(DataStorageTemp::new()),
             node_config,
             broker_net.clone(),
-            Timer::start().await?,
+            Timer::start().await?.broker,
         )
         .await?;
 
         Ok(Self {
-            timer: node_data.timer.broker.clone(),
+            timer: node_data.timer.clone(),
             node: node_data,
         })
     }

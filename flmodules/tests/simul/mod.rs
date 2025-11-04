@@ -32,10 +32,9 @@ impl Node {
         router_node: RouterNode,
     ) -> anyhow::Result<Self> {
         let dht_router = DHTRouter::start(
-            router_node.config.info.get_id(),
+            kademlia::Config::default(router_node.config.info.get_id()),
+            timer.broker.clone(),
             router_node.router.clone(),
-            timer,
-            kademlia::Config::default(),
         )
         .await?;
 
@@ -48,14 +47,14 @@ impl Node {
         Ok(Self {
             dht_storage: DHTStorage::start(
                 ds,
-                router_node.config.info.get_id(),
                 DHTConfig {
+                    our_id: router_node.config.info.get_id(),
                     realms: vec![],
                     owned: vec![],
                     timeout: 10,
                 },
+                timer.broker.clone(),
                 dht_router.broker.clone(),
-                timer,
             )
             .await?,
             _config: router_node.config,

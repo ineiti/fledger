@@ -7,7 +7,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use flarch::{nodeids::NodeID, tasks::spawn_local_nosend};
 use flmodules::{
-    gossip_events::{broker::Gossip, core::Category, messages::GossipOut},
+    gossip_events::{broker::Gossip, broker::GossipOut, core::Category},
     nodeconfig::NodeInfo,
 };
 use tokio::sync::broadcast;
@@ -69,7 +69,6 @@ impl Chat {
                     self.show_msgs();
                 }
             }
-            _ => {}
         }
     }
 

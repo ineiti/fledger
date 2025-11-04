@@ -27,6 +27,15 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
 - Adding NetworkMessage to NetworkOut
 - removed possibility to give configuration on the URL
 - handle connections and disconnections better
+- created different templates
+- updated flmodules to match templates:
+  - dht_router
+  - dht_storage
+  - gossip_events
+  - network
+  - random_connections
+- removed ping module
+- updated READMEs
 
 ### Fixed
 

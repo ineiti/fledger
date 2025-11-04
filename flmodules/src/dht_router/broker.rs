@@ -1,17 +1,17 @@
-use flarch::{broker::Broker, nodeids::U256};
+use flarch::{add_translator_direct, add_translator_link, broker::Broker, nodeids::U256};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
 use crate::{
     flo::realm::RealmID,
     router::{broker::BrokerRouter, messages::NetworkWrapper},
-    timer::Timer,
+    timer::{BrokerTimer, Timer},
 };
 use flarch::nodeids::NodeID;
 
 use super::{
+    intern::{Intern, InternIn, InternOut, Stats},
     kademlia::Config,
-    messages::{InternIn, InternOut, Messages, Stats},
 };
 
 pub(super) const MODULE_NAME: &str = "DHTRouter";
@@ -59,37 +59,22 @@ pub struct DHTRouter {
 
 impl DHTRouter {
     pub async fn start(
-        our_id: NodeID,
-        router: BrokerRouter,
-        tick: &mut Timer,
         config: Config,
+        timer: BrokerTimer,
+        router: BrokerRouter,
     ) -> anyhow::Result<Self> {
-        let (messages, stats) = Messages::new(our_id, config);
-        let mut intern = Broker::new();
-        intern.add_handler(Box::new(messages)).await?;
-        intern
-            .add_translator_link(
-                router,
-                Box::new(|msg| match msg {
-                    InternOut::Network(to_router) => Some(to_router),
-                    _ => None,
-                }),
-                Box::new(|msg| Some(InternIn::Network(msg))),
-            )
-            .await?;
-        tick.tick_second(intern.clone(), InternIn::Tick).await?;
+        let (messages, stats) = Intern::new(config);
+        let mut intern = Broker::new_with_handler(Box::new(messages)).await?.0;
+        add_translator_link!(intern, router, InternIn::Network, InternOut::Network);
 
         let broker = Broker::new();
-        intern
-            .add_translator_direct(
-                broker.clone(),
-                Box::new(|msg| match msg {
-                    InternOut::DHTRouter(dht) => Some(dht),
-                    _ => None,
-                }),
-                Box::new(|msg| Some(InternIn::DHTRouter(msg))),
-            )
-            .await?;
+        add_translator_direct!(
+            intern,
+            broker.clone(),
+            InternIn::DHTRouter,
+            InternOut::DHTRouter
+        );
+        Timer::second(timer, intern, InternIn::Tick).await?;
 
         Ok(DHTRouter { broker, stats })
     }
@@ -113,8 +98,9 @@ mod tests {
     async fn test_routing() -> anyhow::Result<()> {
         start_logging_filter_level(vec![], LOG_LVL);
 
-        let mut tick = Timer::simul();
-        let config = Config {
+        let mut timer = Broker::new();
+        let mut config = Config {
+            root: NodeID::rnd(),
             k: 1,
             ping_interval: 2,
             ping_timeout: 4,
@@ -129,13 +115,13 @@ mod tests {
         let mut taps = vec![];
         for start in ["00", "40", "41", "42", "43"] {
             let (node_conf, brok) = simul.new_node_id(Some(U256::from_str(start)?)).await?;
-            let id = node_conf.info.get_id();
-            let mut dht = DHTRouter::start(id, brok.clone(), &mut tick, config.clone()).await?;
+            config.root = node_conf.info.get_id();
+            let mut dht = DHTRouter::start(config.clone(), timer.clone(), brok.clone()).await?;
             router_nets.push(brok);
             taps.push(dht.broker.get_tap_out().await?.0);
             dht_nets.push(dht.broker.clone());
             dhts.push(dht);
-            node_ids.push(id);
+            node_ids.push(config.root);
             node_infos.push(node_conf.info);
         }
 
@@ -146,7 +132,7 @@ mod tests {
                 .await?;
         }
 
-        tick.broker.settle_msg_out(TimerMessage::Second).await?;
+        timer.settle_msg_out(TimerMessage::Second).await?;
 
         let dhtm_closest = |id: NodeID, module: &str, msg: &str| {
             DHTRouterIn::MessageClosest(
@@ -199,8 +185,8 @@ mod tests {
     async fn test_update_nodes() -> anyhow::Result<()> {
         start_logging_filter_level(vec!["flmodules"], log::LevelFilter::Info);
 
-        let mut tick = Timer::simul();
         let config = Config {
+            root: NodeID::rnd(),
             k: 1,
             ping_interval: 2,
             ping_timeout: 4,
@@ -215,7 +201,7 @@ mod tests {
         for start in ["00", "40", "41"] {
             let (node_conf, brok) = simul.new_node_id(Some(U256::from_str(start)?)).await?;
             let id = node_conf.info.get_id();
-            let mut dht = DHTRouter::start(id, brok.clone(), &mut tick, config).await?;
+            let mut dht = DHTRouter::start(config, Broker::new(), brok.clone()).await?;
             router_nets.push(brok);
             taps.push(dht.broker.get_tap_out().await?.0);
             dht_nets.push(dht.broker.clone());

@@ -21,7 +21,7 @@ async fn connect_nodes_n(nbr_nodes: usize) -> anyhow::Result<()> {
         }
         nodes_visited.push(id);
         let node = net.nodes.get_mut(&id).unwrap();
-        let nd = node.node.random.as_ref().unwrap().storage.clone();
+        let nd = node.node.random.as_ref().unwrap().stats.clone();
         for n in &nd.borrow().connected.0 {
             if nodes_to_visit.contains(&n.id) || nodes_visited.contains(&n.id) {
                 continue;
@@ -36,7 +36,7 @@ async fn connect_nodes_n(nbr_nodes: usize) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn connect_nodes() -> anyhow::Result<()> {
         start_logging();

@@ -38,7 +38,6 @@ impl RouterRandom {
             RandomOut::NetworkWrapperFromNetwork(id, module_message) => {
                 RouterOut::NetworkWrapperFromNetwork(id, module_message)
             }
-            _ => return None,
         })
     }
 

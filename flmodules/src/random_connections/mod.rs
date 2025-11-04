@@ -1,4 +1,4 @@
 pub mod broker;
-pub mod messages;
-pub mod nodes;
 pub mod core;
+pub mod intern;
+pub mod nodes;

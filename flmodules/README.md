@@ -16,19 +16,20 @@ The following modules are available:
   DHT storage), or broadcast to directly connected nodes.
 - [dht_storage](./src/dht_storage/README.md) allows to store blobs of data on the nodes, which can be
   updated and read by all other nodes.
+- [flo](./src/flo/README.md) defines different data types and how to handle authorization
+  to create and update
 - [gossip_events](./src/gossip_events/README.md) exchanges events emitted by the nodes and updates the list. It
 works both in active mode - sending new messages to neighbours - as in passive
 mode - requesting list of available events from other nodes.
 - [network](./src/network/README.md) is the basic networking code to set up a new connection using
 the signalling server.
-- [ping](./src/ping/README.md) uses `random_connections` to send regular messages to the connected nodes
-to make sure they answer. If a node doesn't answer in due time, a failure message 
-is emitted.
 - [random_connections](./src/random_connections/README.md) takes a list of nodes and randomly selects enough nodes for
 a fully connected network
 - [router](./src/router/README.md) is an intermediate layer that contains all messages to be implemented
-for current and future communication layers. 
+for current and future communication layers.
 Currently it's implemented for `random_connections` and `network`.
+- [template](./src/template/README.md) defines three different templates, one for a very simple broker,
+  one with a cleaner separation, and a third one with configuration and storage
 - [timer](./src/timer.rs) sends out one message per second and one message per minute
 - [web_proxy](./src/web_proxy/README.md) allows sending a http GET request to another node, using the other
 node as a proxy.
@@ -87,7 +88,7 @@ Testing your new module should be done in three steps:
    artificially between modules.
 
 3. At the very end should you start implementing the more end-to-end tests.
-   As a first step it is good to use the router simulator in 
+   As a first step it is good to use the router simulator in
    [router_simul](./src/testing/router_simul.rs).
    It abstracts the router in a useful way, while still allowing you to have
    some control of the message flow.
