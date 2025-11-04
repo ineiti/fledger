@@ -1,4 +1,4 @@
-CLIs := fledger flsignal encfs
+CLIs := fledger flsignal 
 CLI_PATHS := $(patsubst %,cli/%,$(CLIs))
 CARGOS := $(CLI_PATHS) flarch flbrowser flcrypto flmacro \
 			flmodules flnode test/{signal-fledger,fledger-nodejs,webrtc-libc-wasm/{libc,wasm}} \
