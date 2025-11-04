@@ -35,6 +35,7 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
   - network
   - random_connections
 - removed ping module
+- updated READMEs
 
 ### Fixed
 

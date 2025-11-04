@@ -4,13 +4,7 @@ This file is in place of github issues, as currently I'm mostly developing on my
 
 ## Current high-level goal
 
-Modify flmodules/templates to use the broker-macros
-
 ## Current concrete goal
-
-- clean up previous elements
-- also create proper "InternIn, InternOut" for flarch-brokers
-- update READMEs
 
 ### User-facing
 
