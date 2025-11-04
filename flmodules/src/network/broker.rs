@@ -28,6 +28,7 @@ use flarch::{
 
 use crate::{
     network::{
+        local_signal::{LocalSignal, LocalSignalIn, LocalSignalOut},
         messages::{InternIn, InternOut, Messages},
         signal::NodeStat,
     },
@@ -136,6 +137,8 @@ impl Network {
         intern.add_handler(Box::new(messages)).await?;
         intern.link_bi(ws).await?;
         intern.link_bi(web_rtc).await?;
+        let node_signal = LocalSignal::start().await?;
+        intern.link_bi(node_signal).await?;
         let broker = Broker::new();
         intern.link_direct(broker.clone()).await?;
         timer.tick_second(intern, InternIn::Tick).await?;
@@ -212,6 +215,20 @@ impl TranslateInto<WSClientIn> for InternOut {
     fn translate(self) -> Option<WSClientIn> {
         match self {
             InternOut::WebSocket(msg) => Some(msg),
+            _ => None,
+        }
+    }
+}
+
+impl TranslateFrom<LocalSignalOut> for InternIn {
+    fn translate(msg: LocalSignalOut) -> Option<Self> {
+        Some(InternIn::LocalSignal(msg))
+    }
+}
+impl TranslateInto<LocalSignalIn> for InternOut {
+    fn translate(self) -> Option<LocalSignalIn> {
+        match self {
+            InternOut::LocalSignal(msg) => Some(msg),
             _ => None,
         }
     }

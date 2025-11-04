@@ -2,9 +2,21 @@
 
 This file is in place of github issues, as currently I'm mostly developing on my own.
 
+## TODO
+  - finalize `todo()`s:
+    - Network::LocalSignal
+      - Implement LocalSignal::messages
+    - Network::Messages::{msg_wrapper, messages}
+  - make sure no regressions are inserted
+
 ## Current high-level goal
 
+- Stabilization: Fix connection and spurious messages, as well as high network load under
+some circumstances
+
 ## Current concrete goal
+
+- Add NodeSignal to allow connection between nodes w/o signalling server
 
 ### User-facing
 

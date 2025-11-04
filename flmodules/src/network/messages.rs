@@ -21,6 +21,7 @@ use flarch::{
 use crate::{
     network::{
         broker::{ConnStats, NetworkConnectionState, NetworkIn, NetworkOut, MODULE_NAME},
+        local_signal::{LocalSignalIn, LocalSignalOut},
         signal::{MessageAnnounce, WSSignalMessageFromNode, WSSignalMessageToNode, SIGNAL_VERSION},
     },
     nodeconfig::NodeConfig,
@@ -36,6 +37,7 @@ pub(super) enum ModuleMessage {
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum InternIn {
     Network(NetworkIn),
+    LocalSignal(LocalSignalOut),
     WebSocket(WSClientOut),
     WebRTC(WebRTCConnOut),
     Tick,
@@ -44,6 +46,7 @@ pub(super) enum InternIn {
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum InternOut {
     Network(NetworkOut),
+    LocalSignal(LocalSignalIn),
     WebSocket(WSClientIn),
     WebRTC(WebRTCConnIn),
 }
@@ -257,6 +260,27 @@ impl Messages {
         }
     }
 
+    fn msg_local_signal(&mut self, msg: LocalSignalOut) -> Vec<InternOut> {
+        match msg {
+            LocalSignalOut::ToNode(id, node_msg) => {
+                if self.connections.contains(&id) {
+                    if let Ok(str) = NetworkWrapper::wrap_yaml(MODULE_NAME, &node_msg)
+                        .and_then(|nw| serde_yaml::to_string(&nw).map_err(|e| anyhow::anyhow!(e)))
+                    {
+                        return vec![InternOut::WebRTC(WebRTCConnIn::Message(
+                            id,
+                            NCInput::Text(str),
+                        ))];
+                    }
+                }
+            }
+            LocalSignalOut::NodeList(ids) => {
+                return vec![];
+            }
+        }
+        vec![]
+    }
+
     /// Connect to the given node.
     fn connect(&mut self, dst: &U256) -> Vec<InternOut> {
         if self.connected(dst) {
@@ -390,6 +414,7 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
                 InternIn::WebRTC(WebRTCConnOut::Message(id, msg)) => self.msg_rtc(id, msg),
                 InternIn::Network(net) => self.msg_net(net),
                 InternIn::Tick => self.msg_tick(),
+                InternIn::LocalSignal(msg) => self.msg_local_signal(msg),
             })
             .collect::<Vec<_>>()
     }
@@ -437,6 +462,9 @@ impl Display for InternIn {
             }
             InternIn::WebRTC(web_rtcconn_output) => {
                 write!(f, "InternalIn::WebRTC({:?})", web_rtcconn_output)
+            }
+            InternIn::LocalSignal(wsserver_in) => {
+                write!(f, "InternalIn::Signal({:?})", wsserver_in)
             }
         }
     }
