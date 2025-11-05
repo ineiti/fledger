@@ -10,7 +10,7 @@ use tokio::sync::watch;
 
 use crate::{
     network::broker::BrokerNetwork,
-    template::multi::intern::{InternIn, InternOut, Intern},
+    template::multi::intern::{Intern, InternIn, InternOut},
     timer::{BrokerTimer, Timer},
 };
 
@@ -140,7 +140,7 @@ mod test {
     #[tokio::test]
     // Testing that the network messages are correctly sent and interpreted.
     async fn test_network() -> Result<()> {
-        // flarch::start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        // flarch::start_logging_filter_level(vec![], log::LevelFilter::Debug);
         let mut timer = Broker::new();
         let mut net = Broker::new();
         let mut tap_net_out = net.get_tap_out().await?.0;

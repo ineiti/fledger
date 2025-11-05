@@ -6,7 +6,10 @@ use flarch::nodeids::U256;
 use flmacro::AsU256;
 use serde::{Deserialize, Serialize};
 
-use crate::{signer::{Signature, Signer, SignerError, SignerTrait, Verifier, VerifierTrait}, tofrombytes::ToFromBytes};
+use crate::{
+    signer::{Signature, Signer, SignerError, SignerTrait, Verifier, VerifierTrait},
+    tofrombytes::ToFromBytes,
+};
 
 use super::signer::KeyPairID;
 
@@ -55,8 +58,14 @@ impl Display for ConditionLink {
         f.write_str(&match self {
             ConditionLink::Verifier(verifier) => format!("Verifier({})", verifier),
             ConditionLink::Badge(version_spec) => format!("Badge({:?})", version_spec),
-            ConditionLink::NofT(thr, conditionlinks) => format!("NofT({thr}, [{}])",
-        conditionlinks.iter().map(|cond| format!("{cond}")).collect::<Vec<_>>().join(",")),
+            ConditionLink::NofT(thr, conditionlinks) => format!(
+                "NofT({thr}, [{}])",
+                conditionlinks
+                    .iter()
+                    .map(|cond| format!("{cond}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
             ConditionLink::Fail => format!("Fail"),
             ConditionLink::Pass => format!("Pass"),
         })
@@ -95,7 +104,7 @@ pub enum VersionSpec<T: Serialize + Clone + AsRef<[u8]>> {
     Maximal(T, u32),
 }
 
-unsafe impl<T: Serialize + Clone + AsRef<[u8]>> Send for VersionSpec<T>{}
+unsafe impl<T: Serialize + Clone + AsRef<[u8]>> Send for VersionSpec<T> {}
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct ConditionSignature {
@@ -137,11 +146,11 @@ impl ConditionLink {
                 if let Some(b) = gb(version.clone()).await {
                     Condition::Badge(
                         version.clone(),
-                        Badge{
+                        Badge {
                             id: b.id,
                             version: b.version,
-                            condition: Box::new(b.condition.to_condition(gb, gv).await),    
-                        }
+                            condition: Box::new(b.condition.to_condition(gb, gv).await),
+                        },
                     )
                 } else {
                     Condition::NotAvailable
@@ -195,24 +204,29 @@ impl Condition {
                 matches!(self, Condition::Verifier(ver) if &ver.get_id() == key_pair_id)
             }
             ConditionLink::Badge(version_spec) => {
-                matches!(self, Condition::Badge(ver_spec, badge) 
+                matches!(self, Condition::Badge(ver_spec, badge)
                 if BadgeLink{ id: badge.id.clone(), version: badge.version, condition: badge.condition.to_link() }
                     .fits_version(version_spec.clone()) && badge.condition.equal_link(cond_link) && version_spec == ver_spec)
             }
             ConditionLink::NofT(_, condition_links) => {
                 condition_links.iter().all(|cl| self.equal_link(cl))
-            },
+            }
             ConditionLink::Pass => matches!(self, Condition::Pass),
             ConditionLink::Fail => matches!(self, Condition::Fail),
         }
     }
 
-    pub fn to_link(&self) -> ConditionLink{
-        match self{
+    pub fn to_link(&self) -> ConditionLink {
+        match self {
             Condition::Verifier(verifier) => ConditionLink::Verifier(verifier.get_id()),
             Condition::Badge(ver_spec, _) => ConditionLink::Badge(ver_spec.clone()),
-            Condition::NofT(thr, conditions) => ConditionLink::NofT(*thr, 
-            conditions.iter().map(|cond| cond.to_link()).collect::<Vec<_>>()),
+            Condition::NofT(thr, conditions) => ConditionLink::NofT(
+                *thr,
+                conditions
+                    .iter()
+                    .map(|cond| cond.to_link())
+                    .collect::<Vec<_>>(),
+            ),
             Condition::NotAvailable => todo!(),
             Condition::Pass => ConditionLink::Pass,
             Condition::Fail => ConditionLink::Fail,
@@ -222,7 +236,7 @@ impl Condition {
     pub fn has_verifier(&self, vid: &KeyPairID) -> bool {
         match self {
             Condition::Verifier(verifier) => &verifier.get_id() == vid,
-            Condition::Badge(_, badge) => badge.condition.has_verifier( vid),
+            Condition::Badge(_, badge) => badge.condition.has_verifier(vid),
             Condition::NofT(_, conditions) => conditions.iter().any(|c| c.has_verifier(vid)),
             Condition::NotAvailable => false,
             Condition::Pass => true,
@@ -233,12 +247,14 @@ impl Condition {
     pub fn can_sign(&self, vids: &[&KeyPairID]) -> bool {
         if vids.len() > 1 {
             todo!("Check with more than one signer");
-        } 
-        if let Some(&vid) = vids.first(){
+        }
+        if let Some(&vid) = vids.first() {
             match self {
                 Condition::Verifier(verifier) => &verifier.get_id() == vid,
-                Condition::Badge(_, badge) => badge.condition.can_sign( &[vid]),
-                Condition::NofT(nbr, conditions) => conditions.iter().any(|c| c.can_sign(&[vid])) && nbr == &1,
+                Condition::Badge(_, badge) => badge.condition.can_sign(&[vid]),
+                Condition::NofT(nbr, conditions) => {
+                    conditions.iter().any(|c| c.can_sign(&[vid])) && nbr == &1
+                }
                 Condition::NotAvailable => false,
                 Condition::Pass => true,
                 Condition::Fail => false,
@@ -263,7 +279,7 @@ impl ConditionSignature {
     }
 
     pub fn empty() -> Self {
-        ConditionSignature{
+        ConditionSignature {
             condition: Condition::NotAvailable,
             signatures: HashMap::new(),
         }
@@ -274,27 +290,29 @@ impl ConditionSignature {
     }
 
     pub fn sign_digest(&mut self, sig: &Signer, digest: &U256) -> anyhow::Result<()> {
-        if !self.condition.has_verifier( &sig.get_id()) {
+        if !self.condition.has_verifier(&sig.get_id()) {
             return Err(SignerError::NoSuchSigner.into());
         }
-        self.signatures.insert(sig.get_id(), sig.sign(&digest.bytes())?);
+        self.signatures
+            .insert(sig.get_id(), sig.sign(&digest.bytes())?);
         Ok(())
     }
 
     pub fn signers_msg(&mut self, signers: &[&Signer], msg: &Bytes) -> anyhow::Result<()> {
         let digest = self.digest(msg);
-        for sig in signers{
-        self.sign_digest(sig, &digest)?
+        for sig in signers {
+            self.sign_digest(sig, &digest)?
         }
         Ok(())
     }
 
     pub fn signers_digest(&mut self, signers: &[&Signer], digest: &U256) -> anyhow::Result<()> {
-        for sig in signers{
-            if !self.condition.has_verifier( &sig.get_id()) {
+        for sig in signers {
+            if !self.condition.has_verifier(&sig.get_id()) {
                 return Err(SignerError::NoSuchSigner.into());
             }
-            self.signatures.insert(sig.get_id(), sig.sign(&digest.bytes())?);
+            self.signatures
+                .insert(sig.get_id(), sig.sign(&digest.bytes())?);
         }
         Ok(())
     }
@@ -439,7 +457,7 @@ mod test {
 
     #[tokio::test]
     async fn test_sign() -> anyhow::Result<()> {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], log::LevelFilter::Info);
         let msg = Bytes::from("123");
         let msg_bad = Bytes::from("1234");
         let mut dht = DHT::new();
@@ -452,7 +470,10 @@ mod test {
         // Wrong and correct signer
         assert_eq!(
             anyhow::anyhow!(SignerError::NoSuchSigner).to_string(),
-            cond_sig0.sign_msg(&svid1.signer, &msg).unwrap_err().to_string()
+            cond_sig0
+                .sign_msg(&svid1.signer, &msg)
+                .unwrap_err()
+                .to_string()
         );
         assert!(!cond_sig0.verify_msg(&msg)?);
         cond_sig0.sign_msg(&svid0.signer, &msg)?;
@@ -460,7 +481,11 @@ mod test {
 
         // Condition swap
         let mut cond_clone = cond_sig0.clone();
-        log::info!("{:?} - {:?}", cond_sig0.condition.hash(), cond_sig1.condition.hash());
+        log::info!(
+            "{:?} - {:?}",
+            cond_sig0.condition.hash(),
+            cond_sig1.condition.hash()
+        );
         cond_clone.condition = cond_sig1.condition;
         assert!(!cond_clone.verify_msg(&msg)?);
 
@@ -499,7 +524,10 @@ mod test {
         assert!(!cond_sig0.verify_msg(&msg)?);
         assert_eq!(
             anyhow::anyhow!(SignerError::NoSuchSigner).to_string(),
-            cond_sig0.sign_msg(&svid2.signer, &msg).unwrap_err().to_string()
+            cond_sig0
+                .sign_msg(&svid2.signer, &msg)
+                .unwrap_err()
+                .to_string()
         );
         cond_sig0.sign_msg(&svid0.signer, &msg)?;
         assert!(cond_sig0.verify_msg(&msg)?);
@@ -537,9 +565,9 @@ mod test {
     }
 
     #[test]
-    fn serialize_condsig() -> anyhow::Result<()>{
+    fn serialize_condsig() -> anyhow::Result<()> {
         let signer = SignerEd25519::new();
-        let mut sig = ConditionSignature{
+        let mut sig = ConditionSignature {
             condition: Condition::Verifier(signer.verifier()),
             signatures: HashMap::new(),
         };

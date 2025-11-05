@@ -40,7 +40,7 @@ use tokio::sync::watch;
 async fn dht_large() -> anyhow::Result<()> {
     // start_logging_filter_level(
     //     vec!["flarch::web_rtc", "dht_large", "flmodules::dht_storage"],
-    //     log::LevelFilter::Trace,
+    //     log::LevelFilter::Debug,
     // );
     start_logging_filter_level(vec!["dht_large", "fl"], log::LevelFilter::Debug);
 
