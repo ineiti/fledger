@@ -47,6 +47,8 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
 - flmodules::realmstorage - avoid cycling of flos when
 flo A and B replace each other
 - webrtc sends first message before connection setup message
+- don't delete DHTStorage when changing nodes
+- don't reset configuration (including private keys) when loading danu-page
 
 ## [0.9.2] - 2025-05-11
 

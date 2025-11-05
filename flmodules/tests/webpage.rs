@@ -102,7 +102,7 @@ async fn page_simple() -> anyhow::Result<()> {
 
 #[test_async_stack]
 async fn page_full() -> anyhow::Result<()> {
-    start_logging_filter_level(vec!["flmodules", "webpage"], log::LevelFilter::Trace);
+    start_logging_filter_level(vec!["flmodules", "webpage"], log::LevelFilter::Debug);
     // start_logging_filter_level(vec!["flmodules::dht_storage", "webpage"], LOG_LVL);
 
     log::info!("Setting up root nodes, realm, root page, and root tag.");

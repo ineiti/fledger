@@ -474,7 +474,7 @@ mod tests {
 
     #[test]
     fn test_furthest() -> anyhow::Result<()> {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], log::LevelFilter::Debug);
         let root = U256::from_str("00")?;
         let realm = get_realm_depth(&root, 0);
         let rid = realm.realm_id();

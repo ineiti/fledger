@@ -106,7 +106,7 @@ mod test {
 
     #[test]
     fn serialize() -> anyhow::Result<()> {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], log::LevelFilter::Debug);
 
         let realm = Realm::new(
             "root".into(),

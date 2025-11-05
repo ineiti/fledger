@@ -619,7 +619,7 @@ mod test {
 
     #[tokio::test]
     async fn test_update_data() -> Result<(), Box<dyn Error>> {
-        start_logging_filter_level(vec![], log::LevelFilter::Trace);
+        start_logging_filter_level(vec![], log::LevelFilter::Debug);
 
         let rid = RealmID::rnd();
         let sig = SignerEd25519::new();
