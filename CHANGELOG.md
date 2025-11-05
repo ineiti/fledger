@@ -34,8 +34,11 @@ See [WIP.md](./WIP.md) for current work and bugs to fix
   - gossip_events
   - network
   - random_connections
+  - router
+  - web_proxy
 - removed ping module
 - updated READMEs
+- timing and number of messages exchanged to minimize traffic when system is idle
 
 ### Fixed
 

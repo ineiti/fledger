@@ -12,8 +12,6 @@ pub struct NetworkWrapper {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RouterIn {
     NetworkWrapperToNetwork(NodeID, NetworkWrapper),
-    // TODO: Replace this with Network(NetworkOut), and add a Network(NetworkIn) to RouterOut
-    Internal(RouterInternal),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -24,15 +22,6 @@ pub enum RouterOut {
     NetworkWrapperFromNetwork(NodeID, NetworkWrapper),
     Disconnected(NodeID),
     Connected(NodeID),
-    SystemConfig(FledgerConfig),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum RouterInternal {
-    Connected(NodeID),
-    Disconnected(NodeID),
-    Available(Vec<NodeInfo>),
-    MessageFromNode(NodeID, NetworkWrapper),
     SystemConfig(FledgerConfig),
 }
 
@@ -51,11 +40,5 @@ impl NetworkWrapper {
             }
         }
         None
-    }
-}
-
-impl From<RouterInternal> for RouterIn {
-    fn from(value: RouterInternal) -> Self {
-        RouterIn::Internal(value)
     }
 }

@@ -15,14 +15,15 @@ use tokio::sync::{mpsc::UnboundedReceiver, watch};
 use tokio_stream::StreamExt;
 
 use flarch::{
-    broker::{Broker, BrokerError, TranslateFrom, TranslateInto},
+    add_translator_direct, add_translator_link,
+    broker::{Broker, BrokerError},
     nodeids::NodeID,
     tasks::Interval,
     web_rtc::{
         messages::{ConnType, SetupError, SignalingState},
         node_connection::{Direction, NCError},
-        websocket::{BrokerWSClient, WSClientIn, WSClientOut},
-        BrokerWebRTCConn, WebRTCConnIn, WebRTCConnOut,
+        websocket::BrokerWSClient,
+        BrokerWebRTCConn,
     },
 };
 
@@ -134,10 +135,15 @@ impl Network {
         let mut intern = Broker::new();
         let (messages, connections) = Intern::start(node_config).await?;
         intern.add_handler(Box::new(messages)).await?;
-        intern.link_bi(ws).await?;
-        intern.link_bi(web_rtc).await?;
+        add_translator_link!(intern, ws, InternIn::WebSocket, InternOut::WebSocket);
+        add_translator_link!(intern, web_rtc, InternIn::WebRTC, InternOut::WebRTC);
         let broker = Broker::new();
-        intern.link_direct(broker.clone()).await?;
+        add_translator_direct!(
+            intern,
+            broker.clone(),
+            InternIn::Network,
+            InternOut::Network
+        );
         timer.tick_second(intern, InternIn::Tick).await?;
 
         Ok(Self {
@@ -200,54 +206,6 @@ impl NetworkWebRTC {
     /// Requests an updated list of all connected nodes to the signalling server.
     pub fn send_list_request(&mut self) -> anyhow::Result<()> {
         self.send(NetworkIn::WSUpdateListRequest)
-    }
-}
-
-impl TranslateFrom<WSClientOut> for InternIn {
-    fn translate(msg: WSClientOut) -> Option<Self> {
-        Some(InternIn::WebSocket(msg))
-    }
-}
-impl TranslateInto<WSClientIn> for InternOut {
-    fn translate(self) -> Option<WSClientIn> {
-        match self {
-            InternOut::WebSocket(msg) => Some(msg),
-            _ => None,
-        }
-    }
-}
-
-/*
-the trait bound `network::messages::InternIn: TranslateFrom<NetworkIn>` is not satisfied
-the trait bound `network::messages::InternOut: TranslateInto<NetworkOut>` is not satisfied
- */
-
-impl TranslateFrom<NetworkIn> for InternIn {
-    fn translate(msg: NetworkIn) -> Option<Self> {
-        Some(InternIn::Network(msg))
-    }
-}
-impl TranslateInto<NetworkOut> for InternOut {
-    fn translate(self) -> Option<NetworkOut> {
-        match self {
-            InternOut::Network(network_out) => Some(network_out),
-            _ => None,
-        }
-    }
-}
-
-impl TranslateFrom<WebRTCConnOut> for InternIn {
-    fn translate(msg: WebRTCConnOut) -> Option<Self> {
-        Some(InternIn::WebRTC(msg))
-    }
-}
-
-impl TranslateInto<WebRTCConnIn> for InternOut {
-    fn translate(self) -> Option<WebRTCConnIn> {
-        match self {
-            InternOut::WebRTC(msg_webrtc) => Some(msg_webrtc),
-            _ => None,
-        }
     }
 }
 

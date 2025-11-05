@@ -1,10 +1,11 @@
 use flarch::{
+    add_translator_direct, add_translator_link,
     broker::{Broker, SubsystemHandler},
     nodeids::U256,
     platform_async_trait,
 };
 
-use super::messages::{RouterIn, RouterInternal, RouterOut};
+use super::messages::{RouterIn, RouterOut};
 use crate::{
     network::broker::{BrokerNetwork, NetworkIn, NetworkOut},
     nodeconfig::NodeInfo,
@@ -42,12 +43,8 @@ impl RouterRandom {
     }
 
     fn translate_rtr_rnd(msg: RouterIn) -> Option<RandomIn> {
-        match msg {
-            RouterIn::NetworkWrapperToNetwork(id, module_message) => {
-                Some(RandomIn::NetworkWrapperToNetwork(id, module_message))
-            }
-            _ => None,
-        }
+        let RouterIn::NetworkWrapperToNetwork(id, module_message) = msg;
+        Some(RandomIn::NetworkWrapperToNetwork(id, module_message))
     }
 }
 
@@ -57,99 +54,75 @@ impl RouterRandom {
  * messages, this implementation has to do some bookkeeping to send out
  * the correct messages.
  */
+#[derive(Debug, Default)]
 pub struct RouterNetwork {
     nodes_available: Vec<NodeInfo>,
     nodes_connected: Vec<U256>,
 }
 
-impl RouterNetwork {
-    pub async fn start(mut network: BrokerNetwork) -> anyhow::Result<BrokerRouter> {
-        let mut b = Broker::new();
-        // Subsystem for handling Connected and Disconnected messages from the Network broker.
-        b.add_handler(Box::new(RouterNetwork {
-            nodes_available: vec![],
-            nodes_connected: vec![],
-        }))
-        .await?;
-
-        // Translate NetworkOut to FromRouter, and ToRouter to NetworkIn.
-        // A module connected to the Broker<RouterMessage> will get translations of the
-        // NetworkOut messages, and can send messages to NetworkIn using the Router.
-        network
-            .add_translator_o_ti(
-                b.clone(),
-                Box::new(|msg| match msg {
-                    NetworkOut::MessageFromNode(id, msg_str) => {
-                        Some(RouterInternal::MessageFromNode(id, msg_str).into())
-                    }
-                    NetworkOut::NodeListFromWS(vec) => Some(RouterInternal::Available(vec).into()),
-                    NetworkOut::Connected(id) => Some(RouterInternal::Connected(id).into()),
-                    NetworkOut::Disconnected(id) => Some(RouterInternal::Disconnected(id).into()),
-                    NetworkOut::SystemConfig(conf) => {
-                        Some(RouterInternal::SystemConfig(conf).into())
-                    }
-                    NetworkOut::Error(e) => {
-                        // TODO: propagate this error to the node control or whatever, so that the
-                        // system can be nicely shut down.
-                        panic!("Got a fatal error from the signalling server: {e}");
-                    }
-                    _ => None,
-                }),
-            )
-            .await?;
-        b.add_translator_i_ti(
-            network,
-            Box::new(|msg| match msg {
-                RouterIn::NetworkWrapperToNetwork(id, module_message) => {
-                    Some(NetworkIn::MessageToNode(id, module_message))
-                }
-                _ => None,
-            }),
-        )
-        .await?;
-        Ok(b)
-    }
+#[derive(Debug, Clone)]
+enum InternIn {
+    Network(NetworkOut),
+    Router(RouterIn),
 }
 
-#[platform_async_trait()]
-impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
-    async fn messages(&mut self, msgs: Vec<RouterIn>) -> Vec<RouterOut> {
+#[derive(Debug, Clone, PartialEq)]
+enum InternOut {
+    Network(NetworkIn),
+    Router(RouterOut),
+}
+
+impl RouterNetwork {
+    pub async fn start(network: BrokerNetwork) -> anyhow::Result<BrokerRouter> {
+        let mut intern = Broker::new_with_handler(Box::new(RouterNetwork::default()))
+            .await?
+            .0;
+        add_translator_link!(intern, network, InternIn::Network, InternOut::Network);
+        let b = Broker::new();
+        add_translator_direct!(intern, b.clone(), InternIn::Router, InternOut::Router);
+
+        Ok(b)
+    }
+
+    fn msg_router(&mut self, msg: RouterIn) -> Vec<InternOut> {
+        let RouterIn::NetworkWrapperToNetwork(node, net_wrap) = msg;
+        vec![InternOut::Network(NetworkIn::MessageToNode(node, net_wrap))]
+    }
+
+    fn msg_net(&mut self, msg: NetworkOut) -> Vec<InternOut> {
         let mut ret = false;
         let mut out = vec![];
         // Keep track of available and connected / disconnected nodes.
-        for msg in msgs {
-            if let RouterIn::Internal(internal) = msg {
-                match internal {
-                    RouterInternal::Connected(id) => {
-                        if !self.nodes_connected.contains(&id) {
-                            self.nodes_connected.push(id);
-                            out.push(RouterOut::Connected(id));
-                            ret = true;
-                        }
-                    }
-                    RouterInternal::Disconnected(id) => {
-                        if self.nodes_connected.contains(&id) {
-                            self.nodes_connected.retain(|&other| other != id);
-                            out.push(RouterOut::Disconnected(id));
-                            ret = true;
-                        }
-                    }
-                    RouterInternal::Available(vec) => {
-                        self.nodes_available = vec;
-                        ret = true;
-                    }
-                    RouterInternal::MessageFromNode(id, msg_nw) => {
-                        if !self.nodes_connected.contains(&id) {
-                            log::warn!("Got message from unconnected node {id}: {msg_nw:?}");
-                            self.nodes_connected.push(id);
-                            out.push(RouterOut::Connected(id));
-                            ret = true;
-                        }
-                        out.push(RouterOut::NetworkWrapperFromNetwork(id, msg_nw))
-                    }
-                    RouterInternal::SystemConfig(conf) => out.push(RouterOut::SystemConfig(conf)),
+        match msg {
+            NetworkOut::Connected(id) => {
+                if !self.nodes_connected.contains(&id) {
+                    self.nodes_connected.push(id);
+                    out.push(RouterOut::Connected(id));
+                    ret = true;
                 }
             }
+            NetworkOut::Disconnected(id) => {
+                if self.nodes_connected.contains(&id) {
+                    self.nodes_connected.retain(|&other| other != id);
+                    out.push(RouterOut::Disconnected(id));
+                    ret = true;
+                }
+            }
+            NetworkOut::NodeListFromWS(vec) => {
+                self.nodes_available = vec;
+                ret = true;
+            }
+            NetworkOut::MessageFromNode(id, msg_nw) => {
+                if !self.nodes_connected.contains(&id) {
+                    log::warn!("Got message from unconnected node {id}: {msg_nw:?}");
+                    self.nodes_connected.push(id);
+                    out.push(RouterOut::Connected(id));
+                    ret = true;
+                }
+                out.push(RouterOut::NetworkWrapperFromNetwork(id, msg_nw))
+            }
+            NetworkOut::SystemConfig(conf) => out.push(RouterOut::SystemConfig(conf)),
+            _ => {}
         }
 
         // If something changed, output all relevant messages _before_ the network messages,
@@ -172,7 +145,21 @@ impl SubsystemHandler<RouterIn, RouterOut> for RouterNetwork {
             .concat();
         }
 
-        out
+        out.into_iter()
+            .map(|msg| InternOut::Router(msg))
+            .collect::<Vec<_>>()
+    }
+}
+
+#[platform_async_trait()]
+impl SubsystemHandler<InternIn, InternOut> for RouterNetwork {
+    async fn messages(&mut self, msgs: Vec<InternIn>) -> Vec<InternOut> {
+        msgs.into_iter()
+            .flat_map(|msg| match msg {
+                InternIn::Network(network_out) => self.msg_net(network_out),
+                InternIn::Router(router_in) => self.msg_router(router_in),
+            })
+            .collect::<Vec<_>>()
     }
 }
 
@@ -185,24 +172,30 @@ mod test {
     use super::*;
 
     fn check_msgs(
-        msgs: Vec<RouterOut>,
+        msgs: Vec<InternOut>,
         available: &[NodeInfo],
         connected: &[NodeInfo],
         total: usize,
     ) {
         assert_eq!(total, msgs.len());
-        assert_eq!(RouterOut::NodeInfoAvailable(available.to_vec()), msgs[0]);
         assert_eq!(
-            RouterOut::NodeIDsConnected(
+            InternOut::Router(RouterOut::NodeInfoAvailable(available.to_vec())),
+            msgs[0]
+        );
+        assert_eq!(
+            InternOut::Router(RouterOut::NodeIDsConnected(
                 connected
                     .iter()
                     .map(|info| info.get_id())
                     .collect::<Vec<NodeID>>()
                     .into()
-            ),
+            )),
             msgs[1]
         );
-        assert_eq!(RouterOut::NodeInfosConnected(connected.to_vec()), msgs[2]);
+        assert_eq!(
+            InternOut::Router(RouterOut::NodeInfosConnected(connected.to_vec())),
+            msgs[2]
+        );
     }
 
     #[tokio::test]
@@ -216,52 +209,69 @@ mod test {
 
         // Start with two new nodes, but not yet connected.
         let msgs = od
-            .messages(vec![RouterInternal::Available(vec![
+            .messages(vec![InternIn::Network(NetworkOut::NodeListFromWS(vec![
                 nodes[0].clone(),
                 nodes[1].clone(),
-            ])
+            ]))
             .into()])
             .await;
         check_msgs(msgs, &nodes, &[], 3);
 
         // Connect first node 0, then node 1
         let msgs = od
-            .messages(vec![RouterInternal::Connected(nodes[0].get_id()).into()])
+            .messages(vec![InternIn::Network(NetworkOut::Connected(
+                nodes[0].get_id(),
+            ))
+            .into()])
             .await;
         check_msgs(msgs, &nodes, &[nodes[0].clone()], 4);
 
         let msgs = od
-            .messages(vec![RouterInternal::Connected(nodes[1].get_id()).into()])
+            .messages(vec![InternIn::Network(NetworkOut::Connected(
+                nodes[1].get_id(),
+            ))
+            .into()])
             .await;
         check_msgs(msgs, &nodes, &nodes, 4);
 
         // Re-connect node 1, should do nothing
         let msgs = od
-            .messages(vec![RouterInternal::Connected(nodes[1].get_id()).into()])
+            .messages(vec![InternIn::Network(NetworkOut::Connected(
+                nodes[1].get_id(),
+            ))
+            .into()])
             .await;
         assert_eq!(0, msgs.len());
 
         // Disconnect an unknown node - twice, in case it keeps it and would fail to remove it when
         // it isn't here anymore.
         let msgs = od
-            .messages(vec![RouterInternal::Disconnected(node_unknown).into()])
+            .messages(vec![InternIn::Network(
+                NetworkOut::Disconnected(node_unknown).into(),
+            )])
             .await;
         assert_eq!(0, msgs.len());
 
         let msgs = od
-            .messages(vec![RouterInternal::Disconnected(node_unknown).into()])
+            .messages(vec![InternIn::Network(
+                NetworkOut::Disconnected(node_unknown).into(),
+            )])
             .await;
         assert_eq!(0, msgs.len());
 
         // Disconnect a node
         let msgs = od
-            .messages(vec![RouterInternal::Disconnected(nodes[0].get_id()).into()])
+            .messages(vec![InternIn::Network(
+                NetworkOut::Disconnected(nodes[0].get_id()).into(),
+            )])
             .await;
         check_msgs(msgs, &nodes, &[nodes[1].clone()], 4);
 
         // Disconnect an unconnected node
         let msgs = od
-            .messages(vec![RouterInternal::Disconnected(nodes[0].get_id()).into()])
+            .messages(vec![InternIn::Network(
+                NetworkOut::Disconnected(nodes[0].get_id()).into(),
+            )])
             .await;
         assert_eq!(0, msgs.len());
 
