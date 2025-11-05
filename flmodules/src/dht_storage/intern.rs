@@ -442,7 +442,7 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
         let _id = self.config.our_id;
         inputs
             .into_iter()
-            // .inspect(|msg| log::debug!("{_id}: In: {msg:?}"))
+            .inspect(|msg| log::trace!("DHTStorageIn: {msg:?}"))
             .flat_map(|msg| match msg {
                 InternIn::Routing(dhtrouting_out) => self.msg_dht_router(dhtrouting_out),
                 InternIn::Storage(dhtstorage_in) => self.msg_dht_storage(dhtstorage_in),
@@ -452,7 +452,7 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
                         .map_or(vec![], |msg| vec![msg])
                 }
             })
-            // .inspect(|msg| log::debug!("{_id}: Out: {msg:?}"))
+            .inspect(|msg| log::trace!("DHTStorageOut: {msg:?}"))
             .collect()
     }
 }

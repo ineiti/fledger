@@ -74,7 +74,10 @@ impl DHTRouter {
             InternIn::DHTRouter,
             InternOut::DHTRouter
         );
+        #[cfg(feature = "testing")]
         Timer::second(timer, intern, InternIn::Tick).await?;
+        #[cfg(not(feature = "testing"))]
+        Timer::minute(timer, intern, InternIn::Tick).await?;
 
         Ok(DHTRouter { broker, stats })
     }

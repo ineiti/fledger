@@ -222,7 +222,10 @@ impl Intern {
 
     fn new_closest(&self, key: U256, msg: NetworkWrapper) -> Vec<InternOut> {
         if let Some(&next_hop) = self.closest_or_connected(key.clone(), None).first() {
-            vec![ModuleMessage::Closest(self.core.config.root, key, msg.clone()).wrapper_network(next_hop)]
+            vec![
+                ModuleMessage::Closest(self.core.config.root, key, msg.clone())
+                    .wrapper_network(next_hop),
+            ]
         } else {
             // log::trace!(
             //     "{}: key {key} is already at its closest node",
@@ -234,7 +237,10 @@ impl Intern {
 
     fn new_direct(&self, dst: NodeID, msg: NetworkWrapper) -> Vec<InternOut> {
         if let Some(&next_hop) = self.closest_or_connected(dst.clone(), None).first() {
-            vec![ModuleMessage::Direct(self.core.config.root, dst, msg.clone()).wrapper_network(next_hop)]
+            vec![
+                ModuleMessage::Direct(self.core.config.root, dst, msg.clone())
+                    .wrapper_network(next_hop),
+            ]
         } else {
             // log::trace!(
             //     "{}: couldn't send new request because no hop to {dst} available",
@@ -318,13 +324,13 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
         let _id = self.core.config.root.clone();
         let out = msgs
             .into_iter()
-            // .inspect(|msg| log::debug!("{_id}: DHTRouterIn: {msg:?}"))
+            .inspect(|msg| log::trace!("{_id}: DHTRouterIn: {msg:?}"))
             .flat_map(|msg| match msg {
                 InternIn::Tick => self.tick(),
                 InternIn::DHTRouter(dht_msg) => self.msg_dht(dht_msg),
                 InternIn::Network(net_msg) => self.msg_network(net_msg),
             })
-            // .inspect(|msg| log::debug!("{_id}: DHTRouterOut: {msg:?}"))
+            .inspect(|msg| log::trace!("{_id}: DHTRouterOut: {msg:?}"))
             .collect();
         self.update_stats();
         out
@@ -387,14 +393,12 @@ mod tests {
             .map(|&id| NodeInfo::new_from_id(id))
             .collect();
 
-        let mut msg = Intern::new(
-            Config {
-                root,
-                k: 1,
-                ping_interval: 2,
-                ping_timeout: 4,
-            },
-        );
+        let mut msg = Intern::new(Config {
+            root,
+            k: 1,
+            ping_interval: 2,
+            ping_timeout: 4,
+        });
 
         let out = msg
             .0
