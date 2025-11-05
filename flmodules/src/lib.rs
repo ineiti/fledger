@@ -6,8 +6,9 @@ bitflags! {
         const STAT = 0x1;
         const RAND = 0x2;
         const GOSSIP = 0x4;
-        // This doesn't exist anymore
-        // const PING = 0x8;
+        // This doesn't exist anymore, but must be kept so things can
+        // be deserialized.
+        const PING = 0x8;
         const WEBPROXY = 0x10;
         const WEBPROXY_REQUESTS = 0x20;
         const DHT_ROUTER = 0x40;
@@ -17,7 +18,7 @@ bitflags! {
 
 impl Modules {
     pub fn stable() -> Modules {
-        Modules::all()
+        Modules::all() - Modules::PING
     }
 }
 
