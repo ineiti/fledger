@@ -249,6 +249,19 @@ impl SignalServer {
                 system_realm: self.config.system_realm.clone(),
             }),
         ));
+        let list = self
+            .info
+            .iter()
+            .map(|(_, info)| info.clone())
+            .collect::<Vec<_>>();
+        for id in self.connection_ids.iter() {
+            if id.1 != &index {
+                msgs.append(
+                    &mut self
+                        .send_msg_node(*id.1, WSSignalMessageToNode::ListIDsReply(list.clone())),
+                )
+            }
+        }
         msgs.push(SignalOut::NewNode(id));
         msgs
     }

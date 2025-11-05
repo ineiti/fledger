@@ -48,7 +48,7 @@ pub(super) enum InternOut {
     WebRTC(WebRTCConnIn),
 }
 
-const UPDATE_INTERVAL: usize = 10;
+const UPDATE_INTERVAL: usize = 60;
 
 pub(super) struct Intern {
     node_config: NodeConfig,

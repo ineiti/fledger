@@ -50,7 +50,10 @@ impl Gossip {
         let (messages, storage) = Intern::new(src.clone(), storage);
         let mut intern = Broker::new_with_handler(Box::new(messages)).await?.0;
 
+        #[cfg(feature = "testing")]
         Timer::second(timer, intern.clone(), InternIn::Tick).await?;
+        #[cfg(not(feature = "testing"))]
+        Timer::minute(timer, intern.clone(), InternIn::Tick).await?;
         add_translator_link!(intern, rc, InternIn::Network, InternOut::Network);
 
         let broker = Broker::new();

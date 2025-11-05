@@ -60,6 +60,10 @@ pub struct Args {
     #[arg(long, default_value = "5")]
     log_freq: u32,
 
+    /// Update frequency of dht_storage in seconds
+    #[arg(long, default_value = "60")]
+    dht_storage_freq: u32,
+
     /// Log gossip messages
     #[arg(long, default_value = "false")]
     log_gossip: bool,
@@ -210,7 +214,9 @@ impl Fledger {
             } {
                 return Ok(());
             }
-            self.ds.sync()?;
+            if count as u32 % self.args.dht_storage_freq == 0 {
+                self.ds.sync()?;
+            }
             let stats_new = self.dr.stats.borrow().clone();
             if stats != stats_new {
                 stats = stats_new;
@@ -268,7 +274,13 @@ impl Fledger {
 
             if self.args.log_dht_storage {
                 if let Some(ds) = self.node.dht_storage.as_mut() {
-                    let rids = ds.get_realm_ids().await?;
+                    let rids = ds
+                        .stats
+                        .borrow()
+                        .realm_stats
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<_>>();
                     if rids.len() == 0 {
                         log::info!("No realms found.");
                         return Ok(());
