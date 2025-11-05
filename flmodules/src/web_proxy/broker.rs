@@ -1,14 +1,22 @@
+use bytes::Bytes;
 use core::str;
 use flarch::{
+    add_translator_direct, add_translator_link,
     data_storage::DataStorage,
     tasks::time::{timeout, Duration},
 };
 use thiserror::Error;
-use tokio::sync::{mpsc::channel, watch};
+use tokio::sync::{
+    mpsc::{self, channel},
+    watch,
+};
 
-use crate::router::{
-    broker::BrokerRouter,
-    messages::{NetworkWrapper, RouterIn, RouterOut},
+use crate::{
+    router::broker::BrokerRouter,
+    web_proxy::{
+        intern::{InternIn, InternOut},
+        response::ResponseHeader,
+    },
 };
 use flarch::{
     broker::{Broker, BrokerError},
@@ -17,7 +25,7 @@ use flarch::{
 
 use super::{
     core::{Counters, WebProxyConfig, WebProxyStorage},
-    messages::{Messages, WebProxyIn, WebProxyOut},
+    intern::Intern,
     response::Response,
 };
 
@@ -35,6 +43,20 @@ pub enum WebProxyError {
     ResponseTimeout,
 }
 
+/// All possible calls TO this module.
+#[derive(Debug, Clone)]
+pub enum WebProxyIn {
+    RequestGet(U256, String, mpsc::Sender<Bytes>),
+}
+
+/// All possible replies FROM this module.
+#[derive(Debug, Clone)]
+pub enum WebProxyOut {
+    ResponseGet(NodeID, U256, ResponseHeader),
+}
+
+pub type BrokerWebProxy = Broker<WebProxyIn, WebProxyOut>;
+
 #[derive(Clone, Debug)]
 pub struct WebProxy {
     /// Represents the underlying broker.
@@ -49,17 +71,16 @@ impl WebProxy {
         router: BrokerRouter,
         config: WebProxyConfig,
     ) -> anyhow::Result<Self> {
-        let mut web_proxy = Broker::new();
-        let (messages, storage) = Messages::new(ds, config, our_id, web_proxy.clone());
+        let (mut intern, storage) = Intern::new(ds, config, our_id).await?;
 
-        web_proxy.add_handler(Box::new(messages)).await?;
-        web_proxy
-            .add_translator_link(
-                router,
-                Box::new(Self::link_proxy_router),
-                Box::new(Self::link_router_proxy),
-            )
-            .await?;
+        add_translator_link!(intern, router, InternIn::Router, InternOut::Router);
+        let web_proxy = Broker::new();
+        add_translator_direct!(
+            intern,
+            web_proxy.clone(),
+            InternIn::WebProxy,
+            InternOut::WebProxy
+        );
 
         Ok(Self { web_proxy, storage })
     }
@@ -77,11 +98,10 @@ impl WebProxy {
         let (mut tap, id) = self.web_proxy.get_tap_out().await?;
         Ok(timeout(Duration::from_secs(5), async move {
             while let Some(msg) = tap.recv().await {
-                if let WebProxyOut::ResponseGet(proxy, rnd, header) = msg {
-                    if rnd == our_rnd {
-                        self.web_proxy.remove_subsystem(id).await?;
-                        return Ok(Response::new(proxy, header, rx));
-                    }
+                let WebProxyOut::ResponseGet(proxy, rnd, header) = msg;
+                if rnd == our_rnd {
+                    self.web_proxy.remove_subsystem(id).await?;
+                    return Ok(Response::new(proxy, header, rx));
                 }
             }
             // TODO: is this really called sometime?
@@ -95,27 +115,6 @@ impl WebProxy {
     pub fn get_counters(&mut self) -> Counters {
         self.storage.borrow().counters.clone()
     }
-
-    fn link_router_proxy(msg: RouterOut) -> Option<WebProxyIn> {
-        match msg {
-            RouterOut::NodeInfosConnected(list) => Some(WebProxyIn::NodeInfoConnected(list)),
-            RouterOut::NetworkWrapperFromNetwork(id, msg) => msg
-                .unwrap_yaml(MODULE_NAME)
-                .map(|msg| WebProxyIn::FromNetwork(id, msg)),
-            _ => None,
-        }
-    }
-
-    fn link_proxy_router(msg: WebProxyOut) -> Option<RouterIn> {
-        if let WebProxyOut::ToNetwork(id, msg_node) = msg {
-            Some(RouterIn::NetworkWrapperToNetwork(
-                id,
-                NetworkWrapper::wrap_yaml(MODULE_NAME, &msg_node).unwrap(),
-            ))
-        } else {
-            None
-        }
-    }
 }
 
 #[cfg(test)]
@@ -126,7 +125,10 @@ mod tests {
         tasks::{spawn_local, wait_ms},
     };
 
-    use crate::nodeconfig::NodeConfig;
+    use crate::{
+        nodeconfig::NodeConfig,
+        router::messages::{RouterIn, RouterOut},
+    };
 
     use super::*;
 

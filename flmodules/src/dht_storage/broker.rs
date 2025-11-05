@@ -1,5 +1,6 @@
 use async_recursion::async_recursion;
 use flarch::{
+    add_translator_direct, add_translator_link,
     broker::{Broker, BrokerError},
     data_storage::DataStorage,
     tasks::wait_ms,
@@ -42,6 +43,8 @@ pub enum DHTStorageIn {
     GetRealms,
     /// Ask all neighbors for their realms and Flos.
     SyncFromNeighbors,
+    /// Ask all neighbors to sync with us.
+    PropagateFlos,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -102,28 +105,20 @@ impl DHTStorage {
         let mut intern = Broker::new();
         intern.add_handler(Box::new(messages)).await?;
 
-        intern
-            .add_translator_link(
-                dht_router,
-                Box::new(|msg| match msg {
-                    InternOut::Routing(dhtrouting_in) => Some(dhtrouting_in),
-                    _ => None,
-                }),
-                Box::new(|msg| Some(InternIn::Routing(msg))),
-            )
-            .await?;
+        add_translator_link!(
+            intern,
+            dht_router.clone(),
+            InternIn::Routing,
+            InternOut::Routing
+        );
 
         let broker = Broker::new();
-        intern
-            .add_translator_direct(
-                broker.clone(),
-                Box::new(|msg| match msg {
-                    InternOut::Storage(dhtstorage_out) => Some(dhtstorage_out),
-                    _ => None,
-                }),
-                Box::new(|msg| Some(InternIn::Storage(msg))),
-            )
-            .await?;
+        add_translator_direct!(
+            intern,
+            broker.clone(),
+            InternIn::Storage,
+            InternOut::Storage
+        );
         Timer::minute(
             timer,
             intern.clone(),
@@ -144,7 +139,9 @@ impl DHTStorage {
     }
 
     pub fn propagate(&mut self) -> anyhow::Result<()> {
-        Ok(self.intern.emit_msg_in(InternIn::PropagateFlos)?)
+        Ok(self
+            .intern
+            .emit_msg_in(InternIn::Storage(DHTStorageIn::PropagateFlos))?)
     }
 
     pub async fn get_realm_ids(&mut self) -> anyhow::Result<Vec<RealmID>> {

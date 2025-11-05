@@ -29,8 +29,6 @@ use super::{
 pub(super) enum InternIn {
     Routing(DHTRouterOut),
     Storage(DHTStorageIn),
-    /// Ask all neighbors to sync with us.
-    PropagateFlos,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -189,6 +187,11 @@ impl Messages {
                         .collect::<Vec<_>>(),
                 )
                 .into()]
+            }
+            DHTStorageIn::PropagateFlos => {
+                MessageNeighbour::AvailableRealmIDs(self.realms.keys().cloned().collect())
+                    .to_broadcast()
+                    .map_or(vec![], |msg| vec![msg])
             }
         }
     }
@@ -446,11 +449,6 @@ impl SubsystemHandler<InternIn, InternOut> for Messages {
             .flat_map(|msg| match msg {
                 InternIn::Routing(dhtrouting_out) => self.msg_dht_router(dhtrouting_out),
                 InternIn::Storage(dhtstorage_in) => self.msg_dht_storage(dhtstorage_in),
-                InternIn::PropagateFlos => {
-                    MessageNeighbour::AvailableRealmIDs(self.realms.keys().cloned().collect())
-                        .to_broadcast()
-                        .map_or(vec![], |msg| vec![msg])
-                }
             })
             .inspect(|msg| log::trace!("DHTStorageOut: {msg:?}"))
             .collect()

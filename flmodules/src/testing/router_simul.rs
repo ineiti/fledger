@@ -83,16 +83,12 @@ struct NSHub {
 
 impl NSHub {
     fn net_msg(&self, id: U256, msg: RouterIn) -> Vec<NSHubMessageOut> {
-        match msg {
-            RouterIn::NetworkWrapperToNetwork(id_dst, msg_node) => {
-                log::debug!("{id} -> {id_dst}: {:?}", msg_node);
-                vec![NSHubMessageOut::ToClient(
-                    id_dst,
-                    RouterOut::NetworkWrapperFromNetwork(id, msg_node),
-                )]
-            }
-            _ => vec![],
-        }
+        let RouterIn::NetworkWrapperToNetwork(id_dst, msg_node) = msg;
+        log::debug!("{id} -> {id_dst}: {:?}", msg_node);
+        vec![NSHubMessageOut::ToClient(
+            id_dst,
+            RouterOut::NetworkWrapperFromNetwork(id, msg_node),
+        )]
     }
 }
 
