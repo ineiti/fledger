@@ -35,6 +35,7 @@ pub struct FloMeta {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DHTConfig {
+    #[serde(default = "NodeID::rnd")]
     pub our_id: NodeID,
     // Realms allowed in this instance. If the Vec is empty, all new realms are
     // allowed.
