@@ -8,15 +8,16 @@ license = "MIT OR Apache-2.0"
 name = "flarch"
 readme = "README.md"
 repository = "https://github.com/ineiti/fledger"
-version = "0.9.3"
+version = "0.10.0"
 
 [features]
 node = ["flmacro/node"]
 
 [dependencies]
-flmacro = { version = "0.9", path = "../flmacro" }
+flmacro = { version = "0.10", path = "../flmacro" }
 
 anyhow = {version = "1", features = ["backtrace"]}
+btparse = "0.2"
 bytes = "1.9"
 chrono = "0.4"
 enum-display = "0.1"
@@ -28,6 +29,7 @@ tokio = { version = "1", features = ["rt", "macros", "time", "sync"] }
 async-trait = "0.1"
 rand = { version = "0.8" }
 regex = "1"
+rmp-serde = "1"
 # serde_with version 2 doesn't work with old configs
 serde_with = { version = "3", features = ["json", "base64", "hex"] }
 # serde_yaml 0.9 uses tags in yaml, which fails here
@@ -35,8 +37,6 @@ serde_yaml = "0.8"
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
-rmp-serde = "1"
-btparse = "0.2"
 
 # For libc
 [target.'cfg(target_family="unix")'.dependencies]

@@ -39,7 +39,8 @@
             } else {
                 function init_jsi() {
                     if (window.wasmBindings) {
-                        new window.wasmBindings.JSInterface().then((res) => { jsi = res });
+                        jsi = new window.wasmBindings.JSInterface();
+                        jsi.init();
                     } else {
                         setTimeout(init_jsi, 500);
                     }

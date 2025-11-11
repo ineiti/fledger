@@ -236,7 +236,10 @@ impl Event {
         id.update(self.src);
         id.update(self.created.to_le_bytes());
         id.update(&self.msg);
-        id.finalize().into()
+        // 2025-11-11: sha2 uses the generic-array crate in a version which
+        // complains about outdated generic-array. But the new sha2 is only
+        // in rc2.
+        Into::<[u8; 32]>::into(id.finalize()).into()
     }
 }
 

@@ -109,11 +109,6 @@ pub fn as_u256_derive(input: TokenStream) -> TokenStream {
                 &self.0.as_ref()
             }
         }
-        impl From<sha2::digest::generic_array::GenericArray<u8, sha2::digest::consts::U32>> for #name {
-            fn from(ga: sha2::digest::generic_array::GenericArray<u8, sha2::digest::consts::U32>) -> Self {
-                Self(ga.into())
-            }
-        }
 
         impl From<[u8; 32]> for #name {
             fn from(b: [u8; 32]) -> Self {

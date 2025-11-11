@@ -3,7 +3,7 @@ use clap::{Parser, ValueEnum};
 use flarch::{start_logging_filter, web_rtc::connection::ConnectionConfig};
 use flmodules::{nodeconfig::NodeConfig, timer::Timer};
 
-use shared::{
+use examples_ping_pong_shared::{
     common::{NodeList, PingPongIn, PingPongOut},
     event_loop,
     handler::{self, URL},

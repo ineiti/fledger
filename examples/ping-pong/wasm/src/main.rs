@@ -11,7 +11,7 @@ use yew::prelude::*;
 
 use flarch::{broker::Broker, tasks::now, web_rtc::connection::ConnectionConfig};
 
-use shared::{
+use examples_ping_pong_shared::{
     common::{NodeList, PingPongIn, PingPongOut},
     handler::PingPong,
 };
@@ -52,7 +52,7 @@ impl Component for App {
                     let id = config.info.get_id();
                     let net = flmodules::network::network_start(
                         config,
-                        ConnectionConfig::from_signal(shared::handler::URL),
+                        ConnectionConfig::from_signal(examples_ping_pong_shared::handler::URL),
                         &mut Timer::start().await.expect("Start timer"),
                     )
                     .await
@@ -63,7 +63,7 @@ impl Component for App {
                         true => PingPong::new(id, net)
                             .await
                             .expect("Couldn't start handler pingpong"),
-                        false => shared::event_loop::start(id, net)
+                        false => examples_ping_pong_shared::event_loop::start(id, net)
                             .await
                             .expect("Couldn't start event_loop PingPong"),
                     };

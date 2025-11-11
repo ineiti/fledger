@@ -61,16 +61,19 @@ pub fn main() {
 // Any suggestions for a framework that allows to do this in a cleaner way are welcome.
 #[wasm_bindgen]
 pub struct JSInterface {
-    tx: broadcast::Sender<Button>,
+    tx: Option<broadcast::Sender<Button>>,
 }
 
 #[wasm_bindgen]
 impl JSInterface {
     #[wasm_bindgen(constructor)]
-    pub async fn new() -> Self {
-        Self {
-            tx: WebState::start().await.expect("Starting WebState"),
-        }
+    pub fn new() -> Self {
+        Self { tx: None }
+    }
+
+    #[wasm_bindgen]
+    pub async fn init(&mut self) {
+        self.tx = Some(WebState::start().await.expect("Starting WebState"));
     }
 
     pub fn visit_page(&mut self, path_js: JsString) {
@@ -102,7 +105,7 @@ impl JSInterface {
     }
 
     fn send_button(&mut self, btn: Button) {
-        if let Err(e) = self.tx.send(btn.clone()) {
+        if let Err(e) = self.tx.as_ref().unwrap().send(btn.clone()) {
             log::error!("While sending {btn:?}: {e:?}");
         }
     }

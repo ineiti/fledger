@@ -1,13 +1,13 @@
 [package]
 edition = "2021"
-name = "ping"
-version = "0.9.0"
+name = "examples-ping"
+version = "0.10.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-flarch = {path = "../../flarch", version = "0.9"}
-flmodules = {path = "../../flmodules", version = "0.9"}
+flarch = {path = "../../flarch", version = "0.10"}
+flmodules = {path = "../../flmodules", version = "0.10"}
 
 anyhow = {version = "1", features = ["backtrace"]}
 clap = {version = "4", features = ["derive"]}

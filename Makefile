@@ -1,4 +1,4 @@
-CLIs := fledger flsignal 
+CLIs := fledger flsignal
 CLI_PATHS := $(patsubst %,cli/%,$(CLIs))
 CARGOS := $(CLI_PATHS) flarch flbrowser flcrypto flmacro \
 			flmodules flnode test/{signal-fledger,fledger-nodejs,webrtc-libc-wasm/{libc,wasm}} \
@@ -13,6 +13,7 @@ CRATES := flcrypto flmacro flarch flmodules flnode
 SHELL := /bin/bash
 PKILL = @/bin/ps aux | grep "$1" | egrep -v "(grep|vscode|rust-analyzer)" | awk '{print $$2}' | xargs -r kill
 PUBLISH = --token $$CARGO_REGISTRY_TOKEN
+PUBLISH_EXCLUDE := --exclude "test-*" --exclude "examples-*"
 FLEDGER = cargo run --bin fledger -- --config fledger/test0$1 --name Local0$1 \
 		--log-dht-storage -s ws://localhost:8765 --disable-turn-stun
 
@@ -71,13 +72,8 @@ publish:
 			echo "Remove wildcard version from $$crate"; \
 			exit 1; \
 		fi; \
-		CRATE_VERSION=$$(cargo search $$crate | grep "^$$crate " | sed -e "s/.*= \"\(.*\)\".*/\1/"); \
-		CARGO_VERSION=$$(grep "^version" $$crate/Cargo.toml | head -n 1 | sed -e "s/.*\"\(.*\)\".*/\1/"); \
-		if [[ "$$CRATE_VERSION" != "$$CARGO_VERSION" ]]; then \
-			echo "Publishing crate $$crate"; \
-			cargo publish ${PUBLISH} --manifest-path $$crate/Cargo.toml; \
-		fi; \
 	done
+	cargo publish ${PUBLISH} --workspace --exclude "test-*" --exclude "examples-*"
 
 update_version:
 	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > flnode/src/version.rs

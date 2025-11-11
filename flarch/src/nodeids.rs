@@ -2,7 +2,6 @@ use bytes::Bytes;
 use rand::random;
 use serde::{Deserialize, Serialize};
 use serde_with::{hex::Hex, serde_as};
-use sha2::digest::{consts::U32, generic_array::GenericArray};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::num::ParseIntError;
@@ -141,17 +140,6 @@ impl FromStr for U256 {
         let mut u = U256 { 0: [0u8; 32] };
         v.iter().enumerate().for_each(|(i, b)| u.0[i] = *b);
         Ok(u)
-    }
-}
-
-impl From<GenericArray<u8, U32>> for U256 {
-    fn from(ga: GenericArray<u8, U32>) -> Self {
-        let mut u = U256 { 0: [0u8; 32] };
-        ga.as_slice()
-            .iter()
-            .enumerate()
-            .for_each(|(i, b)| u.0[i] = *b);
-        u
     }
 }
 
