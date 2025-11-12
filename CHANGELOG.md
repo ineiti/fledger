@@ -8,7 +8,7 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 See [WIP.md](./WIP.md) for current work and bugs to fix
 
-## [0.9.3] - Pending
+## [0.10.0] - 2025-11-11
 
 ### Added
 

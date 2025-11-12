@@ -1,6 +1,6 @@
 [package]
-name = "webrtc-test-libc"
-version = "0.9.1"
+name = "test-webrtc-libc"
+version = "0.10.0"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "Test connection-setup for libc"
@@ -11,8 +11,8 @@ readme = "README.md"
 keywords = ["test", "libc", "webrtc", "websocket", "fledger"]
 
 [dependencies]
-flmodules = {path="../../../flmodules", version = "0.9"}
-flarch = {path="../../../flarch", version = "0.9"}
+flmodules = {path="../../../flmodules", version = "0.10"}
+flarch = {path="../../../flarch", version = "0.10"}
 
 anyhow = { version = "1", features = ["backtrace"]}
 log = "0.4"

@@ -20,7 +20,6 @@ This file is in place of github issues, as currently I'm mostly developing on my
 
 ### Bugs
 
-- a lot of `node1_1   | [2025-10-05T10:27:46Z WARN  flmodules::dht_router::messages] 63caf70b922a4e25 doesn't have a connection to 0f8beba175ec6085 anymore`
 - test dht_large fails too often
 - tags can get the same name and then overrides other tags with the same name
 - cli/fledger seems to remove some of the cuckoos when updating a page

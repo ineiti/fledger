@@ -1,11 +1,11 @@
 [package]
 edition = "2021"
-name = "shared"
-version = "0.9.1"
+name = "examples-ping-pong-shared"
+version = "0.10.0"
 
 [dependencies]
-flmodules = {path = "../../../flmodules", version = "0.9"}
-flarch = {path = "../../../flarch", version = "0.9"}
+flmodules = {path = "../../../flmodules", version = "0.10"}
+flarch = {path = "../../../flarch", version = "0.10"}
 
 anyhow = {version = "1", features = ["backtrace"]}
 async-trait = "0.1"
@@ -16,5 +16,5 @@ tokio = "1"
 tokio-stream = "0.1"
 
 [dev-dependencies]
-flmodules = {path = "../../../flmodules", version = "0.9", features = ["testing"]}
+flmodules = {path = "../../../flmodules", version = "0.10", features = ["testing"]}
 tokio = {version = "1", features = ["rt-multi-thread"]}
