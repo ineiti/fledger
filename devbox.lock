@@ -49,6 +49,54 @@
         }
       }
     },
+    "cargo-workspaces@latest": {
+      "last_modified": "2025-11-15T07:28:48Z",
+      "resolved": "github:NixOS/nixpkgs/1d4c88323ac36805d09657d13a5273aea1b34f0c#cargo-workspaces",
+      "source": "devbox-search",
+      "version": "0.4.1",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/qmbbyrkvkczg99d6qb2qgyg0m8rphhdy-cargo-workspaces-0.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/qmbbyrkvkczg99d6qb2qgyg0m8rphhdy-cargo-workspaces-0.4.1"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/sz7z3n6pf3j6qdr86sblbacnp2xjjm02-cargo-workspaces-0.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/sz7z3n6pf3j6qdr86sblbacnp2xjjm02-cargo-workspaces-0.4.1"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/45s8zr6hkfxmhv7hg4a93r0jpzhhxx96-cargo-workspaces-0.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/45s8zr6hkfxmhv7hg4a93r0jpzhhxx96-cargo-workspaces-0.4.1"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/i77cpybs7mab64f0pzjc8wnkwnq260p0-cargo-workspaces-0.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/i77cpybs7mab64f0pzjc8wnkwnq260p0-cargo-workspaces-0.4.1"
+        }
+      }
+    },
     "darwin.apple_sdk.frameworks.CoreServices": {
       "resolved": "github:NixOS/nixpkgs/75a52265bda7fd25e06e3a67dee3f0354e73243c#darwin.apple_sdk.frameworks.CoreServices",
       "source": "nixpkg",

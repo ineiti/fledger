@@ -1,6 +1,5 @@
 [package]
 name = "test-webrtc-wasm"
-version = "0.10.0"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "Test connection-setup for wasm"

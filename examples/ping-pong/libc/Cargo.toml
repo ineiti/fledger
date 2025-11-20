@@ -1,14 +1,13 @@
 [package]
 edition = "2021"
 name = "examples-ping-pong-libc"
-version = "0.10.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 flarch = {path = "../../../flarch", version = "0.10"}
 flmodules = {path = "../../../flmodules", version = "0.10"}
-examples-ping-pong-shared = {path = "../shared", version = "0.10"}
+examples-ping-pong-shared = {path = "../shared"}
 
 anyhow = {version = "1", features = ["backtrace"]}
 clap = {version = "4", features = ["derive"]}

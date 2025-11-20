@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "signal-fledger",
+    "webrtc-libc-wasm/*",
+]
+
+exclude = [ "fledger-nodejs" ]
