@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 name = "flarch"
 readme = "README.md"
 repository = "https://github.com/ineiti/fledger"
-version = "0.10.0"
+version = "0.10.1"
 
 [features]
 node = ["flmacro/node"]
