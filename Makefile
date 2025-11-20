@@ -73,7 +73,7 @@ publish:
 			exit 1; \
 		fi; \
 	done
-	cargo publish ${PUBLISH} --workspace --exclude "test-*" --exclude "examples-*"
+	cargo-workspaces workspaces publish ${PUBLISH} --publish-as-is
 
 update_version:
 	echo "pub const VERSION_STRING: &str = \"$$( date +%Y-%m-%d_%H:%M )::$$( git rev-parse --short HEAD )\";" > flnode/src/version.rs

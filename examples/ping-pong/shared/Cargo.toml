@@ -1,7 +1,6 @@
 [package]
 edition = "2021"
 name = "examples-ping-pong-shared"
-version = "0.10.0"
 
 [dependencies]
 flmodules = {path = "../../../flmodules", version = "0.10"}

@@ -73,23 +73,6 @@ jobs:
           password: ${{ secrets.DOCKERHUB }}
           tags: latest
 
-  publish_crate:
-    runs-on: ubuntu-latest
-    needs: docker
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install devbox
-        uses: jetify-com/devbox-install-action@v0.14.0
-        with:
-          enable-cache: "true"
-
-      - name: Publish new crates, if any
-        run: devbox run -- make publish
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
   deploy:
     runs-on: ubuntu-latest
     needs: docker

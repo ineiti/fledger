@@ -804,48 +804,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
-name = "examples-ping"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "clap",
- "flarch",
- "flmodules",
- "log",
- "serde",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
-name = "examples-ping-pong-libc"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "clap",
- "examples-ping-pong-shared",
- "flarch",
- "flmodules",
- "log",
- "tokio",
-]
-
-[[package]]
-name = "examples-ping-pong-shared"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "flarch",
- "flmodules",
- "log",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
 name = "ff"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2786,33 +2744,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.110",
-]
-
-[[package]]
-name = "test-signal-fledger"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "env_logger",
- "flarch",
- "flmodules",
- "flnode",
- "log",
- "thiserror 2.0.17",
- "tokio",
-]
-
-[[package]]
-name = "test-webrtc-libc"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "flarch",
- "flmodules",
- "log",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]
