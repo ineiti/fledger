@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "ping",
+    "ping-pong/libc",
+]
+
+exclude = [ "ping-pong" ]

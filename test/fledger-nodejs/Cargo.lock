@@ -872,7 +872,7 @@ dependencies = [
 
 [[package]]
 name = "fledger-node"
-version = "0.10.0"
+version = "0.0.0"
 dependencies = [
  "console_error_panic_hook",
  "env_logger",

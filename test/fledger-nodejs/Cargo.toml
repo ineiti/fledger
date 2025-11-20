@@ -1,6 +1,5 @@
 [package]
 name = "fledger-node"
-version = "0.10.0"
 edition = "2021"
 authors = ["Linus Gasser <linus@gasser.blue>"]
 description = "The fledger server as a CLI using node, to test wasm"
