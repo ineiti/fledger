@@ -109,7 +109,10 @@ impl Intern {
                     vec![ModuleMessage::ConnectedIDsReply(self.core.active_nodes())
                         .wrapper_network(from)]
                 }
-                ModuleMessage::ConnectedIDsReply(nodes) => self.add_nodes(nodes),
+                ModuleMessage::ConnectedIDsReply(nodes) => {
+                    self.core.add_nodes(nodes);
+                    vec![]
+                }
             },
             None => vec![],
         };
@@ -153,40 +156,40 @@ impl Intern {
     }
 
     fn msg_network(&mut self, msg: RouterOut) -> Vec<InternOut> {
+        // log::info!("msg_network({msg})");
         match msg {
             RouterOut::NodeInfoAvailable(node_infos) => self.add_node_infos(node_infos),
             RouterOut::NodeIDsConnected(connected) => {
                 self.connected = connected.0.clone();
-                self.add_nodes(connected.0)
+                self.core.add_nodes(connected.0);
             }
             RouterOut::NetworkWrapperFromNetwork(from, network_wrapper) => {
-                self.process_node_message(from, network_wrapper)
+                return self.process_node_message(from, network_wrapper)
             }
-            RouterOut::SystemConfig(conf) => conf
-                .system_realm
-                .map(|rid| vec![InternOut::DHTRouter(DHTRouterOut::SystemRealm(rid))])
-                .unwrap_or(vec![]),
+            RouterOut::SystemConfig(conf) => {
+                return conf
+                    .system_realm
+                    .map(|rid| vec![InternOut::DHTRouter(DHTRouterOut::SystemRealm(rid))])
+                    .unwrap_or(vec![])
+            }
             RouterOut::Disconnected(id) => {
-                self.core.node_disconnected(id);
-                vec![]
+                self.core.node_disconnected(&id);
             }
-            _ => vec![],
+            RouterOut::Connected(id) => {
+                self.core.add_node(id);
+            }
+            _ => {}
         }
+        vec![]
     }
 
     // Stores the new node list, excluding the ID of this node.
-    fn add_node_infos(&mut self, infos: Vec<NodeInfo>) -> Vec<InternOut> {
+    fn add_node_infos(&mut self, infos: Vec<NodeInfo>) {
         for info in &infos {
             self.infos.insert(info.get_id(), info.clone());
         }
-        self.add_nodes(infos.iter().map(|i| i.get_id()).collect())
-    }
-
-    fn add_nodes(&mut self, nodes: Vec<NodeID>) -> Vec<InternOut> {
-        self.core.add_nodes(nodes);
-        vec![InternOut::DHTRouter(DHTRouterOut::NodeList(
-            self.core.active_nodes(),
-        ))]
+        self.core
+            .add_nodes(infos.iter().map(|i| i.get_id()).collect());
     }
 
     // One second passes - and return messages for nodes to ping.
@@ -407,7 +410,7 @@ mod tests {
                 InternIn::Tick,
             ])
             .await;
-        assert_eq!(5, out.len());
+        assert_eq!(4, out.len());
 
         Ok(())
     }

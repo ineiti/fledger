@@ -287,7 +287,7 @@ mod test {
         net.settle(vec![]).await?;
         let mut tap_out = rd.get_tap_out().await?.0;
 
-        log::info!("Sending nodelist");
+        // log::info!("Sending nodelist");
         let nis = vec![NodeConfig::new().info];
         net.emit_msg_out(NetworkOut::NodeListFromWS(nis))?;
         net.settle(vec![]).await?;

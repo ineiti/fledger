@@ -1,7 +1,7 @@
 use flarch::web_rtc::connection::ConnectionConfig;
 use flmodules::network::network_start;
 use flmodules::timer::BrokerTimer;
-use log::{error, info};
+use log::info;
 use std::collections::HashMap;
 use thiserror::Error;
 use tokio::sync::watch;
