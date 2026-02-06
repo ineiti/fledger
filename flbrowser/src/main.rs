@@ -14,7 +14,7 @@ use proxy::Proxy;
 use std::{collections::HashMap, str::FromStr};
 use tokio::sync::{broadcast, watch};
 use wasm_bindgen::prelude::wasm_bindgen;
-use web_sys::{HtmlButtonElement, HtmlElement, HtmlOListElement};
+use web_sys::{HtmlButtonElement, HtmlElement, HtmlDivElement};
 
 use flarch::{
     data_storage::DataStorageLocal,
@@ -171,7 +171,7 @@ impl WebState {
                 }
             }
             StateEnum::ConnectingNodes => {
-                if self.webn.dht_router.stats.borrow().active >= 2 {
+                if self.webn.dht_router.stats.borrow().active >= 1 {
                     self.set_state(StateEnum::UpdateDHT).await;
                 }
             }
@@ -181,6 +181,7 @@ impl WebState {
                     self.web
                         .get_element::<HtmlButtonElement>("loading-info-button")
                         .click();
+                    self.web.get_element::<HtmlElement>("status-section").set_hidden(true);
                     self.web
                         .get_element::<HtmlElement>("home_page")
                         .set_hidden(false);
@@ -248,7 +249,7 @@ impl WebState {
         }
         self.state = new_state;
         self.web
-            .get_element::<HtmlOListElement>("status-steps")
+            .get_element::<HtmlDivElement>("status-steps")
             .set_inner_html(&self.status_box.to_string());
     }
 
