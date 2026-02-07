@@ -1,0 +1,27 @@
+{
+  "name": "@danu/danu",
+  "version": "0.1.0",
+  "description": "Browser library for Fledger network",
+  "main": "pkg/flbrowser_core.js",
+  "types": "pkg/flbrowser_core.d.ts",
+  "files": [
+    "pkg/*.wasm",
+    "pkg/*.js",
+    "pkg/*.d.ts",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ineiti/fledger"
+  },
+  "keywords": [
+    "fledger",
+    "wasm",
+    "p2p",
+    "webrtc"
+  ],
+  "license": "MIT OR Apache-2.0",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

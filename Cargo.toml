@@ -6,4 +6,4 @@ members = [
     "cli/*",
 ]
 
-exclude = ["flbrowser", "test", "examples"]
+exclude = ["flbrowser", "test", "examples", "package", "frontend"]

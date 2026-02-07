@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Fledger Browser</title>
+        <link rel="stylesheet" href="/src/style.css" />
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>Fledger Browser</h1>
+                <p class="subtitle">Decentralized Network Client</p>
+            </header>
+
+            <main>
+                <section class="status-section">
+                    <h2>Status</h2>
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <span class="status-label">Connection:</span>
+                            <span id="connection-status" class="status-value"
+                                >Disconnected</span
+                            >
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Online Nodes:</span>
+                            <span id="online-nodes" class="status-value"
+                                >0</span
+                            >
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">DHT Connections:</span>
+                            <span id="dht-connections" class="status-value"
+                                >0</span
+                            >
+                        </div>
+                    </div>
+                </section>
+
+                <section class="stats-section">
+                    <h2>Statistics</h2>
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <span class="status-label">Messages Sent:</span>
+                            <span id="messages-sent" class="status-value"
+                                >0</span
+                            >
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Messages Received:</span>
+                            <span id="messages-received" class="status-value"
+                                >0</span
+                            >
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Uptime:</span>
+                            <span id="uptime" class="status-value">0s</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="logs-section">
+                    <h2>Logs</h2>
+                    <div id="logs" class="logs-container"></div>
+                </section>
+            </main>
+        </div>
+
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

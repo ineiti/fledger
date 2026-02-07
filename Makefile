@@ -131,6 +131,10 @@ docker_dev:
 		docker push fledgre/$$cli:dev; \
 	done
 
+frontend_dev:
+	( cd package && make )
+	( cd frontend && npm run dev )
+
 clean:
 	for c in ${CARGOS}; do \
 		echo "Cleaning $$c"; \
