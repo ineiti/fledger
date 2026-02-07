@@ -1,20 +1,14 @@
 import init, { DaNode, initialize, NodeStatus, RealmID } from "@danu/danu";
 
 // DOM elements
-const connectionStatus = document.getElementById(
+const statusConnection = document.getElementById(
   "connection-status",
 ) as HTMLSpanElement;
-const onlineNodes = document.getElementById("online-nodes") as HTMLSpanElement;
-const dhtConnections = document.getElementById(
+const statusNodes = document.getElementById("online-nodes") as HTMLSpanElement;
+const statusDHTNodes = document.getElementById(
   "dht-connections",
 ) as HTMLSpanElement;
-const messagesSent = document.getElementById(
-  "messages-sent",
-) as HTMLSpanElement;
-const messagesReceived = document.getElementById(
-  "messages-received",
-) as HTMLSpanElement;
-const uptime = document.getElementById("uptime") as HTMLSpanElement;
+const statusRealms = document.getElementById("realms") as HTMLSpanElement;
 const logsContainer = document.getElementById("logs") as HTMLDivElement;
 
 let node: DaNode | null = null;
@@ -55,25 +49,26 @@ async function new_event(status: NodeStatus, args: any) {
   switch (status) {
     case NodeStatus.ConnectSignal:
       addLog("Connected to Signal");
-      connectionStatus.textContent = "Connected";
-      connectionStatus.className = `status-value connected`;
+      statusConnection.textContent = "Connected";
+      statusConnection.className = `status-value connected`;
       break;
     case NodeStatus.DisconnectSignal:
-      connectionStatus.textContent = "Disconnected";
-      connectionStatus.className = `status-value disconnected`;
+      statusConnection.textContent = "Disconnected";
+      statusConnection.className = `status-value disconnected`;
       break;
     case NodeStatus.ConnectedNodes:
       addLog(`Connected to ${args} nodes`);
-      dhtConnections.textContent = args.toString();
+      statusDHTNodes.textContent = args.toString();
       break;
     case NodeStatus.AvailableNodes:
       addLog(`${args} nodes available`);
-      onlineNodes.textContent = args.toString();
+      statusNodes.textContent = args.toString();
       break;
     case NodeStatus.RealmAvailable:
       addLog(`${args.length} realms available`);
       realms.splice(0);
       realms.push(...args);
+      statusRealms.textContent = args.toString();
   }
 }
 
