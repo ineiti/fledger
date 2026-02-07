@@ -1,9 +1,9 @@
 {
-  "name": "@danu/danu",
+  "name": "@fledger/danu",
   "version": "0.1.0",
   "description": "Browser library for Fledger network",
-  "main": "pkg/flbrowser_core.js",
-  "types": "pkg/flbrowser_core.d.ts",
+  "main": "pkg/danu.js",
+  "types": "pkg/danu.d.ts",
   "files": [
     "pkg/*.wasm",
     "pkg/*.js",
@@ -23,5 +23,8 @@
   "license": "MIT OR Apache-2.0",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

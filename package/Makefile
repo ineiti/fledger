@@ -1,12 +1,12 @@
-.PHONY: build build-release clean dev pack
+.PHONY: build build-release clean dev pack publish
 
 dev: build
 
 build:
-	wasm-pack build --target web --out-name flbrowser_core --out-dir pkg --features local
+	wasm-pack build --target web --out-name danu --out-dir pkg --scope fledger --features local
 
 build-release:
-	wasm-pack build --target web --out-name flbrowser_core --out-dir pkg --release
+	wasm-pack build --target web --out-name danu --out-dir pkg --scope fledger --release
 
 clean:
 	rm -rf pkg/
@@ -14,3 +14,6 @@ clean:
 
 pack: build
 	npm pack
+
+publish: build-release
+	wasm-pack publish --access public
