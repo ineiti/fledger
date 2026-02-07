@@ -1,9 +1,9 @@
 use flarch::data_storage::DataStorageLocal;
 use flarch::web_rtc::connection::{ConnectionConfig, HostLogin};
+use flmodules::dht_storage::broker::DHTStorage;
 use flmodules::Modules;
 use flnode::node::Node;
 use js_sys::{Function, JsString};
-use log::info;
 use wasm_bindgen::prelude::*;
 
 use crate::darealm::{DaRealm, RealmID};
@@ -37,15 +37,15 @@ const NETWORK_CONFIG: NetConf = NetConf {
 /// Main DaNode interface for browser
 #[wasm_bindgen]
 pub struct DaNode {
-    node: Node,
+    _node: Node,
     events: BrokerEvents,
+    ds: DHTStorage,
 }
 
 #[wasm_bindgen]
 impl DaNode {
     /// Create a new DaNode instance
     pub async fn from_default() -> Result<DaNode, JsString> {
-        info!("Creating new DaNode instance");
         Self::from_config(NETWORK_CONFIG).await
     }
 
@@ -64,19 +64,25 @@ impl DaNode {
         let mut node = Node::start_network(my_storage, node_config, config)
             .await
             .map_err(|e| format!("Failed to start network: {}", e))?;
+        let ds = node
+            .dht_storage
+            .as_ref()
+            .ok_or("DHTStorage not yet initialized")?
+            .clone();
         Ok(DaNode {
             events: Events::new(&mut node).await.map_err(|e| format!("{e}"))?,
-            node,
+            _node: node,
+            ds,
         })
     }
 
+    pub async fn sync(&mut self) -> Result<(), String> {
+        self.ds.sync().map_err(|e| format!("{e:?}"))
+    }
+
     pub async fn get_realm(&mut self, id: RealmID) -> Result<DaRealm, JsString> {
-        let ds = self
-            .node
-            .dht_storage
-            .as_mut()
-            .ok_or(format!("DHTStorage not yet initialized"))?;
-        let realm = ds
+        let realm = self
+            .ds
             .get_realm_view(id.get_id())
             .await
             .map_err(|e| format!("While fetching realm: {e}"))?;

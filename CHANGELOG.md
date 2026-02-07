@@ -8,6 +8,21 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 See [WIP.md](./WIP.md) for current work and bugs to fix
 
+## []
+
+### Added
+
+- package
+  - clean npm package for front-end development
+- frontend
+  - using @danu/danu for a clean frontend
+
+### Changed
+
+- dht_storage
+  - sends a 'sync' when the # of connected nodes goes from 0 to >0
+  - sends DHTStorage::RealmIDs when a new realm gets created
+
 ## [0.10.0] - 2025-11-11
 
 ### Added

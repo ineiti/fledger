@@ -7,6 +7,7 @@ use flarch::{
     platform_async_trait,
 };
 use flcrypto::tofrombytes::ToFromBytes;
+use itertools::concat;
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
@@ -132,7 +133,13 @@ impl Messages {
                 msg.unwrap_yaml(MODULE_NAME).map(|mn| self.msg_dest(mn))
             }
             DHTRouterOut::NodeList(nodes) => {
+                let first_node = self.nodes.is_empty() && !nodes.is_empty();
                 self.nodes = nodes;
+                if first_node {
+                    return vec![MessageNeighbour::RequestRealmIDs
+                        .to_broadcast()
+                        .expect("Sending Sync")];
+                }
                 None
             }
             DHTRouterOut::MessageNeighbour(origin, msg) => msg
@@ -285,7 +292,8 @@ impl Messages {
         //             .unwrap_or("".to_string())
         //     );
         // }
-        match msg {
+        let mut intern = vec![];
+        let msgs = match msg {
             MessageNeighbour::RequestRealmIDs => vec![MessageNeighbour::AvailableRealmIDs(
                 self.realms.keys().cloned().collect(),
             )],
@@ -331,7 +339,7 @@ impl Messages {
                 .map_or(vec![], |flos| vec![MessageNeighbour::Flos(flos)]),
             MessageNeighbour::Flos(flo_cuckoos) => {
                 for (flo, cuckoos) in flo_cuckoos {
-                    self.store_flo(flo.clone());
+                    intern.extend(self.store_flo(flo.clone()));
                     self.realms.get_mut(&flo.realm_id()).map(|realm| {
                         cuckoos
                             .into_iter()
@@ -343,7 +351,8 @@ impl Messages {
         }
         .into_iter()
         .filter_map(|msg| msg.to_neighbour(origin))
-        .collect()
+        .collect();
+        concat(vec![intern, msgs])
     }
 
     fn read_flo(&self, id: &GlobalID) -> Option<FloCuckoo> {
@@ -353,14 +362,7 @@ impl Messages {
     }
 
     fn store_flo(&mut self, flo: Flo) -> Vec<InternOut> {
-        let mut res = vec![];
-        if self.upsert_flo(flo.clone()) {
-            // log::info!("{}: store_flo", self.config.our_id);
-            // TODO: this should not be sent in all cases...
-            res.extend(vec![MessageClosest::StoreFlo(flo.clone())
-                .to_intern_out(flo.flo_id().into())
-                .expect("Storing new DHT")]);
-        }
+        let mut res = self.upsert_flo(flo.clone());
         if let Some(parent) = flo.flo_config().cuckoo_parent() {
             res.extend(vec![MessageClosest::StoreCuckooID(flo.global_id())
                 .to_intern_out(*parent.clone())
@@ -372,7 +374,8 @@ impl Messages {
     // Try really hard to store the flo.
     // Either its realm is already known, or it is a new realm.
     // When 'true' is returned, then the flo has been stored.
-    fn upsert_flo(&mut self, flo: Flo) -> bool {
+    fn upsert_flo(&mut self, flo: Flo) -> Vec<InternOut> {
+        // log::info!("{}: store_flo", self.config.our_id);
         // log::trace!(
         //     "{} store_flo {}({}/{}) {}",
         //     self.config.our_id,
@@ -392,22 +395,34 @@ impl Messages {
         //     flo.data(),
         //     TryInto::<FloRealm>::try_into(flo.clone())
         // );
-        let modification = self
-            .realms
-            .get_mut(&flo.realm_id())
-            // .inspect(|rs| log::info!("{} has realm", self.config.our_id))
-            .map(|dsc| dsc.upsert_flo(flo.clone()))
-            .unwrap_or_else(|| {
-                TryInto::<FloRealm>::try_into(flo)
-                    .ok()
-                    .and_then(|realm| self.create_realm(realm).ok())
-                    .is_some()
-            });
+        let new_flo: bool;
+        let mut new_realm = false;
+        if let Some(realm) = self.realms.get_mut(&flo.realm_id()) {
+            new_flo = realm.upsert_flo(flo.clone());
+        } else {
+            new_flo = true;
+            if let Ok(realm) = TryInto::<FloRealm>::try_into(flo.clone()) {
+                new_realm = self.create_realm(realm.clone()).is_ok();
+            }
+        }
+        let mut ret = vec![];
+        if new_flo {
+            ret.push(
+                MessageClosest::StoreFlo(flo.clone())
+                    .to_intern_out(flo.flo_id().into())
+                    .expect("Storing new DHT"),
+            );
+        }
+        if new_realm {
+            ret.push(InternOut::Storage(DHTStorageOut::RealmIDs(
+                self.realms.keys().cloned().collect::<Vec<_>>(),
+            )))
+        }
 
-        if modification {
+        if ret.len() > 0 {
             self.store();
         }
-        modification
+        ret
     }
 
     fn create_realm(&mut self, realm: FloRealm) -> anyhow::Result<()> {
