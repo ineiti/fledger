@@ -56,6 +56,8 @@ pub enum DHTStorageOut {
     ValueMissing(GlobalID),
 }
 
+pub type BrokerDHTStorage = Broker<DHTStorageIn, DHTStorageOut>;
+
 /// This links the DHTStorage module with other modules, so that
 /// all messages are correctly translated from one to the other.
 /// For this example, it uses the RandomConnections module to communicate
@@ -66,7 +68,7 @@ pub enum DHTStorageOut {
 #[derive(Clone, Debug)]
 pub struct DHTStorage {
     /// Represents the underlying broker.
-    pub broker: Broker<DHTStorageIn, DHTStorageOut>,
+    pub broker: BrokerDHTStorage,
     pub stats: watch::Receiver<Stats>,
     intern: Broker<InternIn, InternOut>,
     config: DHTConfig,
