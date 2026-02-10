@@ -1,7 +1,7 @@
 use core::fmt;
 use std::fmt::Debug;
 
-use flarch::nodeids::{NodeID, NodeIDs};
+use flarch::nodeids::NodeID;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ impl Config {
     pub fn default(root: NodeID) -> Self {
         Self {
             root,
-            k: 1,
+            k: 2,
             ping_interval: 10,
             ping_timeout: 30,
         }
@@ -48,7 +48,7 @@ impl Kademlia {
         if id == self.config.root || self.has_node_id(&id) {
             return;
         }
-        let node = KNode::new(&self.config.root, id);
+        let node = KNode::new(&self.config.root, id, self.config.ping_interval - 1);
         if let Some(bucket) = self.buckets.get_mut(node.depth) {
             bucket.add_node(node);
         } else {
@@ -56,7 +56,7 @@ impl Kademlia {
             if self.root_bucket.status() == BucketStatus::Overflowing {
                 self.rebalance_overflow();
             }
-        };
+        }
     }
 
     pub fn add_nodes(&mut self, ids: Vec<NodeID>) {
@@ -68,7 +68,7 @@ impl Kademlia {
     #[cfg(feature = "testing")]
     pub fn add_nodes_active(&mut self, ids: Vec<NodeID>) {
         for id in ids {
-            let node = KNode::new(&self.config.root, id);
+            let node = KNode::new(&self.config.root, id, 0);
             if let Some(bucket) = self.buckets.get_mut(node.depth) {
                 bucket.add_node_active(node);
             } else {
@@ -80,10 +80,12 @@ impl Kademlia {
         }
     }
 
-    pub fn node_disconnected(&mut self, id: NodeID) {
-        let node = KNode::new(&self.config.root, id);
-        if let Some(bucket) = self.buckets.get_mut(node.depth) {
-            bucket.remove_node(&node.id);
+    pub fn node_disconnected(&mut self, id: &NodeID) {
+        if let Some(bucket) = self
+            .buckets
+            .get_mut(KNode::get_depth(&self.config.root, id))
+        {
+            bucket.remove_node(id);
             if self.root_bucket.status() == BucketStatus::Wanting {
                 self.rebalance_wanting();
             }
@@ -91,8 +93,10 @@ impl Kademlia {
     }
 
     pub fn remove_node(&mut self, id: &NodeID) {
-        let node = KNode::new(&self.config.root, *id);
-        if let Some(bucket) = self.buckets.get_mut(node.depth) {
+        if let Some(bucket) = self
+            .buckets
+            .get_mut(KNode::get_depth(&self.config.root, id))
+        {
             bucket.remove_node(id);
         } else {
             self.root_bucket.remove_node(id);
@@ -105,10 +109,10 @@ impl Kademlia {
     /// Returns the next hop to get the message as close to the destination as possible.
     /// If a needed bucket is empty, the closest nodes on the 'wrong' branch will be returned.
     pub fn route_closest(&self, dst: &NodeID, last: Option<&NodeID>) -> Vec<NodeID> {
-        let depth = KNode::get_depth(&self.config.root, *dst);
+        let depth = KNode::get_depth(&self.config.root, dst);
         match last {
             Some(l) => {
-                let depth_last = depth.max(KNode::get_depth(&self.config.root, *l));
+                let depth_last = depth.max(KNode::get_depth(&self.config.root, l));
                 let depth_root_last = self.root_bucket.last_depth().unwrap_or(depth_last);
                 for d in std::iter::once(depth).chain(depth_last + 1..depth_root_last) {
                     let ret = self.get_nodes_depth(d);
@@ -125,7 +129,7 @@ impl Kademlia {
     /// Returns the next hop to get the message to the exact destination as possible.
     /// If a needed bucket is empty, an empty vector is returned, and the routing will fail.
     pub fn route_direct(&self, dst: &NodeID) -> Vec<NodeID> {
-        let depth = KNode::get_depth(&self.config.root, *dst);
+        let depth = KNode::get_depth(&self.config.root, dst);
         self.get_nodes_depth(depth)
     }
 
@@ -171,7 +175,7 @@ impl Kademlia {
     /// The system received a message from this node, so its considered
     /// active.
     pub fn node_active(&mut self, id: &NodeID) -> bool {
-        let depth = KNode::get_depth(&self.config.root, *id);
+        let depth = KNode::get_depth(&self.config.root, id);
         self.buckets
             .get_mut(depth)
             .unwrap_or_else(|| &mut self.root_bucket)
@@ -275,7 +279,9 @@ impl KBucket {
 
     fn add_node(&mut self, node: KNode) {
         if self.is_root || self.cache.len() < 2 * self.config.k {
-            self.cache.push(node);
+            if !self.cache.contains(&node) {
+                self.cache.push(node);
+            }
         }
     }
 
@@ -396,13 +402,7 @@ impl KBucket {
 
         // Active nodes get only pinged when they were active for ping_interval.
         for node in self.active.iter_mut() {
-            node.tick();
-            if node.ticks_last % self.config.ping_interval == 0 {
-                tick_ids.ping.push(node.id);
-            }
-            if node.ticks_last >= self.config.ping_timeout {
-                tick_ids.deleted.push(node.id);
-            }
+            node.tick(&mut tick_ids, &self.config);
         }
 
         tick_ids
@@ -416,16 +416,10 @@ impl KBucket {
         let fillup_nodes = if self.is_root {
             self.cache.len()
         } else {
-            2 * (self.config.k - self.active.len())
+            2 * self.config.k - self.active.len()
         };
         for node in self.cache.iter_mut().take(fillup_nodes) {
-            if node.ticks_last % self.config.ping_interval == 0 {
-                tick_ids.ping.push(node.id);
-            }
-            node.tick();
-            if node.ticks_last >= self.config.ping_timeout {
-                tick_ids.deleted.push(node.id);
-            }
+            node.tick(&mut tick_ids, &self.config);
         }
 
         tick_ids
@@ -473,8 +467,16 @@ impl fmt::Display for KBucket {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "Active: {} :: Cache: {}",
-            NodeIDs::from(self.active.iter().map(|kn| kn.id).collect::<Vec<NodeID>>()),
-            NodeIDs::from(self.cache.iter().map(|kn| kn.id).collect::<Vec<NodeID>>()),
+            self.active
+                .iter()
+                .map(|kn| format!("{kn}"))
+                .collect::<Vec<String>>()
+                .join(", "),
+            self.cache
+                .iter()
+                .map(|kn| format!("{kn}"))
+                .collect::<Vec<String>>()
+                .join(", "),
         ))?;
         Ok(())
     }
@@ -494,26 +496,23 @@ enum BucketStatus {
 pub struct KNode {
     id: NodeID,
     depth: usize,
-    ticks_active: u32,
     ticks_last: u32,
 }
 
 impl KNode {
-    pub fn new(root: &NodeID, id: NodeID) -> Self {
+    pub fn new(root: &NodeID, id: NodeID, ticks_last: u32) -> Self {
         Self {
             id,
-            depth: Self::get_depth(root, id),
-            ticks_active: 0,
-            ticks_last: 0,
+            depth: Self::get_depth(root, &id),
+            ticks_last,
         }
     }
 
     fn _reset(&mut self) {
-        self.ticks_active = 0;
         self.ticks_last = 0;
     }
 
-    pub fn get_depth(root: &NodeID, id: NodeID) -> usize {
+    pub fn get_depth(root: &NodeID, id: &NodeID) -> usize {
         for (index, (root_byte, id_byte)) in
             root.as_ref().iter().zip(id.as_ref().iter()).enumerate()
         {
@@ -529,9 +528,14 @@ impl KNode {
         return id.as_ref().len() * 8 - 1;
     }
 
-    fn tick(&mut self) {
-        self.ticks_active += 1;
+    fn tick(&mut self, tick_ids: &mut TickIDs, config: &Config) {
         self.ticks_last += 1;
+        if self.ticks_last % config.ping_interval == 0 {
+            tick_ids.ping.push(self.id);
+        }
+        if self.ticks_last >= config.ping_timeout {
+            tick_ids.deleted.push(self.id);
+        }
     }
 
     fn active(&mut self) {
@@ -545,11 +549,20 @@ impl PartialEq for KNode {
     }
 }
 
+impl fmt::Display for KNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}({})", self.id, self.ticks_last)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::{iter::once, str::FromStr};
 
-    use flarch::{nodeids::U256, start_logging_filter_level};
+    use flarch::{
+        nodeids::{NodeIDs, U256},
+        start_logging_filter_level,
+    };
     use rand::seq::SliceRandom;
 
     use super::*;
@@ -568,7 +581,7 @@ mod test {
     pub fn rnd_node_depth(root: &NodeID, depth: usize) -> NodeID {
         loop {
             let node = NodeID::rnd();
-            let nd = KNode::get_depth(root, node);
+            let nd = KNode::get_depth(root, &node);
             if nd == depth {
                 return node;
             }
@@ -581,7 +594,7 @@ mod test {
 
     pub fn distance_str(root: &NodeID, node_str: &str) -> usize {
         let node = U256::from_str(node_str).expect("NodeID init");
-        KNode::get_depth(root, node)
+        KNode::get_depth(root, &node)
     }
 
     pub fn kademlia_add_nodes(kademlia: &mut Kademlia, depth: usize, nbr: usize) {
@@ -597,7 +610,7 @@ mod test {
         start_logging_filter_level(vec![], LOG_LVL);
 
         let root = U256::from_str("00").expect("NodeID init");
-        assert_eq!(255, KNode::get_depth(&root, root));
+        assert_eq!(255, KNode::get_depth(&root, &root));
         assert_eq!(0, distance_str(&root, "80"));
         assert_eq!(1, distance_str(&root, "40"));
         assert_eq!(2, distance_str(&root, "20"));
@@ -773,7 +786,7 @@ mod test {
                 NodeIDs::from(nodes),
             );
             for node in nodes {
-                let d = KNode::get_depth(&root, node);
+                let d = KNode::get_depth(&root, &node);
                 assert_eq!(
                     returned, d,
                     "Node {node} with depth {d} in {depth} - {returned} - {nbr}"
@@ -810,12 +823,13 @@ mod test {
         kademlia_add_nodes(&mut kademlia, 3, 10);
 
         tick_len(&mut kademlia, 0, 0);
-        let ticks = tick_len(&mut kademlia, 12, 0);
+        let ticks = tick_len(&mut kademlia, 14, 0);
         for ping in &ticks.ping[0..3] {
             kademlia.node_active(&ping);
         }
         tick_len(&mut kademlia, 0, 0);
-        tick_len(&mut kademlia, 12, 9);
+        tick_len(&mut kademlia, 14, 11);
+        tick_len(&mut kademlia, 0, 0);
     }
 
     #[test]
@@ -887,8 +901,11 @@ mod test {
                 let next_hops =
                     hop_kademlia.route_closest(node, (hop > 0).then(|| &hop_kademlia.config.root));
                 if let Some(next_hop) = next_hops.choose(rng) {
-                    hop_kademlia = kademlias.iter().find(|k| k.config.root == *next_hop).unwrap();
-                    log::trace!("{hop}/{}: {next_hop}", KNode::get_depth(node, *next_hop));
+                    hop_kademlia = kademlias
+                        .iter()
+                        .find(|k| k.config.root == *next_hop)
+                        .unwrap();
+                    log::trace!("{hop}/{}: {next_hop}", KNode::get_depth(node, next_hop));
                 } else {
                     if node != &hop_kademlia.config.root {
                         log::trace!(
@@ -923,7 +940,7 @@ mod test {
         missing
     }
 
-    fn kademlia_bucket(kademlia: &Kademlia, depth: usize, active: usize, cache: usize) {
+    fn kademlia_assert_bucket(kademlia: &Kademlia, depth: usize, active: usize, cache: usize) {
         let bucket = kademlia
             .buckets
             .get(depth)
@@ -964,17 +981,16 @@ mod test {
             kademlia.node_active(id);
         }
         kademlia_test_cache(&kademlia, 3, config.k, config.k);
-        kademlia_bucket(&kademlia, 2, config.k, config.k);
+        kademlia_assert_bucket(&kademlia, 2, config.k, config.k);
 
         // Ping rest of nodes
         for id in &ticks.ping[2..6] {
             kademlia.node_active(id);
         }
         kademlia_test_cache(&kademlia, 3, 2 * config.k, 0);
-        kademlia_bucket(&kademlia, 2, config.k, config.k);
+        kademlia_assert_bucket(&kademlia, 2, config.k, config.k);
 
         tick_len(&mut kademlia, 0, 0);
-        log::info!("{kademlia}");
-        tick_len(&mut kademlia, 3 * config.k, 0);
+        tick_len(&mut kademlia, 4 * config.k, 0);
     }
 }

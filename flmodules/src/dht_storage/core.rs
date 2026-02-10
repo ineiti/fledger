@@ -236,7 +236,7 @@ impl RealmStorage {
                 self.put(flo);
             } else {
                 // What [remove_furthest] can free.
-                let size_above: u64 = (0..KNode::get_depth(&self.dht_config.our_id, *flo_id))
+                let size_above: u64 = (0..KNode::get_depth(&self.dht_config.our_id, &flo_id))
                     .map(|depth| self.size_at_depth(depth))
                     .sum();
                 if flo_size <= size_above {
@@ -274,7 +274,7 @@ impl RealmStorage {
     fn put(&mut self, flo: Flo) {
         let id = flo.flo_id();
         self.remove_entry(&id);
-        let depth = KNode::get_depth(&self.dht_config.our_id, *id);
+        let depth = KNode::get_depth(&self.dht_config.our_id, &id);
         // log::info!(
         //     "{} Storing id({id}) / version({}) / flo_type({}) at depth {depth}",
         //     self.dht_config.our_id,
@@ -292,7 +292,7 @@ impl RealmStorage {
 
     fn remove_entry(&mut self, id: &FloID) {
         if let Some(df) = self.flos.remove(id) {
-            let distance = KNode::get_depth(&self.dht_config.our_id, **id);
+            let distance = KNode::get_depth(&self.dht_config.our_id, id);
             self.distances
                 .entry(distance)
                 .and_modify(|v| v.retain(|i| i != id));
@@ -446,7 +446,7 @@ mod tests {
                 &[],
             )
             .unwrap();
-            let nd = KNode::get_depth(root, *flo.flo_id());
+            let nd = KNode::get_depth(root, &*flo.flo_id());
             if nd == depth {
                 return flo;
             }
@@ -465,7 +465,7 @@ mod tests {
                 &[],
             )
             .unwrap();
-            let nd = KNode::get_depth(root, *fr.flo_id());
+            let nd = KNode::get_depth(root, &*fr.flo_id());
             if nd == depth {
                 return fr;
             }

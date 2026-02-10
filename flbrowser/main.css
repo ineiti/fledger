@@ -363,15 +363,25 @@ section h2 {
 }
 
 /* Status indicators */
-.status-section {
-    background-color: rgba(52, 152, 219, 0.05);
-    padding: 1rem;
-    border-radius: 4px;
-    border-left: 4px solid var(--primary-color);
+#status-section {
+    max-width: 1400px;
+    margin: 0.75rem auto 0;
+    padding: 0.75rem 1rem;
+    background-color: var(--card-bg-color);
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-bottom: none;
 }
 
-.status-section .error {
-    background-color: rgba(219, 152, 52, 0.05);
+#status-section h2 {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-bottom: 0.4rem;
+}
+
+#status-section.error {
+    background-color: rgba(231, 76, 60, 0.08);
 }
 
 #node-status {
@@ -452,18 +462,66 @@ section h2 {
     text-align: right;
 }
 
-/* Make the status steps list look nicer */
-.status-steps {
-    list-style: none;
-    margin: 0;
-    padding: 0.5rem 0 0 0;
-    border-top: 1px dashed var(--border-color);
+/* Arrow stepper for status steps */
+#status-steps {
+    background-color: var(--border-color);
+    border-radius: 4px;
+    padding: 3px;
+    padding-right: calc(1rem + 3px);
+    display: inline-flex;
+    align-items: center;
 }
 
-.status-steps li {
+#status-steps ul {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+#status-steps li {
+    position: relative;
+    height: 2.4rem;
+    line-height: 2.4rem;
+    padding: 0 1.8rem 0 2rem;
+    background-color: var(--highlight-bg-color);
     font-size: 0.9rem;
-    color: var(--text-secondary);
-    margin: 0.25rem 0 0 1rem;
+    color: var(--text-color);
+    white-space: nowrap;
+}
+
+#status-steps li:first-child {
+    padding-left: 1rem;
+}
+
+#status-steps li:not(:first-child) {
+    margin-left: -1rem;
+}
+
+/* Right-pointing arrow on each step */
+#status-steps li::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: -1rem;
+    width: 0;
+    height: 0;
+    border-top: 1.2rem solid transparent;
+    border-bottom: 1.2rem solid transparent;
+    border-left: 1rem solid var(--highlight-bg-color);
+}
+
+/* Left notch (">" cut) for non-first steps, revealing the border-color background */
+#status-steps li:not(:first-child)::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    border-top: 1.2rem solid transparent;
+    border-bottom: 1.2rem solid transparent;
+    border-left: 1rem solid var(--border-color);
 }
 
 /* Homepage container */
