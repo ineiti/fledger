@@ -32,6 +32,11 @@ log = "0.4"
 bytes = "1.11.1"
 anyhow = "1.0.101"
 async-trait = "0.1.89"
+getrandom = { version = "0.2", features = ["js"] }
+
+[dependencies.web-sys]
+version = "0.3"
+features = ["BroadcastChannel", "MessageEvent"]
 
 [profile.release]
 opt-level = 's'
