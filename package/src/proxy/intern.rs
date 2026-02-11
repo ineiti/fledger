@@ -63,6 +63,7 @@ pub(super) enum InternOut {
 pub(super) type BrokerIntern = Broker<InternIn, InternOut>;
 
 pub(super) struct Intern {
+    broker: BrokerIntern,
     cfg: NetConf,
     id: TabID,
     tabs: Vec<TabID>,
@@ -72,15 +73,17 @@ pub(super) struct Intern {
 
 impl Intern {
     pub(super) async fn start(cfg: NetConf, id: TabID) -> anyhow::Result<BrokerIntern> {
-        let broker = Broker::new_with_handler(Box::new(Intern {
-            cfg,
-            id,
-            tabs: vec![id],
-            danu: None,
-            start: 3,
-        }))
-        .await?
-        .0;
+        let mut broker = Broker::new();
+        broker
+            .add_handler(Box::new(Intern {
+                cfg,
+                id,
+                tabs: vec![id],
+                danu: None,
+                start: 3,
+                broker: broker.clone(),
+            }))
+            .await?;
 
         Ok(broker)
     }
@@ -90,21 +93,6 @@ impl Intern {
             return id == &self.id;
         }
         false
-    }
-
-    async fn msg_start(&mut self) -> Vec<InternOut> {
-        if self.start > 0 {
-            self.start -= 1;
-            return vec![InternOut::Broadcast(BroadcastToTabs::Alive)];
-        }
-        if self.is_leader() {
-            if let Err(e) = self.start_danu().await {
-                log::error!("Couldn't start danu: {e:?}");
-            } else {
-                return vec![InternOut::Proxy(ProxyOut::Elected)];
-            }
-        }
-        vec![]
     }
 
     async fn start_danu(&mut self) -> anyhow::Result<()> {
@@ -122,16 +110,49 @@ impl Intern {
                 .and_then(|url| HostLogin::from_login_url(&url).ok()),
         );
         node_config.info.modules = Modules::stable() - Modules::WEBPROXY_REQUESTS;
-        let node = Node::start_network(my_storage, node_config, config).await?;
+        let mut node = Node::start_network(my_storage, node_config, config).await?;
+        node.dht_router
+            .as_mut()
+            .unwrap()
+            .broker
+            .add_translator_o_to(
+                self.broker.clone(),
+                Box::new(|msg| Some(InternOut::DHTRouter(msg))),
+            )
+            .await?;
+        node.dht_storage
+            .as_mut()
+            .unwrap()
+            .broker
+            .add_translator_o_to(
+                self.broker.clone(),
+                Box::new(|msg| Some(InternOut::DHTStorage(msg))),
+            )
+            .await?;
         self.danu = Some(node);
         Ok(())
     }
 
-    fn timer(&mut self) -> Vec<InternOut> {
+    async fn msg_start(&mut self) -> Vec<InternOut> {
+        if self.start > 0 {
+            self.start -= 1;
+            return vec![InternOut::Broadcast(BroadcastToTabs::Alive)];
+        }
+        if self.is_leader() {
+            if let Err(e) = self.start_danu().await {
+                log::error!("Couldn't start danu: {e:?}");
+            } else {
+                return vec![InternOut::Proxy(ProxyOut::Elected)];
+            }
+        }
         vec![InternOut::Broadcast(BroadcastToTabs::Alive)]
     }
 
-    fn broadcast(&mut self, msg: BroadcastFromTabs) -> Vec<InternOut> {
+    fn msg_timer(&mut self) -> Vec<InternOut> {
+        vec![InternOut::Broadcast(BroadcastToTabs::Alive)]
+    }
+
+    fn msg_broadcast(&mut self, msg: BroadcastFromTabs) -> Vec<InternOut> {
         let mut out = vec![];
         match msg {
             BroadcastFromTabs::Alive(tab_id) => {
@@ -207,10 +228,10 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
                 }
                 InternIn::Timer(timer_message) => {
                     if timer_message == TimerMessage::Second {
-                        out.extend(self.timer());
+                        out.extend(self.msg_timer());
                     }
                 }
-                InternIn::Broadcast(broadcast_io) => out.extend(self.broadcast(broadcast_io)),
+                InternIn::Broadcast(broadcast_io) => out.extend(self.msg_broadcast(broadcast_io)),
             }
         }
         out
@@ -276,7 +297,8 @@ mod test {
     use super::*;
     #[wasm_bindgen_test(async)]
     async fn is_leader() -> anyhow::Result<()> {
-        wasm_logger::init(wasm_logger::Config::default());
+        wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
+
         let tab0 = Tab::new_const(TabID::new_const(0, 0)).await?;
         let tab1 = Tab::new_const(TabID::new_const(0, 1)).await?;
         let cfg = NetConf::default();
@@ -285,26 +307,40 @@ mod test {
         let mut itap0 = int0.get_tap_out().await?.0;
         let mut itap1 = int1.get_tap_out().await?.0;
 
-        for _ in 0..3 {
+        for i in 0..3 {
+            log::info!("Step {i}");
             int0.emit_msg_in(InternIn::Start)?;
             let msg = itap0.recv().await.unwrap();
             assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);
             int1.emit_msg_in(InternIn::Broadcast(BroadcastFromTabs::Alive(tab0.id)))?;
+            if i == 0 {
+                assert_eq!(
+                    InternOut::Proxy(ProxyOut::TabList(vec![tab0.id.clone(), tab1.id.clone()])),
+                    itap1.recv().await.unwrap()
+                );
+            }
 
             int1.emit_msg_in(InternIn::Start)?;
             let msg = itap1.recv().await.unwrap();
             assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);
             int0.emit_msg_in(InternIn::Broadcast(BroadcastFromTabs::Alive(tab1.id)))?;
+            if i == 0 {
+                assert_eq!(
+                    InternOut::Proxy(ProxyOut::TabList(vec![tab0.id.clone(), tab1.id.clone()])),
+                    itap0.recv().await.unwrap()
+                );
+            }
         }
 
+        log::info!("Sending last start to start danu");
         int0.emit_msg_in(InternIn::Start)?;
         let msg = itap0.recv().await.unwrap();
         assert_eq!(InternOut::Proxy(ProxyOut::Elected), msg);
 
+        log::info!("Sending start to int1 which should not start danu");
         int1.emit_msg_in(InternIn::Start)?;
         let msg = itap1.recv().await.unwrap();
         assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);
-        int0.emit_msg_in(InternIn::Broadcast(BroadcastFromTabs::Alive(tab1.id)))?;
 
         Ok(())
     }

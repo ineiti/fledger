@@ -155,8 +155,6 @@ pub mod test {
 
     #[wasm_bindgen_test(async)]
     async fn test_broadcast() -> anyhow::Result<()> {
-        wasm_logger::init(wasm_logger::Config::default());
-
         let mut channels = BroadcastTest::default();
         let mut tab0 = channels.new().await?;
         let mut tab1 = channels.new().await?;

@@ -1,6 +1,5 @@
 use flmodules::{
-    dht_storage::realm_view::RealmView,
-    flo::{blob::BlobAccess, flo, realm},
+    flo::{blob::BlobAccess, flo, realm, realm_view::RealmView},
 };
 use wasm_bindgen::prelude::wasm_bindgen;
 
