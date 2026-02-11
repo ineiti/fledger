@@ -1,4 +1,8 @@
-use flarch::{add_translator_direct, add_translator_link, broker::Broker, tasks::wait_ms};
+use flarch::{
+    add_translator_direct, add_translator_link,
+    broker::Broker,
+    tasks::{spawn_local, wait_ms},
+};
 use flmodules::{
     dht_router::broker::BrokerDHTRouter, dht_storage::broker::BrokerDHTStorage,
     network::broker::BrokerNetwork, timer::BrokerTimer,
@@ -40,11 +44,11 @@ pub struct Proxy {
 
 impl Proxy {
     pub async fn start(
+        id: TabID,
         cfg: NetConf,
         timer: &mut BrokerTimer,
         broadcast: BrokerBroadcast,
     ) -> anyhow::Result<Proxy> {
-        let id = TabID::new();
         let mut intern = Intern::start(cfg, id).await?;
         add_translator_link!(intern, broadcast, InternIn::Broadcast, InternOut::Broadcast);
 
@@ -92,14 +96,18 @@ impl Proxy {
         Ok(proxy)
     }
 
-    pub async fn elect_leader(&mut self) -> anyhow::Result<()> {
-        for i in 0..3 {
-            self.intern.emit_msg_in(InternIn::Start)?;
-            if i < 2 {
-                wait_ms(100).await;
+    pub fn elect_leader(&mut self) {
+        let mut int = self.intern.clone();
+        spawn_local(async move {
+            for i in 0..4 {
+                if let Err(e) = int.emit_msg_in(InternIn::Start) {
+                    log::error!("While sending InternIn::Start: {e:?}");
+                }
+                if i < 3 {
+                    wait_ms(500).await;
+                }
             }
-        }
-        Ok(())
+        });
     }
 }
 
@@ -119,8 +127,9 @@ mod test {
         let mut _tab1 = _channels.new().await?;
         let mut _timer = BrokerTimer::new();
         let cfg = NetConf::default();
-        let mut _proxy0 = Proxy::start(cfg.clone(), &mut _timer, _tab0.broker.clone()).await?;
-        let mut _proxy1 = Proxy::start(cfg, &mut _timer, _tab1.broker.clone()).await?;
+        let mut _proxy0 =
+            Proxy::start(_tab0.id, cfg.clone(), &mut _timer, _tab0.broker.clone()).await?;
+        let mut _proxy1 = Proxy::start(_tab1.id, cfg, &mut _timer, _tab1.broker.clone()).await?;
 
         Ok(())
     }

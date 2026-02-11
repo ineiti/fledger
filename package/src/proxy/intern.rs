@@ -5,10 +5,9 @@ use flarch::{
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
 use flmodules::{
-    dht_router::broker::{DHTRouterIn, DHTRouterOut},
+    dht_router::broker::DHTRouterOut,
     dht_storage::broker::{DHTStorageIn, DHTStorageOut},
-    network::{broker::NetworkOut, signal::FledgerConfig},
-    nodeconfig::NodeInfo,
+    network::broker::NetworkOut,
     timer::TimerMessage,
     Modules,
 };
@@ -18,24 +17,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     danode::NetConf,
     proxy::{
-        broadcast::{BroadcastFromTabs, BroadcastToTabs},
+        broadcast::{BroadcastFromTabs, BroadcastToTabs, MsgFromLeader, MsgToLeader},
         proxy::{ProxyIn, ProxyOut},
     },
 };
-
-#[derive(Debug, Serialize, Deserialize)]
-enum MsgToLeader {
-    DHTStorage(DHTStorageIn),
-    DHTRouter(DHTRouterIn),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-enum MsgFromLeader {
-    DHTStorage(DHTStorageOut),
-    DHTRouter(DHTRouterOut),
-    SystemConfig(FledgerConfig),
-    NodeListFromWS(Vec<NodeInfo>),
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum InternIn {
@@ -111,22 +96,54 @@ impl Intern {
         );
         node_config.info.modules = Modules::stable() - Modules::WEBPROXY_REQUESTS;
         let mut node = Node::start_network(my_storage, node_config, config).await?;
-        node.dht_router
-            .as_mut()
-            .unwrap()
-            .broker
+        let dhtr = &mut node.dht_router.as_mut().unwrap().broker;
+        dhtr.add_translator_o_to(
+            self.broker.clone(),
+            Box::new(|msg| Some(InternOut::DHTRouter(msg))),
+        )
+        .await?;
+        dhtr.add_translator_o_to(
+            self.broker.clone(),
+            Box::new(|msg| {
+                Some(InternOut::Broadcast(BroadcastToTabs::FromLeader(
+                    MsgFromLeader::DHTRouter(msg),
+                )))
+            }),
+        )
+        .await?;
+        let dhts = &mut node.dht_storage.as_mut().unwrap().broker;
+        dhts.add_translator_o_to(
+            self.broker.clone(),
+            Box::new(|msg| Some(InternOut::DHTStorage(msg))),
+        )
+        .await?;
+        dhts.add_translator_o_to(
+            self.broker.clone(),
+            Box::new(|msg| {
+                Some(InternOut::Broadcast(BroadcastToTabs::FromLeader(
+                    MsgFromLeader::DHTStorage(msg),
+                )))
+            }),
+        )
+        .await?;
+        node.broker_net
             .add_translator_o_to(
                 self.broker.clone(),
-                Box::new(|msg| Some(InternOut::DHTRouter(msg))),
+                Box::new(|msg| Some(InternOut::Network(msg))),
             )
             .await?;
-        node.dht_storage
-            .as_mut()
-            .unwrap()
-            .broker
+        node.broker_net
             .add_translator_o_to(
                 self.broker.clone(),
-                Box::new(|msg| Some(InternOut::DHTStorage(msg))),
+                Box::new(|msg| match msg {
+                    NetworkOut::NodeListFromWS(node_infos) => Some(InternOut::Broadcast(
+                        BroadcastToTabs::FromLeader(MsgFromLeader::NodeListFromWS(node_infos)),
+                    )),
+                    NetworkOut::SystemConfig(fledger_config) => Some(InternOut::Broadcast(
+                        BroadcastToTabs::FromLeader(MsgFromLeader::SystemConfig(fledger_config)),
+                    )),
+                    _ => None,
+                }),
             )
             .await?;
         self.danu = Some(node);
@@ -145,7 +162,9 @@ impl Intern {
                 return vec![InternOut::Proxy(ProxyOut::Elected)];
             }
         }
-        vec![InternOut::Broadcast(BroadcastToTabs::Alive)]
+        vec![InternOut::Broadcast(BroadcastToTabs::ToLeader(
+            MsgToLeader::GetUpdate,
+        ))]
     }
 
     fn msg_timer(&mut self) -> Vec<InternOut> {
@@ -156,56 +175,61 @@ impl Intern {
         let mut out = vec![];
         match msg {
             BroadcastFromTabs::Alive(tab_id) => {
+                // TODO: count if leader gets lost
                 if !self.tabs.contains(&tab_id) {
                     self.tabs.push(tab_id);
                     self.tabs.sort();
                     out.push(InternOut::Proxy(ProxyOut::TabList(self.tabs.clone())));
                 }
+                if self.is_leader() {
+                    out.push(InternOut::Broadcast(BroadcastToTabs::Alive));
+                }
             }
             BroadcastFromTabs::Stopped(tab_id) => {
+                // TODO: check if this node is now the leader
                 if self.tabs.contains(&tab_id) {
                     self.tabs.retain(|id| id != &tab_id);
                 }
             }
-            BroadcastFromTabs::ToLeader { from, data } => {
+            BroadcastFromTabs::ToLeader { from: _, data } => {
                 if self.is_leader() {
-                    log::trace!("Got message from {from:?}");
-                    if let Ok(msg) = serde_json::from_str::<MsgToLeader>(&data) {
-                        if let Some(danu) = self.danu.as_mut() {
-                            if let Err(e) = match &msg {
-                                MsgToLeader::DHTStorage(dhts) => danu
-                                    .dht_storage
-                                    .as_mut()
-                                    .unwrap()
-                                    .broker
-                                    .emit_msg_in(dhts.clone()),
-                                MsgToLeader::DHTRouter(dhtr) => danu
-                                    .dht_router
-                                    .as_mut()
-                                    .unwrap()
-                                    .broker
-                                    .emit_msg_in(dhtr.clone()),
-                            } {
-                                log::error!("While passing {msg:?} to danu: {e:?}");
+                    if let Some(danu) = self.danu.as_mut() {
+                        if let Err(e) = match &data {
+                            MsgToLeader::DHTStorage(dhts) => danu
+                                .dht_storage
+                                .as_mut()
+                                .unwrap()
+                                .broker
+                                .emit_msg_in(dhts.clone()),
+                            MsgToLeader::DHTRouter(dhtr) => danu
+                                .dht_router
+                                .as_mut()
+                                .unwrap()
+                                .broker
+                                .emit_msg_in(dhtr.clone()),
+                            MsgToLeader::GetUpdate => {
+                                // TODO: Send all current information to the new tab -
+                                // realms, nodes, connections
+                                todo!()
                             }
+                        } {
+                            log::error!("While passing {data:?} to danu: {e:?}");
                         }
                     }
                 }
             }
             BroadcastFromTabs::FromLeader(data) => {
                 if !self.is_leader() {
-                    if let Ok(msg) = serde_json::from_str::<MsgFromLeader>(&data) {
-                        out.push(match msg {
-                            MsgFromLeader::DHTStorage(dhts) => InternOut::DHTStorage(dhts),
-                            MsgFromLeader::DHTRouter(dhtr) => InternOut::DHTRouter(dhtr),
-                            MsgFromLeader::SystemConfig(fledger_config) => {
-                                InternOut::Network(NetworkOut::SystemConfig(fledger_config))
-                            }
-                            MsgFromLeader::NodeListFromWS(node_infos) => {
-                                InternOut::Network(NetworkOut::NodeListFromWS(node_infos))
-                            }
-                        });
-                    }
+                    out.push(match data {
+                        MsgFromLeader::DHTStorage(dhts) => InternOut::DHTStorage(dhts),
+                        MsgFromLeader::DHTRouter(dhtr) => InternOut::DHTRouter(dhtr),
+                        MsgFromLeader::SystemConfig(fledger_config) => {
+                            InternOut::Network(NetworkOut::SystemConfig(fledger_config))
+                        }
+                        MsgFromLeader::NodeListFromWS(node_infos) => {
+                            InternOut::Network(NetworkOut::NodeListFromWS(node_infos))
+                        }
+                    });
                 }
             }
         }
@@ -222,9 +246,9 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
                 InternIn::Start => out.extend(self.msg_start().await),
                 InternIn::Proxy(_) => {}
                 InternIn::DHTStorage(input) => {
-                    if let Ok(s) = serde_json::to_string(&input) {
-                        out.push(InternOut::Broadcast(BroadcastToTabs::ToLeader(s)));
-                    }
+                    out.push(InternOut::Broadcast(BroadcastToTabs::ToLeader(
+                        MsgToLeader::DHTStorage(input),
+                    )));
                 }
                 InternIn::Timer(timer_message) => {
                     if timer_message == TimerMessage::Second {
@@ -308,7 +332,6 @@ mod test {
         let mut itap1 = int1.get_tap_out().await?.0;
 
         for i in 0..3 {
-            log::info!("Step {i}");
             int0.emit_msg_in(InternIn::Start)?;
             let msg = itap0.recv().await.unwrap();
             assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);
@@ -332,12 +355,10 @@ mod test {
             }
         }
 
-        log::info!("Sending last start to start danu");
         int0.emit_msg_in(InternIn::Start)?;
         let msg = itap0.recv().await.unwrap();
         assert_eq!(InternOut::Proxy(ProxyOut::Elected), msg);
 
-        log::info!("Sending start to int1 which should not start danu");
         int1.emit_msg_in(InternIn::Start)?;
         let msg = itap1.recv().await.unwrap();
         assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);

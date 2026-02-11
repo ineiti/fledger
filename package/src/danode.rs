@@ -1,4 +1,4 @@
-use flmodules::dht_storage::broker::DHTStorage;
+use flmodules::dht_storage::broker::{DHTStorage, DHTStorageIn};
 use flmodules::timer::Timer;
 use js_sys::{Function, JsString};
 use wasm_bindgen::prelude::*;
@@ -68,7 +68,7 @@ impl DaNode {
     /// The callback will be called with events in the format: { type: string, data: any }
     pub fn set_event_listener(&mut self, callback: Function) -> Result<(), String> {
         self.events
-            .emit_msg_in(EventsIn::Event(callback))
+            .emit_msg_in(EventsIn::EventHandler(callback))
             .map_err(|e| format!("{e}"))?;
         Ok(())
     }
@@ -79,6 +79,13 @@ impl DaNode {
             .emit_msg_in(EventsIn::ClearEvent)
             .map_err(|e| format!("{e}"))?;
         Ok(())
+    }
+
+    pub async fn update_realms(&mut self) -> Result<(), String> {
+        self.ds
+            .broker
+            .emit_msg_in(DHTStorageIn::GetRealms)
+            .map_err(|e| format!("{e:?}"))
     }
 }
 
@@ -112,16 +119,19 @@ impl Default for NetConf {
 
 impl DaNode {
     async fn from_net_conf(nc: NetConf) -> Result<DaNode, JsString> {
+        let id = TabID::new();
         let mut _proxy = Proxy::start(
+            id.clone(),
             nc,
             &mut Timer::start().await.map_err(|e| format!("{e}"))?.broker,
-            Broadcast::start("danode", TabID::new())
+            Broadcast::start("danode", id)
                 .await
                 .map_err(|e| format!("{e}"))?,
         )
         .await
         .map_err(|e| format!("{e}"))?;
-        _proxy.elect_leader().await.map_err(|e| format!("{e}"))?;
+
+        _proxy.elect_leader();
 
         Ok(DaNode {
             events: Events::new(&mut _proxy).await.map_err(|e| format!("{e}"))?,

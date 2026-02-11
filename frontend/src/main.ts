@@ -58,6 +58,10 @@ async function new_event(status: NodeStatus, args: any) {
       break;
     case NodeStatus.ConnectedNodes:
       addLog(`Connected to ${args} nodes`);
+      if (args > 0 && realms.length == 0) {
+        addLog("Asking for realms");
+        await node!.update_realms();
+      }
       statusDHTNodes.textContent = args.toString();
       break;
     case NodeStatus.AvailableNodes:
@@ -69,6 +73,13 @@ async function new_event(status: NodeStatus, args: any) {
       realms.splice(0);
       realms.push(...args);
       statusRealms.textContent = args.toString();
+      break;
+    case NodeStatus.IsLeader:
+      addLog(`Got elected as leader`);
+      break;
+    case NodeStatus.TabsCount:
+      addLog(`${args} tabs available`);
+      break;
   }
 }
 

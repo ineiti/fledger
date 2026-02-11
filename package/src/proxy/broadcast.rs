@@ -2,26 +2,65 @@ use flarch::{
     broker::{Broker, SubsystemHandler},
     platform_async_trait,
 };
+use flmodules::{
+    dht_router::broker::{DHTRouterIn, DHTRouterOut},
+    dht_storage::broker::{DHTStorageIn, DHTStorageOut},
+    network::signal::FledgerConfig,
+    nodeconfig::NodeInfo,
+};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::BroadcastChannel;
 
 use crate::proxy::intern::TabID;
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum MsgToLeader {
+    DHTStorage(DHTStorageIn),
+    DHTRouter(DHTRouterIn),
+    GetUpdate,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum MsgFromLeader {
+    DHTStorage(DHTStorageOut),
+    DHTRouter(DHTRouterOut),
+    SystemConfig(FledgerConfig),
+    NodeListFromWS(Vec<NodeInfo>),
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BroadcastToTabs {
     Alive,
     Stopped,
-    ToLeader(String),
-    FromLeader(String),
+    ToLeader(MsgToLeader),
+    FromLeader(MsgFromLeader),
+}
+
+impl BroadcastToTabs {
+    /// Returns `true` if the broadcast to tabs is [`ToLeader`].
+    ///
+    /// [`ToLeader`]: BroadcastToTabs::ToLeader
+    #[must_use]
+    pub fn is_to_leader(&self) -> bool {
+        matches!(self, Self::ToLeader(..))
+    }
+
+    /// Returns `true` if the broadcast to tabs is [`FromLeader`].
+    ///
+    /// [`FromLeader`]: BroadcastToTabs::FromLeader
+    #[must_use]
+    pub fn is_from_leader(&self) -> bool {
+        matches!(self, Self::FromLeader(..))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BroadcastFromTabs {
     Alive(TabID),
     Stopped(TabID),
-    ToLeader { from: TabID, data: String },
-    FromLeader(String),
+    ToLeader { from: TabID, data: MsgToLeader },
+    FromLeader(MsgFromLeader),
 }
 
 pub type BrokerBroadcast = Broker<BroadcastToTabs, BroadcastFromTabs>;
@@ -58,6 +97,7 @@ impl Broadcast {
             },
         );
         channel.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
+        onmessage.forget();
         broker
             .add_handler(Box::new(Broadcast { id, channel }))
             .await?;

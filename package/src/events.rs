@@ -14,7 +14,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     darealm::{FloID, RealmID},
-    proxy::proxy::Proxy,
+    proxy::proxy::{Proxy, ProxyOut},
 };
 
 #[derive(Debug, Clone)]
@@ -22,7 +22,8 @@ pub enum EventsIn {
     DhtStorage(DHTStorageOut),
     DhtRouter(DHTRouterOut),
     Network(NetworkOut),
-    Event(Function),
+    EventHandler(Function),
+    Proxy(ProxyOut),
     ClearEvent,
 }
 
@@ -33,6 +34,7 @@ pub struct Events {
     connected: bool,
     realms: Vec<RealmID>,
     nodes: usize,
+    is_leader: bool,
 }
 
 impl Events {
@@ -42,9 +44,14 @@ impl Events {
             connected: false,
             realms: vec![],
             nodes: 0,
+            is_leader: false,
         }))
         .await?
         .0;
+        proxy
+            .broker
+            .add_translator_o_ti(b.clone(), Box::new(|o| Some(EventsIn::Proxy(o))))
+            .await?;
         proxy
             .network
             .add_translator_o_ti(b.clone(), Box::new(|o| Some(EventsIn::Network(o))))
@@ -57,9 +64,6 @@ impl Events {
             .dht_storage
             .add_translator_o_ti(b.clone(), Box::new(|o| Some(EventsIn::DhtStorage(o))))
             .await?;
-        proxy
-            .dht_storage
-            .emit_msg_in(flmodules::dht_storage::broker::DHTStorageIn::GetRealms)?;
         return Ok(b);
     }
 
@@ -126,6 +130,19 @@ impl Events {
         }
     }
 
+    fn proxy(&mut self, msg: ProxyOut) {
+        match msg {
+            ProxyOut::Elected => {
+                self.is_leader = true;
+                self.emit_event(NodeStatus::IsLeader, JsValue::null());
+            }
+            ProxyOut::TabList(tab_ids) => {
+                self.emit_event(NodeStatus::TabsCount, tab_ids.len().into());
+            }
+            _ => {}
+        }
+    }
+
     fn send_past(&self) {
         if self.connected {
             self.emit_event(NodeStatus::ConnectSignal, JsValue::null());
@@ -135,6 +152,9 @@ impl Events {
         }
         if self.realms.len() > 0 {
             self.emit_event(NodeStatus::RealmAvailable, self.realms.clone().into());
+        }
+        if self.is_leader {
+            self.emit_event(NodeStatus::IsLeader, JsValue::null());
         }
     }
 }
@@ -147,13 +167,14 @@ impl SubsystemHandler<EventsIn, ()> for Events {
                 EventsIn::DhtStorage(out) => self.dht_storage(out),
                 EventsIn::DhtRouter(out) => self.dht_router(out),
                 EventsIn::Network(out) => self.network(out),
-                EventsIn::Event(function) => {
+                EventsIn::EventHandler(function) => {
                     self.event_callback.lock().unwrap().replace(function);
                     self.send_past();
                 }
                 EventsIn::ClearEvent => {
                     self.event_callback.lock().unwrap().take();
                 }
+                EventsIn::Proxy(out) => self.proxy(out),
             }
         }
         vec![]
@@ -180,4 +201,8 @@ pub enum NodeStatus {
     // Got new Flo - not really sure if it is a new version, or just generally
     // a Flo arrived.
     ReceivedFlo,
+    // This tab is the leader
+    IsLeader,
+    // Number of tabs available, in the data.
+    TabsCount,
 }
