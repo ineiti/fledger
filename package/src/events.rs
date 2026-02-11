@@ -9,11 +9,13 @@ use flmodules::{
     network::broker::NetworkOut,
 };
 
-use flnode::node::Node;
 use js_sys::Function;
 use wasm_bindgen::prelude::*;
 
-use crate::darealm::{FloID, RealmID};
+use crate::{
+    darealm::{FloID, RealmID},
+    proxy::proxy::Proxy,
+};
 
 #[derive(Debug, Clone)]
 pub enum EventsIn {
@@ -34,7 +36,7 @@ pub struct Events {
 }
 
 impl Events {
-    pub async fn new(node: &mut Node) -> Result<BrokerEvents, anyhow::Error> {
+    pub async fn new(proxy: &mut Proxy) -> Result<BrokerEvents, anyhow::Error> {
         let b = Broker::new_with_handler(Box::new(Events {
             event_callback: Mutex::new(None),
             connected: false,
@@ -43,23 +45,20 @@ impl Events {
         }))
         .await?
         .0;
-        node.broker_net
+        proxy
+            .network
             .add_translator_o_ti(b.clone(), Box::new(|o| Some(EventsIn::Network(o))))
             .await?;
-        node.dht_router
-            .as_mut()
-            .ok_or(anyhow::anyhow!("DHT-Router not initialised"))?
-            .broker
+        proxy
+            .dht_router
             .add_translator_o_ti(b.clone(), Box::new(|o| Some(EventsIn::DhtRouter(o))))
             .await?;
-        let ds = node
+        proxy
             .dht_storage
-            .as_mut()
-            .ok_or(anyhow::anyhow!("DHT-Storage not initialised"))?;
-        ds.broker
             .add_translator_o_ti(b.clone(), Box::new(|o| Some(EventsIn::DhtStorage(o))))
             .await?;
-        ds.broker
+        proxy
+            .dht_storage
             .emit_msg_in(flmodules::dht_storage::broker::DHTStorageIn::GetRealms)?;
         return Ok(b);
     }

@@ -1,92 +1,83 @@
-use flarch::data_storage::DataStorageLocal;
-use flarch::web_rtc::connection::{ConnectionConfig, HostLogin};
-use flmodules::dht_storage::broker::DHTStorage;
-use flmodules::Modules;
-use flnode::node::Node;
+use flmodules::timer::Timer;
 use js_sys::{Function, JsString};
 use wasm_bindgen::prelude::*;
 
 use crate::darealm::{DaRealm, RealmID};
 use crate::events::{BrokerEvents, Events, EventsIn};
+use crate::proxy::broadcast::Broadcast;
+use crate::proxy::intern::TabID;
+use crate::proxy::proxy::Proxy;
 
-#[derive(Debug)]
-#[wasm_bindgen]
+#[derive(Debug, Clone)]
 pub struct NetConf {
-    storage_name: &'static str,
-    signal_server: &'static str,
-    stun_server: Option<&'static str>,
-    turn_server: Option<&'static str>,
+    pub storage_name: String,
+    pub signal_server: String,
+    pub stun_server: Option<String>,
+    pub turn_server: Option<String>,
 }
 
-#[cfg(not(feature = "local"))]
-const NETWORK_CONFIG: NetConf = NetConf {
-    storage_name: "danu",
-    signal_server: "wss://signal.fledg.re",
-    stun_server: Some("stun:stun.l.google.com:19302"),
-    turn_server: Some("something:something@turn:web.fledg.re:3478"),
-};
+impl Default for NetConf {
+    fn default() -> Self {
+        #[cfg(not(feature = "local"))]
+        return Self {
+            storage_name: "danu".into(),
+            signal_server: "wss://signal.fledg.re".into(),
+            stun_server: Some("stun:stun.l.google.com:19302".into()),
+            turn_server: Some("something:something@turn:web.fledg.re:3478".into()),
+        };
 
-#[cfg(feature = "local")]
-const NETWORK_CONFIG: NetConf = NetConf {
-    storage_name: "danu_local",
-    signal_server: "ws://localhost:8765",
-    stun_server: None,
-    turn_server: None,
-};
+        #[cfg(feature = "local")]
+        return Self {
+            storage_name: "danu_local".into(),
+            signal_server: "ws://localhost:8765".into(),
+            stun_server: None,
+            turn_server: None,
+        };
+    }
+}
 
 /// Main DaNode interface for browser
 #[wasm_bindgen]
 pub struct DaNode {
-    _node: Node,
     events: BrokerEvents,
-    ds: DHTStorage,
+    proxy: Proxy,
 }
 
 #[wasm_bindgen]
 impl DaNode {
     /// Create a new DaNode instance
     pub async fn from_default() -> Result<DaNode, JsString> {
-        Self::from_config(NETWORK_CONFIG).await
+        Self::from_net_conf(NetConf::default()).await
     }
 
-    pub async fn from_config(cfg: NetConf) -> Result<DaNode, JsString> {
-        let my_storage = DataStorageLocal::new(cfg.storage_name);
-        let mut node_config = Node::get_config(my_storage.clone())
-            .map_err(|e| format!("Failed to get config: {}", e))?;
-        let config = ConnectionConfig::new(
-            cfg.signal_server.into(),
-            cfg.stun_server
-                .and_then(|url| Some(HostLogin::from_url(url))),
-            cfg.turn_server
-                .and_then(|url| HostLogin::from_login_url(url).ok()),
-        );
-        node_config.info.modules = Modules::stable() - Modules::WEBPROXY_REQUESTS;
-        let mut node = Node::start_network(my_storage, node_config, config)
-            .await
-            .map_err(|e| format!("Failed to start network: {}", e))?;
-        let ds = node
-            .dht_storage
-            .as_ref()
-            .ok_or("DHTStorage not yet initialized")?
-            .clone();
-        Ok(DaNode {
-            events: Events::new(&mut node).await.map_err(|e| format!("{e}"))?,
-            _node: node,
-            ds,
+    pub async fn from_config(
+        storage_name: String,
+        signal_server: String,
+        stun_server: Option<String>,
+        turn_server: Option<String>,
+    ) -> Result<DaNode, JsString> {
+        Self::from_net_conf(NetConf {
+            storage_name,
+            signal_server,
+            stun_server,
+            turn_server,
         })
+        .await
     }
 
     pub async fn sync(&mut self) -> Result<(), String> {
-        self.ds.sync().map_err(|e| format!("{e:?}"))
+        // self.ds.sync().map_err(|e| format!("{e:?}"))
+        todo!()
     }
 
-    pub async fn get_realm(&mut self, id: RealmID) -> Result<DaRealm, JsString> {
-        let realm = self
-            .ds
-            .get_realm_view(id.get_id())
-            .await
-            .map_err(|e| format!("While fetching realm: {e}"))?;
-        Ok(DaRealm::new(realm))
+    pub async fn get_realm(&mut self, _id: RealmID) -> Result<DaRealm, JsString> {
+        // let realm = self
+        //     .ds
+        //     .get_realm_view(id.get_id())
+        //     .await
+        //     .map_err(|e| format!("While fetching realm: {e}"))?;
+        // Ok(DaRealm::new(realm))
+        todo!()
     }
 
     /// Get basic statistics
@@ -116,5 +107,25 @@ impl DaNode {
             .emit_msg_in(EventsIn::ClearEvent)
             .map_err(|e| format!("{e}"))?;
         Ok(())
+    }
+}
+
+impl DaNode {
+    async fn from_net_conf(nc: NetConf) -> Result<DaNode, JsString> {
+        let mut proxy = Proxy::start(
+            nc,
+            &mut Timer::start().await.map_err(|e| format!("{e}"))?.broker,
+            Broadcast::start("danode", TabID::new())
+                .await
+                .map_err(|e| format!("{e}"))?,
+        )
+        .await
+        .map_err(|e| format!("{e}"))?;
+        proxy.elect_leader().await.map_err(|e| format!("{e}"))?;
+
+        Ok(DaNode {
+            events: Events::new(&mut proxy).await.map_err(|e| format!("{e}"))?,
+            proxy,
+        })
     }
 }

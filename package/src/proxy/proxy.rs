@@ -1,20 +1,24 @@
-use flarch::{add_translator_direct, add_translator_link, broker::Broker};
+use flarch::{add_translator_direct, add_translator_link, broker::Broker, tasks::wait_ms};
 use flmodules::{
     dht_router::broker::BrokerDHTRouter, dht_storage::broker::BrokerDHTStorage,
     network::broker::BrokerNetwork, timer::BrokerTimer,
 };
 
-use crate::proxy::{
-    broadcast::Broadcast,
-    intern::{Intern, InternIn, InternOut, TabID},
+use crate::{
+    danode::NetConf,
+    proxy::{
+        broadcast::BrokerBroadcast,
+        intern::{BrokerIntern, Intern, InternIn, InternOut, TabID},
+    },
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProxyIn {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProxyOut {
     Elected,
+    NewLeader(TabID),
     TabList(Vec<TabID>),
 }
 
@@ -31,19 +35,24 @@ pub struct Proxy {
     // network only sends NetworkOut::SystemConfig and NetworkOut::NodeListFromWS.
     // All other messages, including NetworkIn, are ignored.
     pub network: BrokerNetwork,
+    intern: BrokerIntern,
 }
 
 impl Proxy {
-    pub async fn start(timer: &mut BrokerTimer) -> anyhow::Result<Proxy> {
+    pub async fn start(
+        cfg: NetConf,
+        timer: &mut BrokerTimer,
+        broadcast: BrokerBroadcast,
+    ) -> anyhow::Result<Proxy> {
         let id = TabID::new();
-        let mut intern = Intern::start(id).await?;
+        let mut intern = Intern::start(cfg, id).await?;
+        add_translator_link!(intern, broadcast, InternIn::Broadcast, InternOut::Broadcast);
+
         timer
             .add_translator_o_ti(intern.clone(), Box::new(|t| Some(InternIn::Timer(t))))
             .await?;
         let broker = BrokerProxy::new();
         add_translator_direct!(intern, broker.clone(), InternIn::Proxy, InternOut::Proxy);
-        let broadcast = Broadcast::start("danu_proxy", id).await?;
-        add_translator_link!(intern, broadcast, InternIn::Broadcast, InternOut::Broadcast);
         let dht_storage = BrokerDHTStorage::new();
         add_translator_direct!(
             intern,
@@ -77,8 +86,44 @@ impl Proxy {
             dht_storage,
             dht_router,
             network,
+            intern,
         };
 
         Ok(proxy)
+    }
+
+    pub async fn elect_leader(&mut self) -> anyhow::Result<()> {
+        for i in 0..3 {
+            self.intern.emit_msg_in(InternIn::Start)?;
+            if i < 2 {
+                wait_ms(100).await;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use flmodules::timer::BrokerTimer;
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    use super::*;
+
+    use crate::proxy::broadcast::test::BroadcastTest;
+
+    #[wasm_bindgen_test(async)]
+    async fn test_broadcast() -> anyhow::Result<()> {
+        wasm_logger::init(wasm_logger::Config::default());
+
+        let mut _channels = BroadcastTest::default();
+        let mut _tab0 = _channels.new().await?;
+        let mut _tab1 = _channels.new().await?;
+        let mut _timer = BrokerTimer::new();
+        let cfg = NetConf::default();
+        let mut _proxy0 = Proxy::start(cfg.clone(), &mut _timer, _tab0.broker.clone()).await?;
+        let mut _proxy1 = Proxy::start(cfg, &mut _timer, _tab1.broker.clone()).await?;
+
+        Ok(())
     }
 }

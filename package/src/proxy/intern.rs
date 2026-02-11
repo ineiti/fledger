@@ -1,6 +1,8 @@
 use flarch::{
     broker::{Broker, SubsystemHandler},
+    data_storage::DataStorageLocal,
     platform_async_trait,
+    web_rtc::connection::{ConnectionConfig, HostLogin},
 };
 use flmodules::{
     dht_router::broker::{DHTRouterIn, DHTRouterOut},
@@ -8,13 +10,17 @@ use flmodules::{
     network::{broker::NetworkOut, signal::FledgerConfig},
     nodeconfig::NodeInfo,
     timer::TimerMessage,
+    Modules,
 };
 use flnode::node::Node;
 use serde::{Deserialize, Serialize};
 
-use crate::proxy::{
-    broadcast::{BroadcastFromTabs, BroadcastToTabs},
-    proxy::{ProxyIn, ProxyOut},
+use crate::{
+    danode::NetConf,
+    proxy::{
+        broadcast::{BroadcastFromTabs, BroadcastToTabs},
+        proxy::{ProxyIn, ProxyOut},
+    },
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -31,15 +37,21 @@ enum MsgFromLeader {
     NodeListFromWS(Vec<NodeInfo>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(super) enum InternIn {
+    // To minimize the possibility of having multiple tabs opening at
+    // the same time, and all deciding to become leaders, the proxy
+    // must send three Start messages 100ms apart. Only after the third
+    // Start message is received will Intern decide whether it is the
+    // leader or not.
+    Start,
     Proxy(ProxyIn),
     DHTStorage(DHTStorageIn),
     Timer(TimerMessage),
     Broadcast(BroadcastFromTabs),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(super) enum InternOut {
     Proxy(ProxyOut),
     DHTStorage(DHTStorageOut),
@@ -48,30 +60,71 @@ pub(super) enum InternOut {
     Broadcast(BroadcastToTabs),
 }
 
-type BrokerIntern = Broker<InternIn, InternOut>;
+pub(super) type BrokerIntern = Broker<InternIn, InternOut>;
 
 pub(super) struct Intern {
+    cfg: NetConf,
     id: TabID,
     tabs: Vec<TabID>,
     danu: Option<Node>,
+    start: u32,
 }
 
 impl Intern {
-    pub(super) async fn start(id: TabID) -> anyhow::Result<BrokerIntern> {
-        Ok(Broker::new_with_handler(Box::new(Intern {
+    pub(super) async fn start(cfg: NetConf, id: TabID) -> anyhow::Result<BrokerIntern> {
+        let broker = Broker::new_with_handler(Box::new(Intern {
+            cfg,
             id,
             tabs: vec![id],
             danu: None,
+            start: 3,
         }))
         .await?
-        .0)
+        .0;
+
+        Ok(broker)
     }
 
     fn is_leader(&self) -> bool {
-        if let Some(id) = self.tabs.get(0) {
+        if let Some(id) = self.tabs.first() {
             return id == &self.id;
         }
         false
+    }
+
+    async fn msg_start(&mut self) -> Vec<InternOut> {
+        if self.start > 0 {
+            self.start -= 1;
+            return vec![InternOut::Broadcast(BroadcastToTabs::Alive)];
+        }
+        if self.is_leader() {
+            if let Err(e) = self.start_danu().await {
+                log::error!("Couldn't start danu: {e:?}");
+            } else {
+                return vec![InternOut::Proxy(ProxyOut::Elected)];
+            }
+        }
+        vec![]
+    }
+
+    async fn start_danu(&mut self) -> anyhow::Result<()> {
+        let my_storage = DataStorageLocal::new(&self.cfg.storage_name);
+        let mut node_config = Node::get_config(my_storage.clone())?;
+        let config = ConnectionConfig::new(
+            self.cfg.signal_server.clone(),
+            self.cfg
+                .stun_server
+                .as_ref()
+                .and_then(|url| Some(HostLogin::from_url(&url.clone()))),
+            self.cfg
+                .turn_server
+                .as_ref()
+                .and_then(|url| HostLogin::from_login_url(&url).ok()),
+        );
+        node_config.info.modules = Modules::stable() - Modules::WEBPROXY_REQUESTS;
+        let node = Node::start_network(my_storage, node_config, config).await?;
+        self.danu = Some(node);
+        Ok(())
     }
 
     fn timer(&mut self) -> Vec<InternOut> {
@@ -145,6 +198,7 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
         let mut out = vec![];
         for msg in msgs {
             match msg {
+                InternIn::Start => out.extend(self.msg_start().await),
                 InternIn::Proxy(_) => {}
                 InternIn::DHTStorage(input) => {
                     if let Ok(s) = serde_json::to_string(&input) {
@@ -165,7 +219,7 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
 
 /// Unique identifier for a node, used for leader election.
 /// Lower NodeID = higher priority for leadership.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct TabID {
     timestamp_secs: u64,
     random_component: u32,
@@ -201,5 +255,57 @@ impl TabID {
             timestamp_secs,
             random_component,
         }
+    }
+
+    #[cfg(test)]
+    pub fn new_const(timestamp_secs: u64, random_component: u32) -> Self {
+        Self {
+            timestamp_secs,
+            random_component,
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
+
+    use crate::proxy::broadcast::test::Tab;
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    use super::*;
+    #[wasm_bindgen_test(async)]
+    async fn is_leader() -> anyhow::Result<()> {
+        wasm_logger::init(wasm_logger::Config::default());
+        let tab0 = Tab::new_const(TabID::new_const(0, 0)).await?;
+        let tab1 = Tab::new_const(TabID::new_const(0, 1)).await?;
+        let cfg = NetConf::default();
+        let mut int0 = Intern::start(cfg.clone(), tab0.id.clone()).await?;
+        let mut int1 = Intern::start(cfg, tab1.id.clone()).await?;
+        let mut itap0 = int0.get_tap_out().await?.0;
+        let mut itap1 = int1.get_tap_out().await?.0;
+
+        for _ in 0..3 {
+            int0.emit_msg_in(InternIn::Start)?;
+            let msg = itap0.recv().await.unwrap();
+            assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);
+            int1.emit_msg_in(InternIn::Broadcast(BroadcastFromTabs::Alive(tab0.id)))?;
+
+            int1.emit_msg_in(InternIn::Start)?;
+            let msg = itap1.recv().await.unwrap();
+            assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);
+            int0.emit_msg_in(InternIn::Broadcast(BroadcastFromTabs::Alive(tab1.id)))?;
+        }
+
+        int0.emit_msg_in(InternIn::Start)?;
+        let msg = itap0.recv().await.unwrap();
+        assert_eq!(InternOut::Proxy(ProxyOut::Elected), msg);
+
+        int1.emit_msg_in(InternIn::Start)?;
+        let msg = itap1.recv().await.unwrap();
+        assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);
+        int0.emit_msg_in(InternIn::Broadcast(BroadcastFromTabs::Alive(tab1.id)))?;
+
+        Ok(())
     }
 }

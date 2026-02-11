@@ -17,3 +17,6 @@ pack: build
 
 publish: build-release
 	wasm-pack publish --access public
+
+test:
+	wasm-pack test --firefox --headless
