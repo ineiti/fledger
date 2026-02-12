@@ -68,18 +68,19 @@ impl Proxy {
         let broker = BrokerProxy::new();
         add_translator_direct!(intern, broker.clone(), InternIn::Proxy, InternOut::Proxy);
 
-        let proxy = Proxy {
+        let mut proxy = Proxy {
             broker,
             dht_storage,
             dht_router,
             network,
             intern,
         };
+        proxy.elect_leader();
 
         Ok(proxy)
     }
 
-    pub fn elect_leader(&mut self) {
+    fn elect_leader(&mut self) {
         let mut int = self.intern.clone();
         spawn_local(async move {
             for i in 0..4 {

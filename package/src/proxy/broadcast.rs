@@ -31,7 +31,7 @@ pub enum MsgFromLeader {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BroadcastToTabs {
-    Alive,
+    Alive(Option<bool>),
     Stopped,
     ToLeader(MsgToLeader),
     FromLeader(MsgFromLeader),
@@ -57,9 +57,15 @@ impl BroadcastToTabs {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BroadcastFromTabs {
-    Alive(TabID),
+    Alive {
+        from: TabID,
+        is_leader: Option<bool>,
+    },
     Stopped(TabID),
-    ToLeader { from: TabID, data: MsgToLeader },
+    ToLeader {
+        from: TabID,
+        data: MsgToLeader,
+    },
     FromLeader(MsgFromLeader),
 }
 
@@ -74,7 +80,10 @@ pub struct Broadcast {
 impl Broadcast {
     fn convert_message(id: TabID, msg: BroadcastToTabs) -> BroadcastFromTabs {
         match msg {
-            BroadcastToTabs::Alive => BroadcastFromTabs::Alive(id),
+            BroadcastToTabs::Alive(is_leader) => BroadcastFromTabs::Alive {
+                from: id,
+                is_leader,
+            },
             BroadcastToTabs::Stopped => BroadcastFromTabs::Stopped(id),
             BroadcastToTabs::ToLeader(data) => BroadcastFromTabs::ToLeader { from: id, data },
             BroadcastToTabs::FromLeader(data) => BroadcastFromTabs::FromLeader(data),
@@ -98,6 +107,23 @@ impl Broadcast {
         );
         channel.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
         onmessage.forget();
+
+        let channel_cl = channel.clone();
+        let msg = Self::convert_message(id.clone(), BroadcastToTabs::Stopped);
+        let msg: JsValue = serde_json::to_string(&msg)?.into();
+        let beforeunload_closure = Closure::<dyn Fn()>::new(move || {
+            channel_cl.post_message(&msg).unwrap();
+            channel_cl.close();
+        });
+        let window = web_sys::window().ok_or(anyhow::anyhow!("Couldn't get 'window'"))?;
+        window
+            .add_event_listener_with_callback(
+                "beforeunload",
+                beforeunload_closure.as_ref().unchecked_ref(),
+            )
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        beforeunload_closure.forget();
+
         broker
             .add_handler(Box::new(Broadcast { id, channel }))
             .await?;
@@ -199,11 +225,23 @@ pub mod test {
         let mut tab0 = channels.new().await?;
         let mut tab1 = channels.new().await?;
 
-        tab0.send(BroadcastToTabs::Alive)?;
-        assert_eq!(BroadcastFromTabs::Alive(tab0.id), tab1.recv().await?);
+        tab0.send(BroadcastToTabs::Alive(None))?;
+        assert_eq!(
+            BroadcastFromTabs::Alive {
+                from: tab0.id,
+                is_leader: None
+            },
+            tab1.recv().await?
+        );
 
-        tab1.send(BroadcastToTabs::Alive)?;
-        assert_eq!(BroadcastFromTabs::Alive(tab1.id), tab0.recv().await?);
+        tab1.send(BroadcastToTabs::Alive(None))?;
+        assert_eq!(
+            BroadcastFromTabs::Alive {
+                from: tab1.id,
+                is_leader: None
+            },
+            tab0.recv().await?
+        );
         Ok(())
     }
 }

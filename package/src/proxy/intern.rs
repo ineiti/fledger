@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use flarch::{
     broker::{Broker, SubsystemHandler},
     data_storage::DataStorageLocal,
@@ -19,6 +21,7 @@ use flmodules::{
 };
 use flnode::node::Node;
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     danode::NetConf,
@@ -57,7 +60,7 @@ pub(super) struct Intern {
     broker: BrokerIntern,
     cfg: NetConf,
     id: TabID,
-    tabs: Vec<TabID>,
+    alive: HashMap<TabID, usize>,
     danu: Option<Node>,
     start: u32,
     network: BrokerNetwork,
@@ -78,10 +81,10 @@ impl Intern {
         let mut intern = Intern {
             cfg,
             id,
-            tabs: vec![id],
             danu: None,
             start: 3,
             broker: broker.clone(),
+            alive: HashMap::new(),
             network,
             dht_router,
             dht_storage,
@@ -123,8 +126,18 @@ impl Intern {
         Ok(())
     }
 
+    fn tab_ids_sorted(&self) -> Vec<TabID> {
+        let mut sorted = self
+            .alive
+            .iter()
+            .map(|(id, _)| id.clone())
+            .collect::<Vec<_>>();
+        sorted.sort();
+        sorted
+    }
+
     fn is_leader(&self) -> bool {
-        if let Some(id) = self.tabs.first() {
+        if let Some(id) = self.tab_ids_sorted().first() {
             return id == &self.id;
         }
         false
@@ -163,7 +176,7 @@ impl Intern {
     async fn msg_start(&mut self) -> Vec<InternOut> {
         if self.start > 0 {
             self.start -= 1;
-            return vec![InternOut::Broadcast(BroadcastToTabs::Alive)];
+            return vec![InternOut::Broadcast(BroadcastToTabs::Alive(None))];
         }
         if self.is_leader() {
             if let Err(e) = self.start_danu().await {
@@ -203,36 +216,61 @@ impl Intern {
         Ok(())
     }
 
-    fn msg_timer(&mut self) -> Vec<InternOut> {
-        // TODO: count if leader gets lost
-        vec![InternOut::Broadcast(BroadcastToTabs::Alive)]
+    async fn msg_timer(&mut self) -> Vec<InternOut> {
+        if self.start > 0 {
+            return vec![];
+        }
+
+        self.alive.insert(self.id.clone(), 5);
+        // log::info!(
+        //     "msg_timer: {}",
+        //     self.tab_ids_sorted()
+        //         .iter()
+        //         .map(|t| format!("{t}/{}", self.alive.get(t).unwrap()))
+        //         .collect::<Vec<_>>()
+        //         .join(" : ")
+        // );
+        for kv in &mut self.alive {
+            if *kv.1 > 0 {
+                *kv.1 -= 1;
+            }
+        }
+        self.alive.retain(|_, v| *v > 0);
+
+        let mut out = vec![];
+        if self.is_leader() && self.danu.is_none() {
+            if let Err(e) = self.start_danu().await {
+                log::error!("Couldn't start danu: {e:?}");
+            }
+            out.push(InternOut::Proxy(ProxyOut::Elected));
+        }
+        out.push(InternOut::Broadcast(BroadcastToTabs::Alive(Some(
+            self.is_leader(),
+        ))));
+
+        out
     }
 
-    fn msg_broadcast(&mut self, msg: BroadcastFromTabs) -> Vec<InternOut> {
+    async fn msg_broadcast(&mut self, msg: BroadcastFromTabs) -> Vec<InternOut> {
         let mut out = vec![];
         match msg {
-            BroadcastFromTabs::Alive(tab_id) => {
-                if !self.tabs.contains(&tab_id) {
-                    self.tabs.push(tab_id);
-                    self.tabs.sort();
-                    // log::info!(
-                    //     "{} Got new tab as leader({}) - list is now: {:?}",
-                    //     self.id,
-                    //     self.is_leader(),
-                    //     self.tabs
-                    // );
-                    out.push(InternOut::Proxy(ProxyOut::TabList(self.tabs.clone())));
+            BroadcastFromTabs::Alive { from, is_leader } => {
+                let new_tab = !self.alive.contains_key(&from);
+                self.alive.insert(from, 5);
+                let tabs = self.tab_ids_sorted();
+                if new_tab {
+                    out.push(InternOut::Proxy(ProxyOut::TabList(tabs.clone())));
+                }
+                if tabs.first().unwrap() == &from && is_leader == Some(false) && self.start == 0 {
+                    log::error!("No leader present");
                 }
                 if self.is_leader() {
-                    // log::info!("Leader welcomes new tab");
-                    out.push(InternOut::Broadcast(BroadcastToTabs::Alive));
+                    out.push(InternOut::Broadcast(BroadcastToTabs::Alive(Some(true))));
                 }
             }
             BroadcastFromTabs::Stopped(tab_id) => {
-                // TODO: check if this node is now the leader
-                if self.tabs.contains(&tab_id) {
-                    self.tabs.retain(|id| id != &tab_id);
-                }
+                self.alive.retain(|id, _| id != &tab_id);
+                out.extend(self.msg_timer().await);
             }
             BroadcastFromTabs::ToLeader { from: _, data } => {
                 if self.is_leader() {
@@ -288,10 +326,12 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
                 InternIn::Proxy(_) => {}
                 InternIn::Timer(timer_message) => {
                     if timer_message == TimerMessage::Second {
-                        out.extend(self.msg_timer());
+                        out.extend(self.msg_timer().await);
                     }
                 }
-                InternIn::Broadcast(broadcast_io) => out.extend(self.msg_broadcast(broadcast_io)),
+                InternIn::Broadcast(broadcast_io) => {
+                    out.extend(self.msg_broadcast(broadcast_io).await)
+                }
                 InternIn::FromNode(msg) => {
                     if let Some(msg) = self.cache.update(msg) {
                         if self.is_leader() {
@@ -346,6 +386,7 @@ impl Cache {
 
 /// Unique identifier for a node, used for leader election.
 /// Lower NodeID = higher priority for leadership.
+#[wasm_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct TabID {
     timestamp_secs: u64,
@@ -368,7 +409,12 @@ impl Ord for TabID {
 
 impl std::fmt::Display for TabID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}", self.timestamp_secs, self.random_component)
+        write!(
+            f,
+            "{:04}.{:04}",
+            self.timestamp_secs % 10000,
+            self.random_component / 10000
+        )
     }
 }
 
@@ -430,8 +476,11 @@ mod test {
         for i in 0..3 {
             int0.emit_msg_in(InternIn::Start)?;
             let msg = itap0.recv().await.unwrap();
-            assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);
-            int1.emit_msg_in(InternIn::Broadcast(BroadcastFromTabs::Alive(tab0.id)))?;
+            assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive(None)), msg);
+            int1.emit_msg_in(InternIn::Broadcast(BroadcastFromTabs::Alive {
+                from: tab0.id,
+                is_leader: None,
+            }))?;
             if i == 0 {
                 assert_eq!(
                     InternOut::Proxy(ProxyOut::TabList(vec![tab0.id.clone(), tab1.id.clone()])),
@@ -441,8 +490,11 @@ mod test {
 
             int1.emit_msg_in(InternIn::Start)?;
             let msg = itap1.recv().await.unwrap();
-            assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);
-            int0.emit_msg_in(InternIn::Broadcast(BroadcastFromTabs::Alive(tab1.id)))?;
+            assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive(None)), msg);
+            int0.emit_msg_in(InternIn::Broadcast(BroadcastFromTabs::Alive {
+                from: tab1.id,
+                is_leader: None,
+            }))?;
             if i == 0 {
                 assert_eq!(
                     InternOut::Proxy(ProxyOut::TabList(vec![tab0.id.clone(), tab1.id.clone()])),
@@ -457,7 +509,7 @@ mod test {
 
         int1.emit_msg_in(InternIn::Start)?;
         let msg = itap1.recv().await.unwrap();
-        assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive), msg);
+        assert_eq!(InternOut::Broadcast(BroadcastToTabs::Alive(None)), msg);
 
         Ok(())
     }

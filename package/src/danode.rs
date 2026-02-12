@@ -15,6 +15,7 @@ pub struct DaNode {
     events: BrokerEvents,
     _proxy: Proxy,
     ds: DHTStorage,
+    id: TabID,
 }
 
 #[wasm_bindgen]
@@ -87,6 +88,10 @@ impl DaNode {
             .emit_msg_in(DHTStorageIn::GetRealms)
             .map_err(|e| format!("{e:?}"))
     }
+
+    pub fn get_tab_id(&self) -> String {
+        format!("{}", self.id)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -124,20 +129,19 @@ impl DaNode {
             id.clone(),
             nc,
             &mut Timer::start().await.map_err(|e| format!("{e}"))?.broker,
-            Broadcast::start("danode", id)
+            Broadcast::start("danode", id.clone())
                 .await
                 .map_err(|e| format!("{e}"))?,
         )
         .await
         .map_err(|e| format!("{e}"))?;
 
-        _proxy.elect_leader();
-
         Ok(DaNode {
             events: Events::new(&mut _proxy).await.map_err(|e| format!("{e}"))?,
             ds: DHTStorage::from_broker(_proxy.dht_storage.clone(), 1000)
                 .await
                 .map_err(|e| format!("{e}"))?,
+            id,
             _proxy,
         })
     }

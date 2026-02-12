@@ -9,6 +9,8 @@ const statusDHTNodes = document.getElementById(
   "dht-connections",
 ) as HTMLSpanElement;
 const statusRealms = document.getElementById("realms") as HTMLSpanElement;
+const tabID = document.getElementById("tab-id") as HTMLSpanElement;
+const follower = document.getElementById("follower") as HTMLSpanElement;
 const logsContainer = document.getElementById("logs") as HTMLDivElement;
 
 let node: DaNode | null = null;
@@ -35,6 +37,8 @@ async function initApp() {
     addLog("Creating DaNode instance...", "info");
     node = await DaNode.from_default();
     node.set_event_listener(new_event);
+    tabID.textContent = node.get_tab_id();
+    addLog(`This is tab ${tabID.textContent}`);
 
     addLog("Danu Browser initialized successfully", "success");
   } catch (error) {
@@ -49,7 +53,7 @@ async function new_event(status: NodeStatus, args: any) {
   switch (status) {
     case NodeStatus.ConnectSignal:
       addLog("Connected to Signal");
-      statusConnection.textContent = "Connected";
+      statusConnection.textContent = `Connected`;
       statusConnection.className = `status-value connected`;
       break;
     case NodeStatus.DisconnectSignal:
@@ -72,6 +76,7 @@ async function new_event(status: NodeStatus, args: any) {
       break;
     case NodeStatus.IsLeader:
       addLog(`Got elected as leader`);
+      follower.textContent = "Leader";
       break;
     case NodeStatus.TabsCount:
       addLog(`${args} tabs available`);
