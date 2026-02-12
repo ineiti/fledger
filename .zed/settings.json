@@ -12,9 +12,10 @@
           "./test/fledger-nodejs/Cargo.toml",
           "./test/signal-fledger/Cargo.toml",
           "./examples/ping/Cargo.toml",
-          "./examples/ping-pong/*"
-        ]
-      }
-    }
-  }
+          "./examples/ping-pong/*",
+          "./package/Cargo.toml",
+        ],
+      },
+    },
+  },
 }

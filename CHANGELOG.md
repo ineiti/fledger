@@ -8,6 +8,24 @@ Following https://keepachangelog.com/en/1.1.0/ and using
 
 See [WIP.md](./WIP.md) for current work and bugs to fix
 
+## [Unreleased]
+
+### Added
+
+- package
+  - clean npm package for front-end development
+  - use BroadcastChannel to allow for multiple tabs
+- frontend
+  - using @danu/danu for a clean frontend
+- dht_storage
+
+### Changed
+
+- dht_storage
+  - sends a 'sync' when the # of connected nodes goes from 0 to >0
+  - sends DHTStorage::RealmIDs when a new realm gets created
+  - only depends on BrokerDHTStorage and can be cloned
+
 ## [0.10.0] - 2025-11-11
 
 ### Added

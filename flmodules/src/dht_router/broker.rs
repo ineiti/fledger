@@ -39,6 +39,7 @@ pub enum DHTRouterOut {
     MessageClosest(NodeID, NodeID, U256, NetworkWrapper),
     // MessageDest(origin, last_hop, msg)
     MessageDest(NodeID, NodeID, NetworkWrapper),
+    /// List of currently active nodes
     NodeList(Vec<NodeID>),
     /// If the system is configured with a unique realm, pass it here
     /// to the DHT_Storage.

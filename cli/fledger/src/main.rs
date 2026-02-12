@@ -283,21 +283,25 @@ impl Fledger {
                         .collect::<Vec<_>>();
                     if rids.len() == 0 {
                         log::info!("No realms found.");
+                        ds.get_realm_ids().await?;
                         return Ok(());
                     }
-                    if let Some(rids_old) = &self.realm_ids {
-                        if rids_old != &rids {
-                            log::info!(
-                                "Realm-IDs are: {}",
-                                rids.iter()
-                                    .map(|rid| format!("{rid}"))
-                                    .collect::<Vec<_>>()
-                                    .join(" :: ")
-                            );
-                            self.realm_ids = Some(rids);
-                        }
+                    let print = if let Some(rids_old) = &self.realm_ids {
+                        rids_old != &rids
+                    } else {
+                        true
+                    };
+                    if print {
+                        log::info!(
+                            "Realm-IDs are: {}",
+                            rids.iter()
+                                .map(|rid| format!("{rid}"))
+                                .collect::<Vec<_>>()
+                                .join(" :: ")
+                        );
+                        self.realm_ids = Some(rids);
                     }
-                }
+                };
             }
         }
 

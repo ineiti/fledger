@@ -3,7 +3,7 @@ use flarch::{
     add_translator_direct, add_translator_link,
     broker::{Broker, BrokerError},
     data_storage::DataStorage,
-    tasks::wait_ms,
+    tasks::{spawn_local, wait_ms},
 };
 use flcrypto::{
     access::{Condition, ConditionLink},
@@ -22,6 +22,7 @@ use crate::{
         crypto::BadgeCond,
         flo::{Flo, FloError, FloID, FloWrapper, UpdateCondSign},
         realm::{GlobalID, RealmID},
+        realm_view::RealmView,
     },
     timer::{BrokerTimer, Timer},
 };
@@ -29,7 +30,6 @@ use crate::{
 use super::{
     core::{CoreError, DHTConfig, FloCuckoo},
     intern::{InternIn, InternOut, Messages, Stats},
-    realm_view::RealmView,
 };
 
 pub(super) const MODULE_NAME: &str = "DHTStorage";
@@ -41,6 +41,7 @@ pub enum DHTStorageIn {
     ReadCuckooIDs(GlobalID),
     GetFlos,
     GetRealms,
+    GetStats,
     /// Ask all neighbors for their realms and Flos.
     SyncFromNeighbors,
     /// Ask all neighbors to sync with us.
@@ -54,7 +55,10 @@ pub enum DHTStorageOut {
     RealmIDs(Vec<RealmID>),
     CuckooIDs(GlobalID, Vec<FloID>),
     ValueMissing(GlobalID),
+    Stats(Stats),
 }
+
+pub type BrokerDHTStorage = Broker<DHTStorageIn, DHTStorageOut>;
 
 /// This links the DHTStorage module with other modules, so that
 /// all messages are correctly translated from one to the other.
@@ -66,10 +70,9 @@ pub enum DHTStorageOut {
 #[derive(Clone, Debug)]
 pub struct DHTStorage {
     /// Represents the underlying broker.
-    pub broker: Broker<DHTStorageIn, DHTStorageOut>,
+    pub broker: BrokerDHTStorage,
     pub stats: watch::Receiver<Stats>,
-    intern: Broker<InternIn, InternOut>,
-    config: DHTConfig,
+    timeout: u64,
 }
 
 // unsafe impl Send for DHTStorage {}
@@ -101,9 +104,9 @@ impl DHTStorage {
         timer: BrokerTimer,
         dht_router: BrokerDHTRouter,
     ) -> anyhow::Result<Self> {
-        let (messages, stats) = Messages::new(ds, config.clone());
-        let mut intern = Broker::new();
-        intern.add_handler(Box::new(messages)).await?;
+        let mut intern = Broker::new_with_handler(Box::new(Messages::new(ds, config.clone())))
+            .await?
+            .0;
 
         add_translator_link!(
             intern,
@@ -126,11 +129,32 @@ impl DHTStorage {
         )
         .await?;
 
+        Self::from_broker(broker, config.timeout).await
+    }
+
+    pub async fn from_broker(
+        mut broker: BrokerDHTStorage,
+        timeout: u64,
+    ) -> anyhow::Result<DHTStorage> {
+        let (tx, stats) = watch::channel(Stats::default());
+
+        let mut tap = broker.get_tap_out().await?.0;
+        spawn_local(async move {
+            while let Some(msg) = tap.recv().await {
+                if let DHTStorageOut::Stats(s) = msg {
+                    if let Err(e) = tx.send(s) {
+                        log::error!("Couldn't send new stats: {e:?}");
+                    }
+                }
+            }
+        });
+
+        broker.emit_msg_in(DHTStorageIn::GetStats)?;
+
         Ok(DHTStorage {
             broker,
             stats,
-            intern,
-            config,
+            timeout,
         })
     }
 
@@ -139,9 +163,7 @@ impl DHTStorage {
     }
 
     pub fn propagate(&mut self) -> anyhow::Result<()> {
-        Ok(self
-            .intern
-            .emit_msg_in(InternIn::Storage(DHTStorageIn::PropagateFlos))?)
+        Ok(self.broker.emit_msg_in(DHTStorageIn::PropagateFlos)?)
     }
 
     pub async fn get_realm_ids(&mut self) -> anyhow::Result<Vec<RealmID>> {
@@ -157,7 +179,7 @@ impl DHTStorage {
         &mut self,
         id: &GlobalID,
     ) -> anyhow::Result<FloWrapper<T>> {
-        Ok(self.get_flo_timeout(id, self.config.timeout).await?)
+        Ok(self.get_flo_timeout(id, self.timeout).await?)
     }
 
     pub async fn get_flo_timeout<T: Serialize + DeserializeOwned + Clone>(
@@ -270,9 +292,7 @@ impl DHTStorage {
         msg_in: DHTStorageIn,
         check: &(dyn Fn(DHTStorageOut) -> Option<T> + Sync),
     ) -> anyhow::Result<T> {
-        Ok(self
-            .send_wait_timeout(msg_in, check, self.config.timeout)
-            .await?)
+        Ok(self.send_wait_timeout(msg_in, check, self.timeout).await?)
     }
 
     async fn send_wait_timeout<T>(
@@ -281,25 +301,23 @@ impl DHTStorage {
         check: &(dyn Fn(DHTStorageOut) -> Option<T> + Sync),
         timeout: u64,
     ) -> anyhow::Result<T> {
-        let (mut tap, tap_id) = self.intern.get_tap_out().await?;
-        self.intern.emit_msg_in(InternIn::Storage(msg_in))?;
+        let (mut tap, tap_id) = self.broker.get_tap_out().await?;
+        self.broker.emit_msg_in(msg_in)?;
         let res = select! {
             _ = wait_ms(timeout) => Err(StorageError::TimeoutError.into()),
             res = Self::wait_tap(&mut tap, check) => res
         };
-        self.intern.remove_subsystem(tap_id).await?;
+        self.broker.remove_subsystem(tap_id).await?;
         res
     }
 
     async fn wait_tap<T>(
-        tap: &mut UnboundedReceiver<InternOut>,
+        tap: &mut UnboundedReceiver<DHTStorageOut>,
         check: &(dyn Fn(DHTStorageOut) -> Option<T> + Sync),
     ) -> anyhow::Result<T> {
-        while let Some(msg_int) = tap.recv().await {
-            if let InternOut::Storage(msg_out) = msg_int {
-                if let Some(res) = check(msg_out) {
-                    return Ok(res);
-                }
+        while let Some(msg) = tap.recv().await {
+            if let Some(res) = check(msg) {
+                return Ok(res);
             }
         }
         Err(anyhow::anyhow!("Channel closed while waiting"))
