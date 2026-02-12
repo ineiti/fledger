@@ -1,13 +1,19 @@
 use flarch::{
     broker::{Broker, SubsystemHandler},
     data_storage::DataStorageLocal,
+    nodeids::NodeID,
     platform_async_trait,
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
 use flmodules::{
-    dht_router::broker::DHTRouterOut,
-    dht_storage::broker::{DHTStorageIn, DHTStorageOut},
-    network::broker::NetworkOut,
+    dht_router::broker::{BrokerDHTRouter, DHTRouterOut},
+    dht_storage::broker::{BrokerDHTStorage, DHTStorageIn, DHTStorageOut},
+    flo::realm::RealmID,
+    network::{
+        broker::{BrokerNetwork, NetworkOut},
+        signal::FledgerConfig,
+    },
+    nodeconfig::NodeInfo,
     timer::TimerMessage,
     Modules,
 };
@@ -31,17 +37,17 @@ pub(super) enum InternIn {
     // leader or not.
     Start,
     Proxy(ProxyIn),
-    DHTStorage(DHTStorageIn),
     Timer(TimerMessage),
     Broadcast(BroadcastFromTabs),
+    // This is used so Intern.is_leader()==true can cache some of the
+    // messages, and when a new tab joins, the leader can directly
+    // send the latest values.
+    FromNode(MsgFromLeader),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum InternOut {
     Proxy(ProxyOut),
-    DHTStorage(DHTStorageOut),
-    DHTRouter(DHTRouterOut),
-    Network(NetworkOut),
     Broadcast(BroadcastToTabs),
 }
 
@@ -54,23 +60,67 @@ pub(super) struct Intern {
     tabs: Vec<TabID>,
     danu: Option<Node>,
     start: u32,
+    network: BrokerNetwork,
+    dht_router: BrokerDHTRouter,
+    dht_storage: BrokerDHTStorage,
+    cache: Cache,
 }
 
 impl Intern {
-    pub(super) async fn start(cfg: NetConf, id: TabID) -> anyhow::Result<BrokerIntern> {
+    pub(super) async fn start(
+        cfg: NetConf,
+        id: TabID,
+        network: BrokerNetwork,
+        dht_router: BrokerDHTRouter,
+        dht_storage: BrokerDHTStorage,
+    ) -> anyhow::Result<BrokerIntern> {
         let mut broker = Broker::new();
-        broker
-            .add_handler(Box::new(Intern {
-                cfg,
-                id,
-                tabs: vec![id],
-                danu: None,
-                start: 3,
-                broker: broker.clone(),
-            }))
-            .await?;
+        let mut intern = Intern {
+            cfg,
+            id,
+            tabs: vec![id],
+            danu: None,
+            start: 3,
+            broker: broker.clone(),
+            network,
+            dht_router,
+            dht_storage,
+            cache: Cache::default(),
+        };
+        intern.add_translators().await?;
+        broker.add_handler(Box::new(intern)).await?;
 
         Ok(broker)
+    }
+
+    async fn add_translators(&mut self) -> anyhow::Result<()> {
+        self.network
+            .add_translator_o_ti(
+                self.broker.clone(),
+                Box::new(|m| match m {
+                    NetworkOut::NodeListFromWS(node_infos) => Some(InternIn::FromNode(
+                        MsgFromLeader::NodeListFromWS(node_infos),
+                    )),
+                    NetworkOut::SystemConfig(fledger_config) => Some(InternIn::FromNode(
+                        MsgFromLeader::SystemConfig(fledger_config),
+                    )),
+                    _ => None,
+                }),
+            )
+            .await?;
+        self.dht_router
+            .add_translator_o_ti(
+                self.broker.clone(),
+                Box::new(|m| Some(InternIn::FromNode(MsgFromLeader::DHTRouter(m)))),
+            )
+            .await?;
+        self.dht_storage
+            .add_translator_o_ti(
+                self.broker.clone(),
+                Box::new(|m| Some(InternIn::FromNode(MsgFromLeader::DHTStorage(m)))),
+            )
+            .await?;
+        Ok(())
     }
 
     fn is_leader(&self) -> bool {
@@ -96,56 +146,16 @@ impl Intern {
         );
         node_config.info.modules = Modules::stable() - Modules::WEBPROXY_REQUESTS;
         let mut node = Node::start_network(my_storage, node_config, config).await?;
-        let dhtr = &mut node.dht_router.as_mut().unwrap().broker;
-        dhtr.add_translator_o_to(
-            self.broker.clone(),
-            Box::new(|msg| Some(InternOut::DHTRouter(msg))),
-        )
-        .await?;
-        dhtr.add_translator_o_to(
-            self.broker.clone(),
-            Box::new(|msg| {
-                Some(InternOut::Broadcast(BroadcastToTabs::FromLeader(
-                    MsgFromLeader::DHTRouter(msg),
-                )))
-            }),
-        )
-        .await?;
-        let dhts = &mut node.dht_storage.as_mut().unwrap().broker;
-        dhts.add_translator_o_to(
-            self.broker.clone(),
-            Box::new(|msg| Some(InternOut::DHTStorage(msg))),
-        )
-        .await?;
-        dhts.add_translator_o_to(
-            self.broker.clone(),
-            Box::new(|msg| {
-                Some(InternOut::Broadcast(BroadcastToTabs::FromLeader(
-                    MsgFromLeader::DHTStorage(msg),
-                )))
-            }),
-        )
-        .await?;
-        node.broker_net
-            .add_translator_o_to(
-                self.broker.clone(),
-                Box::new(|msg| Some(InternOut::Network(msg))),
-            )
+        node.broker_net.link_direct(self.network.clone()).await?;
+        node.dht_router
+            .as_mut()
+            .unwrap()
+            .broker
+            .link_direct(self.dht_router.clone())
             .await?;
-        node.broker_net
-            .add_translator_o_to(
-                self.broker.clone(),
-                Box::new(|msg| match msg {
-                    NetworkOut::NodeListFromWS(node_infos) => Some(InternOut::Broadcast(
-                        BroadcastToTabs::FromLeader(MsgFromLeader::NodeListFromWS(node_infos)),
-                    )),
-                    NetworkOut::SystemConfig(fledger_config) => Some(InternOut::Broadcast(
-                        BroadcastToTabs::FromLeader(MsgFromLeader::SystemConfig(fledger_config)),
-                    )),
-                    _ => None,
-                }),
-            )
-            .await?;
+        let ds = &mut node.dht_storage.as_mut().unwrap().broker;
+        ds.link_direct(self.dht_storage.clone()).await?;
+        ds.emit_msg_in(DHTStorageIn::GetRealms)?;
         self.danu = Some(node);
         Ok(())
     }
@@ -158,16 +168,43 @@ impl Intern {
         if self.is_leader() {
             if let Err(e) = self.start_danu().await {
                 log::error!("Couldn't start danu: {e:?}");
-            } else {
-                return vec![InternOut::Proxy(ProxyOut::Elected)];
             }
+            return vec![InternOut::Proxy(ProxyOut::Elected)];
+        }
+        if let Err(e) = self.setup_client_translations().await {
+            log::error!("Couldn't setup client translations: {e:?}");
         }
         vec![InternOut::Broadcast(BroadcastToTabs::ToLeader(
             MsgToLeader::GetUpdate,
         ))]
     }
 
+    async fn setup_client_translations(&mut self) -> anyhow::Result<()> {
+        self.dht_router
+            .add_translator_i_to(
+                self.broker.clone(),
+                Box::new(|m| {
+                    Some(InternOut::Broadcast(BroadcastToTabs::ToLeader(
+                        MsgToLeader::DHTRouter(m),
+                    )))
+                }),
+            )
+            .await?;
+        self.dht_storage
+            .add_translator_i_to(
+                self.broker.clone(),
+                Box::new(|m| {
+                    Some(InternOut::Broadcast(BroadcastToTabs::ToLeader(
+                        MsgToLeader::DHTStorage(m),
+                    )))
+                }),
+            )
+            .await?;
+        Ok(())
+    }
+
     fn msg_timer(&mut self) -> Vec<InternOut> {
+        // TODO: count if leader gets lost
         vec![InternOut::Broadcast(BroadcastToTabs::Alive)]
     }
 
@@ -175,13 +212,19 @@ impl Intern {
         let mut out = vec![];
         match msg {
             BroadcastFromTabs::Alive(tab_id) => {
-                // TODO: count if leader gets lost
                 if !self.tabs.contains(&tab_id) {
                     self.tabs.push(tab_id);
                     self.tabs.sort();
+                    // log::info!(
+                    //     "{} Got new tab as leader({}) - list is now: {:?}",
+                    //     self.id,
+                    //     self.is_leader(),
+                    //     self.tabs
+                    // );
                     out.push(InternOut::Proxy(ProxyOut::TabList(self.tabs.clone())));
                 }
                 if self.is_leader() {
+                    // log::info!("Leader welcomes new tab");
                     out.push(InternOut::Broadcast(BroadcastToTabs::Alive));
                 }
             }
@@ -207,11 +250,7 @@ impl Intern {
                                 .unwrap()
                                 .broker
                                 .emit_msg_in(dhtr.clone()),
-                            MsgToLeader::GetUpdate => {
-                                // TODO: Send all current information to the new tab -
-                                // realms, nodes, connections
-                                todo!()
-                            }
+                            MsgToLeader::GetUpdate => Ok(out.extend(self.cache.replay())),
                         } {
                             log::error!("While passing {data:?} to danu: {e:?}");
                         }
@@ -220,16 +259,18 @@ impl Intern {
             }
             BroadcastFromTabs::FromLeader(data) => {
                 if !self.is_leader() {
-                    out.push(match data {
-                        MsgFromLeader::DHTStorage(dhts) => InternOut::DHTStorage(dhts),
-                        MsgFromLeader::DHTRouter(dhtr) => InternOut::DHTRouter(dhtr),
-                        MsgFromLeader::SystemConfig(fledger_config) => {
-                            InternOut::Network(NetworkOut::SystemConfig(fledger_config))
-                        }
-                        MsgFromLeader::NodeListFromWS(node_infos) => {
-                            InternOut::Network(NetworkOut::NodeListFromWS(node_infos))
-                        }
-                    });
+                    if let Err(e) = match data {
+                        MsgFromLeader::DHTStorage(dhts) => self.dht_storage.emit_msg_out(dhts),
+                        MsgFromLeader::DHTRouter(dhtr) => self.dht_router.emit_msg_out(dhtr),
+                        MsgFromLeader::SystemConfig(fledger_config) => self
+                            .network
+                            .emit_msg_out(NetworkOut::SystemConfig(fledger_config)),
+                        MsgFromLeader::NodeListFromWS(node_infos) => self
+                            .network
+                            .emit_msg_out(NetworkOut::NodeListFromWS(node_infos)),
+                    } {
+                        log::error!("While passing data to brokers: {e:?}");
+                    }
                 }
             }
         }
@@ -245,20 +286,61 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
             match msg {
                 InternIn::Start => out.extend(self.msg_start().await),
                 InternIn::Proxy(_) => {}
-                InternIn::DHTStorage(input) => {
-                    out.push(InternOut::Broadcast(BroadcastToTabs::ToLeader(
-                        MsgToLeader::DHTStorage(input),
-                    )));
-                }
                 InternIn::Timer(timer_message) => {
                     if timer_message == TimerMessage::Second {
                         out.extend(self.msg_timer());
                     }
                 }
                 InternIn::Broadcast(broadcast_io) => out.extend(self.msg_broadcast(broadcast_io)),
+                InternIn::FromNode(msg) => {
+                    if let Some(msg) = self.cache.update(msg) {
+                        if self.is_leader() {
+                            out.push(InternOut::Broadcast(BroadcastToTabs::FromLeader(msg)));
+                        }
+                    }
+                }
             }
         }
         out
+    }
+}
+
+#[derive(Default)]
+struct Cache {
+    config: Option<FledgerConfig>,
+    realm_ids: Vec<RealmID>,
+    nodes_connected_dht: Vec<NodeID>,
+    nodes_online: Vec<NodeInfo>,
+}
+
+impl Cache {
+    fn update(&mut self, msg: MsgFromLeader) -> Option<MsgFromLeader> {
+        match msg.clone() {
+            MsgFromLeader::SystemConfig(conf) => self.config = Some(conf),
+            MsgFromLeader::NodeListFromWS(node_infos) => self.nodes_online = node_infos,
+            MsgFromLeader::DHTRouter(DHTRouterOut::NodeList(nodes)) => {
+                self.nodes_connected_dht = nodes
+            }
+            MsgFromLeader::DHTStorage(DHTStorageOut::RealmIDs(ids)) => self.realm_ids = ids,
+            _ => return None,
+        }
+        Some(msg)
+    }
+
+    fn replay(&self) -> Vec<InternOut> {
+        if let Some(config) = self.config.as_ref() {
+            vec![
+                MsgFromLeader::DHTStorage(DHTStorageOut::RealmIDs(self.realm_ids.clone())),
+                MsgFromLeader::DHTRouter(DHTRouterOut::NodeList(self.nodes_connected_dht.clone())),
+                MsgFromLeader::SystemConfig(config.clone()),
+                MsgFromLeader::NodeListFromWS(self.nodes_online.clone()),
+            ]
+            .into_iter()
+            .map(|m| InternOut::Broadcast(BroadcastToTabs::FromLeader(m)))
+            .collect::<Vec<_>>()
+        } else {
+            return vec![];
+        }
     }
 }
 
@@ -326,8 +408,22 @@ mod test {
         let tab0 = Tab::new_const(TabID::new_const(0, 0)).await?;
         let tab1 = Tab::new_const(TabID::new_const(0, 1)).await?;
         let cfg = NetConf::default();
-        let mut int0 = Intern::start(cfg.clone(), tab0.id.clone()).await?;
-        let mut int1 = Intern::start(cfg, tab1.id.clone()).await?;
+        let mut int0 = Intern::start(
+            cfg.clone(),
+            tab0.id.clone(),
+            Broker::new(),
+            Broker::new(),
+            Broker::new(),
+        )
+        .await?;
+        let mut int1 = Intern::start(
+            cfg,
+            tab1.id.clone(),
+            Broker::new(),
+            Broker::new(),
+            Broker::new(),
+        )
+        .await?;
         let mut itap0 = int0.get_tap_out().await?.0;
         let mut itap1 = int1.get_tap_out().await?.0;
 

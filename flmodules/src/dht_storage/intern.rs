@@ -190,6 +190,9 @@ impl Messages {
                     .to_broadcast()
                     .map_or(vec![], |msg| vec![msg])
             }
+            DHTStorageIn::GetStats => {
+                vec![self.get_stats()]
+            }
         }
     }
 
@@ -414,11 +417,16 @@ impl Messages {
             serde_yaml::to_string(&self.realms)
                 .ok()
                 .map(|s| (*self.ds).set(MODULE_NAME, &s));
-            ret.push(InternOut::Storage(DHTStorageOut::Stats(
-                Stats::from_realms(&self.realms, self.config.realms.clone()),
-            )));
+            ret.push(self.get_stats());
         }
         ret
+    }
+
+    fn get_stats(&self) -> InternOut {
+        InternOut::Storage(DHTStorageOut::Stats(Stats::from_realms(
+            &self.realms,
+            self.config.realms.clone(),
+        )))
     }
 
     fn create_realm(&mut self, realm: FloRealm) -> anyhow::Result<()> {

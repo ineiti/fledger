@@ -995,6 +995,18 @@ pub trait TranslateFrom<T: Message>: Sized {
     fn translate(msg: T) -> Option<Self>;
 }
 
+impl<M: Message + 'static> TranslateFrom<M> for M {
+    fn translate(msg: M) -> Option<M> {
+        Some(msg)
+    }
+}
+
+impl<M: Message + 'static> TranslateInto<M> for M {
+    fn translate(self) -> Option<M> {
+        Some(self)
+    }
+}
+
 #[platform_async_trait()]
 pub trait TranslateInto<T: Message> {
     fn translate(self) -> Option<T>;

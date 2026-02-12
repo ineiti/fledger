@@ -31,10 +31,10 @@ pub type BrokerProxy = Broker<ProxyIn, ProxyOut>;
 pub struct Proxy {
     pub broker: BrokerProxy,
     // dht_storage is linked over the broadcastChannel to the
-    // actual dht_storage broker on the active danu.
+    // actual dht_storage broker on the active tab.
     pub dht_storage: BrokerDHTStorage,
-    // dht_router only gets DHTRouterOut messages from the
-    // leader. DHTRouterIn messages are ignored.
+    // dht_router is linked over the broadcastChannel to the
+    // actual dht_router broker on the active tab.
     pub dht_router: BrokerDHTRouter,
     // network only sends NetworkOut::SystemConfig and NetworkOut::NodeListFromWS.
     // All other messages, including NetworkIn, are ignored.
@@ -49,7 +49,17 @@ impl Proxy {
         timer: &mut BrokerTimer,
         broadcast: BrokerBroadcast,
     ) -> anyhow::Result<Proxy> {
-        let mut intern = Intern::start(cfg, id).await?;
+        let network = Broker::new();
+        let dht_router = Broker::new();
+        let dht_storage = Broker::new();
+        let mut intern = Intern::start(
+            cfg,
+            id,
+            network.clone(),
+            dht_router.clone(),
+            dht_storage.clone(),
+        )
+        .await?;
         add_translator_link!(intern, broadcast, InternIn::Broadcast, InternOut::Broadcast);
 
         timer
@@ -57,33 +67,6 @@ impl Proxy {
             .await?;
         let broker = BrokerProxy::new();
         add_translator_direct!(intern, broker.clone(), InternIn::Proxy, InternOut::Proxy);
-        let dht_storage = BrokerDHTStorage::new();
-        add_translator_direct!(
-            intern,
-            dht_storage.clone(),
-            InternIn::DHTStorage,
-            InternOut::DHTStorage
-        );
-        let dht_router = BrokerDHTRouter::new();
-        intern
-            .add_translator_o_to(
-                dht_router.clone(),
-                Box::new(|o| match o {
-                    InternOut::DHTRouter(dht_router_out) => Some(dht_router_out),
-                    _ => None,
-                }),
-            )
-            .await?;
-        let network = BrokerNetwork::new();
-        intern
-            .add_translator_o_to(
-                network.clone(),
-                Box::new(|o| match o {
-                    InternOut::Network(net) => Some(net),
-                    _ => None,
-                }),
-            )
-            .await?;
 
         let proxy = Proxy {
             broker,

@@ -41,6 +41,7 @@ pub enum DHTStorageIn {
     ReadCuckooIDs(GlobalID),
     GetFlos,
     GetRealms,
+    GetStats,
     /// Ask all neighbors for their realms and Flos.
     SyncFromNeighbors,
     /// Ask all neighbors to sync with us.
@@ -147,6 +148,8 @@ impl DHTStorage {
                 }
             }
         });
+
+        broker.emit_msg_in(DHTStorageIn::GetStats)?;
 
         Ok(DHTStorage {
             broker,

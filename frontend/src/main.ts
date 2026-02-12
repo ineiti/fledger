@@ -58,10 +58,6 @@ async function new_event(status: NodeStatus, args: any) {
       break;
     case NodeStatus.ConnectedNodes:
       addLog(`Connected to ${args} nodes`);
-      if (args > 0 && realms.length == 0) {
-        addLog("Asking for realms");
-        await node!.update_realms();
-      }
       statusDHTNodes.textContent = args.toString();
       break;
     case NodeStatus.AvailableNodes:
