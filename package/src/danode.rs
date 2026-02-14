@@ -82,6 +82,23 @@ impl DaNode {
         Ok(())
     }
 
+    /// Set the div element to display the status bar
+    pub fn set_status_div(&mut self, div_id: String) -> Result<(), String> {
+        self.events
+            .emit_msg_in(EventsIn::SetStatusDiv(div_id))
+            .map_err(|e| format!("{e}"))?;
+
+        Ok(())
+    }
+
+    /// Remove the status bar display
+    pub fn remove_status_div(&mut self) -> Result<(), String> {
+        self.events
+            .emit_msg_in(EventsIn::ClearStatusDiv)
+            .map_err(|e| format!("{e}"))?;
+        Ok(())
+    }
+
     pub async fn update_realms(&mut self) -> Result<(), String> {
         self.ds
             .broker
@@ -136,11 +153,18 @@ impl DaNode {
         .await
         .map_err(|e| format!("{e}"))?;
 
+        let ds = DHTStorage::from_broker(_proxy.dht_storage.clone(), 1000)
+            .await
+            .map_err(|e| format!("{e}"))?;
+
+        // Request initial storage stats
+        // ds.broker
+        //     .emit_msg_in(DHTStorageIn::GetStats)
+        //     .map_err(|e| format!("{e}"))?;
+
         Ok(DaNode {
             events: Events::new(&mut _proxy).await.map_err(|e| format!("{e}"))?,
-            ds: DHTStorage::from_broker(_proxy.dht_storage.clone(), 1000)
-                .await
-                .map_err(|e| format!("{e}"))?,
+            ds,
             id,
             _proxy,
         })

@@ -27,6 +27,7 @@ pub enum MsgFromLeader {
     DHTRouter(DHTRouterOut),
     SystemConfig(FledgerConfig),
     NodeListFromWS(Vec<NodeInfo>),
+    NodeInfo(NodeInfo),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

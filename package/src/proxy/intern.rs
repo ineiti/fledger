@@ -306,6 +306,9 @@ impl Intern {
                         MsgFromLeader::NodeListFromWS(node_infos) => self
                             .network
                             .emit_msg_out(NetworkOut::NodeListFromWS(node_infos)),
+                        MsgFromLeader::NodeInfo(ni) => {
+                            Ok(out.push(InternOut::Proxy(ProxyOut::NodeInfo(ni))))
+                        }
                     } {
                         log::error!("While passing data to brokers: {e:?}");
                     }

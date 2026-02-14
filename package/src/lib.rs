@@ -13,3 +13,4 @@ pub mod danode;
 pub mod darealm;
 pub mod events;
 pub mod proxy;
+mod status_bar;

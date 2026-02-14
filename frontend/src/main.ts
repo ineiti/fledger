@@ -1,16 +1,5 @@
 import init, { DaNode, initialize, NodeStatus, RealmID } from "@danu/danu";
 
-// DOM elements
-const statusConnection = document.getElementById(
-  "connection-status",
-) as HTMLSpanElement;
-const statusNodes = document.getElementById("online-nodes") as HTMLSpanElement;
-const statusDHTNodes = document.getElementById(
-  "dht-connections",
-) as HTMLSpanElement;
-const statusRealms = document.getElementById("realms") as HTMLSpanElement;
-const tabID = document.getElementById("tab-id") as HTMLSpanElement;
-const follower = document.getElementById("follower") as HTMLSpanElement;
 const logsContainer = document.getElementById("logs") as HTMLDivElement;
 
 let node: DaNode | null = null;
@@ -36,9 +25,9 @@ async function initApp() {
 
     addLog("Creating DaNode instance...", "info");
     node = await DaNode.from_default();
+    node.set_status_div("danu-stats");
     node.set_event_listener(new_event);
-    tabID.textContent = node.get_tab_id();
-    addLog(`This is tab ${tabID.textContent}`);
+    addLog(`This is tab ${node.get_tab_id()}`);
 
     addLog("Danu Browser initialized successfully", "success");
   } catch (error) {
@@ -53,30 +42,21 @@ async function new_event(status: NodeStatus, args: any) {
   switch (status) {
     case NodeStatus.ConnectSignal:
       addLog("Connected to Signal");
-      statusConnection.textContent = `Connected`;
-      statusConnection.className = `status-value connected`;
       break;
     case NodeStatus.DisconnectSignal:
-      statusConnection.textContent = "Disconnected";
-      statusConnection.className = `status-value disconnected`;
+      addLog("Disconnected from Signal");
       break;
     case NodeStatus.ConnectedNodes:
       addLog(`Connected to ${args} nodes`);
-      statusDHTNodes.textContent = args.toString();
       break;
     case NodeStatus.AvailableNodes:
       addLog(`${args} nodes available`);
-      statusNodes.textContent = args.toString();
       break;
     case NodeStatus.RealmAvailable:
       addLog(`${args.length} realms available`);
-      realms.splice(0);
-      realms.push(...args);
-      statusRealms.textContent = args.toString();
       break;
     case NodeStatus.IsLeader:
       addLog(`Got elected as leader`);
-      follower.textContent = "Leader";
       break;
     case NodeStatus.TabsCount:
       addLog(`${args} tabs available`);

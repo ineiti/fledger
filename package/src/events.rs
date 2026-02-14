@@ -6,7 +6,7 @@ use flarch::{
 };
 use flmodules::{
     dht_router::broker::DHTRouterOut, dht_storage::broker::DHTStorageOut,
-    network::broker::NetworkOut,
+    network::broker::NetworkOut, nodeconfig::NodeInfo,
 };
 
 use js_sys::Function;
@@ -15,6 +15,7 @@ use wasm_bindgen::prelude::*;
 use crate::{
     darealm::{FloID, RealmID},
     proxy::proxy::{Proxy, ProxyOut},
+    status_bar::StatusBar,
 };
 
 #[derive(Debug, Clone)]
@@ -22,12 +23,22 @@ pub enum EventsIn {
     DhtStorage(DHTStorageOut),
     DhtRouter(DHTRouterOut),
     Network(NetworkOut),
-    EventHandler(Function),
     Proxy(ProxyOut),
+    NodeInfo(NodeInfo),
+    EventHandler(Function),
     ClearEvent,
+    SetStatusDiv(String),
+    ClearStatusDiv,
 }
 
 pub type BrokerEvents = Broker<EventsIn, ()>;
+
+#[derive(Clone)]
+struct StorageStats {
+    total_size: usize,
+    realm_count: usize,
+    page_count: usize,
+}
 
 pub struct Events {
     event_callback: Mutex<Option<Function>>,
@@ -35,6 +46,12 @@ pub struct Events {
     realms: Vec<RealmID>,
     nodes: usize,
     is_leader: bool,
+    status_bar: Option<StatusBar>,
+    node_info: Option<NodeInfo>,
+    connected_node_ids: Vec<String>,
+    storage_stats: Option<StorageStats>,
+    total_pages: usize,
+    available_nodes: usize,
 }
 
 impl Events {
@@ -45,6 +62,12 @@ impl Events {
             realms: vec![],
             nodes: 0,
             is_leader: false,
+            status_bar: None,
+            node_info: None,
+            connected_node_ids: vec![],
+            storage_stats: None,
+            total_pages: 0,
+            available_nodes: 0,
         }))
         .await?
         .0;
@@ -76,6 +99,35 @@ impl Events {
         }
     }
 
+    fn update_status_bar(&self) {
+        if let Some(bar) = &self.status_bar {
+            // Update nodes count
+            let nodes_text = format!("{}/{}", self.nodes, self.available_nodes);
+            bar.update_field("nodes", &nodes_text).ok();
+
+            // Update DHT info
+            if let Some(stats) = &self.storage_stats {
+                let dht_text = format!("{} realms, {} pages", stats.realm_count, stats.page_count);
+                bar.update_field("dht", &dht_text).ok();
+
+                // Update storage
+                let storage_text = StatusBar::format_bytes(stats.total_size);
+                bar.update_field("storage", &storage_text).ok();
+            } else if !self.realms.is_empty() {
+                let dht_text = format!("{} realms", self.realms.len());
+                bar.update_field("dht", &dht_text).ok();
+            }
+
+            if let Some(ni) = &self.node_info {
+                bar.update_node_info(&ni).ok();
+            }
+
+            bar.update_node_list(&self.connected_node_ids).ok();
+            bar.update_connection(self.connected, self.connected_node_ids.len() > 0)
+                .ok();
+        }
+    }
+
     fn dht_storage(&mut self, msg: DHTStorageOut) {
         match msg {
             DHTStorageOut::FloValue(item) => self.dht_storage(DHTStorageOut::FloValues(vec![item])),
@@ -95,6 +147,25 @@ impl Events {
                 if self.realms.len() > 0 {
                     self.emit_event(NodeStatus::RealmAvailable, self.realms.clone().into());
                 }
+                self.update_status_bar();
+            }
+            DHTStorageOut::Stats(stats) => {
+                let mut total_size = 0;
+                let mut page_count = 0;
+
+                for (_, realm_stats) in stats.realm_stats.iter() {
+                    total_size += realm_stats.real_size;
+                    page_count += realm_stats.flos;
+                }
+
+                self.storage_stats = Some(StorageStats {
+                    total_size,
+                    realm_count: stats.realm_stats.len(),
+                    page_count,
+                });
+                self.total_pages = page_count;
+
+                self.update_status_bar();
             }
             _ => {}
         }
@@ -104,6 +175,13 @@ impl Events {
         match msg {
             DHTRouterOut::NodeList(ids) => {
                 self.nodes = ids.len();
+
+                // Convert NodeIDs to hex strings (first 12 chars)
+                self.connected_node_ids = ids
+                    .iter()
+                    .map(|id| format!("{:x}", id).chars().take(12).collect())
+                    .collect();
+
                 self.emit_event(
                     if self.nodes > 0 {
                         NodeStatus::ConnectedNodes
@@ -112,6 +190,8 @@ impl Events {
                     },
                     ids.len().into(),
                 );
+
+                self.update_status_bar();
             }
             _ => {}
         }
@@ -121,10 +201,13 @@ impl Events {
         match msg {
             NetworkOut::SystemConfig(_) => {
                 self.connected = true;
-                self.emit_event(NodeStatus::ConnectSignal, JsValue::null())
+                self.emit_event(NodeStatus::ConnectSignal, JsValue::null());
+                self.update_status_bar();
             }
             NetworkOut::NodeListFromWS(list) => {
+                self.available_nodes = list.len();
                 self.emit_event(NodeStatus::AvailableNodes, list.len().into());
+                self.update_status_bar();
             }
             _ => {}
         }
@@ -175,6 +258,20 @@ impl SubsystemHandler<EventsIn, ()> for Events {
                     self.event_callback.lock().unwrap().take();
                 }
                 EventsIn::Proxy(out) => self.proxy(out),
+                EventsIn::SetStatusDiv(div_id) => match StatusBar::new(&div_id) {
+                    Ok(sb) => {
+                        self.status_bar = Some(sb);
+                        self.update_status_bar();
+                    }
+                    Err(e) => log::error!("Couldn't create status bar: {e:?}"),
+                },
+                EventsIn::ClearStatusDiv => {
+                    self.status_bar = None;
+                }
+                EventsIn::NodeInfo(ni) => {
+                    self.node_info = Some(ni);
+                    self.update_status_bar();
+                }
             }
         }
         vec![]

@@ -5,7 +5,7 @@ use flarch::{
 };
 use flmodules::{
     dht_router::broker::BrokerDHTRouter, dht_storage::broker::BrokerDHTStorage,
-    network::broker::BrokerNetwork, timer::BrokerTimer,
+    network::broker::BrokerNetwork, nodeconfig::NodeInfo, timer::BrokerTimer,
 };
 
 use crate::{
@@ -24,6 +24,7 @@ pub enum ProxyOut {
     Elected,
     NewLeader(TabID),
     TabList(Vec<TabID>),
+    NodeInfo(NodeInfo),
 }
 
 pub type BrokerProxy = Broker<ProxyIn, ProxyOut>;
