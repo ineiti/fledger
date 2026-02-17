@@ -1,5 +1,5 @@
 use flarch::{
-    add_translator_direct, add_translator_link,
+    add_translator_direct, add_translator_link, add_translator_o_ti,
     broker::Broker,
     tasks::{spawn_local, wait_ms},
 };
@@ -12,7 +12,7 @@ use crate::{
     danode::NetConf,
     proxy::{
         broadcast::BrokerBroadcast,
-        intern::{BrokerIntern, Intern, InternIn, InternOut, TabID},
+        inter_tab::{BrokerInterTab, InterTab, InterTabIn, InterTabOut, TabID},
     },
 };
 
@@ -29,6 +29,7 @@ pub enum ProxyOut {
 
 pub type BrokerProxy = Broker<ProxyIn, ProxyOut>;
 
+#[derive(Clone)]
 pub struct Proxy {
     pub broker: BrokerProxy,
     // dht_storage is linked over the broadcastChannel to the
@@ -40,7 +41,7 @@ pub struct Proxy {
     // network only sends NetworkOut::SystemConfig and NetworkOut::NodeListFromWS.
     // All other messages, including NetworkIn, are ignored.
     pub network: BrokerNetwork,
-    intern: BrokerIntern,
+    intern: BrokerInterTab,
 }
 
 impl Proxy {
@@ -53,7 +54,7 @@ impl Proxy {
         let network = Broker::new();
         let dht_router = Broker::new();
         let dht_storage = Broker::new();
-        let mut intern = Intern::start(
+        let mut intern = InterTab::start(
             cfg,
             id,
             network.clone(),
@@ -61,13 +62,20 @@ impl Proxy {
             dht_storage.clone(),
         )
         .await?;
-        add_translator_link!(intern, broadcast, InternIn::Broadcast, InternOut::Broadcast);
-
-        timer
-            .add_translator_o_ti(intern.clone(), Box::new(|t| Some(InternIn::Timer(t))))
-            .await?;
+        add_translator_link!(
+            intern,
+            broadcast,
+            InterTabIn::Broadcast,
+            InterTabOut::Broadcast
+        );
+        add_translator_o_ti!(timer, intern, InterTabIn::Timer);
         let broker = BrokerProxy::new();
-        add_translator_direct!(intern, broker.clone(), InternIn::Proxy, InternOut::Proxy);
+        add_translator_direct!(
+            intern,
+            broker.clone(),
+            InterTabIn::Proxy,
+            InterTabOut::Proxy
+        );
 
         let mut proxy = Proxy {
             broker,
@@ -85,7 +93,7 @@ impl Proxy {
         let mut int = self.intern.clone();
         spawn_local(async move {
             for i in 0..4 {
-                if let Err(e) = int.emit_msg_in(InternIn::Start) {
+                if let Err(e) = int.emit_msg_in(InterTabIn::Start) {
                     log::error!("While sending InternIn::Start: {e:?}");
                 }
                 if i < 3 {

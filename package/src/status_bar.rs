@@ -1,17 +1,26 @@
-use flmodules::nodeconfig::NodeInfo;
+use flarch::{
+    broker::{Broker, SubsystemHandler},
+    platform_async_trait,
+};
+use flmodules::flo::blob::{BlobPath, FloBlobPage};
 use wasm_bindgen::prelude::*;
 use web_sys::{window, Document, Element, HtmlElement};
+
+use crate::state::{State, StateOut, StateUpdate};
 
 const CSS: &str = include_str!("status_bar.css");
 const HTML_TEMPLATE: &str = include_str!("status_bar.html");
 
+pub type BrokerStatusBar = Broker<StateOut, ()>;
+
 pub struct StatusBar {
+    state: State,
     doc: Document,
     div: Element,
 }
 
 impl StatusBar {
-    pub fn new(div_id: &str) -> anyhow::Result<StatusBar> {
+    pub async fn new(div_id: &str, state: State) -> anyhow::Result<BrokerStatusBar> {
         let doc = window()
             .ok_or(anyhow::anyhow!("No window found"))?
             .document()
@@ -20,22 +29,44 @@ impl StatusBar {
             .get_element_by_id(div_id)
             .ok_or(anyhow::anyhow!("Element with id '{}' not found", div_id))?;
 
-        let sb = StatusBar { doc, div };
+        let mut broker = Broker::new();
+        let sb = StatusBar { doc, div, state };
+        sb.update_node_info()?;
         sb.add_styles().map_err(|e| anyhow::anyhow!("{e:?}"))?;
         sb.add_html().map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        broker.add_handler(Box::new(sb)).await?;
 
-        Ok(sb)
+        Ok(broker)
     }
 
-    pub fn update_node_info(&self, ni: &NodeInfo) -> anyhow::Result<()> {
+    fn update_state(&mut self, up: StateUpdate) -> anyhow::Result<()> {
+        match up {
+            StateUpdate::ConnectSignal
+            | StateUpdate::ConnectedNodes
+            | StateUpdate::AvailableNodes
+            | StateUpdate::DisconnectNodes => self.update_connection()?,
+            StateUpdate::RealmAvailable | StateUpdate::ReceivedFlo => self.update_page_list()?,
+            StateUpdate::DHTStorageStats => todo!(),
+            StateUpdate::IsLeader => todo!(),
+            StateUpdate::NewLeader => todo!(),
+            StateUpdate::TabList => todo!(),
+            StateUpdate::SystemRealm => todo!(),
+        }
+        Ok(())
+    }
+
+    fn update_node_info(&self) -> anyhow::Result<()> {
         // Set initial node info
+        let ni = &self.state.node_info;
         self.update_field("node-name", ni.name.as_str())?;
         self.update_field("node-id", &ni.get_id().to_string())?;
         Ok(())
     }
 
     /// Update connection status with color coding
-    pub fn update_connection(&self, connected: bool, connected_dht: bool) -> anyhow::Result<()> {
+    fn update_connection(&self) -> anyhow::Result<()> {
+        let connected = self.state.config.is_some();
+        let connected_dht = !self.state.nodes_connected_dht.is_empty();
         let element = self.get_element_by_id("danu-connection")?;
 
         // Remove all status classes
@@ -63,15 +94,28 @@ impl StatusBar {
         };
         element.set_text_content(Some(status));
 
-        Ok(())
+        self.update_node_list()
     }
 
     // fn update_class(&self, )
 
     /// Update the DHT node list in the expanded section
-    pub fn update_node_list(&self, node_ids: &[String]) -> anyhow::Result<()> {
+    fn update_node_list(&self) -> anyhow::Result<()> {
         let list_element = self.get_element_by_id("danu-node-list")?;
 
+        let node_infos = self.state.nodes_online.clone();
+        let node_ids = self
+            .state
+            .nodes_connected_dht
+            .iter()
+            .map(|n| {
+                node_infos
+                    .iter()
+                    .find(|i| i.get_id() == (*n))
+                    .map(|i| i.name.clone())
+                    .unwrap_or_else(|| format!("{}", n))
+            })
+            .collect::<Vec<_>>();
         if node_ids.is_empty() {
             list_element.set_inner_html("None");
         } else {
@@ -87,7 +131,17 @@ impl StatusBar {
     }
 
     /// Update the stored page list in the expanded section
-    pub fn _update_page_list(&self, pages: &[String]) -> anyhow::Result<()> {
+    fn update_page_list(&self) -> anyhow::Result<()> {
+        let mut pages = vec![];
+        if let Some(rid) = &self.state.get_system_realm() {
+            if let Some(flos) = self.state.flos.get(rid) {
+                for flo in flos {
+                    if let Ok(page) = FloBlobPage::try_from(flo.1 .0.clone()) {
+                        pages.push(page.get_path().unwrap_or(&format!("unknown")).clone())
+                    }
+                }
+            }
+        }
         let list_element = self.get_element_by_id("danu-page-list")?;
 
         if pages.is_empty() {
@@ -104,7 +158,7 @@ impl StatusBar {
         Ok(())
     }
 
-    pub fn update_field(&self, field: &str, value: &str) -> anyhow::Result<()> {
+    fn update_field(&self, field: &str, value: &str) -> anyhow::Result<()> {
         self.get_element_by_id(&format!("danu-{}", field))?
             .set_text_content(Some(value));
         Ok(())
@@ -168,7 +222,7 @@ impl StatusBar {
     }
 
     /// Format bytes into human-readable format
-    pub fn format_bytes(bytes: usize) -> String {
+    fn _format_bytes(bytes: usize) -> String {
         if bytes < 1024 {
             format!("{} B", bytes)
         } else if bytes < 1024 * 1024 {
@@ -182,5 +236,22 @@ impl StatusBar {
         self.doc
             .get_element_by_id(id)
             .ok_or(anyhow::anyhow!("Element with id {id} not found"))
+    }
+}
+
+#[platform_async_trait]
+impl SubsystemHandler<StateOut, ()> for StatusBar {
+    async fn messages(&mut self, msgs: Vec<StateOut>) -> Vec<()> {
+        for msg in msgs {
+            match msg {
+                StateOut::State(state) => self.state = state,
+                StateOut::Update(up) => {
+                    if let Err(e) = self.update_state(up) {
+                        log::error!("While updating statusBar: {e:?}");
+                    }
+                }
+            }
+        }
+        vec![]
     }
 }

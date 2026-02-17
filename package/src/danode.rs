@@ -1,28 +1,32 @@
-use flmodules::dht_storage::broker::{DHTStorage, DHTStorageIn};
-use flmodules::timer::Timer;
+use flarch::broker::Broker;
+use flarch::data_storage::DataStorageIndexedDB;
+use flarch::tasks::spawn_local;
+use flmodules::dht_storage::broker::DHTStorage;
 use js_sys::{Function, JsString};
 use wasm_bindgen::prelude::*;
 
 use crate::darealm::{DaRealm, RealmID};
-use crate::events::{BrokerEvents, Events, EventsIn};
-use crate::proxy::broadcast::Broadcast;
-use crate::proxy::intern::TabID;
-use crate::proxy::proxy::Proxy;
+use crate::node::broadcast::TabID;
+use crate::node::node::{BrokerNode, Node};
+use crate::state::NodeState;
+use crate::status_bar::StatusBar;
 
 /// Main DaNode interface for browser
 #[wasm_bindgen]
 pub struct DaNode {
-    events: BrokerEvents,
-    _proxy: Proxy,
+    state: NodeState,
     ds: DHTStorage,
     id: TabID,
+    _node: BrokerNode,
 }
 
 #[wasm_bindgen]
 impl DaNode {
     /// Create a new DaNode instance
     pub async fn from_default() -> Result<DaNode, JsString> {
-        Self::from_net_conf(NetConf::default()).await
+        Self::from_net_conf(NetConf::default())
+            .await
+            .map_err(|e| format!("While initialising DaNode: {e:?}").into())
     }
 
     pub async fn from_config(
@@ -38,6 +42,7 @@ impl DaNode {
             turn_server,
         })
         .await
+        .map_err(|e| format!("While initialising DaNode: {e:?}").into())
     }
 
     pub fn sync(&mut self) -> Result<(), String> {
@@ -67,43 +72,58 @@ impl DaNode {
 
     /// Set an event listener callback
     /// The callback will be called with events in the format: { type: string, data: any }
-    pub fn set_event_listener(&mut self, callback: Function) -> Result<(), String> {
-        self.events
-            .emit_msg_in(EventsIn::EventHandler(callback))
-            .map_err(|e| format!("{e}"))?;
-        Ok(())
+    pub async fn set_event_listener(&mut self, callback: Function) -> Result<usize, String> {
+        let (mut tap, id) = self
+            .state
+            .broker
+            .get_tap_out()
+            .await
+            .map_err(|e| format!("Getting tap: {e:?}"))?;
+
+        let state = self.state.state.clone();
+        spawn_local(async move {
+            while let Some(msg) = tap.recv().await {
+                if let Err(e) = callback.call2(
+                    &JsValue::null(),
+                    &msg.into(),
+                    &state.borrow().clone().into(),
+                ) {
+                    log::error!("Couldn't call event callback: {e:?}");
+                }
+            }
+        });
+
+        Ok(id)
     }
 
     /// Remove the event listener callback
-    pub fn remove_event_listener(&mut self) -> Result<(), String> {
-        self.events
-            .emit_msg_in(EventsIn::ClearEvent)
-            .map_err(|e| format!("{e}"))?;
-        Ok(())
+    pub async fn remove_event_listener(&mut self, id: usize) -> Result<(), String> {
+        self.state
+            .broker
+            .remove_subsystem(id)
+            .await
+            .map_err(|e| format!("Couldn't remove event listener: {e:?}"))
     }
 
     /// Set the div element to display the status bar
-    pub fn set_status_div(&mut self, div_id: String) -> Result<(), String> {
-        self.events
-            .emit_msg_in(EventsIn::SetStatusDiv(div_id))
-            .map_err(|e| format!("{e}"))?;
-
-        Ok(())
+    pub async fn set_status_div(&mut self, div_id: String) -> Result<usize, String> {
+        let b = StatusBar::new(&div_id, self.state.state.borrow().clone())
+            .await
+            .map_err(|e| format!("Couldn't create new status bar: {e:?}"))?;
+        self.state
+            .broker
+            .add_translator_o_ti(b.clone(), Box::new(|msg| Some(msg)))
+            .await
+            .map_err(|e| format!("While adding translator: {e:?}"))
     }
 
     /// Remove the status bar display
-    pub fn remove_status_div(&mut self) -> Result<(), String> {
-        self.events
-            .emit_msg_in(EventsIn::ClearStatusDiv)
-            .map_err(|e| format!("{e}"))?;
-        Ok(())
-    }
-
-    pub async fn update_realms(&mut self) -> Result<(), String> {
-        self.ds
+    pub async fn remove_status_div(&mut self, id: usize) -> Result<(), String> {
+        self.state
             .broker
-            .emit_msg_in(DHTStorageIn::GetRealms)
-            .map_err(|e| format!("{e:?}"))
+            .remove_subsystem(id)
+            .await
+            .map_err(|e| format!("Couldn't remove status_div from state.broker: {e:?}"))
     }
 
     pub fn get_tab_id(&self) -> String {
@@ -140,33 +160,14 @@ impl Default for NetConf {
 }
 
 impl DaNode {
-    async fn from_net_conf(nc: NetConf) -> Result<DaNode, JsString> {
+    async fn from_net_conf(nc: NetConf) -> anyhow::Result<DaNode> {
         let id = TabID::new();
-        let mut _proxy = Proxy::start(
-            id.clone(),
-            nc,
-            &mut Timer::start().await.map_err(|e| format!("{e}"))?.broker,
-            Broadcast::start("danode", id.clone())
-                .await
-                .map_err(|e| format!("{e}"))?,
-        )
-        .await
-        .map_err(|e| format!("{e}"))?;
-
-        let ds = DHTStorage::from_broker(_proxy.dht_storage.clone(), 1000)
-            .await
-            .map_err(|e| format!("{e}"))?;
-
-        // Request initial storage stats
-        // ds.broker
-        //     .emit_msg_in(DHTStorageIn::GetStats)
-        //     .map_err(|e| format!("{e}"))?;
 
         Ok(DaNode {
-            events: Events::new(&mut _proxy).await.map_err(|e| format!("{e}"))?,
-            ds,
+            ds: DHTStorage::from_broker(Broker::new(), 1000).await?,
             id,
-            _proxy,
+            _node: Node::start(nc)?,
+            state: NodeState::new(DataStorageIndexedDB::new("node_state").await?).await?,
         })
     }
 }

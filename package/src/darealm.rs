@@ -1,10 +1,9 @@
-use flmodules::{
-    flo::{blob::BlobAccess, flo, realm, realm_view::RealmView},
-};
+use flmodules::flo::{blob::BlobAccess, flo, realm, realm_view::RealmView};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 #[wasm_bindgen]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Hash, Eq)]
 pub struct RealmID(realm::RealmID);
 
 impl RealmID {
@@ -22,6 +21,18 @@ impl RealmID {
     #[wasm_bindgen(js_name = toString)]
     pub fn to_string(&self) -> String {
         format!("{}", self.0)
+    }
+}
+
+impl From<realm::RealmID> for RealmID {
+    fn from(id: realm::RealmID) -> Self {
+        RealmID(id)
+    }
+}
+
+impl Into<realm::RealmID> for RealmID {
+    fn into(self) -> realm::RealmID {
+        self.0
     }
 }
 
@@ -43,6 +54,18 @@ impl FloID {
     #[wasm_bindgen(js_name = toString)]
     pub fn to_string(&self) -> String {
         format!("{}", self.0)
+    }
+}
+
+impl From<flo::FloID> for FloID {
+    fn from(id: flo::FloID) -> Self {
+        FloID(id)
+    }
+}
+
+impl Into<flo::FloID> for FloID {
+    fn into(self) -> flo::FloID {
+        self.0
     }
 }
 

@@ -2,32 +2,80 @@ use flarch::{
     broker::{Broker, SubsystemHandler},
     platform_async_trait,
 };
-use flmodules::{
-    dht_router::broker::{DHTRouterIn, DHTRouterOut},
-    dht_storage::broker::{DHTStorageIn, DHTStorageOut},
-    network::signal::FledgerConfig,
-    nodeconfig::NodeInfo,
-};
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
+use wasm_bindgen::{
+    prelude::{wasm_bindgen, Closure},
+    JsCast, JsValue,
+};
 use web_sys::BroadcastChannel;
 
-use crate::proxy::{inter_tab::TabID, state::State};
+use crate::{node::node::NodeIn, state::StateUpdate};
+
+/// Unique identifier for a node, used for leader election.
+/// Lower NodeID = higher priority for leadership.
+#[wasm_bindgen]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct TabID {
+    timestamp_secs: u64,
+    random_component: u32,
+}
+
+impl PartialOrd for TabID {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TabID {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.timestamp_secs
+            .cmp(&other.timestamp_secs)
+            .then_with(|| self.random_component.cmp(&other.random_component))
+    }
+}
+
+impl std::fmt::Display for TabID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:04}.{:04}",
+            self.timestamp_secs % 10000,
+            self.random_component / 10000
+        )
+    }
+}
+
+impl TabID {
+    pub fn new() -> Self {
+        let timestamp_secs = (js_sys::Date::now() / 1000.0) as u64;
+        let mut buf = [0u8; 4];
+        getrandom::getrandom(&mut buf).expect("getrandom failed");
+        let random_component = u32::from_le_bytes(buf);
+        Self {
+            timestamp_secs,
+            random_component,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_const(timestamp_secs: u64, random_component: u32) -> Self {
+        Self {
+            timestamp_secs,
+            random_component,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum MsgToLeader {
-    DHTStorage(DHTStorageIn),
-    DHTRouter(DHTRouterIn),
+    Node(NodeIn),
     GetUpdate,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum MsgFromLeader {
-    DHTStorage(DHTStorageOut),
-    DHTRouter(DHTRouterOut),
-    SystemConfig(FledgerConfig),
-    NodeListFromWS(Vec<NodeInfo>),
-    State(State),
+    Node(NodeIn),
+    StateUpdate(StateUpdate),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -38,7 +86,7 @@ pub enum BroadcastToTabs {
     FromLeader(MsgFromLeader),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum BroadcastFromTabs {
     Alive {
         from: TabID,

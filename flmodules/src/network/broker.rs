@@ -9,6 +9,7 @@
 //! Both of these structures are best created with [`crate::network_start`] and
 //! [`crate::network_broker_start`].
 
+use serde::{Deserialize, Serialize};
 use std::{fmt, time::Duration};
 use thiserror::Error;
 use tokio::sync::{mpsc::UnboundedReceiver, watch};
@@ -44,7 +45,7 @@ pub type BrokerNetwork = Broker<NetworkIn, NetworkOut>;
 pub const MODULE_NAME: &str = "Network";
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 /// These are similar to public methods on a structure.
 /// Sending these messages will call the linked actions.
 pub enum NetworkIn {
@@ -71,7 +72,7 @@ pub enum NetworkIn {
 }
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 /// Messages sent from the [`Network`] to the user.
 pub enum NetworkOut {
     /// A new message has been received from the given node.
@@ -235,7 +236,7 @@ impl fmt::Display for NetworkOut {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 /// The connection state of a remote node.
 pub struct NetworkConnectionState {
     /// The ID of the remote node.
@@ -246,7 +247,7 @@ pub struct NetworkConnectionState {
     pub s: ConnStats,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 /// Some statistics on the connection.
 /// Not all fields are usable in all implementations.
 pub struct ConnStats {
