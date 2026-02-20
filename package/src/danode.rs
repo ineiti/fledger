@@ -2,12 +2,13 @@ use flarch::broker::Broker;
 use flarch::data_storage::DataStorageIndexedDB;
 use flarch::tasks::spawn_local;
 use flmodules::dht_storage::broker::DHTStorage;
+use flmodules::timer::Timer;
 use js_sys::{Function, JsString};
 use wasm_bindgen::prelude::*;
 
 use crate::darealm::{DaRealm, RealmID};
-use crate::node::broadcast::TabID;
-use crate::node::node::{BrokerNode, Node};
+use crate::proxy::broadcast::TabID;
+use crate::proxy::proxy::{BrokerProxy, Proxy};
 use crate::state::NodeState;
 use crate::status_bar::StatusBar;
 
@@ -17,7 +18,7 @@ pub struct DaNode {
     state: NodeState,
     ds: DHTStorage,
     id: TabID,
-    _node: BrokerNode,
+    _proxy: BrokerProxy,
 }
 
 #[wasm_bindgen]
@@ -165,8 +166,15 @@ impl DaNode {
 
         Ok(DaNode {
             ds: DHTStorage::from_broker(Broker::new(), 1000).await?,
+            _proxy: Proxy::start(
+                DataStorageIndexedDB::new("node_state").await?,
+                nc,
+                id.clone(),
+                Timer::start().await?.broker,
+            )
+            .await?
+            .broker,
             id,
-            _node: Node::start(nc)?,
             state: NodeState::new(DataStorageIndexedDB::new("node_state").await?).await?,
         })
     }

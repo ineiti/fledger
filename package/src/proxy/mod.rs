@@ -1,4 +1,3 @@
 pub mod broadcast;
-pub mod inter_tab;
+pub mod intern;
 pub mod proxy;
-pub mod state;

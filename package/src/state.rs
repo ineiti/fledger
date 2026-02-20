@@ -22,15 +22,11 @@ use tokio::sync::watch;
 use tsify::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::{
-    node::node::NodeOut,
-    proxy::{inter_tab::TabID, proxy::ProxyOut},
-};
+use crate::proxy::{broadcast::TabID, proxy::NodeOut};
 
 #[derive(Debug, Clone)]
 pub enum StateIn {
     Node(NodeOut),
-    Proxy(ProxyOut),
 }
 
 #[derive(Tsify, Debug, Clone, Serialize, Deserialize)]
@@ -48,32 +44,10 @@ pub struct NodeState {
 
 impl NodeState {
     pub async fn new(ds: Box<dyn DataStorage + Send>) -> anyhow::Result<NodeState> {
-        let (mut int, state) = Intern::new(ds).await?;
-        let mut broker = Broker::new();
-        broker
-            .add_translator_i_ti(
-                int.clone(),
-                Box::new(|msg| match msg {
-                    StateIn::Node(NodeOut::Network(net)) => Some(InternIn::Network(net)),
-                    StateIn::Node(NodeOut::DHTRouter(dhtr)) => Some(InternIn::DHTRouter(dhtr)),
-                    StateIn::Node(NodeOut::DHTStorage(dhts)) => Some(InternIn::DHTStorage(dhts)),
-                    StateIn::Proxy(proxy) => Some(InternIn::Proxy(proxy)),
-                }),
-            )
-            .await?;
-        int.add_translator_o_to(broker.clone(), Box::new(|msg| Some(msg)))
-            .await?;
+        let (broker, state) = Intern::new(ds).await?;
 
         Ok(NodeState { state, broker })
     }
-}
-
-#[derive(Debug, Clone)]
-enum InternIn {
-    Proxy(ProxyOut),
-    DHTRouter(DHTRouterOut),
-    DHTStorage(DHTStorageOut),
-    Network(NetworkOut),
 }
 
 #[derive(Debug)]
@@ -85,7 +59,7 @@ struct Intern {
 impl Intern {
     async fn new(
         ds: Box<dyn DataStorage + Send>,
-    ) -> anyhow::Result<(Broker<InternIn, StateOut>, watch::Receiver<State>)> {
+    ) -> anyhow::Result<(Broker<StateIn, StateOut>, watch::Receiver<State>)> {
         let state = State::new(ds)?;
         let (_state_update, state_watch) = watch::channel(state.clone());
         Ok((
@@ -101,11 +75,11 @@ impl Intern {
 }
 
 #[platform_async_trait]
-impl SubsystemHandler<InternIn, StateOut> for Intern {
-    async fn messages(&mut self, msgs: Vec<InternIn>) -> Vec<StateOut> {
+impl SubsystemHandler<StateIn, StateOut> for Intern {
+    async fn messages(&mut self, msgs: Vec<StateIn>) -> Vec<StateOut> {
         let mut out = msgs
             .into_iter()
-            .filter_map(|i| self.state.update(i))
+            .filter_map(|StateIn::Node(i)| self.state.update(i))
             .map(|m| StateOut::Update(m))
             .collect::<Vec<_>>();
         if !out.is_empty() {
@@ -182,24 +156,25 @@ impl State {
         }
     }
 
-    fn update(&mut self, msg: InternIn) -> Option<StateUpdate> {
+    fn update(&mut self, msg: NodeOut) -> Option<StateUpdate> {
         let out = match msg {
-            InternIn::Proxy(proxy_out) => match proxy_out {
-                ProxyOut::Elected => {
-                    self.is_leader = true;
-                    StateUpdate::IsLeader
-                }
-                ProxyOut::NewLeader(leader) => {
-                    self.leader = Some(leader);
-                    StateUpdate::NewLeader
-                }
-                ProxyOut::TabList(list) => {
-                    self.tab_list = list;
-                    StateUpdate::TabList
-                }
-                _ => return None,
-            },
-            InternIn::DHTRouter(out) => match out {
+            // NodeOut::IsLeader => return None,
+            // NodeOut::Proxy(proxy_out) => match proxy_out {
+            //     ProxyOut::Elected => {
+            //         self.is_leader = true;
+            //         StateUpdate::IsLeader
+            //     }
+            //     ProxyOut::NewLeader(leader) => {
+            //         self.leader = Some(leader);
+            //         StateUpdate::NewLeader
+            //     }
+            //     ProxyOut::TabList(list) => {
+            //         self.tab_list = list;
+            //         StateUpdate::TabList
+            //     }
+            //     _ => return None,
+            // },
+            NodeOut::DHTRouter(out) => match out {
                 DHTRouterOut::NodeList(list) => {
                     self.nodes_connected_dht = list;
                     if self.nodes_connected_dht.is_empty() {
@@ -211,7 +186,7 @@ impl State {
                 DHTRouterOut::SystemRealm(_) => StateUpdate::SystemRealm,
                 _ => return None,
             },
-            InternIn::DHTStorage(msg) => match msg {
+            NodeOut::DHTStorage(msg) => match msg {
                 DHTStorageOut::FloValue(fv) => {
                     self.flos
                         .entry(fv.0.realm_id())
@@ -238,7 +213,7 @@ impl State {
                 }
                 _ => return None,
             },
-            InternIn::Network(msg) => match msg {
+            NodeOut::Network(msg) => match msg {
                 NetworkOut::NodeListFromWS(list) => {
                     self.nodes_online = list;
                     StateUpdate::AvailableNodes

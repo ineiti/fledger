@@ -11,7 +11,6 @@ pub fn initialize() {
 
 pub mod danode;
 pub mod darealm;
-pub mod node;
 pub mod proxy;
 pub mod state;
 mod status_bar;

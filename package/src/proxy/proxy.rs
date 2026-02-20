@@ -1,129 +1,86 @@
-use flarch::{
-    add_translator_direct, add_translator_link, add_translator_o_ti,
-    broker::Broker,
-    tasks::{spawn_local, wait_ms},
-};
+use flarch::{add_translator, broker::Broker, data_storage::DataStorage};
 use flmodules::{
-    dht_router::broker::BrokerDHTRouter, dht_storage::broker::BrokerDHTStorage,
-    network::broker::BrokerNetwork, nodeconfig::NodeInfo, timer::BrokerTimer,
+    dht_router::broker::{DHTRouterIn, DHTRouterOut},
+    dht_storage::broker::{DHTStorageIn, DHTStorageOut},
+    network::broker::NetworkOut,
+    nodeconfig::NodeInfo,
+    timer::{BrokerTimer, TimerMessage},
 };
+use flnode::node;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     danode::NetConf,
     proxy::{
-        broadcast::BrokerBroadcast,
-        inter_tab::{BrokerInterTab, InterTab, InterTabIn, InterTabOut, TabID},
+        broadcast::{Broadcast, TabID},
+        intern::{BrokerIntern, Intern, InternIn, InternOut},
     },
 };
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ProxyIn {}
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum ProxyIn {
+    Node(NodeIn),
+    IsLeader,
+}
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum ProxyOut {
-    Elected,
-    NewLeader(TabID),
-    TabList(Vec<TabID>),
-    NodeInfo(NodeInfo),
+    Node(NodeOut),
+    Tabs(Tabs),
 }
 
 pub type BrokerProxy = Broker<ProxyIn, ProxyOut>;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Proxy {
     pub broker: BrokerProxy,
-    // dht_storage is linked over the broadcastChannel to the
-    // actual dht_storage broker on the active tab.
-    pub dht_storage: BrokerDHTStorage,
-    // dht_router is linked over the broadcastChannel to the
-    // actual dht_router broker on the active tab.
-    pub dht_router: BrokerDHTRouter,
-    // network only sends NetworkOut::SystemConfig and NetworkOut::NodeListFromWS.
-    // All other messages, including NetworkIn, are ignored.
-    pub network: BrokerNetwork,
-    intern: BrokerInterTab,
+    pub node_info: NodeInfo,
+    _intern: BrokerIntern,
 }
 
 impl Proxy {
     pub async fn start(
-        id: TabID,
-        cfg: NetConf,
-        timer: &mut BrokerTimer,
-        broadcast: BrokerBroadcast,
+        ds: Box<dyn DataStorage + Send>,
+        netconf: NetConf,
+        tab_id: TabID,
+        mut timer: BrokerTimer,
     ) -> anyhow::Result<Proxy> {
-        let network = Broker::new();
-        let dht_router = Broker::new();
-        let dht_storage = Broker::new();
-        let mut intern = InterTab::start(
-            cfg,
-            id,
-            network.clone(),
-            dht_router.clone(),
-            dht_storage.clone(),
-        )
-        .await?;
-        add_translator_link!(
-            intern,
-            broadcast,
-            InterTabIn::Broadcast,
-            InterTabOut::Broadcast
-        );
-        add_translator_o_ti!(timer, intern, InterTabIn::Timer);
-        let broker = BrokerProxy::new();
-        add_translator_direct!(
-            intern,
-            broker.clone(),
-            InterTabIn::Proxy,
-            InterTabOut::Proxy
-        );
+        let mut bc = Broadcast::start("danode", tab_id.clone()).await?;
+        let mut broker = Broker::new();
+        let node_config = node::Node::get_config(ds.clone())?;
+        let mut intern = Intern::start(ds.clone(), node_config.clone(), tab_id, 5, netconf).await?;
 
-        let mut proxy = Proxy {
+        add_translator!(bc, o_ti, intern, msg => InternIn::Broadcast(msg));
+        add_translator!(intern, o_ti, bc, InternOut::Broadcast(msg) => msg);
+        add_translator!(intern, o_to, broker, InternOut::Node(m) => ProxyOut::Node(m));
+        add_translator!(broker, i_ti, intern, ProxyIn::Node(m) => InternIn::Node(m));
+        add_translator!(timer, o_ti, intern, TimerMessage::Second => InternIn::Timer);
+
+        Ok(Proxy {
             broker,
-            dht_storage,
-            dht_router,
-            network,
-            intern,
-        };
-        proxy.elect_leader();
-
-        Ok(proxy)
-    }
-
-    fn elect_leader(&mut self) {
-        let mut int = self.intern.clone();
-        spawn_local(async move {
-            for i in 0..4 {
-                if let Err(e) = int.emit_msg_in(InterTabIn::Start) {
-                    log::error!("While sending InternIn::Start: {e:?}");
-                }
-                if i < 3 {
-                    wait_ms(500).await;
-                }
-            }
-        });
+            _intern: intern,
+            node_info: node_config.info,
+        })
     }
 }
 
-#[cfg(test)]
-mod test {
-    use flmodules::timer::BrokerTimer;
-    use wasm_bindgen_test::wasm_bindgen_test;
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum NodeIn {
+    DHTRouter(DHTRouterIn),
+    DHTStorage(DHTStorageIn),
+}
 
-    use super::*;
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum NodeOut {
+    DHTRouter(DHTRouterOut),
+    DHTStorage(DHTStorageOut),
+    // network only sends NetworkOut::SystemConfig and NetworkOut::NodeListFromWS.
+    Network(NetworkOut),
+}
 
-    use crate::proxy::broadcast::test::BroadcastTest;
-
-    #[wasm_bindgen_test(async)]
-    async fn test_broadcast() -> anyhow::Result<()> {
-        let mut _channels = BroadcastTest::default();
-        let mut _tab0 = _channels.new().await?;
-        let mut _tab1 = _channels.new().await?;
-        let mut _timer = BrokerTimer::new();
-        let cfg = NetConf::default();
-        let mut _proxy0 =
-            Proxy::start(_tab0.id, cfg.clone(), &mut _timer, _tab0.broker.clone()).await?;
-        let mut _proxy1 = Proxy::start(_tab1.id, cfg, &mut _timer, _tab1.broker.clone()).await?;
-
-        Ok(())
-    }
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum Tabs {
+    Elected,
+    NewLeader(TabID),
+    TabList(Vec<TabID>),
 }

@@ -2,32 +2,23 @@ use flarch::{
     broker::{Broker, SubsystemHandler},
     platform_async_trait,
 };
-use flmodules::{
-    dht_router::broker::{DHTRouterIn, DHTRouterOut},
-    dht_storage::broker::{DHTStorageIn, DHTStorageOut},
-    network::signal::FledgerConfig,
-    nodeconfig::NodeInfo,
-};
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
+use wasm_bindgen::{
+    prelude::{wasm_bindgen, Closure},
+    JsCast, JsValue,
+};
 use web_sys::BroadcastChannel;
 
-use crate::proxy::{inter_tab::TabID, state::State};
+use crate::{proxy::proxy::NodeIn, state::StateUpdate};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum MsgToLeader {
-    DHTStorage(DHTStorageIn),
-    DHTRouter(DHTRouterIn),
-    GetUpdate,
+    Node(NodeIn),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum MsgFromLeader {
-    DHTStorage(DHTStorageOut),
-    DHTRouter(DHTRouterOut),
-    SystemConfig(FledgerConfig),
-    NodeListFromWS(Vec<NodeInfo>),
-    State(State),
+    StateUpdate(StateUpdate),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -38,17 +29,11 @@ pub enum BroadcastToTabs {
     FromLeader(MsgFromLeader),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum BroadcastFromTabs {
-    Alive {
-        from: TabID,
-        is_leader: Option<bool>,
-    },
+    Alive((TabID, Option<bool>)),
     Stopped(TabID),
-    ToLeader {
-        from: TabID,
-        data: MsgToLeader,
-    },
+    ToLeader((TabID, MsgToLeader)),
     FromLeader(MsgFromLeader),
 }
 
@@ -61,18 +46,6 @@ pub struct Broadcast {
 }
 
 impl Broadcast {
-    fn convert_message(id: TabID, msg: BroadcastToTabs) -> BroadcastFromTabs {
-        match msg {
-            BroadcastToTabs::Alive(is_leader) => BroadcastFromTabs::Alive {
-                from: id,
-                is_leader,
-            },
-            BroadcastToTabs::Stopped => BroadcastFromTabs::Stopped(id),
-            BroadcastToTabs::ToLeader(data) => BroadcastFromTabs::ToLeader { from: id, data },
-            BroadcastToTabs::FromLeader(data) => BroadcastFromTabs::FromLeader(data),
-        }
-    }
-
     pub async fn start(channel_name: &str, id: TabID) -> anyhow::Result<BrokerBroadcast> {
         let channel = BroadcastChannel::new(channel_name).map_err(|e| anyhow::anyhow!("{e:?}"))?;
         let mut broker = Broker::new();
@@ -113,6 +86,15 @@ impl Broadcast {
 
         Ok(broker)
     }
+
+    fn convert_message(id: TabID, msg: BroadcastToTabs) -> BroadcastFromTabs {
+        match msg {
+            BroadcastToTabs::Alive(is_leader) => BroadcastFromTabs::Alive((id, is_leader)),
+            BroadcastToTabs::Stopped => BroadcastFromTabs::Stopped(id),
+            BroadcastToTabs::ToLeader(data) => BroadcastFromTabs::ToLeader((id, data)),
+            BroadcastToTabs::FromLeader(data) => BroadcastFromTabs::FromLeader(data),
+        }
+    }
 }
 
 #[platform_async_trait]
@@ -127,6 +109,61 @@ impl SubsystemHandler<BroadcastToTabs, BroadcastFromTabs> for Broadcast {
             }
         }
         vec![]
+    }
+}
+
+/// Unique identifier for a node, used for leader election.
+/// Lower NodeID = higher priority for leadership.
+#[wasm_bindgen]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct TabID {
+    timestamp_secs: u64,
+    random_component: u32,
+}
+
+impl PartialOrd for TabID {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TabID {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.timestamp_secs
+            .cmp(&other.timestamp_secs)
+            .then_with(|| self.random_component.cmp(&other.random_component))
+    }
+}
+
+impl std::fmt::Display for TabID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:04}.{:04}",
+            self.timestamp_secs % 10000,
+            self.random_component / 10000
+        )
+    }
+}
+
+impl TabID {
+    pub fn new() -> Self {
+        let timestamp_secs = (js_sys::Date::now() / 1000.0) as u64;
+        let mut buf = [0u8; 4];
+        getrandom::getrandom(&mut buf).expect("getrandom failed");
+        let random_component = u32::from_le_bytes(buf);
+        Self {
+            timestamp_secs,
+            random_component,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_const(timestamp_secs: u64, random_component: u32) -> Self {
+        Self {
+            timestamp_secs,
+            random_component,
+        }
     }
 }
 
@@ -210,19 +247,13 @@ pub mod test {
 
         tab0.send(BroadcastToTabs::Alive(None))?;
         assert_eq!(
-            BroadcastFromTabs::Alive {
-                from: tab0.id,
-                is_leader: None
-            },
+            BroadcastFromTabs::Alive((tab0.id, None)),
             tab1.recv().await?
         );
 
         tab1.send(BroadcastToTabs::Alive(None))?;
         assert_eq!(
-            BroadcastFromTabs::Alive {
-                from: tab1.id,
-                is_leader: None
-            },
+            BroadcastFromTabs::Alive((tab1.id, None)),
             tab0.recv().await?
         );
         Ok(())
