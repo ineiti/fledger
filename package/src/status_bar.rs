@@ -6,8 +6,8 @@ use flmodules::flo::blob::{BlobPath, FloBlobPage};
 use wasm_bindgen::prelude::*;
 use web_sys::{window, Document, Element, HtmlElement};
 
-use crate::{
-    proxy::broadcast::TabID,
+use crate::proxy::{
+    broadcast::TabID,
     state::{State, StateOut, StateUpdate},
 };
 
@@ -40,9 +40,9 @@ impl StatusBar {
             state,
             id,
         };
-        sb.update_node_info()?;
         sb.add_styles().map_err(|e| anyhow::anyhow!("{e:?}"))?;
         sb.add_html().map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        sb.update_node_info()?;
         broker.add_handler(Box::new(sb)).await?;
 
         Ok(broker)
@@ -137,7 +137,7 @@ impl StatusBar {
     fn update_page_list(&self) -> anyhow::Result<()> {
         let mut pages = vec![];
         if let Some(rid) = &self.state.get_system_realm() {
-            if let Some(flos) = self.state.flos.get(rid) {
+            if let Some(flos) = self.state.flos.get(&rid.get_id()) {
                 for flo in flos {
                     if let Ok(page) = FloBlobPage::try_from(flo.1 .0.clone()) {
                         pages.push(page.get_path().unwrap_or(&format!("unknown")).clone())
@@ -167,7 +167,7 @@ impl StatusBar {
         } else {
             "Follower"
         };
-        self.update_field("danu-tab-role", role)
+        self.update_field("tab-role", role)
     }
 
     fn update_field(&self, field: &str, value: &str) -> anyhow::Result<()> {

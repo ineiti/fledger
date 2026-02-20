@@ -8,17 +8,15 @@ use wasm_bindgen::prelude::*;
 
 use crate::darealm::{DaRealm, RealmID};
 use crate::proxy::broadcast::TabID;
-use crate::proxy::proxy::{BrokerProxy, Proxy};
-use crate::state::NodeState;
+use crate::proxy::proxy::{Proxy, ProxyOut};
 use crate::status_bar::StatusBar;
 
 /// Main DaNode interface for browser
 #[wasm_bindgen]
 pub struct DaNode {
-    state: NodeState,
     ds: DHTStorage,
     id: TabID,
-    _proxy: BrokerProxy,
+    proxy: Proxy,
 }
 
 #[wasm_bindgen]
@@ -75,15 +73,15 @@ impl DaNode {
     /// The callback will be called with events in the format: { type: string, data: any }
     pub async fn set_event_listener(&mut self, callback: Function) -> Result<usize, String> {
         let (mut tap, id) = self
-            .state
+            .proxy
             .broker
             .get_tap_out()
             .await
             .map_err(|e| format!("Getting tap: {e:?}"))?;
 
-        let state = self.state.state.clone();
+        let state = self.proxy.state.state.clone();
         spawn_local(async move {
-            while let Some(msg) = tap.recv().await {
+            while let Some(ProxyOut::Update(msg)) = tap.recv().await {
                 if let Err(e) = callback.call2(
                     &JsValue::null(),
                     &msg.into(),
@@ -99,7 +97,7 @@ impl DaNode {
 
     /// Remove the event listener callback
     pub async fn remove_event_listener(&mut self, id: usize) -> Result<(), String> {
-        self.state
+        self.proxy
             .broker
             .remove_subsystem(id)
             .await
@@ -108,10 +106,15 @@ impl DaNode {
 
     /// Set the div element to display the status bar
     pub async fn set_status_div(&mut self, div_id: String) -> Result<usize, String> {
-        let b = StatusBar::new(self.id.clone(), &div_id, self.state.state.borrow().clone())
-            .await
-            .map_err(|e| format!("Couldn't create new status bar: {e:?}"))?;
-        self.state
+        let b = StatusBar::new(
+            self.id.clone(),
+            &div_id,
+            self.proxy.state.state.borrow().clone(),
+        )
+        .await
+        .map_err(|e| format!("Couldn't create new status bar: {e:?}"))?;
+        self.proxy
+            .state
             .broker
             .add_translator_o_ti(b.clone(), Box::new(|msg| Some(msg)))
             .await
@@ -120,7 +123,8 @@ impl DaNode {
 
     /// Remove the status bar display
     pub async fn remove_status_div(&mut self, id: usize) -> Result<(), String> {
-        self.state
+        self.proxy
+            .state
             .broker
             .remove_subsystem(id)
             .await
@@ -166,16 +170,13 @@ impl DaNode {
 
         Ok(DaNode {
             ds: DHTStorage::from_broker(Broker::new(), 1000).await?,
-            _proxy: Proxy::start(
+            proxy: Proxy::start(
                 DataStorageIndexedDB::new("node_state").await?,
                 nc,
                 id.clone(),
                 Timer::start().await?.broker,
             )
-            .await?
-            .broker,
-            state: NodeState::new(DataStorageIndexedDB::new("node_state").await?, id.clone())
-                .await?,
+            .await?,
             id,
         })
     }

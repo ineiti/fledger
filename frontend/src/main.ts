@@ -1,4 +1,10 @@
-import init, { DaNode, initialize, NodeStatus, RealmID } from "@danu/danu";
+import init, {
+  DaNode,
+  initialize,
+  RealmID,
+  State,
+  StateUpdate,
+} from "@danu/danu";
 
 const logsContainer = document.getElementById("logs") as HTMLDivElement;
 
@@ -38,28 +44,25 @@ async function initApp() {
 
 const realms: RealmID[] = [];
 
-async function new_event(status: NodeStatus, args: any) {
+async function new_event(status: StateUpdate, state: State) {
   switch (status) {
-    case NodeStatus.ConnectSignal:
+    case StateUpdate.ConnectSignal:
       addLog("Connected to Signal");
       break;
-    case NodeStatus.DisconnectSignal:
-      addLog("Disconnected from Signal");
+    case StateUpdate.ConnectedNodes:
+      addLog(`Connected to ${state.nodes_connected_dht.length} nodes`);
       break;
-    case NodeStatus.ConnectedNodes:
-      addLog(`Connected to ${args} nodes`);
+    case StateUpdate.AvailableNodes:
+      addLog(`${state.nodes_online.length} nodes available`);
       break;
-    case NodeStatus.AvailableNodes:
-      addLog(`${args} nodes available`);
+    case StateUpdate.RealmAvailable:
+      addLog(`${state.realm_ids.length} realms available`);
       break;
-    case NodeStatus.RealmAvailable:
-      addLog(`${args.length} realms available`);
+    case StateUpdate.NewLeader:
+      if (state) addLog(`Got elected as leader`);
       break;
-    case NodeStatus.IsLeader:
-      addLog(`Got elected as leader`);
-      break;
-    case NodeStatus.TabsCount:
-      addLog(`${args} tabs available`);
+    case StateUpdate.TabList:
+      addLog(`${state.tab_list.length} tabs available`);
       break;
   }
 }

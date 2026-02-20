@@ -16,8 +16,8 @@ use crate::{
     proxy::{
         broadcast::{BroadcastFromTabs, BroadcastToTabs, TabID},
         proxy::{NodeIn, NodeOut, Tabs},
+        state::StateUpdate,
     },
-    state::StateUpdate,
 };
 
 const TAB_TIMEOUT: usize = 5;
@@ -35,7 +35,7 @@ pub enum InternOut {
     // Only the leader will ever send Node messages
     Node(NodeOut),
     Tabs(Tabs),
-    State(StateUpdate),
+    Update(StateUpdate),
 }
 
 pub type BrokerIntern = Broker<InternIn, InternOut>;
@@ -116,6 +116,8 @@ impl Intern {
     }
 
     async fn start_node(&mut self) -> anyhow::Result<Vec<InternOut>> {
+        self.state = InternState::Leader;
+
         let config = ConnectionConfig::new(
             self.netconf.signal_server.clone(),
             self.netconf
@@ -198,7 +200,7 @@ impl Intern {
                 BroadcastFromTabs::FromLeader(msg_leader) => {
                     self.search_cnt = 0;
                     self.state = InternState::Follower;
-                    vec![InternOut::State(msg_leader)]
+                    vec![InternOut::Update(msg_leader)]
                 }
                 _ => vec![],
             },
@@ -238,6 +240,6 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
         if tabs != self.tabs_sorted() && self.is_leader() {
             out.push(InternOut::Tabs(Tabs::TabList(self.tabs_sorted())));
         }
-        todo!()
+        out
     }
 }

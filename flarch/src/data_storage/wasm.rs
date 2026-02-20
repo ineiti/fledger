@@ -191,9 +191,7 @@ impl DataStorageIndexedDB {
                     let value = cursor.value().unwrap();
 
                     if let (Some(k), Some(v)) = (key.as_string(), value.as_string()) {
-                        log::info!("lock 192");
                         let mut cache = data_inner.lock().unwrap();
-                        log::info!("lock 194");
                         cache.insert(k, v);
                     }
 
@@ -209,9 +207,7 @@ impl DataStorageIndexedDB {
             .await
             .map_err(|e| StorageError::Underlying(format!("Failed to load data: {:?}", e)))?;
 
-        log::info!("lock 210");
         let result = data.lock().unwrap().clone();
-        log::info!("lock 212");
         Ok(result)
     }
 
@@ -264,7 +260,6 @@ impl DataStorageIndexedDB {
         key: &str,
         value: &str,
     ) -> Result<(), StorageError> {
-        log::info!("lock 263");
         future_write
             .lock()
             .unwrap()
@@ -273,10 +268,8 @@ impl DataStorageIndexedDB {
             Ok(db) => db,
             Err(_) => return Ok(()),
         };
-        log::info!("lock 265");
         let kvs = future_write.lock().unwrap().drain().collect::<Vec<_>>();
         for kv in kvs {
-            log::info!("Storing {kv:?} persistently");
             let db = db
                 .as_ref()
                 .ok_or_else(|| StorageError::Underlying("Database not initialized".to_string()))?;
@@ -295,9 +288,7 @@ impl DataStorageIndexedDB {
                 .put_with_key(&JsValue::from_str(&kv.1), &JsValue::from_str(&kv.0))
                 .map_err(|e| StorageError::Underlying(format!("Failed to put value: {:?}", e)))?;
 
-            log::info!("await_request start");
             Self::await_request(&request).await?;
-            log::info!("await_request end");
         }
         Ok(())
     }
@@ -317,9 +308,7 @@ impl DataStorageIndexedDB {
         db_arc: &Arc<Mutex<Option<IdbDatabase>>>,
         key: &str,
     ) -> Result<(), StorageError> {
-        log::info!("lock 303");
         let db = db_arc.lock().unwrap();
-        log::info!("lock 305");
         let db = db
             .as_ref()
             .ok_or_else(|| StorageError::Underlying("Database not initialized".to_string()))?;
@@ -346,23 +335,19 @@ impl DataStorageIndexedDB {
 #[async_trait(?Send)]
 impl DataStorage for DataStorageIndexedDB {
     fn get(&self, key: &str) -> Result<String, StorageError> {
-        log::info!("lock 332");
         let cache = self
             .cache
             .lock()
             .map_err(|e| StorageError::Underlying(e.to_string()))?;
-        log::info!("lock 337");
         Ok(cache.get(key).cloned().unwrap_or_default())
     }
 
     fn set(&mut self, key: &str, value: &str) -> Result<(), StorageError> {
         {
-            log::info!("lock 343");
             let mut cache = self
                 .cache
                 .lock()
                 .map_err(|e| StorageError::Underlying(e.to_string()))?;
-            log::info!("lock 348");
             cache.insert(key.to_string(), value.to_string());
         }
 
@@ -373,12 +358,10 @@ impl DataStorage for DataStorageIndexedDB {
 
     fn remove(&mut self, key: &str) -> Result<(), StorageError> {
         {
-            log::info!("lock 359");
             let mut cache = self
                 .cache
                 .lock()
                 .map_err(|e| StorageError::Underlying(e.to_string()))?;
-            log::info!("lock 364");
             cache.remove(key);
         }
 

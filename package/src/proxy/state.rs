@@ -9,10 +9,7 @@ use flarch::{
 use flmodules::{
     dht_router::broker::DHTRouterOut,
     dht_storage::{self, broker::DHTStorageOut, core::FloCuckoo},
-    flo::{
-        flo::FloID,
-        realm::{self, RealmID},
-    },
+    flo::{flo::FloID, realm},
     network::{broker::NetworkOut, signal::FledgerConfig},
     nodeconfig::{self},
 };
@@ -22,15 +19,18 @@ use tokio::sync::watch;
 use tsify::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::proxy::{
-    broadcast::TabID,
-    proxy::{NodeOut, Tabs},
+use crate::{
+    darealm,
+    proxy::{
+        broadcast::TabID,
+        proxy::{NodeOut, Tabs},
+    },
 };
 
 #[derive(Debug, Clone)]
 pub enum StateIn {
     Node(NodeOut),
-    Update(StateUpdate),
+    UpdateFromLeader(StateUpdate),
     Tabs(Tabs),
 }
 
@@ -88,28 +88,37 @@ impl Intern {
 impl SubsystemHandler<StateIn, StateOut> for Intern {
     async fn messages(&mut self, msgs: Vec<StateIn>) -> Vec<StateOut> {
         let mut out = vec![];
-        let mut new_state = false;
         for msg in msgs {
-            if let Some(m) = match msg {
-                StateIn::Node(node_out) => self.state.update_node(node_out),
-                StateIn::Update(_) => {
-                    new_state = true;
-                    match State::new(&mut self.ds) {
-                        Ok(s) => self.state = s,
-                        Err(e) => log::warn!("Couldn't read state: {e:?}"),
+            let is_leader = self.state.is_leader(&self.id);
+            match msg {
+                StateIn::Node(node_out) => {
+                    log::info!("Got node {is_leader}");
+                    if is_leader {
+                        out.extend(self.state.update_node(node_out))
                     }
-                    None
                 }
-                StateIn::Tabs(tabs) => self.state.update_tabs(tabs),
-            } {
-                out.push(StateOut::Update(m));
+                StateIn::UpdateFromLeader(update) => {
+                    log::info!("Got UpdateFromLeader {is_leader}");
+                    if !is_leader {
+                        out.push(StateOut::Update(update));
+                        match State::new(&mut self.ds) {
+                            Ok(s) => self.state = s,
+                            Err(e) => log::warn!("Couldn't read state: {e:?}"),
+                        }
+                    }
+                }
+                StateIn::Tabs(tabs) => {
+                    log::info!("Got Tabs {is_leader}");
+                    let t = self.state.update_tabs(tabs);
+                    if is_leader {
+                        out.extend(t);
+                    }
+                }
             }
         }
-        if !out.is_empty() || new_state {
+        if !out.is_empty() {
             if self.state.is_leader(&self.id) {
                 self.state.store(&mut self.ds);
-            } else {
-                out.clear();
             }
             out.insert(0, StateOut::State(self.state.clone()));
         }
@@ -123,12 +132,12 @@ pub struct NodeConfig {
     pub id: NodeID,
 }
 
-#[derive(Tsify, Clone, Debug, Serialize, Deserialize)]
+#[derive(Tsify, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct State {
     pub config: Option<FledgerConfig>,
     pub node_info: nodeconfig::NodeInfo,
-    pub realm_ids: Vec<RealmID>,
+    pub realm_ids: Vec<realm::RealmID>,
     pub nodes_connected_dht: Vec<NodeID>,
     pub nodes_online: Vec<nodeconfig::NodeInfo>,
     pub dht_storage_stats: dht_storage::intern::Stats,
@@ -163,16 +172,6 @@ impl State {
         Ok(state)
     }
 
-    pub fn get_system_realm(&self) -> Option<RealmID> {
-        self.config
-            .as_ref()
-            .and_then(|conf| conf.system_realm.clone())
-    }
-
-    pub fn is_leader(&self, id: &TabID) -> bool {
-        self.tab_list.first() == Some(id)
-    }
-
     fn store(&mut self, ds: &mut Box<dyn DataStorage + Send>) {
         if let Ok(s) = serde_json::to_string(self) {
             if let Err(e) = ds.set(STORAGE_STATE, &s) {
@@ -181,18 +180,18 @@ impl State {
         }
     }
 
-    fn update_tabs(&mut self, msg: Tabs) -> Option<StateUpdate> {
-        Some(match msg {
+    fn update_tabs(&mut self, msg: Tabs) -> Vec<StateOut> {
+        vec![StateOut::Update(match msg {
             Tabs::Elected | Tabs::NewLeader(_) => StateUpdate::NewLeader,
             Tabs::TabList(tab_ids) => {
                 self.tab_list = tab_ids;
                 StateUpdate::TabList
             }
-        })
+        })]
     }
 
-    fn update_node(&mut self, msg: NodeOut) -> Option<StateUpdate> {
-        Some(match msg {
+    fn update_node(&mut self, msg: NodeOut) -> Vec<StateOut> {
+        vec![StateOut::Update(match msg {
             NodeOut::DHTRouter(out) => match out {
                 DHTRouterOut::NodeList(list) => {
                     self.nodes_connected_dht = list;
@@ -203,7 +202,7 @@ impl State {
                     }
                 }
                 DHTRouterOut::SystemRealm(_) => StateUpdate::SystemRealm,
-                _ => return None,
+                _ => return vec![],
             },
             NodeOut::DHTStorage(msg) => match msg {
                 DHTStorageOut::FloValue(fv) => {
@@ -230,7 +229,7 @@ impl State {
                     self.dht_storage_stats = st;
                     StateUpdate::DHTStorageStats
                 }
-                _ => return None,
+                _ => return vec![],
             },
             NodeOut::Network(msg) => match msg {
                 NetworkOut::NodeListFromWS(list) => {
@@ -241,14 +240,28 @@ impl State {
                     self.config = Some(sc);
                     StateUpdate::ConnectSignal
                 }
-                _ => return None,
+                _ => return vec![],
             },
-        })
+        })]
     }
 }
 
-#[derive(Tsify, Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
+#[wasm_bindgen]
+impl State {
+    pub fn get_system_realm(&self) -> Option<darealm::RealmID> {
+        self.config
+            .as_ref()
+            .and_then(|conf| conf.system_realm.as_ref())
+            .map(|rid| darealm::RealmID::new(rid.clone()))
+    }
+
+    pub fn is_leader(&self, id: &TabID) -> bool {
+        self.tab_list.first() == Some(id)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[wasm_bindgen]
 pub enum StateUpdate {
     // Connection to the signalling server established
     ConnectSignal,

@@ -9,7 +9,7 @@ use wasm_bindgen::{
 };
 use web_sys::BroadcastChannel;
 
-use crate::{proxy::proxy::NodeIn, state::StateUpdate};
+use crate::proxy::{proxy::NodeIn, state::StateUpdate};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BroadcastToTabs {
@@ -50,10 +50,12 @@ impl Broadcast {
         let channel = BroadcastChannel::new(channel_name).map_err(|e| anyhow::anyhow!("{e:?}"))?;
         let mut broker = Broker::new();
         let mut br_cl = broker.clone();
+        // let id_cl = id.clone();
         let onmessage = Closure::<dyn FnMut(web_sys::MessageEvent)>::new(
             move |event: web_sys::MessageEvent| {
                 if let Some(data_str) = event.data().as_string() {
                     if let Ok(msg) = serde_json::from_str::<BroadcastFromTabs>(&data_str) {
+                        // log::info!("{}: Got {msg:?}", id_cl);
                         if let Err(e) = br_cl.emit_msg_out(msg) {
                             log::error!("While sending broadcast message: {e}");
                         }
@@ -101,6 +103,7 @@ impl Broadcast {
 impl SubsystemHandler<BroadcastToTabs, BroadcastFromTabs> for Broadcast {
     async fn messages(&mut self, msgs: Vec<BroadcastToTabs>) -> Vec<BroadcastFromTabs> {
         for msg in msgs {
+            // log::info!("{}: Sending {msg:?}", self.id);
             let out = Self::convert_message(self.id, msg);
             if let Ok(json) = serde_json::to_string(&out) {
                 if let Err(e) = self.channel.post_message(&JsValue::from_str(&json)) {
