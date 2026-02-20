@@ -11,30 +11,30 @@ use web_sys::BroadcastChannel;
 
 use crate::{proxy::proxy::NodeIn, state::StateUpdate};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum MsgToLeader {
-    Node(NodeIn),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum MsgFromLeader {
-    StateUpdate(StateUpdate),
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BroadcastToTabs {
-    Alive(Option<bool>),
+    Alive,
     Stopped,
-    ToLeader(MsgToLeader),
-    FromLeader(MsgFromLeader),
+    ToLeader(NodeIn),
+    FromLeader(StateUpdate),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum BroadcastFromTabs {
-    Alive((TabID, Option<bool>)),
+    Alive(TabID),
     Stopped(TabID),
-    ToLeader((TabID, MsgToLeader)),
-    FromLeader(MsgFromLeader),
+    ToLeader(NodeIn),
+    FromLeader(StateUpdate),
+}
+
+impl BroadcastFromTabs {
+    /// Returns `true` if the broadcast from tabs is [`FromLeader`].
+    ///
+    /// [`FromLeader`]: BroadcastFromTabs::FromLeader
+    #[must_use]
+    pub fn is_from_leader(&self) -> bool {
+        matches!(self, Self::FromLeader(..))
+    }
 }
 
 pub type BrokerBroadcast = Broker<BroadcastToTabs, BroadcastFromTabs>;
@@ -89,9 +89,9 @@ impl Broadcast {
 
     fn convert_message(id: TabID, msg: BroadcastToTabs) -> BroadcastFromTabs {
         match msg {
-            BroadcastToTabs::Alive(is_leader) => BroadcastFromTabs::Alive((id, is_leader)),
+            BroadcastToTabs::Alive => BroadcastFromTabs::Alive(id),
             BroadcastToTabs::Stopped => BroadcastFromTabs::Stopped(id),
-            BroadcastToTabs::ToLeader(data) => BroadcastFromTabs::ToLeader((id, data)),
+            BroadcastToTabs::ToLeader(data) => BroadcastFromTabs::ToLeader(data),
             BroadcastToTabs::FromLeader(data) => BroadcastFromTabs::FromLeader(data),
         }
     }
@@ -245,17 +245,11 @@ pub mod test {
         let mut tab0 = channels.new().await?;
         let mut tab1 = channels.new().await?;
 
-        tab0.send(BroadcastToTabs::Alive(None))?;
-        assert_eq!(
-            BroadcastFromTabs::Alive((tab0.id, None)),
-            tab1.recv().await?
-        );
+        tab0.send(BroadcastToTabs::Alive)?;
+        assert_eq!(BroadcastFromTabs::Alive(tab0.id), tab1.recv().await?);
 
-        tab1.send(BroadcastToTabs::Alive(None))?;
-        assert_eq!(
-            BroadcastFromTabs::Alive((tab1.id, None)),
-            tab0.recv().await?
-        );
+        tab1.send(BroadcastToTabs::Alive)?;
+        assert_eq!(BroadcastFromTabs::Alive(tab1.id), tab0.recv().await?);
         Ok(())
     }
 }

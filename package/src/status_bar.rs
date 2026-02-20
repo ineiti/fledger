@@ -6,7 +6,10 @@ use flmodules::flo::blob::{BlobPath, FloBlobPage};
 use wasm_bindgen::prelude::*;
 use web_sys::{window, Document, Element, HtmlElement};
 
-use crate::state::{State, StateOut, StateUpdate};
+use crate::{
+    proxy::broadcast::TabID,
+    state::{State, StateOut, StateUpdate},
+};
 
 const CSS: &str = include_str!("status_bar.css");
 const HTML_TEMPLATE: &str = include_str!("status_bar.html");
@@ -17,10 +20,11 @@ pub struct StatusBar {
     state: State,
     doc: Document,
     div: Element,
+    id: TabID,
 }
 
 impl StatusBar {
-    pub async fn new(div_id: &str, state: State) -> anyhow::Result<BrokerStatusBar> {
+    pub async fn new(id: TabID, div_id: &str, state: State) -> anyhow::Result<BrokerStatusBar> {
         let doc = window()
             .ok_or(anyhow::anyhow!("No window found"))?
             .document()
@@ -30,7 +34,12 @@ impl StatusBar {
             .ok_or(anyhow::anyhow!("Element with id '{}' not found", div_id))?;
 
         let mut broker = Broker::new();
-        let sb = StatusBar { doc, div, state };
+        let sb = StatusBar {
+            doc,
+            div,
+            state,
+            id,
+        };
         sb.update_node_info()?;
         sb.add_styles().map_err(|e| anyhow::anyhow!("{e:?}"))?;
         sb.add_html().map_err(|e| anyhow::anyhow!("{e:?}"))?;
@@ -44,15 +53,11 @@ impl StatusBar {
             StateUpdate::ConnectSignal
             | StateUpdate::ConnectedNodes
             | StateUpdate::AvailableNodes
-            | StateUpdate::DisconnectNodes => self.update_connection()?,
-            StateUpdate::RealmAvailable | StateUpdate::ReceivedFlo => self.update_page_list()?,
-            StateUpdate::DHTStorageStats => todo!(),
-            StateUpdate::IsLeader => todo!(),
-            StateUpdate::NewLeader => todo!(),
-            StateUpdate::TabList => todo!(),
-            StateUpdate::SystemRealm => todo!(),
+            | StateUpdate::DisconnectNodes => self.update_connection(),
+            StateUpdate::RealmAvailable | StateUpdate::ReceivedFlo => self.update_page_list(),
+            StateUpdate::SystemRealm | StateUpdate::DHTStorageStats => self.update_page_list(),
+            StateUpdate::NewLeader | StateUpdate::TabList => self.update_tabs(),
         }
-        Ok(())
     }
 
     fn update_node_info(&self) -> anyhow::Result<()> {
@@ -96,8 +101,6 @@ impl StatusBar {
 
         self.update_node_list()
     }
-
-    // fn update_class(&self, )
 
     /// Update the DHT node list in the expanded section
     fn update_node_list(&self) -> anyhow::Result<()> {
@@ -156,6 +159,15 @@ impl StatusBar {
         }
 
         Ok(())
+    }
+
+    fn update_tabs(&self) -> anyhow::Result<()> {
+        let role = if self.state.is_leader(&self.id) {
+            "Leader"
+        } else {
+            "Follower"
+        };
+        self.update_field("danu-tab-role", role)
     }
 
     fn update_field(&self, field: &str, value: &str) -> anyhow::Result<()> {

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     danode::NetConf,
     proxy::{
-        broadcast::{BroadcastFromTabs, BroadcastToTabs, MsgFromLeader, MsgToLeader, TabID},
+        broadcast::{BroadcastFromTabs, BroadcastToTabs, TabID},
         proxy::{NodeIn, NodeOut, Tabs},
     },
     state::StateUpdate,
@@ -56,6 +56,7 @@ pub struct Intern {
     id: TabID,
     netconf: NetConf,
     ds: Box<dyn DataStorage + Send>,
+    danu: Option<node::Node>,
 }
 
 impl Intern {
@@ -76,12 +77,13 @@ impl Intern {
             netconf,
             ds,
             broker: broker.clone(),
+            danu: None,
         };
         broker.add_handler(Box::new(intern)).await?;
         Ok(broker)
     }
 
-    fn tab_alive(&mut self, id: TabID, _leader: Option<bool>) -> Vec<InternOut> {
+    fn tab_alive(&mut self, id: TabID) -> Vec<InternOut> {
         self.tabs.insert(id, TAB_TIMEOUT);
         vec![]
     }
@@ -132,22 +134,25 @@ impl Intern {
         add_translator!(danu.broker_net, o_to, self.broker,
             msg => InternOut::Node(NodeOut::Network(msg)));
 
-        let dhtr = &mut danu.dht_router.unwrap().broker;
+        let dhtr = &mut danu.dht_router.as_mut().unwrap().broker;
         add_translator!(dhtr, o_to, self.broker,
             msg => InternOut::Node(NodeOut::DHTRouter(msg)));
         add_translator!(self.broker, i_ti, dhtr, InternIn::Node(NodeIn::DHTRouter(msg)) => msg);
         add_translator!(self.broker, i_ti, dhtr,
-            InternIn::Broadcast(BroadcastFromTabs::ToLeader((_, MsgToLeader::Node(NodeIn::DHTRouter(msg))))) => msg);
+            InternIn::Broadcast(BroadcastFromTabs::ToLeader(NodeIn::DHTRouter(msg))) => msg);
 
-        let dhts = &mut danu.dht_storage.unwrap().broker;
+        let dhts = &mut danu.dht_storage.as_mut().unwrap().broker;
         add_translator!(dhts, o_to, self.broker,
             msg => InternOut::Node(NodeOut::DHTStorage(msg)));
         add_translator!(self.broker, i_ti, dhts, InternIn::Node(NodeIn::DHTStorage(msg)) => msg);
         add_translator!(self.broker, i_ti, dhts,
-            InternIn::Broadcast(BroadcastFromTabs::ToLeader((_, MsgToLeader::Node(NodeIn::DHTStorage(msg))))) => msg);
+            InternIn::Broadcast(BroadcastFromTabs::ToLeader(NodeIn::DHTStorage(msg))) => msg);
 
-        // self.danu = Some(danu);
-        Ok(vec![])
+        self.danu = Some(danu);
+        Ok(vec![
+            InternOut::Tabs(Tabs::Elected),
+            InternOut::Tabs(Tabs::NewLeader(self.id)),
+        ])
     }
 
     fn tabs_sorted(&self) -> Vec<TabID> {
@@ -182,28 +187,24 @@ impl Intern {
                 self.check_leader().await;
             }
         }
-        vec![InternOut::Broadcast(BroadcastToTabs::Alive(None))]
+        vec![InternOut::Broadcast(BroadcastToTabs::Alive)]
     }
 
     async fn msg_follower(&mut self, msg: InternIn) -> Vec<InternOut> {
         match msg {
             InternIn::Broadcast(bc) => match bc {
-                BroadcastFromTabs::Alive((id, is_leader)) => self.tab_alive(id, is_leader),
+                BroadcastFromTabs::Alive(id) => self.tab_alive(id),
                 BroadcastFromTabs::Stopped(id) => self.tab_stopped(id).await,
                 BroadcastFromTabs::FromLeader(msg_leader) => {
                     self.search_cnt = 0;
                     self.state = InternState::Follower;
-                    match msg_leader {
-                        MsgFromLeader::StateUpdate(state_update) => {
-                            vec![InternOut::State(state_update)]
-                        }
-                    }
+                    vec![InternOut::State(msg_leader)]
                 }
                 _ => vec![],
             },
-            InternIn::Node(node_in) => vec![InternOut::Broadcast(BroadcastToTabs::ToLeader(
-                MsgToLeader::Node(node_in),
-            ))],
+            InternIn::Node(node_in) => {
+                vec![InternOut::Broadcast(BroadcastToTabs::ToLeader(node_in))]
+            }
             InternIn::Timer => self.tick().await,
         }
     }
@@ -211,7 +212,7 @@ impl Intern {
     async fn msg_leader(&mut self, msg: InternIn) -> Vec<InternOut> {
         match msg {
             InternIn::Broadcast(bc) => match bc {
-                BroadcastFromTabs::Alive((id, is_stopped)) => self.tab_alive(id, is_stopped),
+                BroadcastFromTabs::Alive(id) => self.tab_alive(id),
                 BroadcastFromTabs::Stopped(id) => self.tab_stopped(id).await,
                 _ => vec![],
             },
@@ -225,6 +226,7 @@ impl Intern {
 impl SubsystemHandler<InternIn, InternOut> for Intern {
     async fn messages(&mut self, msgs: Vec<InternIn>) -> Vec<InternOut> {
         let mut out = vec![];
+        let tabs = self.tabs_sorted();
         for msg in msgs {
             match self.state {
                 InternState::Search | InternState::Follower => {
@@ -232,6 +234,9 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
                 }
                 InternState::Leader => out.extend(self.msg_leader(msg).await),
             }
+        }
+        if tabs != self.tabs_sorted() && self.is_leader() {
+            out.push(InternOut::Tabs(Tabs::TabList(self.tabs_sorted())));
         }
         todo!()
     }

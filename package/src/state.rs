@@ -22,11 +22,16 @@ use tokio::sync::watch;
 use tsify::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::proxy::{broadcast::TabID, proxy::NodeOut};
+use crate::proxy::{
+    broadcast::TabID,
+    proxy::{NodeOut, Tabs},
+};
 
 #[derive(Debug, Clone)]
 pub enum StateIn {
     Node(NodeOut),
+    Update(StateUpdate),
+    Tabs(Tabs),
 }
 
 #[derive(Tsify, Debug, Clone, Serialize, Deserialize)]
@@ -43,8 +48,8 @@ pub struct NodeState {
 }
 
 impl NodeState {
-    pub async fn new(ds: Box<dyn DataStorage + Send>) -> anyhow::Result<NodeState> {
-        let (broker, state) = Intern::new(ds).await?;
+    pub async fn new(ds: Box<dyn DataStorage + Send>, id: TabID) -> anyhow::Result<NodeState> {
+        let (broker, state) = Intern::new(ds, id).await?;
 
         Ok(NodeState { state, broker })
     }
@@ -53,18 +58,23 @@ impl NodeState {
 #[derive(Debug)]
 struct Intern {
     state: State,
+    ds: Box<dyn DataStorage + Send>,
+    id: TabID,
     _state_update: watch::Sender<State>,
 }
 
 impl Intern {
     async fn new(
-        ds: Box<dyn DataStorage + Send>,
+        mut ds: Box<dyn DataStorage + Send>,
+        id: TabID,
     ) -> anyhow::Result<(Broker<StateIn, StateOut>, watch::Receiver<State>)> {
-        let state = State::new(ds)?;
+        let state = State::new(&mut ds)?;
         let (_state_update, state_watch) = watch::channel(state.clone());
         Ok((
             Broker::new_with_handler(Box::new(Intern {
                 state,
+                ds,
+                id,
                 _state_update,
             }))
             .await?
@@ -77,12 +87,30 @@ impl Intern {
 #[platform_async_trait]
 impl SubsystemHandler<StateIn, StateOut> for Intern {
     async fn messages(&mut self, msgs: Vec<StateIn>) -> Vec<StateOut> {
-        let mut out = msgs
-            .into_iter()
-            .filter_map(|StateIn::Node(i)| self.state.update(i))
-            .map(|m| StateOut::Update(m))
-            .collect::<Vec<_>>();
-        if !out.is_empty() {
+        let mut out = vec![];
+        let mut new_state = false;
+        for msg in msgs {
+            if let Some(m) = match msg {
+                StateIn::Node(node_out) => self.state.update_node(node_out),
+                StateIn::Update(_) => {
+                    new_state = true;
+                    match State::new(&mut self.ds) {
+                        Ok(s) => self.state = s,
+                        Err(e) => log::warn!("Couldn't read state: {e:?}"),
+                    }
+                    None
+                }
+                StateIn::Tabs(tabs) => self.state.update_tabs(tabs),
+            } {
+                out.push(StateOut::Update(m));
+            }
+        }
+        if !out.is_empty() || new_state {
+            if self.state.is_leader(&self.id) {
+                self.state.store(&mut self.ds);
+            } else {
+                out.clear();
+            }
             out.insert(0, StateOut::State(self.state.clone()));
         }
         out
@@ -105,18 +133,15 @@ pub struct State {
     pub nodes_online: Vec<nodeconfig::NodeInfo>,
     pub dht_storage_stats: dht_storage::intern::Stats,
     pub leader: Option<TabID>,
-    pub is_leader: bool,
     pub tab_list: Vec<TabID>,
     pub flos: HashMap<realm::RealmID, HashMap<FloID, FloCuckoo>>,
-    #[serde(skip)]
-    ds: Option<Box<dyn DataStorage + Send>>,
 }
 
-const STORAGE_CONFIG: &str = "danodeState";
+const STORAGE_STATE: &str = "danodeState";
 
 impl State {
-    fn new(ds: Box<dyn DataStorage + Send>) -> anyhow::Result<Self> {
-        if let Ok(s) = ds.get(STORAGE_CONFIG) {
+    fn new(ds: &mut Box<dyn DataStorage + Send>) -> anyhow::Result<Self> {
+        if let Ok(s) = ds.get(STORAGE_STATE) {
             if let Ok(state) = serde_json::from_str::<State>(&s) {
                 return Ok(state);
             }
@@ -130,13 +155,11 @@ impl State {
             nodes_online: Vec::new(),
             dht_storage_stats: dht_storage::intern::Stats::default(),
             leader: None,
-            is_leader: false,
             tab_list: Vec::new(),
             flos: HashMap::new(),
-            ds: Some(ds),
         };
 
-        state.store();
+        state.store(ds);
         Ok(state)
     }
 
@@ -146,34 +169,30 @@ impl State {
             .and_then(|conf| conf.system_realm.clone())
     }
 
-    fn store(&mut self) {
+    pub fn is_leader(&self, id: &TabID) -> bool {
+        self.tab_list.first() == Some(id)
+    }
+
+    fn store(&mut self, ds: &mut Box<dyn DataStorage + Send>) {
         if let Ok(s) = serde_json::to_string(self) {
-            if let Some(ds) = &mut self.ds {
-                if let Err(e) = ds.set("DANODE_STATE", &s) {
-                    log::warn!("Couldn't store: {e:?}");
-                }
+            if let Err(e) = ds.set(STORAGE_STATE, &s) {
+                log::warn!("Couldn't store: {e:?}");
             }
         }
     }
 
-    fn update(&mut self, msg: NodeOut) -> Option<StateUpdate> {
-        let out = match msg {
-            // NodeOut::IsLeader => return None,
-            // NodeOut::Proxy(proxy_out) => match proxy_out {
-            //     ProxyOut::Elected => {
-            //         self.is_leader = true;
-            //         StateUpdate::IsLeader
-            //     }
-            //     ProxyOut::NewLeader(leader) => {
-            //         self.leader = Some(leader);
-            //         StateUpdate::NewLeader
-            //     }
-            //     ProxyOut::TabList(list) => {
-            //         self.tab_list = list;
-            //         StateUpdate::TabList
-            //     }
-            //     _ => return None,
-            // },
+    fn update_tabs(&mut self, msg: Tabs) -> Option<StateUpdate> {
+        Some(match msg {
+            Tabs::Elected | Tabs::NewLeader(_) => StateUpdate::NewLeader,
+            Tabs::TabList(tab_ids) => {
+                self.tab_list = tab_ids;
+                StateUpdate::TabList
+            }
+        })
+    }
+
+    fn update_node(&mut self, msg: NodeOut) -> Option<StateUpdate> {
+        Some(match msg {
             NodeOut::DHTRouter(out) => match out {
                 DHTRouterOut::NodeList(list) => {
                     self.nodes_connected_dht = list;
@@ -224,9 +243,7 @@ impl State {
                 }
                 _ => return None,
             },
-        };
-        self.store();
-        Some(out)
+        })
     }
 }
 
@@ -249,9 +266,7 @@ pub enum StateUpdate {
     ReceivedFlo,
     // The status of the DHT Storage changed
     DHTStorageStats,
-    // This tab is the leader
-    IsLeader,
-    // Other new leader elected
+    // New leader elected
     NewLeader,
     // Received a new list of tabs
     TabList,

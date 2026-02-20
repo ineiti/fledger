@@ -108,7 +108,7 @@ impl DaNode {
 
     /// Set the div element to display the status bar
     pub async fn set_status_div(&mut self, div_id: String) -> Result<usize, String> {
-        let b = StatusBar::new(&div_id, self.state.state.borrow().clone())
+        let b = StatusBar::new(self.id.clone(), &div_id, self.state.state.borrow().clone())
             .await
             .map_err(|e| format!("Couldn't create new status bar: {e:?}"))?;
         self.state
@@ -174,8 +174,9 @@ impl DaNode {
             )
             .await?
             .broker,
+            state: NodeState::new(DataStorageIndexedDB::new("node_state").await?, id.clone())
+                .await?,
             id,
-            state: NodeState::new(DataStorageIndexedDB::new("node_state").await?).await?,
         })
     }
 }
