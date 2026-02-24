@@ -59,7 +59,11 @@ async function new_event(status: StateUpdate, state: State) {
       addLog(`${state.realm_ids.length} realms available`);
       break;
     case StateUpdate.NewLeader:
-      if (state) addLog(`Got elected as leader`);
+      let role = "Searching";
+      if (state.is_leader !== null) {
+        role = state.is_leader ? "leader-tab" : "follower-tab";
+      }
+      addLog(`New leader got elected - ${role}`);
       break;
     case StateUpdate.TabList:
       addLog(`${state.tab_list.length} tabs available`);

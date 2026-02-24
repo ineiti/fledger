@@ -1,11 +1,6 @@
 use std::collections::HashMap;
 
-use flarch::{
-    broker::{Broker, SubsystemHandler},
-    data_storage::DataStorage,
-    nodeids::NodeID,
-    platform_async_trait,
-};
+use flarch::{data_storage::DataStorage, nodeids::NodeID};
 use flmodules::{
     dht_router::broker::DHTRouterOut,
     dht_storage::{self, broker::DHTStorageOut, core::FloCuckoo},
@@ -15,116 +10,13 @@ use flmodules::{
 };
 use flnode::node::Node;
 use serde::{Deserialize, Serialize};
-use tokio::sync::watch;
 use tsify::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     darealm,
-    proxy::{
-        broadcast::TabID,
-        proxy::{NodeOut, Tabs},
-    },
+    proxy::{broadcast::TabID, proxy::NodeOut},
 };
-
-#[derive(Debug, Clone)]
-pub enum StateIn {
-    Node(NodeOut),
-    UpdateFromLeader(StateUpdate),
-    Tabs(Tabs),
-}
-
-#[derive(Tsify, Debug, Clone, Serialize, Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub enum StateOut {
-    State(State),
-    Update(StateUpdate),
-}
-
-#[derive(Debug, Clone)]
-pub struct NodeState {
-    pub state: watch::Receiver<State>,
-    pub broker: Broker<StateIn, StateOut>,
-}
-
-impl NodeState {
-    pub async fn new(ds: Box<dyn DataStorage + Send>, id: TabID) -> anyhow::Result<NodeState> {
-        let (broker, state) = Intern::new(ds, id).await?;
-
-        Ok(NodeState { state, broker })
-    }
-}
-
-#[derive(Debug)]
-struct Intern {
-    state: State,
-    ds: Box<dyn DataStorage + Send>,
-    id: TabID,
-    _state_update: watch::Sender<State>,
-}
-
-impl Intern {
-    async fn new(
-        mut ds: Box<dyn DataStorage + Send>,
-        id: TabID,
-    ) -> anyhow::Result<(Broker<StateIn, StateOut>, watch::Receiver<State>)> {
-        let state = State::new(&mut ds)?;
-        let (_state_update, state_watch) = watch::channel(state.clone());
-        Ok((
-            Broker::new_with_handler(Box::new(Intern {
-                state,
-                ds,
-                id,
-                _state_update,
-            }))
-            .await?
-            .0,
-            state_watch,
-        ))
-    }
-}
-
-#[platform_async_trait]
-impl SubsystemHandler<StateIn, StateOut> for Intern {
-    async fn messages(&mut self, msgs: Vec<StateIn>) -> Vec<StateOut> {
-        let mut out = vec![];
-        for msg in msgs {
-            let is_leader = self.state.is_leader(&self.id);
-            match msg {
-                StateIn::Node(node_out) => {
-                    log::info!("Got node {is_leader}");
-                    if is_leader {
-                        out.extend(self.state.update_node(node_out))
-                    }
-                }
-                StateIn::UpdateFromLeader(update) => {
-                    log::info!("Got UpdateFromLeader {is_leader}");
-                    if !is_leader {
-                        out.push(StateOut::Update(update));
-                        match State::new(&mut self.ds) {
-                            Ok(s) => self.state = s,
-                            Err(e) => log::warn!("Couldn't read state: {e:?}"),
-                        }
-                    }
-                }
-                StateIn::Tabs(tabs) => {
-                    log::info!("Got Tabs {is_leader}");
-                    let t = self.state.update_tabs(tabs);
-                    if is_leader {
-                        out.extend(t);
-                    }
-                }
-            }
-        }
-        if !out.is_empty() {
-            if self.state.is_leader(&self.id) {
-                self.state.store(&mut self.ds);
-            }
-            out.insert(0, StateOut::State(self.state.clone()));
-        }
-        out
-    }
-}
 
 #[derive(Tsify)]
 pub struct NodeConfig {
@@ -141,38 +33,40 @@ pub struct State {
     pub nodes_connected_dht: Vec<NodeID>,
     pub nodes_online: Vec<nodeconfig::NodeInfo>,
     pub dht_storage_stats: dht_storage::intern::Stats,
-    pub leader: Option<TabID>,
-    pub tab_list: Vec<TabID>,
     pub flos: HashMap<realm::RealmID, HashMap<FloID, FloCuckoo>>,
+    pub is_leader: Option<bool>,
+    pub tab_list: Vec<TabID>,
 }
 
 const STORAGE_STATE: &str = "danodeState";
 
 impl State {
-    fn new(ds: &mut Box<dyn DataStorage + Send>) -> anyhow::Result<Self> {
-        if let Ok(s) = ds.get(STORAGE_STATE) {
-            if let Ok(state) = serde_json::from_str::<State>(&s) {
-                return Ok(state);
-            }
-        }
-        let node_config = Node::get_config(ds.clone())?;
-        let mut state = Self {
-            config: None,
-            node_info: node_config.info,
-            realm_ids: Vec::new(),
-            nodes_connected_dht: Vec::new(),
-            nodes_online: Vec::new(),
-            dht_storage_stats: dht_storage::intern::Stats::default(),
-            leader: None,
-            tab_list: Vec::new(),
-            flos: HashMap::new(),
-        };
-
-        state.store(ds);
+    pub fn read(
+        ds: &mut Box<dyn DataStorage + Send>,
+        leader: Option<bool>,
+    ) -> anyhow::Result<Self> {
+        let state_str = ds.get(STORAGE_STATE)?;
+        let mut state = serde_json::from_str::<State>(&state_str)
+            .ok()
+            .unwrap_or_else(|| {
+                let node_config = Node::get_config(ds.clone()).unwrap();
+                Self {
+                    config: None,
+                    node_info: node_config.info,
+                    realm_ids: Vec::new(),
+                    nodes_connected_dht: Vec::new(),
+                    nodes_online: Vec::new(),
+                    dht_storage_stats: dht_storage::intern::Stats::default(),
+                    flos: HashMap::new(),
+                    tab_list: Vec::new(),
+                    is_leader: None,
+                }
+            });
+        state.is_leader = leader;
         Ok(state)
     }
 
-    fn store(&mut self, ds: &mut Box<dyn DataStorage + Send>) {
+    pub fn store(&mut self, ds: &mut Box<dyn DataStorage + Send>) {
         if let Ok(s) = serde_json::to_string(self) {
             if let Err(e) = ds.set(STORAGE_STATE, &s) {
                 log::warn!("Couldn't store: {e:?}");
@@ -180,29 +74,28 @@ impl State {
         }
     }
 
-    fn update_tabs(&mut self, msg: Tabs) -> Vec<StateOut> {
-        vec![StateOut::Update(match msg {
-            Tabs::Elected | Tabs::NewLeader(_) => StateUpdate::NewLeader,
-            Tabs::TabList(tab_ids) => {
-                self.tab_list = tab_ids;
-                StateUpdate::TabList
-            }
-        })]
+    pub fn msg_new_tabs(&mut self, tab_list: Vec<TabID>) -> StateUpdate {
+        self.tab_list = tab_list;
+        StateUpdate::TabList
     }
 
-    fn update_node(&mut self, msg: NodeOut) -> Vec<StateOut> {
-        vec![StateOut::Update(match msg {
+    pub fn msg_node(&mut self, msg: NodeOut) -> Option<StateUpdate> {
+        Some(match msg {
             NodeOut::DHTRouter(out) => match out {
                 DHTRouterOut::NodeList(list) => {
-                    self.nodes_connected_dht = list;
-                    if self.nodes_connected_dht.is_empty() {
-                        StateUpdate::DisconnectNodes
+                    if self.nodes_connected_dht != list {
+                        self.nodes_connected_dht = list;
+                        if self.nodes_connected_dht.is_empty() {
+                            StateUpdate::DisconnectNodes
+                        } else {
+                            StateUpdate::ConnectedNodes
+                        }
                     } else {
-                        StateUpdate::ConnectedNodes
+                        return None;
                     }
                 }
                 DHTRouterOut::SystemRealm(_) => StateUpdate::SystemRealm,
-                _ => return vec![],
+                _ => return None,
             },
             NodeOut::DHTStorage(msg) => match msg {
                 DHTStorageOut::FloValue(fv) => {
@@ -229,20 +122,24 @@ impl State {
                     self.dht_storage_stats = st;
                     StateUpdate::DHTStorageStats
                 }
-                _ => return vec![],
+                _ => return None,
             },
             NodeOut::Network(msg) => match msg {
                 NetworkOut::NodeListFromWS(list) => {
-                    self.nodes_online = list;
-                    StateUpdate::AvailableNodes
+                    if self.nodes_online != list {
+                        self.nodes_online = list;
+                        StateUpdate::AvailableNodes
+                    } else {
+                        return None;
+                    }
                 }
                 NetworkOut::SystemConfig(sc) => {
                     self.config = Some(sc);
                     StateUpdate::ConnectSignal
                 }
-                _ => return vec![],
+                _ => return None,
             },
-        })]
+        })
     }
 }
 
@@ -253,10 +150,6 @@ impl State {
             .as_ref()
             .and_then(|conf| conf.system_realm.as_ref())
             .map(|rid| darealm::RealmID::new(rid.clone()))
-    }
-
-    pub fn is_leader(&self, id: &TabID) -> bool {
-        self.tab_list.first() == Some(id)
     }
 }
 

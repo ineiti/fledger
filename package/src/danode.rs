@@ -1,3 +1,4 @@
+use flarch::add_translator;
 use flarch::broker::Broker;
 use flarch::data_storage::DataStorageIndexedDB;
 use flarch::tasks::spawn_local;
@@ -9,7 +10,7 @@ use wasm_bindgen::prelude::*;
 use crate::darealm::{DaRealm, RealmID};
 use crate::proxy::broadcast::TabID;
 use crate::proxy::proxy::{Proxy, ProxyOut};
-use crate::status_bar::StatusBar;
+use crate::status_bar::{StatusBar, StatusBarIn};
 
 /// Main DaNode interface for browser
 #[wasm_bindgen]
@@ -79,7 +80,7 @@ impl DaNode {
             .await
             .map_err(|e| format!("Getting tap: {e:?}"))?;
 
-        let state = self.proxy.state.state.clone();
+        let state = self.proxy.state.clone();
         spawn_local(async move {
             while let Some(ProxyOut::Update(msg)) = tap.recv().await {
                 if let Err(e) = callback.call2(
@@ -106,25 +107,14 @@ impl DaNode {
 
     /// Set the div element to display the status bar
     pub async fn set_status_div(&mut self, div_id: String) -> Result<usize, String> {
-        let b = StatusBar::new(
-            self.id.clone(),
-            &div_id,
-            self.proxy.state.state.borrow().clone(),
-        )
-        .await
-        .map_err(|e| format!("Couldn't create new status bar: {e:?}"))?;
-        self.proxy
-            .state
-            .broker
-            .add_translator_o_ti(b.clone(), Box::new(|msg| Some(msg)))
+        self.ssd(div_id)
             .await
-            .map_err(|e| format!("While adding translator: {e:?}"))
+            .map_err(|e| format!("While setting status_div - {e:?}"))
     }
 
     /// Remove the status bar display
     pub async fn remove_status_div(&mut self, id: usize) -> Result<(), String> {
         self.proxy
-            .state
             .broker
             .remove_subsystem(id)
             .await
@@ -133,6 +123,15 @@ impl DaNode {
 
     pub fn get_tab_id(&self) -> String {
         format!("{}", self.id)
+    }
+}
+
+impl DaNode {
+    async fn ssd(&mut self, div_id: String) -> anyhow::Result<usize> {
+        let b = StatusBar::new(self.id.clone(), &div_id, self.proxy.state.clone()).await?;
+        Ok(
+            add_translator!(self.proxy.broker, o_ti, b, ProxyOut::Update(su) => StatusBarIn::Update(su)),
+        )
     }
 }
 

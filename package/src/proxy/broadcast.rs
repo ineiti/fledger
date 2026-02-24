@@ -13,7 +13,7 @@ use crate::proxy::{proxy::NodeIn, state::StateUpdate};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BroadcastToTabs {
-    Alive,
+    Alive(Option<bool>),
     Stopped,
     ToLeader(NodeIn),
     FromLeader(StateUpdate),
@@ -21,7 +21,7 @@ pub enum BroadcastToTabs {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum BroadcastFromTabs {
-    Alive(TabID),
+    Alive(TabID, Option<bool>),
     Stopped(TabID),
     ToLeader(NodeIn),
     FromLeader(StateUpdate),
@@ -50,12 +50,12 @@ impl Broadcast {
         let channel = BroadcastChannel::new(channel_name).map_err(|e| anyhow::anyhow!("{e:?}"))?;
         let mut broker = Broker::new();
         let mut br_cl = broker.clone();
-        // let id_cl = id.clone();
+        let _id_cl = id.clone();
         let onmessage = Closure::<dyn FnMut(web_sys::MessageEvent)>::new(
             move |event: web_sys::MessageEvent| {
                 if let Some(data_str) = event.data().as_string() {
                     if let Ok(msg) = serde_json::from_str::<BroadcastFromTabs>(&data_str) {
-                        // log::info!("{}: Got {msg:?}", id_cl);
+                        // log::info!("{}: Got {msg:?}", _id_cl);
                         if let Err(e) = br_cl.emit_msg_out(msg) {
                             log::error!("While sending broadcast message: {e}");
                         }
@@ -91,7 +91,7 @@ impl Broadcast {
 
     fn convert_message(id: TabID, msg: BroadcastToTabs) -> BroadcastFromTabs {
         match msg {
-            BroadcastToTabs::Alive => BroadcastFromTabs::Alive(id),
+            BroadcastToTabs::Alive(l) => BroadcastFromTabs::Alive(id, l),
             BroadcastToTabs::Stopped => BroadcastFromTabs::Stopped(id),
             BroadcastToTabs::ToLeader(data) => BroadcastFromTabs::ToLeader(data),
             BroadcastToTabs::FromLeader(data) => BroadcastFromTabs::FromLeader(data),
@@ -248,11 +248,11 @@ pub mod test {
         let mut tab0 = channels.new().await?;
         let mut tab1 = channels.new().await?;
 
-        tab0.send(BroadcastToTabs::Alive)?;
-        assert_eq!(BroadcastFromTabs::Alive(tab0.id), tab1.recv().await?);
+        tab0.send(BroadcastToTabs::Alive(None))?;
+        assert_eq!(BroadcastFromTabs::Alive(tab0.id, None), tab1.recv().await?);
 
-        tab1.send(BroadcastToTabs::Alive)?;
-        assert_eq!(BroadcastFromTabs::Alive(tab1.id), tab0.recv().await?);
+        tab1.send(BroadcastToTabs::Alive(None))?;
+        assert_eq!(BroadcastFromTabs::Alive(tab1.id, None), tab0.recv().await?);
         Ok(())
     }
 }
