@@ -598,8 +598,8 @@
       }
     },
     "wasm-pack@latest": {
-      "last_modified": "2025-03-11T17:52:14Z",
-      "resolved": "github:NixOS/nixpkgs/0d534853a55b5d02a4ababa1d71921ce8f0aee4c#wasm-pack",
+      "last_modified": "2026-01-23T17:20:52Z",
+      "resolved": "github:NixOS/nixpkgs/a1bab9e494f5f4939442a57a58d0449a109593fe#wasm-pack",
       "source": "devbox-search",
       "version": "0.13.1",
       "systems": {
@@ -607,41 +607,41 @@
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/s60d3ga2vfzmcc51sm6bk1by5d7mqscq-wasm-pack-0.13.1",
+              "path": "/nix/store/rylvi51gwxwxljcbayr7lkp4xmmwa9cb-wasm-pack-0.13.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/s60d3ga2vfzmcc51sm6bk1by5d7mqscq-wasm-pack-0.13.1"
+          "store_path": "/nix/store/rylvi51gwxwxljcbayr7lkp4xmmwa9cb-wasm-pack-0.13.1"
         },
         "aarch64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/h4amv3z8pg62z9q6h1kr5ky165bx94if-wasm-pack-0.13.1",
+              "path": "/nix/store/cy8phfjq8fhziindfpv5n8y18n756ip5-wasm-pack-0.13.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/h4amv3z8pg62z9q6h1kr5ky165bx94if-wasm-pack-0.13.1"
+          "store_path": "/nix/store/cy8phfjq8fhziindfpv5n8y18n756ip5-wasm-pack-0.13.1"
         },
         "x86_64-darwin": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/l3fhgn66cys1wd8m9iimymw7xdi8iazh-wasm-pack-0.13.1",
+              "path": "/nix/store/ds72jg2a9kwsbhzkcs632jp4qx23zklp-wasm-pack-0.13.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/l3fhgn66cys1wd8m9iimymw7xdi8iazh-wasm-pack-0.13.1"
+          "store_path": "/nix/store/ds72jg2a9kwsbhzkcs632jp4qx23zklp-wasm-pack-0.13.1"
         },
         "x86_64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/v6n4nfp8xs9d0b3ka6d3rj3d9rfdrx05-wasm-pack-0.13.1",
+              "path": "/nix/store/vk16igm145l19fg7jwvl731xq24p06z8-wasm-pack-0.13.1",
               "default": true
             }
           ],
-          "store_path": "/nix/store/v6n4nfp8xs9d0b3ka6d3rj3d9rfdrx05-wasm-pack-0.13.1"
+          "store_path": "/nix/store/vk16igm145l19fg7jwvl731xq24p06z8-wasm-pack-0.13.1"
         }
       }
     },

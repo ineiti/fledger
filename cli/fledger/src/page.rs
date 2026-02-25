@@ -8,8 +8,8 @@ use flcrypto::{
     signer::{SignerTrait, VerifierTrait},
 };
 use flmodules::{
-    dht_storage::{broker::DHTStorage, core::Cuckoo, realm_view::RealmView},
-    flo::{blob::BlobAccess, realm::RealmID},
+    dht_storage::{broker::DHTStorage, core::Cuckoo},
+    flo::{blob::BlobAccess, realm::RealmID, realm_view::RealmView},
 };
 
 pub struct Page {

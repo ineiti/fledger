@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     dht_storage::{
-        broker::DHTStorage,
+        broker::{DHTStorage, DHTStorageOut, StorageError},
         core::{Cuckoo, RealmConfig},
     },
     flo::{
@@ -28,8 +28,6 @@ use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 
-use super::broker::{DHTStorageOut, StorageError};
-
 /// A RealmView is a wrapper for the dht_storage, FloRealm, FloBlob{Page,Tag}.
 /// It offers a simpler interface to interact with these elements using paths
 /// as well as IDs.
@@ -45,7 +43,7 @@ pub struct RealmView {
 #[derive(Debug, Clone)]
 pub struct RealmStorage<T> {
     realm: RealmID,
-    dht_storage: DHTStorage,
+    ds: DHTStorage,
     pub root: BlobID,
     pub storage: HashMap<BlobID, FloWrapper<T>>,
     pub cuckoos: HashMap<BlobID, Vec<BlobID>>,
@@ -424,7 +422,7 @@ where
             root: (*root.flo_id().clone()).into(),
             storage: HashMap::new(),
             cuckoos: HashMap::new(),
-            dht_storage,
+            ds: dht_storage,
         };
         rs.update_cuckoos(&rs.root.clone()).await?;
         Ok(rs)
@@ -496,7 +494,7 @@ where
 
     async fn update_cuckoos(&mut self, bid: &BlobID) -> anyhow::Result<()> {
         for id in self
-            .dht_storage
+            .ds
             .get_cuckoos(&self.realm.global_id((**bid).into()))
             .await
             .unwrap_or_default()
@@ -504,7 +502,7 @@ where
             .chain(std::iter::once((**bid).into()))
         {
             if let Ok(flo) = self
-                .dht_storage
+                .ds
                 .get_flo::<T>(&self.realm.global_id(id.clone()))
                 .await
             {
@@ -683,7 +681,10 @@ mod test {
 
     use flarch::{broker::Broker, data_storage::DataStorageTemp, nodeids::NodeID};
 
-    use crate::{dht_storage::core::DHTConfig, timer::Timer};
+    use crate::{
+        dht_storage::{broker::DHTStorage, core::DHTConfig},
+        timer::Timer,
+    };
 
     use super::*;
 
@@ -722,18 +723,19 @@ mod test {
 
     #[tokio::test]
     async fn get_path() -> anyhow::Result<()> {
+        let ds = DHTStorage::start(
+            DataStorageTemp::new_box(),
+            DHTConfig::default(NodeID::rnd()),
+            Timer::start().await?.broker,
+            Broker::new(),
+        )
+        .await?;
         let mut rs: RealmStorage<BlobPage> = RealmStorage {
             realm: RealmID::from_str("00")?,
             root: BlobID::from_str("00")?,
             storage: HashMap::new(),
             cuckoos: HashMap::new(),
-            dht_storage: DHTStorage::start(
-                DataStorageTemp::new_box(),
-                DHTConfig::default(NodeID::rnd()),
-                Timer::start().await?.broker,
-                Broker::new(),
-            )
-            .await?,
+            ds: DHTStorage::from_broker(ds.broker, 1000).await?,
         };
         let root = add_page(&mut rs, "danu", None, Cuckoo::Duration(1000));
         rs.root = root.blob_id();

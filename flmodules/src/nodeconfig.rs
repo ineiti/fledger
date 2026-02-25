@@ -304,13 +304,13 @@ mod tests {
     }
 
     #[test]
-    fn node_info_serde() -> anyhow::Result<()>{
+    fn node_info_serde() -> anyhow::Result<()> {
         let nc = NodeConfig::new();
         let ni = nc.info;
         let ni_str = ni.encode();
         let ni_clone = NodeInfo::decode(&ni_str)?;
         assert_eq!(ni, ni_clone);
-        
+
         Ok(())
     }
 }

@@ -93,7 +93,7 @@ impl Display for NCOutput {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, EnumDisplay)]
+#[derive(Debug, Clone, PartialEq, EnumDisplay, Serialize, Deserialize)]
 /// One of the directions for a connection
 pub enum Direction {
     /// Being initiated by the remote peer
