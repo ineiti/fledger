@@ -42,7 +42,7 @@ async function initApp() {
   }
 }
 
-const realms: RealmID[] = [];
+let realms: RealmID[] = [];
 
 async function new_event(status: StateUpdate, state: State) {
   switch (status) {
@@ -56,6 +56,7 @@ async function new_event(status: StateUpdate, state: State) {
       addLog(`${state.nodes_online.length} nodes available`);
       break;
     case StateUpdate.RealmAvailable:
+      realms = state.realm_ids;
       addLog(`${state.realm_ids.length} realms available`);
       break;
     case StateUpdate.NewLeader:

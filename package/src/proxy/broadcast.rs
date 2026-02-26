@@ -1,3 +1,5 @@
+//! Implements the broadcast channel to communicate between tabs.
+
 use flarch::{
     broker::{Broker, SubsystemHandler},
     platform_async_trait,

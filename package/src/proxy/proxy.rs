@@ -1,8 +1,11 @@
+//! Proxies the node between different nodes. Upon start, the tabs listen
+//! to other messages, and then decide on a leader as the tab which started
+//! first (plus some randomness for reloading tabs).
+
 use flarch::{add_translator, broker::Broker, data_storage::DataStorage};
 use flmodules::{
-    dht_router::broker::{DHTRouterIn, DHTRouterOut},
-    dht_storage::broker::{DHTStorageIn, DHTStorageOut},
-    network::broker::NetworkOut,
+    dht_router::broker::DHTRouterIn,
+    dht_storage::broker::DHTStorageIn,
     nodeconfig::NodeInfo,
     timer::{BrokerTimer, TimerMessage},
 };
@@ -22,6 +25,12 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum ProxyIn {
     Node(NodeIn),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum NodeIn {
+    DHTRouter(DHTRouterIn),
+    DHTStorage(DHTStorageIn),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -64,18 +73,4 @@ impl Proxy {
             node_info: node_config.info,
         })
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum NodeIn {
-    DHTRouter(DHTRouterIn),
-    DHTStorage(DHTStorageIn),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum NodeOut {
-    DHTRouter(DHTRouterOut),
-    DHTStorage(DHTStorageOut),
-    // network only sends NetworkOut::SystemConfig and NetworkOut::NodeListFromWS.
-    Network(NetworkOut),
 }

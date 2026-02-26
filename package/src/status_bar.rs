@@ -1,3 +1,6 @@
+//! Shows a minimal status bar for projects to simplify showing
+//! the current status of danu.
+
 use flarch::{
     broker::{Broker, SubsystemHandler},
     platform_async_trait,

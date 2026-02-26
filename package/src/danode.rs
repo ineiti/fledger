@@ -1,3 +1,5 @@
+//! DaNode is the basic class for the typescript library.
+
 use flarch::add_translator;
 use flarch::broker::Broker;
 use flarch::data_storage::DataStorageIndexedDB;
@@ -58,18 +60,6 @@ impl DaNode {
         ))
     }
 
-    /// Get basic statistics
-    pub fn get_stats(&self) -> JsValue {
-        // TODO: Implement actual stats retrieval
-        let stats = serde_json::json!({
-            "messages_sent": 0,
-            "messages_received": 0,
-            "uptime_seconds": 0
-        });
-
-        serde_wasm_bindgen::to_value(&stats).unwrap_or(JsValue::NULL)
-    }
-
     /// Set an event listener callback
     /// The callback will be called with events in the format: { type: string, data: any }
     pub async fn set_event_listener(&mut self, callback: Function) -> Result<usize, String> {
@@ -127,6 +117,22 @@ impl DaNode {
 }
 
 impl DaNode {
+    async fn from_net_conf(nc: NetConf) -> anyhow::Result<DaNode> {
+        let id = TabID::new();
+
+        Ok(DaNode {
+            ds: DHTStorage::from_broker(Broker::new(), 1000).await?,
+            proxy: Proxy::start(
+                DataStorageIndexedDB::new("node_state").await?,
+                nc,
+                id.clone(),
+                Timer::start().await?.broker,
+            )
+            .await?,
+            id,
+        })
+    }
+
     async fn ssd(&mut self, div_id: String) -> anyhow::Result<usize> {
         let b = StatusBar::new(self.id.clone(), &div_id, self.proxy.state.clone()).await?;
         Ok(
@@ -160,23 +166,5 @@ impl Default for NetConf {
             stun_server: None,
             turn_server: None,
         };
-    }
-}
-
-impl DaNode {
-    async fn from_net_conf(nc: NetConf) -> anyhow::Result<DaNode> {
-        let id = TabID::new();
-
-        Ok(DaNode {
-            ds: DHTStorage::from_broker(Broker::new(), 1000).await?,
-            proxy: Proxy::start(
-                DataStorageIndexedDB::new("node_state").await?,
-                nc,
-                id.clone(),
-                Timer::start().await?.broker,
-            )
-            .await?,
-            id,
-        })
     }
 }

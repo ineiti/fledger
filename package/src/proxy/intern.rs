@@ -1,3 +1,6 @@
+//! Does all the election of the tab-leader, starting of a node for
+//! the leader, and updating the state.
+
 use std::collections::HashMap;
 
 use flarch::{
@@ -7,7 +10,10 @@ use flarch::{
     platform_async_trait,
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
-use flmodules::{nodeconfig::NodeConfig, Modules};
+use flmodules::{
+    dht_router::broker::DHTRouterOut, dht_storage::broker::DHTStorageOut,
+    network::broker::NetworkOut, nodeconfig::NodeConfig, Modules,
+};
 use flnode::node;
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
@@ -17,7 +23,7 @@ use crate::{
     danode::NetConf,
     proxy::{
         broadcast::{BroadcastFromTabs, BroadcastToTabs, TabID},
-        proxy::{NodeIn, NodeOut},
+        proxy::NodeIn,
         state::{State, StateUpdate},
     },
 };
@@ -36,6 +42,13 @@ pub enum InternIn {
 pub enum InternOut {
     Broadcast(BroadcastToTabs),
     Update(StateUpdate),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum NodeOut {
+    DHTRouter(DHTRouterOut),
+    DHTStorage(DHTStorageOut),
+    Network(NetworkOut),
 }
 
 pub type BrokerIntern = Broker<InternIn, InternOut>;
@@ -240,7 +253,11 @@ impl Intern {
             TabRole::Leader => Some(true),
             _ => None,
         };
-        out.push(InternOut::Broadcast(BroadcastToTabs::Alive(role)));
+        self.update_state();
+        out.extend(vec![
+            InternOut::Broadcast(BroadcastToTabs::Alive(role)),
+            InternOut::Update(StateUpdate::NewLeader),
+        ]);
         out
     }
 

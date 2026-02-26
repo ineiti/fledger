@@ -1,3 +1,9 @@
+//! A common state for all tabs, so that all Flos are only stored
+//! once.
+//! The state is sent between the tabs using DataStorage, which
+//! has the disadvantage that somtimes it's not synchronized between
+//! the leader and the followers.
+
 use std::collections::HashMap;
 
 use flarch::{data_storage::DataStorage, nodeids::NodeID};
@@ -15,7 +21,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     darealm,
-    proxy::{broadcast::TabID, proxy::NodeOut},
+    proxy::{broadcast::TabID, intern::NodeOut},
 };
 
 #[derive(Tsify)]
