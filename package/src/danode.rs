@@ -9,7 +9,8 @@ use flmodules::timer::Timer;
 use js_sys::{Function, JsString};
 use wasm_bindgen::prelude::*;
 
-use crate::darealm::{DaRealm, RealmID};
+use crate::darealm::DaRealm;
+use crate::ids::RealmID;
 use crate::proxy::broadcast::TabID;
 use crate::proxy::proxy::{Proxy, ProxyOut};
 use crate::status_bar::{StatusBar, StatusBarIn};

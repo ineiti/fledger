@@ -20,7 +20,7 @@ use tsify::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
-    darealm,
+    ids,
     proxy::{broadcast::TabID, intern::NodeOut},
 };
 
@@ -151,11 +151,11 @@ impl State {
 
 #[wasm_bindgen]
 impl State {
-    pub fn get_system_realm(&self) -> Option<darealm::RealmID> {
+    pub fn get_system_realm(&self) -> Option<ids::RealmID> {
         self.config
             .as_ref()
             .and_then(|conf| conf.system_realm.as_ref())
-            .map(|rid| darealm::RealmID::new(rid.clone()))
+            .map(|rid| ids::RealmID::new(rid.clone()))
     }
 }
 
