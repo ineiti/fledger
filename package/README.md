@@ -1,4 +1,4 @@
-# @danu/danu
+# @fledger/danu
 
 Browser library for Fledger network, compiled to WebAssembly.
 
@@ -11,13 +11,13 @@ npm install file:../package/pkg
 
 When published:
 ```bash
-npm install @danu/danu
+npm install @fledger/danu
 ```
 
 ## Usage
 
 ```typescript
-import init, { FlNode, initialize } from '@danu/danu';
+import init, { FlNode, initialize } from '@fledger/danu';
 
 // Initialize WASM module
 await init();
