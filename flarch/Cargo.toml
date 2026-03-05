@@ -88,6 +88,8 @@ web-sys = { version = "0.3", features = [
     "WorkerGlobalScope",
     "Event",
     "EventTarget",
+    "ReadableStream",
+    "ReadableStreamDefaultController",
 ] }
 
 # [dev-dependencies]
