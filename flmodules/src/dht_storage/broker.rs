@@ -295,7 +295,7 @@ impl DHTStorage {
         Ok(self.send_wait_timeout(msg_in, check, self.timeout).await?)
     }
 
-    async fn send_wait_timeout<T>(
+    pub async fn send_wait_timeout<T>(
         &mut self,
         msg_in: DHTStorageIn,
         check: &(dyn Fn(DHTStorageOut) -> Option<T> + Sync),
