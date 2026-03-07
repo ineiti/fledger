@@ -4,16 +4,13 @@
 //! has the disadvantage that somtimes it's not synchronized between
 //! the leader and the followers.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use flarch::{data_storage::DataStorage, nodeids::NodeID};
 use flmodules::{
     dht_router::broker::DHTRouterOut,
     dht_storage::{self, broker::DHTStorageOut, core::FloCuckoo},
-    flo::{
-        flo::{Flo, FloID},
-        realm::{self, GlobalID},
-    },
+    flo::{flo::FloID, realm},
     network::{broker::NetworkOut, signal::FledgerConfig},
     nodeconfig::{self},
 };
@@ -151,17 +148,6 @@ impl State {
                 _ => return vec![],
             },
         }]
-    }
-
-    pub fn get_flo(&self, gid: &GlobalID) -> Option<Flo> {
-        self.get_flo_cuckoos(gid).map(|(flo, _)| flo)
-    }
-
-    pub fn get_flo_cuckoos(&self, gid: &GlobalID) -> Option<FloCuckoo> {
-        self.flos
-            .get(gid.realm_id())
-            .and_then(|realm| realm.get(gid.flo_id()))
-            .cloned()
     }
 }
 
