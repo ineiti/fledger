@@ -10,7 +10,10 @@ use flarch::{data_storage::DataStorage, nodeids::NodeID};
 use flmodules::{
     dht_router::broker::DHTRouterOut,
     dht_storage::{self, broker::DHTStorageOut, core::FloCuckoo},
-    flo::{flo::FloID, realm},
+    flo::{
+        flo::{Flo, FloID},
+        realm::{self, GlobalID},
+    },
     network::{broker::NetworkOut, signal::FledgerConfig},
     nodeconfig::{self},
 };
@@ -85,8 +88,8 @@ impl State {
         StateUpdate::TabList
     }
 
-    pub fn msg_node(&mut self, msg: NodeOut) -> Option<StateUpdate> {
-        Some(match msg {
+    pub fn msg_node(&mut self, msg: NodeOut) -> Vec<StateUpdate> {
+        vec![match msg {
             NodeOut::DHTRouter(out) => match out {
                 DHTRouterOut::NodeList(list) => {
                     if self.nodes_connected_dht != list {
@@ -97,28 +100,30 @@ impl State {
                             StateUpdate::ConnectedNodes
                         }
                     } else {
-                        return None;
+                        return vec![];
                     }
                 }
                 DHTRouterOut::SystemRealm(_) => StateUpdate::SystemRealm,
-                _ => return None,
+                _ => return vec![],
             },
             NodeOut::DHTStorage(msg) => match msg {
                 DHTStorageOut::FloValue(fv) => {
                     self.flos
                         .entry(fv.0.realm_id())
                         .or_insert_with(HashMap::new)
-                        .insert(fv.0.flo_id(), fv);
-                    StateUpdate::ReceivedFlo
+                        .insert(fv.0.flo_id(), fv.clone());
+                    StateUpdate::ReceivedFlo(fv.0.flo_id())
                 }
                 DHTStorageOut::FloValues(fvs) => {
+                    let mut ret = vec![];
                     for fv in fvs {
+                        ret.push(StateUpdate::ReceivedFlo(fv.0.flo_id()));
                         self.flos
                             .entry(fv.0.realm_id())
                             .or_insert_with(HashMap::new)
                             .insert(fv.0.flo_id(), fv);
                     }
-                    StateUpdate::ReceivedFlo
+                    return ret;
                 }
                 DHTStorageOut::RealmIDs(rids) => {
                     self.realm_ids = rids;
@@ -128,7 +133,7 @@ impl State {
                     self.dht_storage_stats = st;
                     StateUpdate::DHTStorageStats
                 }
-                _ => return None,
+                _ => return vec![],
             },
             NodeOut::Network(msg) => match msg {
                 NetworkOut::NodeListFromWS(list) => {
@@ -136,16 +141,27 @@ impl State {
                         self.nodes_online = list;
                         StateUpdate::AvailableNodes
                     } else {
-                        return None;
+                        return vec![];
                     }
                 }
                 NetworkOut::SystemConfig(sc) => {
                     self.config = Some(sc);
                     StateUpdate::ConnectSignal
                 }
-                _ => return None,
+                _ => return vec![],
             },
-        })
+        }]
+    }
+
+    pub fn get_flo(&self, gid: &GlobalID) -> Option<Flo> {
+        self.get_flo_cuckoos(gid).map(|(flo, _)| flo)
+    }
+
+    pub fn get_flo_cuckoos(&self, gid: &GlobalID) -> Option<FloCuckoo> {
+        self.flos
+            .get(gid.realm_id())
+            .and_then(|realm| realm.get(gid.flo_id()))
+            .cloned()
     }
 }
 
@@ -160,7 +176,6 @@ impl State {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[wasm_bindgen]
 pub enum StateUpdate {
     // Connection to the signalling server established
     ConnectSignal,
@@ -175,7 +190,7 @@ pub enum StateUpdate {
     RealmAvailable,
     // Got new Flo - not really sure if it is a new version, or just generally
     // a Flo arrived.
-    ReceivedFlo,
+    ReceivedFlo(FloID),
     // The status of the DHT Storage changed
     DHTStorageStats,
     // New leader elected

@@ -21,7 +21,8 @@
     "wasm-pack":        "latest",
     "nodejs":           "18",
     "cargo-udeps":      "latest",
-    "cargo-workspaces": "latest"
+    "cargo-workspaces": "latest",
+    "typescript":       "latest"
   },
   "shell": {
     "init_hook": [

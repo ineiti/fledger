@@ -75,7 +75,7 @@ impl StatusBar {
             | StateUpdate::ConnectedNodes
             | StateUpdate::AvailableNodes
             | StateUpdate::DisconnectNodes => self.update_connection(),
-            StateUpdate::RealmAvailable | StateUpdate::ReceivedFlo => self.update_page_list(),
+            StateUpdate::RealmAvailable | StateUpdate::ReceivedFlo(_) => self.update_page_list(),
             StateUpdate::SystemRealm | StateUpdate::DHTStorageStats => self.update_page_list(),
             StateUpdate::NewLeader => self.update_all(),
             StateUpdate::TabList => self.update_tabs(),

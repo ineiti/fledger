@@ -4,7 +4,7 @@ import init, {
   RealmID,
   State,
   StateUpdate,
-} from "@danu/danu";
+} from "@fledger/danu";
 
 const logsContainer = document.getElementById("logs") as HTMLDivElement;
 
@@ -32,7 +32,7 @@ async function initApp() {
     addLog("Creating DaNode instance...", "info");
     node = await DaNode.from_default();
     node.set_status_div("danu-stats");
-    node.set_event_listener(new_event);
+    // node.set_event_listener(new_event);
     addLog(`This is tab ${node.get_tab_id()}`);
 
     addLog("Danu Browser initialized successfully", "success");
@@ -71,6 +71,16 @@ async function new_event(status: StateUpdate, state: State) {
       break;
   }
 }
+
+// import { signal, effect } from "@preact/signals-core";
+// let dn = DaNode.from_default();
+// let realm = dn.get_realm();
+// realm.set_update_callback((flo_realm) => console.log(flo_realm));
+// let flo_page = realm.get_flo_page_path("/");
+// flo_page.set_update_callback((fp) => console.log(fp));
+// flo_page.update((fp) => {
+//   fp.set_index("<html><h1>New");
+// });
 
 // Initialize on page load
 initApp();

@@ -9,8 +9,10 @@ pub fn initialize() {
     info!("danode-core initialized");
 }
 
+pub mod daflo;
 pub mod danode;
 pub mod darealm;
+pub mod error;
 pub mod ids;
 pub mod proxy;
 mod status_bar;

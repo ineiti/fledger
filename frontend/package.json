@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@danu/danu": "file:../package/pkg"
+    "@fledger/danu": "file:../package/pkg"
   },
   "devDependencies": {
     "vite": "^5.0.0",

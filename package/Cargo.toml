@@ -49,6 +49,8 @@ features = [
     "HtmlHeadElement",
     "Window",
     "DomTokenList",
+    "ReadableStream",
+    "ReadableStreamDefaultController",
 ]
 
 [profile.release]

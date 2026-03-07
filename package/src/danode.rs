@@ -1,24 +1,23 @@
 //! DaNode is the basic class for the typescript library.
 
 use flarch::add_translator;
-use flarch::broker::Broker;
 use flarch::data_storage::DataStorageIndexedDB;
 use flarch::tasks::spawn_local;
-use flmodules::dht_storage::broker::DHTStorage;
+use flmodules::dht_storage::broker::DHTStorageIn;
 use flmodules::timer::Timer;
-use js_sys::{Function, JsString};
+use js_sys::Function;
 use wasm_bindgen::prelude::*;
 
-use crate::darealm::DaRealm;
+use crate::darealm::RealmObserver;
+use crate::error::WasmError;
 use crate::ids::RealmID;
 use crate::proxy::broadcast::TabID;
-use crate::proxy::proxy::{Proxy, ProxyOut};
+use crate::proxy::proxy::{NodeIn, Proxy, ProxyIn, ProxyOut};
 use crate::status_bar::{StatusBar, StatusBarIn};
 
 /// Main DaNode interface for browser
 #[wasm_bindgen]
 pub struct DaNode {
-    ds: DHTStorage,
     id: TabID,
     proxy: Proxy,
 }
@@ -26,10 +25,8 @@ pub struct DaNode {
 #[wasm_bindgen]
 impl DaNode {
     /// Create a new DaNode instance
-    pub async fn from_default() -> Result<DaNode, JsString> {
-        Self::from_net_conf(NetConf::default())
-            .await
-            .map_err(|e| format!("While initialising DaNode: {e:?}").into())
+    pub async fn from_default() -> Result<DaNode, WasmError> {
+        Ok(Self::from_net_conf(NetConf::default()).await?)
     }
 
     pub async fn from_config(
@@ -37,79 +34,68 @@ impl DaNode {
         signal_server: String,
         stun_server: Option<String>,
         turn_server: Option<String>,
-    ) -> Result<DaNode, JsString> {
-        Self::from_net_conf(NetConf {
+    ) -> Result<DaNode, WasmError> {
+        Ok(Self::from_net_conf(NetConf {
             storage_name,
             signal_server,
             stun_server,
             turn_server,
         })
-        .await
-        .map_err(|e| format!("While initialising DaNode: {e:?}").into())
+        .await?)
     }
 
-    pub fn sync(&mut self) -> Result<(), String> {
-        self.ds.sync().map_err(|e| format!("{e}"))
-    }
-
-    pub async fn get_realm(&mut self, _id: RealmID) -> Result<DaRealm, JsString> {
-        Ok(DaRealm::new(
-            self.ds
-                .get_realm_view(_id.get_id())
-                .await
-                .map_err(|e| format!("While fetching realm: {e}"))?,
-        ))
-    }
-
-    /// Set an event listener callback
-    /// The callback will be called with events in the format: { type: string, data: any }
-    pub async fn set_event_listener(&mut self, callback: Function) -> Result<usize, String> {
-        let (mut tap, id) = self
+    pub fn sync(&mut self) -> Result<(), WasmError> {
+        Ok(self
             .proxy
             .broker
-            .get_tap_out()
-            .await
-            .map_err(|e| format!("Getting tap: {e:?}"))?;
+            .emit_msg_in(ProxyIn::Node(NodeIn::DHTStorage(
+                DHTStorageIn::SyncFromNeighbors,
+            )))?)
+    }
 
-        let state = self.proxy.state.clone();
+    pub async fn get_realm(&mut self, id: RealmID) -> Result<RealmObserver, WasmError> {
+        Ok(RealmObserver::start(
+            self.proxy.broker.clone(),
+            self.proxy.state.clone(),
+            id.into(),
+        )
+        .await?)
+    }
+
+    /// The callback will be called with state-update in the format: { type: string, state: State }
+    pub async fn add_state_listener(&mut self, _callback: Function) -> Result<usize, WasmError> {
+        // let (mut tap, id) = self.proxy.broker.get_tap_out().await?;
+
+        // let state = self.proxy.state.clone();
         spawn_local(async move {
-            while let Some(ProxyOut::Update(msg)) = tap.recv().await {
-                if let Err(e) = callback.call2(
-                    &JsValue::null(),
-                    &msg.into(),
-                    &state.borrow().clone().into(),
-                ) {
-                    log::error!("Couldn't call event callback: {e:?}");
-                }
-            }
+            // while let Some(ProxyOut::Update(msg)) = tap.recv().await {
+            //     if let Err(e) = callback.call2(
+            //         &JsValue::null(),
+            //         &msg.into(),
+            //         &state.borrow().clone().into(),
+            //     ) {
+            //         log::error!("Couldn't call state listener: {e:?}");
+            //     }
+            // }
         });
 
-        Ok(id)
+        // Ok(id)
+        todo!()
     }
 
     /// Remove the event listener callback
-    pub async fn remove_event_listener(&mut self, id: usize) -> Result<(), String> {
-        self.proxy
-            .broker
-            .remove_subsystem(id)
-            .await
-            .map_err(|e| format!("Couldn't remove event listener: {e:?}"))
+    pub async fn remove_state_listener(&mut self, id: usize) -> Result<(), WasmError> {
+        Ok(self.proxy.broker.remove_subsystem(id).await?)
     }
 
     /// Set the div element to display the status bar
-    pub async fn set_status_div(&mut self, div_id: String) -> Result<usize, String> {
-        self.ssd(div_id)
-            .await
-            .map_err(|e| format!("While setting status_div - {e:?}"))
+    pub async fn set_status_div(&mut self, div_id: String) -> Result<usize, WasmError> {
+        Ok(self.ssd(div_id).await?)
     }
 
     /// Remove the status bar display
-    pub async fn remove_status_div(&mut self, id: usize) -> Result<(), String> {
-        self.proxy
-            .broker
-            .remove_subsystem(id)
-            .await
-            .map_err(|e| format!("Couldn't remove status_div from state.broker: {e:?}"))
+    pub async fn remove_status_div(&mut self, id: usize) -> Result<(), WasmError> {
+        Ok(self.proxy.broker.remove_subsystem(id).await?)
     }
 
     pub fn get_tab_id(&self) -> String {
@@ -122,7 +108,6 @@ impl DaNode {
         let id = TabID::new();
 
         Ok(DaNode {
-            ds: DHTStorage::from_broker(Broker::new(), 1000).await?,
             proxy: Proxy::start(
                 DataStorageIndexedDB::new("node_state").await?,
                 nc,

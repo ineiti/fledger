@@ -291,9 +291,12 @@ impl Intern {
             },
             InternIn::Timer => self.tick().await,
             InternIn::NodeOut(node_out) => {
-                if let Some(m) = self.state.msg_node(node_out) {
+                let out = self.state.msg_node(node_out);
+                if !out.is_empty() {
                     self.update_state();
-                    vec![InternOut::Update(m)]
+                    out.into_iter()
+                        .map(|o| InternOut::Update(o))
+                        .collect::<Vec<_>>()
                 } else {
                     vec![]
                 }

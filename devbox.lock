@@ -529,6 +529,54 @@
         }
       }
     },
+    "typescript@latest": {
+      "last_modified": "2026-02-23T15:40:43Z",
+      "resolved": "github:NixOS/nixpkgs/80d901ec0377e19ac3f7bb8c035201e2e098cc97#typescript",
+      "source": "devbox-search",
+      "version": "5.9.3",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/4ljbrd7cr6dj5hmvfccwczlmbyxdnd44-typescript-5.9.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/4ljbrd7cr6dj5hmvfccwczlmbyxdnd44-typescript-5.9.3"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/lr75l0b1lcdh18a89cg5hcl9bfn85b9a-typescript-5.9.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/lr75l0b1lcdh18a89cg5hcl9bfn85b9a-typescript-5.9.3"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/fmvk53a3i83xkpps045d36j92g1s3k4i-typescript-5.9.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/fmvk53a3i83xkpps045d36j92g1s3k4i-typescript-5.9.3"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/716f9vxn5aan1g1pfv1pmn5jiks4gnhi-typescript-5.9.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/716f9vxn5aan1g1pfv1pmn5jiks4gnhi-typescript-5.9.3"
+        }
+      }
+    },
     "vim@latest": {
       "last_modified": "2025-03-23T05:31:05Z",
       "resolved": "github:NixOS/nixpkgs/dd613136ee91f67e5dba3f3f41ac99ae89c5406b#vim",

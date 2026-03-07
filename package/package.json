@@ -2,14 +2,25 @@
   "name": "@fledger/danu",
   "version": "0.1.0",
   "description": "Browser library for Fledger network",
-  "main": "pkg/danu.js",
-  "types": "pkg/danu.d.ts",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "pkg/*.wasm",
     "pkg/*.js",
     "pkg/*.d.ts",
+    "dist/*.js",
+    "dist/*.d.ts",
+    "dist/*.map",
     "README.md"
   ],
+  "scripts": {
+    "build:ts": "tsc",
+    "prepublishOnly": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/ineiti/fledger"
