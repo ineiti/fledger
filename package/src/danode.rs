@@ -2,10 +2,8 @@
 
 use flarch::add_translator;
 use flarch::data_storage::DataStorageIndexedDB;
-use flarch::tasks::spawn_local;
 use flmodules::dht_storage::broker::DHTStorageIn;
 use flmodules::timer::Timer;
-use js_sys::Function;
 use wasm_bindgen::prelude::*;
 
 use crate::darealm::RealmObserver;
@@ -60,32 +58,6 @@ impl DaNode {
             id.into(),
         )
         .await?)
-    }
-
-    /// The callback will be called with state-update in the format: { type: string, state: State }
-    pub async fn add_state_listener(&mut self, _callback: Function) -> Result<usize, WasmError> {
-        // let (mut tap, id) = self.proxy.broker.get_tap_out().await?;
-
-        // let state = self.proxy.state.clone();
-        spawn_local(async move {
-            // while let Some(ProxyOut::Update(msg)) = tap.recv().await {
-            //     if let Err(e) = callback.call2(
-            //         &JsValue::null(),
-            //         &msg.into(),
-            //         &state.borrow().clone().into(),
-            //     ) {
-            //         log::error!("Couldn't call state listener: {e:?}");
-            //     }
-            // }
-        });
-
-        // Ok(id)
-        todo!()
-    }
-
-    /// Remove the event listener callback
-    pub async fn remove_state_listener(&mut self, id: usize) -> Result<(), WasmError> {
-        Ok(self.proxy.broker.remove_subsystem(id).await?)
     }
 
     /// Set the div element to display the status bar

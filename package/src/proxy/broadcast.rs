@@ -26,7 +26,7 @@ pub enum BroadcastFromTabs {
     Alive(TabID, Option<bool>),
     Stopped(TabID),
     ToLeader(NodeIn),
-    FromLeader(StateUpdate),
+    FromLeader(TabID, StateUpdate),
 }
 
 impl BroadcastFromTabs {
@@ -96,7 +96,7 @@ impl Broadcast {
             BroadcastToTabs::Alive(l) => BroadcastFromTabs::Alive(id, l),
             BroadcastToTabs::Stopped => BroadcastFromTabs::Stopped(id),
             BroadcastToTabs::ToLeader(data) => BroadcastFromTabs::ToLeader(data),
-            BroadcastToTabs::FromLeader(data) => BroadcastFromTabs::FromLeader(data),
+            BroadcastToTabs::FromLeader(data) => BroadcastFromTabs::FromLeader(id, data),
         }
     }
 }

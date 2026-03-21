@@ -115,7 +115,7 @@ impl Intern {
                         let _ = window.location().reload();
                     }
                 } else if self.role == TabRole::Search {
-                    return self.set_follower();
+                    return self.set_follower(id);
                 }
             }
         }
@@ -138,11 +138,11 @@ impl Intern {
         }
     }
 
-    fn set_follower(&mut self) -> Vec<InternOut> {
+    fn set_follower(&mut self, leader: TabID) -> Vec<InternOut> {
         self.role = TabRole::Follower;
         self.search_cnt = 0;
         self.update_state();
-        vec![InternOut::Update(StateUpdate::NewLeader)]
+        vec![InternOut::Update(StateUpdate::NewLeader(leader))]
     }
 
     fn set_leader(&mut self) -> Vec<InternOut> {
@@ -150,7 +150,7 @@ impl Intern {
         self.search_cnt = 0;
         self.state.is_leader = Some(true);
         self.update_state();
-        vec![InternOut::Update(StateUpdate::NewLeader)]
+        vec![InternOut::Update(StateUpdate::NewLeader(self.id.clone()))]
     }
 
     fn is_first_tab(&self) -> bool {
@@ -234,7 +234,7 @@ impl Intern {
                         }
                         return self.set_leader();
                     } else {
-                        out.extend(self.set_follower());
+                        out.extend(self.set_follower(self.tabs_sorted().first().unwrap().clone()));
                     }
                 }
             }
@@ -254,10 +254,7 @@ impl Intern {
             _ => None,
         };
         self.update_state();
-        out.extend(vec![
-            InternOut::Broadcast(BroadcastToTabs::Alive(role)),
-            InternOut::Update(StateUpdate::NewLeader),
-        ]);
+        out.push(InternOut::Broadcast(BroadcastToTabs::Alive(role)));
         out
     }
 
@@ -266,10 +263,12 @@ impl Intern {
             InternIn::Broadcast(bc) => match bc {
                 BroadcastFromTabs::Alive(id, role) => self.tab_alive(id, role),
                 BroadcastFromTabs::Stopped(id) => self.tab_stopped(id).await,
-                BroadcastFromTabs::FromLeader(msg_leader) => {
+                BroadcastFromTabs::FromLeader(id, msg_leader) => {
                     log::info!("Got msg from leader: {msg_leader:?}");
-                    let mut out = self.set_follower();
-                    out.push(InternOut::Update(msg_leader));
+                    let mut out = vec![InternOut::Update(msg_leader.clone())];
+                    if self.role == TabRole::Search {
+                        out.extend(self.set_follower(id));
+                    }
                     out
                 }
                 _ => vec![],

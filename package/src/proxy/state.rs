@@ -10,9 +10,12 @@ use flarch::{data_storage::DataStorage, nodeids::NodeID};
 use flmodules::{
     dht_router::broker::DHTRouterOut,
     dht_storage::{self, broker::DHTStorageOut, core::FloCuckoo},
-    flo::{flo::FloID, realm},
+    flo::{
+        flo::FloID,
+        realm::{self, RealmID},
+    },
     network::{broker::NetworkOut, signal::FledgerConfig},
-    nodeconfig::{self},
+    nodeconfig::{self, NodeInfo},
 };
 use flnode::node::Node;
 use serde::{Deserialize, Serialize};
@@ -81,8 +84,8 @@ impl State {
     }
 
     pub fn msg_new_tabs(&mut self, tab_list: Vec<TabID>) -> StateUpdate {
-        self.tab_list = tab_list;
-        StateUpdate::TabList
+        self.tab_list = tab_list.clone();
+        StateUpdate::TabList(tab_list)
     }
 
     pub fn msg_node(&mut self, msg: NodeOut) -> Vec<StateUpdate> {
@@ -100,7 +103,7 @@ impl State {
                         return vec![];
                     }
                 }
-                DHTRouterOut::SystemRealm(_) => StateUpdate::SystemRealm,
+                DHTRouterOut::SystemRealm(id) => StateUpdate::SystemRealm(id),
                 _ => return vec![],
             },
             NodeOut::DHTStorage(msg) => match msg {
@@ -123,8 +126,8 @@ impl State {
                     return ret;
                 }
                 DHTStorageOut::RealmIDs(rids) => {
-                    self.realm_ids = rids;
-                    StateUpdate::RealmAvailable
+                    self.realm_ids = rids.clone();
+                    StateUpdate::RealmAvailable(rids)
                 }
                 DHTStorageOut::Stats(st) => {
                     self.dht_storage_stats = st;
@@ -135,8 +138,8 @@ impl State {
             NodeOut::Network(msg) => match msg {
                 NetworkOut::NodeListFromWS(list) => {
                     if self.nodes_online != list {
-                        self.nodes_online = list;
-                        StateUpdate::AvailableNodes
+                        self.nodes_online = list.clone();
+                        StateUpdate::AvailableNodes(list)
                     } else {
                         return vec![];
                     }
@@ -168,21 +171,21 @@ pub enum StateUpdate {
     // Number of nodes connected, always >= 1
     ConnectedNodes,
     // Available nodes on the signalling server
-    AvailableNodes,
+    AvailableNodes(Vec<NodeInfo>),
     // Lost connection to last node - signal server might still be connected
     DisconnectNodes,
     // Realm available - this might happen before any connections are set up.
     // Sends the list of available realm-IDs
-    RealmAvailable,
+    RealmAvailable(Vec<RealmID>),
     // Got new Flo - not really sure if it is a new version, or just generally
     // a Flo arrived.
     ReceivedFlo(FloID),
     // The status of the DHT Storage changed
     DHTStorageStats,
     // New leader elected
-    NewLeader,
+    NewLeader(TabID),
     // Received a new list of tabs
-    TabList,
+    TabList(Vec<TabID>),
     // Got system realm
-    SystemRealm,
+    SystemRealm(RealmID),
 }

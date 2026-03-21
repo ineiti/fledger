@@ -1,10 +1,4 @@
-import init, {
-  DaNode,
-  initialize,
-  RealmID,
-  State,
-  StateUpdate,
-} from "@fledger/danu";
+import init, { DaNode, initialize, RealmID, State } from "@fledger/danu";
 
 const logsContainer = document.getElementById("logs") as HTMLDivElement;
 
@@ -32,7 +26,7 @@ async function initApp() {
     addLog("Creating DaNode instance...", "info");
     node = await DaNode.from_default();
     node.set_status_div("danu-stats");
-    // node.set_event_listener(new_event);
+    node.add_state_listener(new_event);
     addLog(`This is tab ${node.get_tab_id()}`);
 
     addLog("Danu Browser initialized successfully", "success");

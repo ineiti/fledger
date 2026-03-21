@@ -73,12 +73,12 @@ impl StatusBar {
         match up {
             StateUpdate::ConnectSignal
             | StateUpdate::ConnectedNodes
-            | StateUpdate::AvailableNodes
+            | StateUpdate::AvailableNodes(_)
             | StateUpdate::DisconnectNodes => self.update_connection(),
-            StateUpdate::RealmAvailable | StateUpdate::ReceivedFlo(_) => self.update_page_list(),
-            StateUpdate::SystemRealm | StateUpdate::DHTStorageStats => self.update_page_list(),
-            StateUpdate::NewLeader => self.update_all(),
-            StateUpdate::TabList => self.update_tabs(),
+            StateUpdate::RealmAvailable(_) | StateUpdate::ReceivedFlo(_) => self.update_page_list(),
+            StateUpdate::SystemRealm(_) | StateUpdate::DHTStorageStats => self.update_page_list(),
+            StateUpdate::NewLeader(_) => self.update_all(),
+            StateUpdate::TabList(_) => self.update_tabs(),
         }
     }
 
