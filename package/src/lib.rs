@@ -15,4 +15,5 @@ pub mod darealm;
 pub mod error;
 pub mod ids;
 pub mod proxy;
+pub mod state_observer;
 mod status_bar;

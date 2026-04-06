@@ -12,7 +12,8 @@ export default defineConfig({
     alias: {
       // During development, resolve @danu/danu to the local build
       // This allows package.json to reference the npm version while using local builds
-      '@danu/danu': path.resolve(__dirname, '../package/pkg')
+      '@danu/danu': path.resolve(__dirname, '../package/pkg'),
+      '@fledger/danu': path.resolve(__dirname, '../package/dist/index.js')
     }
   },
   server: {
@@ -23,7 +24,9 @@ export default defineConfig({
         // Allow serving files from the frontend directory
         '.',
         // Allow serving the WASM package from the parent directory
-        '../package/pkg'
+        '../package/pkg',
+        '../package/dist',
+        '../package/node_modules'
       ]
     }
   },

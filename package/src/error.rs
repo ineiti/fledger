@@ -5,6 +5,9 @@ use wasm_bindgen::JsValue;
 #[derive(Debug)]
 pub struct WasmError(pub String);
 
+/// Crate-wide result type for wasm boundary methods.
+pub type WasmResult<T> = Result<T, WasmError>;
+
 impl From<JsValue> for WasmError {
     fn from(e: JsValue) -> Self {
         WasmError(format!("{e:?}"))

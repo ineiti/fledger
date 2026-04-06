@@ -16,10 +16,15 @@
   ],
   "scripts": {
     "build:ts": "tsc",
+    "test": "vitest run",
     "prepublishOnly": "tsc"
   },
+  "dependencies": {
+    "@preact/signals-core": "^1.8.0"
+  },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
   },
   "repository": {
     "type": "git",

@@ -9,4 +9,6 @@ export {
   initialize,
   initSync,
 } from "../pkg/danu.js";
-export { default as initWasm } from "../pkg/danu.js";
+export { default as initWasm, default } from "../pkg/danu.js";
+export { FledgerState } from "./state.js";
+export type { IStateObserver, StateUpdateMsg, StateUpdateTS } from "./state.js";

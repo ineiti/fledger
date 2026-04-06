@@ -1,4 +1,5 @@
-import init, { DaNode, initialize, RealmID, State } from "@fledger/danu";
+import init, { DaNode, initialize, FledgerState } from "@fledger/danu";
+import { effect } from "@preact/signals-core";
 
 const logsContainer = document.getElementById("logs") as HTMLDivElement;
 
@@ -26,8 +27,27 @@ async function initApp() {
     addLog("Creating DaNode instance...", "info");
     node = await DaNode.from_default();
     node.set_status_div("danu-stats");
-    node.add_state_listener(new_event);
     addLog(`This is tab ${node.get_tab_id()}`);
+
+    const rawState = await node.get_state();
+    const state = await FledgerState.create(rawState);
+
+    effect(() => {
+      addLog(
+        state.$signalConnected.value
+          ? "Connected to Signal"
+          : "Waiting for connection",
+      );
+    });
+    effect(() => {
+      addLog(`Nodes connected: ${state.$nodes_connected_dht.value.length}`);
+    });
+    effect(() => {
+      addLog(`Nodes online: ${state.$nodes_online.value.length}`);
+    });
+    effect(() => {
+      addLog(`Got new realm: ${state.$realm_ids.value}`);
+    });
 
     addLog("Danu Browser initialized successfully", "success");
   } catch (error) {
@@ -35,46 +55,6 @@ async function initApp() {
     console.error("Initialization error:", error);
   }
 }
-
-let realms: RealmID[] = [];
-
-async function new_event(status: StateUpdate, state: State) {
-  switch (status) {
-    case StateUpdate.ConnectSignal:
-      addLog("Connected to Signal");
-      break;
-    case StateUpdate.ConnectedNodes:
-      addLog(`Connected to ${state.nodes_connected_dht.length} nodes`);
-      break;
-    case StateUpdate.AvailableNodes:
-      addLog(`${state.nodes_online.length} nodes available`);
-      break;
-    case StateUpdate.RealmAvailable:
-      realms = state.realm_ids;
-      addLog(`${state.realm_ids.length} realms available`);
-      break;
-    case StateUpdate.NewLeader:
-      let role = "Searching";
-      if (state.is_leader !== null) {
-        role = state.is_leader ? "leader-tab" : "follower-tab";
-      }
-      addLog(`New leader got elected - ${role}`);
-      break;
-    case StateUpdate.TabList:
-      addLog(`${state.tab_list.length} tabs available`);
-      break;
-  }
-}
-
-// import { signal, effect } from "@preact/signals-core";
-// let dn = DaNode.from_default();
-// let realm = dn.get_realm();
-// realm.set_update_callback((flo_realm) => console.log(flo_realm));
-// let flo_page = realm.get_flo_page_path("/");
-// flo_page.set_update_callback((fp) => console.log(fp));
-// flo_page.update((fp) => {
-//   fp.set_index("<html><h1>New");
-// });
 
 // Initialize on page load
 initApp();

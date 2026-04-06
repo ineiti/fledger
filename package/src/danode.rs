@@ -1,16 +1,18 @@
 //! DaNode is the basic class for the typescript library.
 
 use flarch::add_translator;
+use flarch::broker::Broker;
 use flarch::data_storage::DataStorageIndexedDB;
 use flmodules::dht_storage::broker::DHTStorageIn;
 use flmodules::timer::Timer;
 use wasm_bindgen::prelude::*;
 
 use crate::darealm::RealmObserver;
-use crate::error::WasmError;
+use crate::error::{WasmError, WasmResult};
 use crate::ids::RealmID;
 use crate::proxy::broadcast::TabID;
 use crate::proxy::proxy::{NodeIn, Proxy, ProxyIn, ProxyOut};
+use crate::state_observer::StateObserver;
 use crate::status_bar::{StatusBar, StatusBarIn};
 
 /// Main DaNode interface for browser
@@ -49,6 +51,12 @@ impl DaNode {
             .emit_msg_in(ProxyIn::Node(NodeIn::DHTStorage(
                 DHTStorageIn::SyncFromNeighbors,
             )))?)
+    }
+
+    pub async fn get_state(&mut self) -> WasmResult<StateObserver> {
+        let b = Broker::new();
+        add_translator!(self.proxy.broker, o_ti, b, ProxyOut::Update(msg) => msg);
+        Ok(StateObserver::start(b, self.proxy.state.clone()))
     }
 
     pub async fn get_realm(&mut self, id: RealmID) -> Result<RealmObserver, WasmError> {
