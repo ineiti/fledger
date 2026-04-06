@@ -1,18 +1,19 @@
 //! DaNode is the basic class for the typescript library.
 
 use flarch::add_translator;
-use flarch::broker::Broker;
 use flarch::data_storage::DataStorageIndexedDB;
 use flmodules::dht_storage::broker::DHTStorageIn;
 use flmodules::timer::Timer;
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
+use web_sys::ReadableStream;
 
 use crate::darealm::RealmObserver;
 use crate::error::{WasmError, WasmResult};
 use crate::ids::RealmID;
 use crate::proxy::broadcast::TabID;
 use crate::proxy::proxy::{NodeIn, Proxy, ProxyIn, ProxyOut};
-use crate::state_observer::StateObserver;
+use crate::proxy::state::{State, StateUpdate};
 use crate::status_bar::{StatusBar, StatusBarIn};
 
 /// Main DaNode interface for browser
@@ -53,10 +54,18 @@ impl DaNode {
             )))?)
     }
 
-    pub async fn get_state(&mut self) -> WasmResult<StateObserver> {
-        let b = Broker::new();
-        add_translator!(self.proxy.broker, o_ti, b, ProxyOut::Update(msg) => msg);
-        Ok(StateObserver::start(b, self.proxy.state.clone()))
+    pub async fn get_state(&mut self) -> WasmResult<ReadableStream> {
+        let snapshot = self.proxy.state.clone();
+        let (stream, _) = self.proxy.broker
+            .get_async_iterable_out_translate(Box::new(move |msg| {
+                let ProxyOut::Update(update) = msg;
+                Some(StateUpdateMsg {
+                    state: snapshot.borrow().clone(),
+                    update,
+                })
+            }))
+            .await?;
+        Ok(stream)
     }
 
     pub async fn get_realm(&mut self, id: RealmID) -> Result<RealmObserver, WasmError> {
@@ -105,6 +114,12 @@ impl DaNode {
             add_translator!(self.proxy.broker, o_ti, b, ProxyOut::Update(su) => StatusBarIn::Update(su)),
         )
     }
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct StateUpdateMsg {
+    update: StateUpdate,
+    state: State,
 }
 
 #[derive(Debug, Clone)]

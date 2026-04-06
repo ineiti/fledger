@@ -77,17 +77,15 @@ impl RealmObserver {
         fip: FloIDPath,
     ) -> Result<ReadableStream, WasmError> {
         // TODO: Add different FloWrapper types like FloBlobPage, FloBlobTag, FloBlobRealm
-        let mut b: Broker<(), flo::FloWrapper<T>> = Broker::new();
-        let (stream, id) = b.get_async_iterable_out().await?;
-        self.intern
-            .add_translator_o_to(
-                b,
-                Box::new(move |msg| match msg {
-                    InternOut::Stream(out_id, fbp) if out_id == id => fbp.try_into().ok(),
-                    _ => None,
-                }),
-            )
+        let id_cell = std::rc::Rc::new(std::cell::Cell::new(0usize));
+        let id_cell_clone = id_cell.clone();
+        let (stream, id) = self.intern
+            .get_async_iterable_out_translate::<flo::FloWrapper<T>>(Box::new(move |msg| match msg {
+                InternOut::Stream(out_id, fbp) if out_id == id_cell_clone.get() => fbp.try_into().ok(),
+                _ => None,
+            }))
             .await?;
+        id_cell.set(id);
         self.intern.emit_msg_in(InternIn::Stream(id, fip))?;
         Ok(stream)
     }

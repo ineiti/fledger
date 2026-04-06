@@ -326,21 +326,17 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         Ok((rx, pos))
     }
 
-    /// Creates a JS `ReadableStream` over outgoing (O) messages.
+    /// Creates a JS `ReadableStream` over outgoing (O) messages, applying a translation.
+    /// Only messages for which `translate` returns `Some` are enqueued.
     /// The stream is natively `AsyncIterable` in browsers:
     /// ```typescript
-    /// for await (const msg of broker.get_async_iterable_out()) { ... }
-    /// ```
-    /// Creates a JS `ReadableStream` over outgoing (O) messages.
-    /// The stream is natively `AsyncIterable` in browsers:
-    /// ```typescript
-    /// for await (const msg of broker.get_async_iterable_out()) { ... }
+    /// for await (const msg of broker.get_async_iterable_out_translate(...)) { ... }
     /// ```
     #[cfg(target_family = "wasm")]
-    pub async fn get_async_iterable_out(&mut self) -> anyhow::Result<(web_sys::ReadableStream, usize)>
-    where
-        O: serde::Serialize + 'static,
-    {
+    pub async fn get_async_iterable_out_translate<T: serde::Serialize + 'static>(
+        &mut self,
+        translate: Translate<O, T>,
+    ) -> anyhow::Result<(web_sys::ReadableStream, usize)> {
         use wasm_bindgen::closure::Closure;
 
         let controller_ref = std::rc::Rc::new(std::cell::RefCell::new(
@@ -370,11 +366,13 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
             .ok_or_else(|| anyhow::anyhow!("ReadableStream start callback was not called synchronously"))?;
 
         let enqueue = Box::new(move |msg: O| -> anyhow::Result<()> {
-            let js_val = serde_wasm_bindgen::to_value(&msg)
-                .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
-            controller
-                .enqueue_with_chunk(&js_val)
-                .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
+            if let Some(translated) = translate(msg) {
+                let js_val = serde_wasm_bindgen::to_value(&translated)
+                    .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
+                controller
+                    .enqueue_with_chunk(&js_val)
+                    .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
+            }
             Ok(())
         });
 
@@ -382,16 +380,30 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         Ok((stream, pos))
     }
 
-    /// Creates a JS `ReadableStream` over incoming (I) messages.
+    /// Creates a JS `ReadableStream` over outgoing (O) messages.
     /// The stream is natively `AsyncIterable` in browsers:
     /// ```typescript
-    /// for await (const msg of broker.get_async_iterable_in()) { ... }
+    /// for await (const msg of broker.get_async_iterable_out()) { ... }
     /// ```
     #[cfg(target_family = "wasm")]
-    pub async fn get_async_iterable_in(&mut self) -> anyhow::Result<(web_sys::ReadableStream, usize)>
+    pub async fn get_async_iterable_out(&mut self) -> anyhow::Result<(web_sys::ReadableStream, usize)>
     where
-        I: serde::Serialize + 'static,
+        O: serde::Serialize + 'static,
     {
+        self.get_async_iterable_out_translate(Box::new(Some)).await
+    }
+
+    /// Creates a JS `ReadableStream` over incoming (I) messages, applying a translation.
+    /// Only messages for which `translate` returns `Some` are enqueued.
+    /// The stream is natively `AsyncIterable` in browsers:
+    /// ```typescript
+    /// for await (const msg of broker.get_async_iterable_in_translate(...)) { ... }
+    /// ```
+    #[cfg(target_family = "wasm")]
+    pub async fn get_async_iterable_in_translate<T: serde::Serialize + 'static>(
+        &mut self,
+        translate: Translate<I, T>,
+    ) -> anyhow::Result<(web_sys::ReadableStream, usize)> {
         use wasm_bindgen::closure::Closure;
 
         let controller_ref = std::rc::Rc::new(std::cell::RefCell::new(
@@ -421,16 +433,31 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
             .ok_or_else(|| anyhow::anyhow!("ReadableStream start callback was not called synchronously"))?;
 
         let enqueue = Box::new(move |msg: I| -> anyhow::Result<()> {
-            let js_val = serde_wasm_bindgen::to_value(&msg)
-                .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
-            controller
-                .enqueue_with_chunk(&js_val)
-                .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
+            if let Some(translated) = translate(msg) {
+                let js_val = serde_wasm_bindgen::to_value(&translated)
+                    .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
+                controller
+                    .enqueue_with_chunk(&js_val)
+                    .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
+            }
             Ok(())
         });
 
         let pos = self.add_subsystem(Subsystem::AsyncIterableIn(enqueue)).await?;
         Ok((stream, pos))
+    }
+
+    /// Creates a JS `ReadableStream` over incoming (I) messages.
+    /// The stream is natively `AsyncIterable` in browsers:
+    /// ```typescript
+    /// for await (const msg of broker.get_async_iterable_in()) { ... }
+    /// ```
+    #[cfg(target_family = "wasm")]
+    pub async fn get_async_iterable_in(&mut self) -> anyhow::Result<(web_sys::ReadableStream, usize)>
+    where
+        I: serde::Serialize + 'static,
+    {
+        self.get_async_iterable_in_translate(Box::new(Some)).await
     }
 
     /// Emit a message to a given destination of other listeners.

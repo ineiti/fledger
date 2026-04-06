@@ -11,4 +11,4 @@ export {
 } from "../pkg/danu.js";
 export { default as initWasm, default } from "../pkg/danu.js";
 export { FledgerState } from "./state.js";
-export type { IStateObserver, StateUpdateMsg, StateUpdateTS } from "./state.js";
+export type { StateUpdateMsg, StateUpdateTS } from "./state.js";

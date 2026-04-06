@@ -29,8 +29,7 @@ async function initApp() {
     node.set_status_div("danu-stats");
     addLog(`This is tab ${node.get_tab_id()}`);
 
-    const rawState = await node.get_state();
-    const state = await FledgerState.create(rawState);
+    const state = await FledgerState.create(await node.get_state());
 
     effect(() => {
       addLog(

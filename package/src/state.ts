@@ -20,34 +20,48 @@ export interface StateUpdateMsg {
   state: State;
 }
 
-export interface IStateObserver {
-  listen_updates(): Promise<ReadableStream<StateUpdateMsg>>;
-}
-
 export class FledgerState {
   // Public signals — subscribe with effect() from @preact/signals-core
   readonly $signalConnected: Signal<boolean> = signal(false);
-  readonly $nodes_connected_dht: Signal<State["nodes_connected_dht"]> = signal([]);
+  readonly $nodes_connected_dht: Signal<State["nodes_connected_dht"]> = signal(
+    [],
+  );
   readonly $nodes_online: Signal<State["nodes_online"]> = signal([]);
   readonly $realm_ids: Signal<State["realm_ids"]> = signal([]);
-  readonly $dht_storage_stats: Signal<State["dht_storage_stats"] | null> = signal(null);
+  readonly $dht_storage_stats: Signal<State["dht_storage_stats"] | null> =
+    signal(null);
   readonly $is_leader: Signal<boolean | null> = signal(null);
   readonly $tab_list: Signal<State["tab_list"]> = signal([]);
 
   // Convenience getters for plain values
-  get signalConnected() { return this.$signalConnected.value; }
-  get nodes_connected_dht() { return this.$nodes_connected_dht.value; }
-  get nodes_online() { return this.$nodes_online.value; }
-  get realm_ids() { return this.$realm_ids.value; }
-  get dht_storage_stats() { return this.$dht_storage_stats.value; }
-  get is_leader() { return this.$is_leader.value; }
-  get tab_list() { return this.$tab_list.value; }
+  get signalConnected() {
+    return this.$signalConnected.value;
+  }
+  get nodes_connected_dht() {
+    return this.$nodes_connected_dht.value;
+  }
+  get nodes_online() {
+    return this.$nodes_online.value;
+  }
+  get realm_ids() {
+    return this.$realm_ids.value;
+  }
+  get dht_storage_stats() {
+    return this.$dht_storage_stats.value;
+  }
+  get is_leader() {
+    return this.$is_leader.value;
+  }
+  get tab_list() {
+    return this.$tab_list.value;
+  }
 
   private constructor() {}
 
-  static async create(observer: IStateObserver): Promise<FledgerState> {
+  static async create(
+    stream: ReadableStream<StateUpdateMsg>,
+  ): Promise<FledgerState> {
     const instance = new FledgerState();
-    const stream = await observer.listen_updates();
     instance._readLoop(stream);
     return instance;
   }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { effect } from "@preact/signals-core";
 import { FledgerState } from "./state.js";
-import type { IStateObserver, StateUpdateMsg } from "./state.js";
+import type { StateUpdateMsg } from "./state.js";
 
 // Helper to create a controllable ReadableStream
 function makeStream<T>(): {
@@ -38,22 +38,17 @@ function makeState(overrides: Partial<StateUpdateMsg["state"]> = {}): StateUpdat
   };
 }
 
-function makeMockObserver(s: ReturnType<typeof makeStream<StateUpdateMsg>>): IStateObserver {
-  return {
-    listen_updates: () => Promise.resolve(s.stream),
-  };
-}
 
 describe("FledgerState", () => {
   it("signalConnected starts false", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     expect(state.signalConnected).toBe(false);
   });
 
   it("signalConnected becomes true after ConnectSignal", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     s.push({ update: "ConnectSignal", state: makeState() });
     // Allow microtask to process
     await new Promise((r) => setTimeout(r, 0));
@@ -62,13 +57,13 @@ describe("FledgerState", () => {
 
   it("nodes_connected_dht starts empty", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     expect(state.nodes_connected_dht).toEqual([]);
   });
 
   it("nodes_connected_dht updates on ConnectedNodes", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     s.push({
       update: "ConnectedNodes",
       state: makeState({ nodes_connected_dht: ["node-1", "node-2"] as any }),
@@ -79,7 +74,7 @@ describe("FledgerState", () => {
 
   it("nodes_connected_dht clears on DisconnectNodes", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     s.push({
       update: "ConnectedNodes",
       state: makeState({ nodes_connected_dht: ["node-1"] as any }),
@@ -95,7 +90,7 @@ describe("FledgerState", () => {
 
   it("nodes_online updates on AvailableNodes", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     const nodeInfo = { name: "peer", id: "node-x" } as any;
     s.push({
       update: { AvailableNodes: [nodeInfo] },
@@ -107,7 +102,7 @@ describe("FledgerState", () => {
 
   it("realm_ids updates on RealmAvailable", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     const rid = "realm-abc" as any;
     s.push({
       update: { RealmAvailable: [rid] },
@@ -119,7 +114,7 @@ describe("FledgerState", () => {
 
   it("tab_list updates on TabList", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     s.push({
       update: { TabList: ["tab-1", "tab-2"] as any },
       state: makeState(),
@@ -130,7 +125,7 @@ describe("FledgerState", () => {
 
   it("is_leader updates on NewLeader", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     s.push({
       update: { NewLeader: "tab-1" as any },
       state: makeState({ is_leader: true }),
@@ -141,7 +136,7 @@ describe("FledgerState", () => {
 
   it("dht_storage_stats updates on DHTStorageStats", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     const stats = { stored: 42, requested: 7 } as any;
     s.push({
       update: "DHTStorageStats",
@@ -153,14 +148,14 @@ describe("FledgerState", () => {
 
   it("properties return plain values, not Signal objects", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
     expect(typeof state.signalConnected).toBe("boolean");
     expect(Array.isArray(state.nodes_connected_dht)).toBe(true);
   });
 
   it("effect() re-runs when signalConnected changes", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
 
     const calls: boolean[] = [];
     const dispose = effect(() => {
@@ -179,7 +174,7 @@ describe("FledgerState", () => {
 
   it("effect() re-runs when nodes_connected_dht changes", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(makeMockObserver(s));
+    const state = await FledgerState.create(s.stream);
 
     const lengths: number[] = [];
     const dispose = effect(() => {

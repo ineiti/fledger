@@ -30,7 +30,7 @@ macro_rules! add_translator {
 
     ($broker_src:expr, $variant:ident, $broker_dst:expr, $pattern_in:pat => $pattern_out:expr) => {
         add_translator!(@call_method $variant, $broker_src, $broker_dst.clone(),
-                Box::new(|msg| match msg {
+                Box::new(move |msg| match msg {
                     $pattern_in => Some($pattern_out),
                     _ => None,
                 })
