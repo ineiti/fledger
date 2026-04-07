@@ -424,10 +424,6 @@ impl Messages {
 
     fn get_stats(&mut self) -> InternOut {
         let stats = Stats::from_realms(&self.realms, self.config.realms.clone());
-        let stats_str = serde_yaml::to_string(&stats).unwrap();
-        if let Err(e) = self.ds.set(MODULE_NAME, &stats_str) {
-            log::warn!("Couldn't update value of DHTStorage-stats: {e:?}");
-        }
         InternOut::Storage(DHTStorageOut::Stats(stats))
     }
 
