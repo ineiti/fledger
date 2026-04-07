@@ -194,7 +194,6 @@ impl StatusBar {
 
     fn update_tabs(&self) -> anyhow::Result<()> {
         let state = self.state.borrow();
-        log::info!("Update_tabs {:?}", state.is_leader);
         let role = match state.is_leader {
             Some(true) => "Leader",
             Some(false) => "Follower",

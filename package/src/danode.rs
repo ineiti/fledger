@@ -54,8 +54,9 @@ impl DaNode {
             )))?)
     }
 
-    pub async fn get_state(&mut self) -> WasmResult<ReadableStream> {
+    pub async fn get_state(&mut self) -> WasmResult<StateInit> {
         let snapshot = self.proxy.state.clone();
+        let initial = snapshot.borrow().clone();
         let (stream, _) = self.proxy.broker
             .get_async_iterable_out_translate(Box::new(move |msg| {
                 let ProxyOut::Update(update) = msg;
@@ -65,7 +66,7 @@ impl DaNode {
                 })
             }))
             .await?;
-        Ok(stream)
+        Ok(StateInit { stream, state: initial })
     }
 
     pub async fn get_realm(&mut self, id: RealmID) -> Result<RealmObserver, WasmError> {
@@ -120,6 +121,14 @@ impl DaNode {
 struct StateUpdateMsg {
     update: StateUpdate,
     state: State,
+}
+
+#[wasm_bindgen]
+pub struct StateInit {
+    #[wasm_bindgen(readonly, getter_with_clone)]
+    pub stream: ReadableStream,
+    #[wasm_bindgen(readonly, getter_with_clone)]
+    pub state: State,
 }
 
 #[derive(Debug, Clone)]

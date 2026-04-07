@@ -42,13 +42,13 @@ function makeState(overrides: Partial<StateUpdateMsg["state"]> = {}): StateUpdat
 describe("FledgerState", () => {
   it("signalConnected starts false", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     expect(state.signalConnected).toBe(false);
   });
 
   it("signalConnected becomes true after ConnectSignal", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     s.push({ update: "ConnectSignal", state: makeState() });
     // Allow microtask to process
     await new Promise((r) => setTimeout(r, 0));
@@ -57,13 +57,13 @@ describe("FledgerState", () => {
 
   it("nodes_connected_dht starts empty", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     expect(state.nodes_connected_dht).toEqual([]);
   });
 
   it("nodes_connected_dht updates on ConnectedNodes", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     s.push({
       update: "ConnectedNodes",
       state: makeState({ nodes_connected_dht: ["node-1", "node-2"] as any }),
@@ -74,7 +74,7 @@ describe("FledgerState", () => {
 
   it("nodes_connected_dht clears on DisconnectNodes", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     s.push({
       update: "ConnectedNodes",
       state: makeState({ nodes_connected_dht: ["node-1"] as any }),
@@ -90,7 +90,7 @@ describe("FledgerState", () => {
 
   it("nodes_online updates on AvailableNodes", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     const nodeInfo = { name: "peer", id: "node-x" } as any;
     s.push({
       update: { AvailableNodes: [nodeInfo] },
@@ -102,7 +102,7 @@ describe("FledgerState", () => {
 
   it("realm_ids updates on RealmAvailable", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     const rid = "realm-abc" as any;
     s.push({
       update: { RealmAvailable: [rid] },
@@ -114,7 +114,7 @@ describe("FledgerState", () => {
 
   it("tab_list updates on TabList", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     s.push({
       update: { TabList: ["tab-1", "tab-2"] as any },
       state: makeState(),
@@ -125,7 +125,7 @@ describe("FledgerState", () => {
 
   it("is_leader updates on NewLeader", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     s.push({
       update: { NewLeader: "tab-1" as any },
       state: makeState({ is_leader: true }),
@@ -136,7 +136,7 @@ describe("FledgerState", () => {
 
   it("dht_storage_stats updates on DHTStorageStats", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     const stats = { stored: 42, requested: 7 } as any;
     s.push({
       update: "DHTStorageStats",
@@ -148,14 +148,14 @@ describe("FledgerState", () => {
 
   it("properties return plain values, not Signal objects", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
     expect(typeof state.signalConnected).toBe("boolean");
     expect(Array.isArray(state.nodes_connected_dht)).toBe(true);
   });
 
   it("effect() re-runs when signalConnected changes", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
 
     const calls: boolean[] = [];
     const dispose = effect(() => {
@@ -174,7 +174,7 @@ describe("FledgerState", () => {
 
   it("effect() re-runs when nodes_connected_dht changes", async () => {
     const s = makeStream<StateUpdateMsg>();
-    const state = await FledgerState.create(s.stream);
+    const state = await FledgerState.create(s.stream, makeState());
 
     const lengths: number[] = [];
     const dispose = effect(() => {

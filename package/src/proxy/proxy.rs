@@ -2,7 +2,11 @@
 //! to other messages, and then decide on a leader as the tab which started
 //! first (plus some randomness for reloading tabs).
 
-use flarch::{add_translator, broker::Broker, data_storage::DataStorage};
+use flarch::{
+    add_translator,
+    broker::Broker,
+    data_storage::{DataStorage, DataStorageIndexedDB},
+};
 use flmodules::{
     dht_router::broker::DHTRouterIn,
     dht_storage::broker::DHTStorageIn,
@@ -49,14 +53,14 @@ pub struct Proxy {
 
 impl Proxy {
     pub async fn start(
-        ds: Box<dyn DataStorage + Send>,
+        ds: Box<DataStorageIndexedDB>,
         netconf: NetConf,
         tab_id: TabID,
         mut timer: BrokerTimer,
     ) -> anyhow::Result<Proxy> {
         let mut broker = Broker::new();
         let mut bc = Broadcast::start("danode", tab_id.clone()).await?;
-        let node_config = node::Node::get_config(ds.clone())?;
+        let node_config = node::Node::get_config(ds.clone_box())?;
         let (mut intern, state) =
             Intern::start(ds, node_config.clone(), tab_id.clone(), 2, netconf).await?;
 

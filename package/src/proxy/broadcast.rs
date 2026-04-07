@@ -221,7 +221,16 @@ pub mod test {
 
     impl BroadcastTest {
         pub async fn new(&mut self) -> anyhow::Result<Tab> {
-            let mut tab = Tab::new().await?;
+            let tab = Tab::new().await?;
+            self.register(tab).await
+        }
+
+        pub async fn new_with_id(&mut self, id: TabID) -> anyhow::Result<Tab> {
+            let tab = Tab::new_const(id).await?;
+            self.register(tab).await
+        }
+
+        async fn register(&mut self, mut tab: Tab) -> anyhow::Result<Tab> {
             for b in &mut self.brokers {
                 tab.broker
                     .add_translator_i_to(

@@ -6,7 +6,10 @@
 
 use std::{collections::HashMap, fmt::Debug};
 
-use flarch::{data_storage::DataStorage, nodeids::NodeID};
+use flarch::{
+    data_storage::{DataStorage, DataStorageIndexedDB},
+    nodeids::NodeID,
+};
 use flmodules::{
     dht_router::broker::DHTRouterOut,
     dht_storage::{self, broker::DHTStorageOut, core::FloCuckoo},
@@ -50,15 +53,16 @@ pub struct State {
 const STORAGE_STATE: &str = "danodeState";
 
 impl State {
-    pub fn read(
-        ds: &mut Box<dyn DataStorage + Send>,
+    pub async fn from_storage(
+        ds: &mut Box<DataStorageIndexedDB>,
         leader: Option<bool>,
     ) -> anyhow::Result<Self> {
+        ds.update_cache().await?;
         let state_str = ds.get(STORAGE_STATE)?;
         let mut state = serde_json::from_str::<State>(&state_str)
             .ok()
             .unwrap_or_else(|| {
-                let node_config = Node::get_config(ds.clone()).unwrap();
+                let node_config = Node::get_config(ds.clone_box()).unwrap();
                 Self {
                     config: None,
                     node_info: node_config.info,
@@ -75,9 +79,9 @@ impl State {
         Ok(state)
     }
 
-    pub fn store(&mut self, ds: &mut Box<dyn DataStorage + Send>) {
+    pub async fn store(&mut self, ds: &mut Box<DataStorageIndexedDB>) {
         if let Ok(s) = serde_json::to_string(self) {
-            if let Err(e) = ds.set(STORAGE_STATE, &s) {
+            if let Err(e) = ds.async_set(STORAGE_STATE.to_string(), s).await {
                 log::warn!("Couldn't store: {e:?}");
             }
         }

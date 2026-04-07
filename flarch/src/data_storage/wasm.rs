@@ -74,6 +74,7 @@ const STORE_NAME: &str = "kv_store";
 /// Since IndexedDB operations are asynchronous but the DataStorage trait is synchronous,
 /// this implementation caches all data in memory. The async `new` constructor loads
 /// existing data from IndexedDB, and all mutations are persisted asynchronously.
+#[derive(Debug)]
 pub struct DataStorageIndexedDB {
     db_name: String,
     cache: Arc<Mutex<HashMap<String, String>>>,
@@ -88,7 +89,7 @@ impl DataStorageIndexedDB {
     ///
     /// This async constructor opens the database, creates the object store if needed,
     /// and loads all existing key-value pairs into memory.
-    pub async fn new(db_name: &str) -> Result<Box<dyn DataStorage + Send>, StorageError> {
+    pub async fn new(db_name: &str) -> Result<Box<Self>, StorageError> {
         let db = Self::open_database(db_name).await?;
         let cache = Self::load_all_data(&db).await?;
 
@@ -98,6 +99,12 @@ impl DataStorageIndexedDB {
             db: Arc::new(Mutex::new(Some(db))),
             future_write: Arc::new(Mutex::new(HashMap::new())),
         }))
+    }
+
+    pub async fn update_cache(&mut self) -> Result<(), StorageError> {
+        *self.cache.lock().unwrap() =
+            Self::load_all_data(self.db.lock().unwrap().as_ref().unwrap()).await?;
+        Ok(())
     }
 
     /// Gets the IDBFactory from either window or worker global scope.
@@ -252,6 +259,10 @@ impl DataStorageIndexedDB {
                 log::error!("Failed to persist to IndexedDB: {:?}", e);
             }
         });
+    }
+
+    pub async fn async_set(&self, key: String, value: String) -> Result<(), StorageError> {
+        Self::do_persist_set(&self.db, &self.future_write, &key, &value).await
     }
 
     async fn do_persist_set(

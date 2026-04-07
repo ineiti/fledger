@@ -60,8 +60,15 @@ export class FledgerState {
 
   static async create(
     stream: ReadableStream<StateUpdateMsg>,
+    state: State,
   ): Promise<FledgerState> {
     const instance = new FledgerState();
+    instance.$nodes_connected_dht.value = state.nodes_connected_dht;
+    instance.$nodes_online.value = state.nodes_online;
+    instance.$realm_ids.value = state.realm_ids;
+    instance.$dht_storage_stats.value = state.dht_storage_stats;
+    instance.$is_leader.value = state.is_leader ?? null;
+    instance.$tab_list.value = state.tab_list;
     instance._readLoop(stream);
     return instance;
   }

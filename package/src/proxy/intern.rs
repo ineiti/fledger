@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use flarch::{
     add_translator,
     broker::{Broker, SubsystemHandler},
-    data_storage::DataStorage,
+    data_storage::{DataStorage, DataStorageIndexedDB},
     platform_async_trait,
     web_rtc::connection::{ConnectionConfig, HostLogin},
 };
@@ -72,20 +72,20 @@ pub struct Intern {
     tabs: HashMap<TabID, usize>,
     id: TabID,
     netconf: NetConf,
-    ds: Box<dyn DataStorage + Send>,
+    ds: Box<DataStorageIndexedDB>,
     danu: Option<node::Node>,
 }
 
 impl Intern {
     pub async fn start(
-        mut ds: Box<dyn DataStorage + Send>,
+        mut ds: Box<DataStorageIndexedDB>,
         node_config: NodeConfig,
         id: TabID,
         search_cnt: usize,
         netconf: NetConf,
     ) -> anyhow::Result<(BrokerIntern, watch::Receiver<State>)> {
         let mut broker = Broker::new();
-        let state = State::read(&mut ds, None)?;
+        let state = State::from_storage(&mut ds, None).await?;
         let (state_send, state_rcv) = watch::channel(state.clone());
         let intern = Intern {
             role: TabRole::Search,
@@ -105,7 +105,7 @@ impl Intern {
         Ok((broker, state_rcv))
     }
 
-    fn tab_alive(&mut self, id: TabID, role: Option<bool>) -> Vec<InternOut> {
+    async fn tab_alive(&mut self, id: TabID, role: Option<bool>) -> Vec<InternOut> {
         self.tabs.insert(id, TAB_TIMEOUT);
         if let Some(r) = role {
             if r {
@@ -115,21 +115,21 @@ impl Intern {
                         let _ = window.location().reload();
                     }
                 } else if self.role == TabRole::Search {
-                    return self.set_follower(id);
+                    return self.set_follower(id).await;
                 }
             }
         }
         vec![]
     }
 
-    fn update_state(&mut self) {
+    async fn update_state(&mut self) {
         match self.role {
-            TabRole::Follower => match State::read(&mut self.ds, Some(false)) {
+            TabRole::Follower => match State::from_storage(&mut self.ds, Some(false)).await {
                 Ok(state) => self.state = state,
                 Err(e) => log::error!("While reading state: {e:?}"),
             },
             TabRole::Leader => {
-                self.state.store(&mut self.ds);
+                self.state.store(&mut self.ds).await;
             }
             _ => return,
         }
@@ -138,18 +138,23 @@ impl Intern {
         }
     }
 
-    fn set_follower(&mut self, leader: TabID) -> Vec<InternOut> {
+    async fn set_follower(&mut self, leader: TabID) -> Vec<InternOut> {
+        log::info!("Tab becomes follower");
         self.role = TabRole::Follower;
         self.search_cnt = 0;
-        self.update_state();
+        self.update_state().await;
         vec![InternOut::Update(StateUpdate::NewLeader(leader))]
     }
 
-    fn set_leader(&mut self) -> Vec<InternOut> {
+    async fn set_leader(&mut self) -> Vec<InternOut> {
+        log::info!("Tab becomes leader");
         self.role = TabRole::Leader;
         self.search_cnt = 0;
         self.state.is_leader = Some(true);
-        self.update_state();
+        self.update_state().await;
+        if let Err(e) = self.start_node().await {
+            log::error!("Couldn't setup node: {e:?}")
+        }
         vec![InternOut::Update(StateUpdate::NewLeader(self.id.clone()))]
     }
 
@@ -168,17 +173,14 @@ impl Intern {
 
     async fn check_leader(&mut self) -> Vec<InternOut> {
         if self.role != TabRole::Leader && self.is_first_tab() {
-            if let Err(e) = self.start_node().await {
-                log::error!("Couldn't setup node: {e:?}")
-            }
-            return self.set_leader();
+            return self.set_leader().await;
         }
         vec![]
     }
 
     async fn start_node(&mut self) -> anyhow::Result<()> {
-        log::info!("Starting tab as leader");
-
+        self.state.nodes_connected_dht.clear();
+        self.state.nodes_online.clear();
         let config = ConnectionConfig::new(
             self.netconf.signal_server.clone(),
             self.netconf
@@ -192,7 +194,8 @@ impl Intern {
         );
         self.node_config.info.modules = Modules::stable() - Modules::WEBPROXY_REQUESTS;
         let mut danu =
-            node::Node::start_network(self.ds.clone(), self.node_config.clone(), config).await?;
+            node::Node::start_network(self.ds.clone_box(), self.node_config.clone(), config)
+                .await?;
 
         add_translator!(danu.broker_net, o_ti, self.broker,
             msg => InternIn::NodeOut(NodeOut::Network(msg)));
@@ -229,12 +232,12 @@ impl Intern {
             TabRole::Search => {
                 if self.counter >= self.search_cnt {
                     if self.is_first_tab() {
-                        if let Err(e) = self.start_node().await {
-                            log::error!("Couldn't start node: {e:?}");
-                        }
-                        return self.set_leader();
+                        return self.set_leader().await;
                     } else {
-                        out.extend(self.set_follower(self.tabs_sorted().first().unwrap().clone()));
+                        out.extend(
+                            self.set_follower(self.tabs_sorted().first().unwrap().clone())
+                                .await,
+                        );
                     }
                 }
             }
@@ -253,7 +256,7 @@ impl Intern {
             TabRole::Leader => Some(true),
             _ => None,
         };
-        self.update_state();
+        self.update_state().await;
         out.push(InternOut::Broadcast(BroadcastToTabs::Alive(role)));
         out
     }
@@ -261,13 +264,14 @@ impl Intern {
     async fn msg_follower(&mut self, msg: InternIn) -> Vec<InternOut> {
         match msg {
             InternIn::Broadcast(bc) => match bc {
-                BroadcastFromTabs::Alive(id, role) => self.tab_alive(id, role),
+                BroadcastFromTabs::Alive(id, role) => self.tab_alive(id, role).await,
                 BroadcastFromTabs::Stopped(id) => self.tab_stopped(id).await,
                 BroadcastFromTabs::FromLeader(id, msg_leader) => {
-                    log::info!("Got msg from leader: {msg_leader:?}");
                     let mut out = vec![InternOut::Update(msg_leader.clone())];
                     if self.role == TabRole::Search {
-                        out.extend(self.set_follower(id));
+                        out.extend(self.set_follower(id).await);
+                    } else {
+                        self.update_state().await;
                     }
                     out
                 }
@@ -284,7 +288,7 @@ impl Intern {
     async fn msg_leader(&mut self, msg: InternIn) -> Vec<InternOut> {
         match msg {
             InternIn::Broadcast(bc) => match bc {
-                BroadcastFromTabs::Alive(id, role) => self.tab_alive(id, role),
+                BroadcastFromTabs::Alive(id, role) => self.tab_alive(id, role).await,
                 BroadcastFromTabs::Stopped(id) => self.tab_stopped(id).await,
                 _ => vec![],
             },
@@ -292,9 +296,14 @@ impl Intern {
             InternIn::NodeOut(node_out) => {
                 let out = self.state.msg_node(node_out);
                 if !out.is_empty() {
-                    self.update_state();
+                    self.update_state().await;
                     out.into_iter()
-                        .map(|o| InternOut::Update(o))
+                        .flat_map(|o| {
+                            vec![
+                                InternOut::Update(o.clone()),
+                                InternOut::Broadcast(BroadcastToTabs::FromLeader(o)),
+                            ]
+                        })
                         .collect::<Vec<_>>()
                 } else {
                     vec![]
@@ -318,7 +327,7 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
         }
         if tabs != self.tabs_sorted() {
             let m = self.state.msg_new_tabs(self.tabs_sorted());
-            self.update_state();
+            self.update_state().await;
             out.push(InternOut::Update(m));
         }
         out
