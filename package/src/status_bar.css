@@ -1,0 +1,135 @@
+.danu-status-bar {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 auto;
+    max-width: fit-content;
+}
+
+.danu-status-header {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    padding: 0.5em 1em;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.danu-status-header:hover {
+    background: #ebebeb;
+}
+
+.danu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+}
+
+.danu-label {
+    font-weight: 500;
+    color: #555;
+}
+
+.danu-value {
+    color: #333;
+}
+
+.danu-expand {
+    margin-left: auto;
+    transition: transform 0.3s;
+    font-size: 0.8em;
+}
+
+.danu-expand.expanded {
+    transform: rotate(180deg);
+}
+
+.danu-status-details {
+    border-top: 1px solid #ddd;
+    background: #fafafa;
+    padding: 1em;
+    display: none;
+}
+
+.danu-status-details.visible {
+    display: block;
+}
+
+.danu-section {
+    margin-bottom: 1em;
+}
+
+.danu-section:last-child {
+    margin-bottom: 0;
+}
+
+.danu-section-title {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.5em;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.danu-detail-row {
+    display: flex;
+    gap: 0.5em;
+    margin-bottom: 0.3em;
+}
+
+.danu-detail-label {
+    font-weight: 500;
+    color: #666;
+    min-width: 80px;
+}
+
+.danu-detail-value {
+    color: #333;
+    word-break: break-all;
+}
+
+.danu-list {
+    color: #555;
+    font-size: 13px;
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+}
+
+.danu-list-item {
+    padding: 0.25em 0.5em;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    font-family: monospace;
+}
+
+.danu-status-connected {
+    color: #22c55e;
+}
+
+.danu-status-connecting {
+    color: #eab308;
+}
+
+.danu-status-disconnected {
+    color: #ef4444;
+}
+
+@media (max-width: 600px) {
+    .danu-status-header {
+        gap: 0.5em;
+        font-size: 12px;
+    }
+
+    .danu-label {
+        display: none;
+    }
+}

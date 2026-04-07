@@ -1,0 +1,269 @@
+//! Implements the broadcast channel to communicate between tabs.
+
+use flarch::{
+    broker::{Broker, SubsystemHandler},
+    platform_async_trait,
+};
+use serde::{Deserialize, Serialize};
+use wasm_bindgen::{
+    prelude::{wasm_bindgen, Closure},
+    JsCast, JsValue,
+};
+use web_sys::BroadcastChannel;
+
+use crate::proxy::{proxy::NodeIn, state::StateUpdate};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum BroadcastToTabs {
+    Alive(Option<bool>),
+    Stopped,
+    ToLeader(NodeIn),
+    FromLeader(StateUpdate),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum BroadcastFromTabs {
+    Alive(TabID, Option<bool>),
+    Stopped(TabID),
+    ToLeader(NodeIn),
+    FromLeader(TabID, StateUpdate),
+}
+
+impl BroadcastFromTabs {
+    /// Returns `true` if the broadcast from tabs is [`FromLeader`].
+    ///
+    /// [`FromLeader`]: BroadcastFromTabs::FromLeader
+    #[must_use]
+    pub fn is_from_leader(&self) -> bool {
+        matches!(self, Self::FromLeader(..))
+    }
+}
+
+pub type BrokerBroadcast = Broker<BroadcastToTabs, BroadcastFromTabs>;
+
+#[derive(Debug, Clone)]
+pub struct Broadcast {
+    id: TabID,
+    channel: BroadcastChannel,
+}
+
+impl Broadcast {
+    pub async fn start(channel_name: &str, id: TabID) -> anyhow::Result<BrokerBroadcast> {
+        let channel = BroadcastChannel::new(channel_name).map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        let mut broker = Broker::new();
+        let mut br_cl = broker.clone();
+        let _id_cl = id.clone();
+        let onmessage = Closure::<dyn FnMut(web_sys::MessageEvent)>::new(
+            move |event: web_sys::MessageEvent| {
+                if let Some(data_str) = event.data().as_string() {
+                    if let Ok(msg) = serde_json::from_str::<BroadcastFromTabs>(&data_str) {
+                        // log::info!("{}: Got {msg:?}", _id_cl);
+                        if let Err(e) = br_cl.emit_msg_out(msg) {
+                            log::error!("While sending broadcast message: {e}");
+                        }
+                    }
+                }
+            },
+        );
+        channel.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
+        onmessage.forget();
+
+        let channel_cl = channel.clone();
+        let msg = Self::convert_message(id.clone(), BroadcastToTabs::Stopped);
+        let msg: JsValue = serde_json::to_string(&msg)?.into();
+        let beforeunload_closure = Closure::<dyn Fn()>::new(move || {
+            channel_cl.post_message(&msg).unwrap();
+            channel_cl.close();
+        });
+        let window = web_sys::window().ok_or(anyhow::anyhow!("Couldn't get 'window'"))?;
+        window
+            .add_event_listener_with_callback(
+                "beforeunload",
+                beforeunload_closure.as_ref().unchecked_ref(),
+            )
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        beforeunload_closure.forget();
+
+        broker
+            .add_handler(Box::new(Broadcast { id, channel }))
+            .await?;
+
+        Ok(broker)
+    }
+
+    fn convert_message(id: TabID, msg: BroadcastToTabs) -> BroadcastFromTabs {
+        match msg {
+            BroadcastToTabs::Alive(l) => BroadcastFromTabs::Alive(id, l),
+            BroadcastToTabs::Stopped => BroadcastFromTabs::Stopped(id),
+            BroadcastToTabs::ToLeader(data) => BroadcastFromTabs::ToLeader(data),
+            BroadcastToTabs::FromLeader(data) => BroadcastFromTabs::FromLeader(id, data),
+        }
+    }
+}
+
+#[platform_async_trait]
+impl SubsystemHandler<BroadcastToTabs, BroadcastFromTabs> for Broadcast {
+    async fn messages(&mut self, msgs: Vec<BroadcastToTabs>) -> Vec<BroadcastFromTabs> {
+        for msg in msgs {
+            // log::info!("{}: Sending {msg:?}", self.id);
+            let out = Self::convert_message(self.id, msg);
+            if let Ok(json) = serde_json::to_string(&out) {
+                if let Err(e) = self.channel.post_message(&JsValue::from_str(&json)) {
+                    log::error!("Couldn't send to broadcast: {e:?}");
+                }
+            }
+        }
+        vec![]
+    }
+}
+
+/// Unique identifier for a node, used for leader election.
+/// Lower NodeID = higher priority for leadership.
+#[wasm_bindgen]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct TabID {
+    timestamp_secs: u64,
+    random_component: u32,
+}
+
+impl PartialOrd for TabID {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TabID {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.timestamp_secs
+            .cmp(&other.timestamp_secs)
+            .then_with(|| self.random_component.cmp(&other.random_component))
+    }
+}
+
+impl std::fmt::Display for TabID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:04}.{:04}",
+            self.timestamp_secs % 10000,
+            self.random_component / 10000
+        )
+    }
+}
+
+impl TabID {
+    pub fn new() -> Self {
+        let timestamp_secs = (js_sys::Date::now() / 1000.0) as u64;
+        let mut buf = [0u8; 4];
+        getrandom::getrandom(&mut buf).expect("getrandom failed");
+        let random_component = u32::from_le_bytes(buf);
+        Self {
+            timestamp_secs,
+            random_component,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_const(timestamp_secs: u64, random_component: u32) -> Self {
+        Self {
+            timestamp_secs,
+            random_component,
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use std::collections::HashMap;
+
+    use flarch::broker::Broker;
+    use tokio::sync::mpsc::UnboundedReceiver;
+
+    use super::*;
+
+    #[derive(Debug)]
+    pub struct Tab {
+        pub id: TabID,
+        pub tap: UnboundedReceiver<BroadcastFromTabs>,
+        pub broker: BrokerBroadcast,
+    }
+
+    impl Tab {
+        pub async fn new() -> anyhow::Result<Self> {
+            let mut broker = Broker::new();
+            let tap = broker.get_tap_out().await?.0;
+            Ok(Self {
+                id: TabID::new(),
+                tap,
+                broker,
+            })
+        }
+
+        pub async fn new_const(id: TabID) -> anyhow::Result<Self> {
+            let mut broker = Broker::new();
+            let tap = broker.get_tap_out().await?.0;
+            Ok(Self { id, tap, broker })
+        }
+
+        pub fn send(&mut self, msg: BroadcastToTabs) -> anyhow::Result<()> {
+            self.broker.emit_msg_in(msg)
+        }
+
+        pub async fn recv(&mut self) -> anyhow::Result<BroadcastFromTabs> {
+            self.tap.recv().await.ok_or(anyhow::anyhow!("Rx error"))
+        }
+    }
+
+    #[derive(Debug, Clone, Default)]
+    pub struct BroadcastTest {
+        brokers: HashMap<TabID, BrokerBroadcast>,
+    }
+
+    impl BroadcastTest {
+        pub async fn new(&mut self) -> anyhow::Result<Tab> {
+            let tab = Tab::new().await?;
+            self.register(tab).await
+        }
+
+        pub async fn new_with_id(&mut self, id: TabID) -> anyhow::Result<Tab> {
+            let tab = Tab::new_const(id).await?;
+            self.register(tab).await
+        }
+
+        async fn register(&mut self, mut tab: Tab) -> anyhow::Result<Tab> {
+            for b in &mut self.brokers {
+                tab.broker
+                    .add_translator_i_to(
+                        b.1.clone(),
+                        Box::new(move |m| Some(Broadcast::convert_message(tab.id, m))),
+                    )
+                    .await?;
+                let id = b.0.clone();
+                b.1.add_translator_i_to(
+                    tab.broker.clone(),
+                    Box::new(move |m| Some(Broadcast::convert_message(id, m))),
+                )
+                .await?;
+            }
+            self.brokers.insert(tab.id, tab.broker.clone());
+            Ok(tab)
+        }
+    }
+
+    use wasm_bindgen_test::wasm_bindgen_test;
+    wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+
+    #[wasm_bindgen_test(async)]
+    async fn test_broadcast() -> anyhow::Result<()> {
+        let mut channels = BroadcastTest::default();
+        let mut tab0 = channels.new().await?;
+        let mut tab1 = channels.new().await?;
+
+        tab0.send(BroadcastToTabs::Alive(None))?;
+        assert_eq!(BroadcastFromTabs::Alive(tab0.id, None), tab1.recv().await?);
+
+        tab1.send(BroadcastToTabs::Alive(None))?;
+        assert_eq!(BroadcastFromTabs::Alive(tab1.id, None), tab0.recv().await?);
+        Ok(())
+    }
+}

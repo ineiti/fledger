@@ -3,8 +3,8 @@ use chat::Chat;
 use flcrypto::signer::SignerTrait;
 use flmodules::{
     dht_router::broker::DHTRouter,
-    dht_storage::{self, broker::DHTStorage, realm_view::RealmView},
-    flo::{crypto::FloVerifier, flo::FloID, realm::RealmID},
+    dht_storage::{self, broker::DHTStorage},
+    flo::{crypto::FloVerifier, flo::FloID, realm::RealmID, realm_view::RealmView},
     gossip_events::broker::Gossip,
     Modules,
 };
@@ -14,7 +14,7 @@ use proxy::Proxy;
 use std::{collections::HashMap, str::FromStr};
 use tokio::sync::{broadcast, watch};
 use wasm_bindgen::prelude::wasm_bindgen;
-use web_sys::{HtmlButtonElement, HtmlElement, HtmlDivElement};
+use web_sys::{HtmlButtonElement, HtmlDivElement, HtmlElement};
 
 use flarch::{
     data_storage::DataStorageLocal,
@@ -181,7 +181,9 @@ impl WebState {
                     self.web
                         .get_element::<HtmlButtonElement>("loading-info-button")
                         .click();
-                    self.web.get_element::<HtmlElement>("status-section").set_hidden(true);
+                    self.web
+                        .get_element::<HtmlElement>("status-section")
+                        .set_hidden(true);
                     self.web
                         .get_element::<HtmlElement>("home_page")
                         .set_hidden(false);

@@ -2,11 +2,8 @@ use flarch::start_logging_filter_level;
 use flcrypto::{access::Condition, tofrombytes::ToFromBytes};
 use flmacro::test_async_stack;
 use flmodules::{
-    dht_storage::{
-        core::{Cuckoo, RealmConfig},
-        realm_view::RealmViewBuilder,
-    },
-    flo::blob::BlobPage,
+    dht_storage::core::{Cuckoo, RealmConfig},
+    flo::{blob::BlobPage, realm_view::RealmViewBuilder},
 };
 
 mod simul;

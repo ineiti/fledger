@@ -326,6 +326,140 @@ impl<I: 'static + Message, O: 'static + Message> Broker<I, O> {
         Ok((rx, pos))
     }
 
+    /// Creates a JS `ReadableStream` over outgoing (O) messages, applying a translation.
+    /// Only messages for which `translate` returns `Some` are enqueued.
+    /// The stream is natively `AsyncIterable` in browsers:
+    /// ```typescript
+    /// for await (const msg of broker.get_async_iterable_out_translate(...)) { ... }
+    /// ```
+    #[cfg(target_family = "wasm")]
+    pub async fn get_async_iterable_out_translate<T: serde::Serialize + 'static>(
+        &mut self,
+        translate: Translate<O, T>,
+    ) -> anyhow::Result<(web_sys::ReadableStream, usize)> {
+        use wasm_bindgen::closure::Closure;
+
+        let controller_ref = std::rc::Rc::new(std::cell::RefCell::new(
+            None::<web_sys::ReadableStreamDefaultController>,
+        ));
+        let controller_ref_clone = controller_ref.clone();
+
+        let start_cb = Closure::once(move |controller: web_sys::ReadableStreamDefaultController| {
+            *controller_ref_clone.borrow_mut() = Some(controller);
+        });
+
+        let underlying_source = js_sys::Object::new();
+        js_sys::Reflect::set(
+            &underlying_source,
+            &wasm_bindgen::JsValue::from_str("start"),
+            start_cb.as_ref(),
+        )
+        .map_err(|e| anyhow::anyhow!("Reflect::set failed: {e:?}"))?;
+        start_cb.forget();
+
+        let stream = web_sys::ReadableStream::new_with_underlying_source(&underlying_source)
+            .map_err(|e| anyhow::anyhow!("ReadableStream::new failed: {e:?}"))?;
+
+        let controller = controller_ref
+            .borrow_mut()
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("ReadableStream start callback was not called synchronously"))?;
+
+        let enqueue = Box::new(move |msg: O| -> anyhow::Result<()> {
+            if let Some(translated) = translate(msg) {
+                let js_val = serde_wasm_bindgen::to_value(&translated)
+                    .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
+                controller
+                    .enqueue_with_chunk(&js_val)
+                    .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
+            }
+            Ok(())
+        });
+
+        let pos = self.add_subsystem(Subsystem::AsyncIterableOut(enqueue)).await?;
+        Ok((stream, pos))
+    }
+
+    /// Creates a JS `ReadableStream` over outgoing (O) messages.
+    /// The stream is natively `AsyncIterable` in browsers:
+    /// ```typescript
+    /// for await (const msg of broker.get_async_iterable_out()) { ... }
+    /// ```
+    #[cfg(target_family = "wasm")]
+    pub async fn get_async_iterable_out(&mut self) -> anyhow::Result<(web_sys::ReadableStream, usize)>
+    where
+        O: serde::Serialize + 'static,
+    {
+        self.get_async_iterable_out_translate(Box::new(Some)).await
+    }
+
+    /// Creates a JS `ReadableStream` over incoming (I) messages, applying a translation.
+    /// Only messages for which `translate` returns `Some` are enqueued.
+    /// The stream is natively `AsyncIterable` in browsers:
+    /// ```typescript
+    /// for await (const msg of broker.get_async_iterable_in_translate(...)) { ... }
+    /// ```
+    #[cfg(target_family = "wasm")]
+    pub async fn get_async_iterable_in_translate<T: serde::Serialize + 'static>(
+        &mut self,
+        translate: Translate<I, T>,
+    ) -> anyhow::Result<(web_sys::ReadableStream, usize)> {
+        use wasm_bindgen::closure::Closure;
+
+        let controller_ref = std::rc::Rc::new(std::cell::RefCell::new(
+            None::<web_sys::ReadableStreamDefaultController>,
+        ));
+        let controller_ref_clone = controller_ref.clone();
+
+        let start_cb = Closure::once(move |controller: web_sys::ReadableStreamDefaultController| {
+            *controller_ref_clone.borrow_mut() = Some(controller);
+        });
+
+        let underlying_source = js_sys::Object::new();
+        js_sys::Reflect::set(
+            &underlying_source,
+            &wasm_bindgen::JsValue::from_str("start"),
+            start_cb.as_ref(),
+        )
+        .map_err(|e| anyhow::anyhow!("Reflect::set failed: {e:?}"))?;
+        start_cb.forget();
+
+        let stream = web_sys::ReadableStream::new_with_underlying_source(&underlying_source)
+            .map_err(|e| anyhow::anyhow!("ReadableStream::new failed: {e:?}"))?;
+
+        let controller = controller_ref
+            .borrow_mut()
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("ReadableStream start callback was not called synchronously"))?;
+
+        let enqueue = Box::new(move |msg: I| -> anyhow::Result<()> {
+            if let Some(translated) = translate(msg) {
+                let js_val = serde_wasm_bindgen::to_value(&translated)
+                    .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
+                controller
+                    .enqueue_with_chunk(&js_val)
+                    .map_err(|e| BrokerError::SendQueue(format!("{e:?}")))?;
+            }
+            Ok(())
+        });
+
+        let pos = self.add_subsystem(Subsystem::AsyncIterableIn(enqueue)).await?;
+        Ok((stream, pos))
+    }
+
+    /// Creates a JS `ReadableStream` over incoming (I) messages.
+    /// The stream is natively `AsyncIterable` in browsers:
+    /// ```typescript
+    /// for await (const msg of broker.get_async_iterable_in()) { ... }
+    /// ```
+    #[cfg(target_family = "wasm")]
+    pub async fn get_async_iterable_in(&mut self) -> anyhow::Result<(web_sys::ReadableStream, usize)>
+    where
+        I: serde::Serialize + 'static,
+    {
+        self.get_async_iterable_in_translate(Box::new(Some)).await
+    }
+
     /// Emit a message to a given destination of other listeners.
     /// The message will be processed asynchronously.
     pub fn emit_msg_in_dest(&mut self, dst: Destination, msg: I) -> anyhow::Result<()> {
@@ -824,6 +958,10 @@ pub enum Subsystem<I, O> {
     TapSyncOut(Sender<O>),
     Handler(SubsystemHandlerBox<I, O>),
     Translator(SubsystemTranslatorBox<I, O>),
+    #[cfg(target_family = "wasm")]
+    AsyncIterableOut(Box<dyn Fn(O) -> anyhow::Result<()>>),
+    #[cfg(target_family = "wasm")]
+    AsyncIterableIn(Box<dyn Fn(I) -> anyhow::Result<()>>),
 }
 
 impl<I: Message, O: Message> Subsystem<I, O> {
@@ -839,6 +977,12 @@ impl<I: Message, O: Message> Subsystem<I, O> {
                 for msg in msgs {
                     s.send(msg.clone())
                         .map_err(|_| BrokerError::SendQueue("send_tap_async".into()))?;
+                }
+            }
+            #[cfg(target_family = "wasm")]
+            Self::AsyncIterableOut(enqueue) => {
+                for msg in msgs {
+                    enqueue(msg)?;
                 }
             }
             _ => (),
@@ -857,6 +1001,12 @@ impl<I: Message, O: Message> Subsystem<I, O> {
                 for msg in msgs {
                     s.send(msg.clone())
                         .map_err(|_| BrokerError::SendQueue("send_tap_async".into()))?;
+                }
+            }
+            #[cfg(target_family = "wasm")]
+            Self::AsyncIterableIn(enqueue) => {
+                for msg in msgs {
+                    enqueue(msg)?;
                 }
             }
             _ => (),
@@ -904,6 +1054,10 @@ impl<I, O> fmt::Debug for Subsystem<I, O> {
             Self::TapOut(_) => write!(f, "TapAsyncOut"),
             Self::Handler(_) => write!(f, "Handler"),
             Self::Translator(_) => write!(f, "Translator"),
+            #[cfg(target_family = "wasm")]
+            Self::AsyncIterableOut(_) => write!(f, "AsyncIterableOut"),
+            #[cfg(target_family = "wasm")]
+            Self::AsyncIterableIn(_) => write!(f, "AsyncIterableIn"),
         }
     }
 }
@@ -993,6 +1147,18 @@ impl<I: Message, O: Message, TI: Message + 'static, TO: Message + 'static> Subsy
 #[platform_async_trait()]
 pub trait TranslateFrom<T: Message>: Sized {
     fn translate(msg: T) -> Option<Self>;
+}
+
+impl<M: Message + 'static> TranslateFrom<M> for M {
+    fn translate(msg: M) -> Option<M> {
+        Some(msg)
+    }
+}
+
+impl<M: Message + 'static> TranslateInto<M> for M {
+    fn translate(self) -> Option<M> {
+        Some(self)
+    }
 }
 
 #[platform_async_trait()]

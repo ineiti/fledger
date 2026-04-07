@@ -1,20 +1,15 @@
-use std::{
-    collections::{HashMap, HashSet},
-    iter::once,
-};
+use std::collections::HashSet;
 
 use crate::{
     dht_storage::{
-        broker::DHTStorage,
+        broker::{DHTStorage, DHTStorageOut, StorageError},
         core::{Cuckoo, RealmConfig},
     },
     flo::{
-        blob::{
-            BlobFamily, BlobID, BlobPage, BlobPath, BlobPathFamily, BlobTag, FloBlobPage,
-            FloBlobTag,
-        },
+        blob::{BlobFamily, BlobID, BlobPage, BlobPathFamily, BlobTag, FloBlobPage, FloBlobTag},
         flo::{FloError, FloID, FloWrapper},
-        realm::{FloRealm, GlobalID, Realm, RealmID},
+        realm::{FloRealm, Realm, RealmID},
+        realm_storage::RealmStorage,
     },
 };
 use bytes::Bytes;
@@ -28,27 +23,16 @@ use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 
-use super::broker::{DHTStorageOut, StorageError};
-
 /// A RealmView is a wrapper for the dht_storage, FloRealm, FloBlob{Page,Tag}.
 /// It offers a simpler interface to interact with these elements using paths
 /// as well as IDs.
 /// If you want to have a RealmView for a new Realm, please use [RealmViewBuilder].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RealmView {
     dht_storage: DHTStorage,
     pub realm: FloRealm,
     pub pages: RealmStorage<BlobPage>,
     pub tags: RealmStorage<BlobTag>,
-}
-
-#[derive(Debug, Clone)]
-pub struct RealmStorage<T> {
-    realm: RealmID,
-    dht_storage: DHTStorage,
-    pub root: BlobID,
-    pub storage: HashMap<BlobID, FloWrapper<T>>,
-    pub cuckoos: HashMap<BlobID, Vec<BlobID>>,
 }
 
 #[derive(Error, Debug)]
@@ -95,13 +79,13 @@ impl RealmView {
     ///
     /// Error: if there is no page and/or tag service in the given realm.
     pub async fn new_from_realm(dht_storage: DHTStorage, realm: FloRealm) -> anyhow::Result<Self> {
-        let pages = RealmStorage::from_service(dht_storage.clone(), &realm, "http")
+        let pages = RealmStorage::from_service(dht_storage.clone().into(), &realm, "http")
             .await?
             .ok_or(anyhow::anyhow!(
                 "Didn't find the root page for {}",
                 realm.realm_id()
             ))?;
-        let tags = RealmStorage::from_service(dht_storage.clone(), &realm, "tag")
+        let tags = RealmStorage::from_service(dht_storage.clone().into(), &realm, "tag")
             .await?
             .ok_or(anyhow::anyhow!("Didn't find the root tag"))?;
         Ok(Self {
@@ -414,122 +398,6 @@ impl RealmView {
     }
 }
 
-impl<T: Serialize + DeserializeOwned + Clone + std::fmt::Debug> RealmStorage<T>
-where
-    FloWrapper<T>: BlobPath + BlobFamily,
-{
-    async fn from_root(dht_storage: DHTStorage, root: GlobalID) -> anyhow::Result<Self> {
-        let mut rs = Self {
-            realm: root.realm_id().clone(),
-            root: (*root.flo_id().clone()).into(),
-            storage: HashMap::new(),
-            cuckoos: HashMap::new(),
-            dht_storage,
-        };
-        rs.update_cuckoos(&rs.root.clone()).await?;
-        Ok(rs)
-    }
-
-    async fn from_service(
-        ds: DHTStorage,
-        fr: &FloRealm,
-        service: &str,
-    ) -> anyhow::Result<Option<Self>>
-    where
-        FloWrapper<T>: BlobPath + BlobFamily,
-    {
-        Ok(if let Some(id) = fr.cache().get_services().get(service) {
-            Some(RealmStorage::from_root(ds, fr.realm_id().global_id(id.clone())).await?)
-        } else {
-            None
-        })
-    }
-
-    pub fn get_path(&self, path: &str) -> anyhow::Result<&FloWrapper<T>> {
-        self.get_path_internal(
-            path.trim_start_matches("/").split('/').collect::<Vec<_>>(),
-            vec![&self.root],
-        )
-    }
-
-    /// Returns the Blob and its cuckoos.
-    /// If no blob with this ID is stored, it starts by fetching this blob and its cuckoos.
-    /// If the blob doesn't exist, but its cuckoos, then it will try to fetch the blob, and then
-    /// return either the blob and its cuckoos, or just the cuckoos.
-    pub async fn get_cuckoos(&mut self, bid: BlobID) -> anyhow::Result<Vec<&FloWrapper<T>>> {
-        // if self.storage.get(&bid).is_none() {
-        self.update_cuckoos(&bid).await?;
-        // }
-        Ok(once(&bid)
-            .chain(self.cuckoos.get(&bid).unwrap_or(&Vec::new()))
-            .filter_map(|id| self.storage.get(id))
-            .collect::<Vec<_>>())
-    }
-
-    fn get_path_internal(
-        &self,
-        parts: Vec<&str>,
-        curr: Vec<&BlobID>,
-    ) -> anyhow::Result<&FloWrapper<T>> {
-        let ids = curr
-            .into_iter()
-            .flat_map(|id| once(id).chain(self.cuckoos.get(id).into_iter().flatten()))
-            .collect::<Vec<_>>();
-        if let Some(part) = parts.split_first() {
-            if let Some(f) = ids
-                .iter()
-                .filter_map(|id| self.storage.get(id))
-                .find(|f| f.get_path().map(|p| p == part.0).unwrap_or(false))
-            {
-                if part.1.len() == 0 {
-                    return Ok(f);
-                } else {
-                    let children = f.get_children();
-                    if !children.is_empty() {
-                        return self.get_path_internal(part.1.to_vec(), children.iter().collect());
-                    }
-                }
-            }
-        }
-        Err(anyhow::anyhow!("Couldn't find page"))
-    }
-
-    async fn update_cuckoos(&mut self, bid: &BlobID) -> anyhow::Result<()> {
-        for id in self
-            .dht_storage
-            .get_cuckoos(&self.realm.global_id((**bid).into()))
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .chain(std::iter::once((**bid).into()))
-        {
-            if let Ok(flo) = self
-                .dht_storage
-                .get_flo::<T>(&self.realm.global_id(id.clone()))
-                .await
-            {
-                self.storage.insert((*flo.flo_id()).into(), flo.clone());
-                let blob_id: BlobID = (*flo.flo_id()).into();
-                if *bid != blob_id {
-                    let cuckoos = self.cuckoos.entry(bid.clone()).or_insert_with(Vec::new);
-                    if !cuckoos.contains(&blob_id) {
-                        cuckoos.push(blob_id);
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    async fn update_blobs(&mut self) -> anyhow::Result<()> {
-        let bids = self.storage.keys().cloned().collect::<Vec<_>>();
-        for bid in bids {
-            self.update_cuckoos(&bid).await?;
-        }
-        Ok(())
-    }
-}
-
 pub struct RealmViewBuilder {
     dht_storage: DHTStorage,
     name: String,
@@ -679,11 +547,14 @@ impl RealmViewBuilder {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
+    use std::{collections::HashMap, str::FromStr};
 
     use flarch::{broker::Broker, data_storage::DataStorageTemp, nodeids::NodeID};
 
-    use crate::{dht_storage::core::DHTConfig, timer::Timer};
+    use crate::{
+        dht_storage::{broker::DHTStorage, core::DHTConfig},
+        timer::Timer,
+    };
 
     use super::*;
 
@@ -722,18 +593,19 @@ mod test {
 
     #[tokio::test]
     async fn get_path() -> anyhow::Result<()> {
+        let ds = DHTStorage::start(
+            DataStorageTemp::new_box(),
+            DHTConfig::default(NodeID::rnd()),
+            Timer::start().await?.broker,
+            Broker::new(),
+        )
+        .await?;
         let mut rs: RealmStorage<BlobPage> = RealmStorage {
             realm: RealmID::from_str("00")?,
             root: BlobID::from_str("00")?,
             storage: HashMap::new(),
             cuckoos: HashMap::new(),
-            dht_storage: DHTStorage::start(
-                DataStorageTemp::new_box(),
-                DHTConfig::default(NodeID::rnd()),
-                Timer::start().await?.broker,
-                Broker::new(),
-            )
-            .await?,
+            ds: DHTStorage::from_broker(ds.broker, 1000).await?.into(),
         };
         let root = add_page(&mut rs, "danu", None, Cuckoo::Duration(1000));
         rs.root = root.blob_id();

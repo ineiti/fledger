@@ -9,11 +9,11 @@ use flarch::start_logging_filter_level;
 use flcrypto::access::Condition;
 use flmacro::test_async_stack;
 use flmodules::{
-    dht_storage::{
-        core::{Cuckoo, RealmConfig},
+    dht_storage::core::{Cuckoo, RealmConfig},
+    flo::{
+        blob::{FloBlobPage, FloBlobTag},
         realm_view::{RealmView, RealmViewBuilder},
     },
-    flo::blob::{FloBlobPage, FloBlobTag},
     testing::wallet::Wallet,
 };
 

@@ -1,0 +1,46 @@
+{
+  "name": "@fledger/danu",
+  "version": "0.1.0",
+  "description": "Browser library for Fledger network",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "pkg/*.wasm",
+    "pkg/*.js",
+    "pkg/*.d.ts",
+    "dist/*.js",
+    "dist/*.d.ts",
+    "dist/*.map",
+    "README.md"
+  ],
+  "scripts": {
+    "build:ts": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "tsc"
+  },
+  "dependencies": {
+    "@preact/signals-core": "^1.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ineiti/fledger"
+  },
+  "keywords": [
+    "fledger",
+    "wasm",
+    "p2p",
+    "webrtc"
+  ],
+  "license": "MIT OR Apache-2.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

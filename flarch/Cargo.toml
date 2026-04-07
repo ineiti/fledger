@@ -72,6 +72,24 @@ web-sys = { version = "0.3", features = [
     "ErrorEvent",
     "MessageEvent",
     "WebSocket",
+    # IndexedDB features
+    "IdbFactory",
+    "IdbDatabase",
+    "IdbObjectStore",
+    "IdbRequest",
+    "IdbOpenDbRequest",
+    "IdbTransaction",
+    "IdbTransactionMode",
+    "IdbCursorWithValue",
+    "IdbKeyRange",
+    "IdbVersionChangeEvent",
+    "DomException",
+    "DomStringList",
+    "WorkerGlobalScope",
+    "Event",
+    "EventTarget",
+    "ReadableStream",
+    "ReadableStreamDefaultController",
 ] }
 
 # [dev-dependencies]
