@@ -71,8 +71,8 @@ impl StatusBar {
 
     fn update_state(&mut self, up: StateUpdate) -> anyhow::Result<()> {
         match up {
-            StateUpdate::ConnectSignal
-            | StateUpdate::ConnectedNodes
+            StateUpdate::ConnectSignal(_)
+            | StateUpdate::ConnectedNodes(_)
             | StateUpdate::AvailableNodes(_)
             | StateUpdate::DisconnectNodes => self.update_connection(),
             StateUpdate::RealmAvailable(_) | StateUpdate::ReceivedFlo(_) => self.update_page_list(),

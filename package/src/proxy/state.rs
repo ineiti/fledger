@@ -101,7 +101,7 @@ impl State {
                         if self.nodes_connected_dht.is_empty() {
                             StateUpdate::DisconnectNodes
                         } else {
-                            StateUpdate::ConnectedNodes
+                            StateUpdate::ConnectedNodes(self.nodes_connected_dht.len())
                         }
                     } else {
                         return vec![];
@@ -150,7 +150,7 @@ impl State {
                 }
                 NetworkOut::SystemConfig(sc) => {
                     self.config = Some(sc);
-                    StateUpdate::ConnectSignal
+                    StateUpdate::ConnectSignal(true)
                 }
                 _ => return vec![],
             },
@@ -171,9 +171,9 @@ impl State {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum StateUpdate {
     // Connection to the signalling server established
-    ConnectSignal,
+    ConnectSignal(bool),
     // Number of nodes connected, always >= 1
-    ConnectedNodes,
+    ConnectedNodes(usize),
     // Available nodes on the signalling server
     AvailableNodes(Vec<NodeInfo>),
     // Lost connection to last node - signal server might still be connected

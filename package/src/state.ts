@@ -4,10 +4,10 @@ import type { State, FloID, RealmID, TabID } from "../pkg/danu.js";
 
 // Serde externally-tagged enum representation of StateUpdate
 export type StateUpdateTS =
-  | "ConnectSignal"
-  | "ConnectedNodes"
   | "DisconnectNodes"
   | "DHTStorageStats"
+  | { ConnectSignal: boolean }
+  | { ConnectedNodes: number }
   | { AvailableNodes: State["nodes_online"] }
   | { RealmAvailable: State["realm_ids"] }
   | { ReceivedFlo: FloID }
@@ -85,12 +85,8 @@ export class FledgerState {
   }
 
   private _applyUpdate({ update, state }: StateUpdateMsg): void {
-    if (update === "ConnectSignal") {
-      this.$signalConnected.value = true;
-    } else if (update === "DisconnectNodes") {
+    if (update === "DisconnectNodes") {
       this.$signalConnected.value = false;
-      this.$nodes_connected_dht.value = state.nodes_connected_dht;
-    } else if (update === "ConnectedNodes") {
       this.$nodes_connected_dht.value = state.nodes_connected_dht;
     } else if (update === "DHTStorageStats") {
       this.$dht_storage_stats.value = state.dht_storage_stats;
@@ -103,6 +99,10 @@ export class FledgerState {
         this.$is_leader.value = state.is_leader ?? null;
       } else if ("TabList" in update) {
         this.$tab_list.value = update.TabList;
+      } else if ("ConnectSignal" in update) {
+        this.$signalConnected.value = update.ConnectSignal;
+      } else if ("ConnectedNodes" in update) {
+        this.$nodes_connected_dht.value = state.nodes_connected_dht;
       }
       // ReceivedFlo and SystemRealm are intentionally not handled here:
       // ReceivedFlo is consumed by RealmObserver streams.

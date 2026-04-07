@@ -151,11 +151,18 @@ impl Intern {
         self.role = TabRole::Leader;
         self.search_cnt = 0;
         self.state.is_leader = Some(true);
+        self.state.nodes_connected_dht.clear();
+        self.state.nodes_online.clear();
         self.update_state().await;
         if let Err(e) = self.start_node().await {
             log::error!("Couldn't setup node: {e:?}")
         }
-        vec![InternOut::Update(StateUpdate::NewLeader(self.id.clone()))]
+        vec![
+            InternOut::Update(StateUpdate::NewLeader(self.id.clone())),
+            InternOut::Update(StateUpdate::ConnectSignal(false)),
+            InternOut::Update(StateUpdate::ConnectedNodes(0)),
+            InternOut::Update(StateUpdate::AvailableNodes(vec![])),
+        ]
     }
 
     fn is_first_tab(&self) -> bool {
@@ -179,8 +186,6 @@ impl Intern {
     }
 
     async fn start_node(&mut self) -> anyhow::Result<()> {
-        self.state.nodes_connected_dht.clear();
-        self.state.nodes_online.clear();
         let config = ConnectionConfig::new(
             self.netconf.signal_server.clone(),
             self.netconf
@@ -298,12 +303,7 @@ impl Intern {
                 if !out.is_empty() {
                     self.update_state().await;
                     out.into_iter()
-                        .flat_map(|o| {
-                            vec![
-                                InternOut::Update(o.clone()),
-                                InternOut::Broadcast(BroadcastToTabs::FromLeader(o)),
-                            ]
-                        })
+                        .flat_map(|o| vec![InternOut::Update(o.clone())])
                         .collect::<Vec<_>>()
                 } else {
                     vec![]
@@ -329,6 +329,15 @@ impl SubsystemHandler<InternIn, InternOut> for Intern {
             let m = self.state.msg_new_tabs(self.tabs_sorted());
             self.update_state().await;
             out.push(InternOut::Update(m));
+        }
+        if self.role == TabRole::Leader {
+            let mut broadcast = vec![];
+            for o in &out {
+                if let InternOut::Update(u) = o {
+                    broadcast.push(InternOut::Broadcast(BroadcastToTabs::FromLeader(u.clone())));
+                }
+            }
+            out.extend(broadcast);
         }
         out
     }

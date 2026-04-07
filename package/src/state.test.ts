@@ -49,7 +49,7 @@ describe("FledgerState", () => {
   it("signalConnected becomes true after ConnectSignal", async () => {
     const s = makeStream<StateUpdateMsg>();
     const state = await FledgerState.create(s.stream, makeState());
-    s.push({ update: "ConnectSignal", state: makeState() });
+    s.push({ update: { ConnectSignal: true }, state: makeState() });
     // Allow microtask to process
     await new Promise((r) => setTimeout(r, 0));
     expect(state.signalConnected).toBe(true);
@@ -65,7 +65,7 @@ describe("FledgerState", () => {
     const s = makeStream<StateUpdateMsg>();
     const state = await FledgerState.create(s.stream, makeState());
     s.push({
-      update: "ConnectedNodes",
+      update: { ConnectedNodes: 2 },
       state: makeState({ nodes_connected_dht: ["node-1", "node-2"] as any }),
     });
     await new Promise((r) => setTimeout(r, 0));
@@ -76,7 +76,7 @@ describe("FledgerState", () => {
     const s = makeStream<StateUpdateMsg>();
     const state = await FledgerState.create(s.stream, makeState());
     s.push({
-      update: "ConnectedNodes",
+      update: { ConnectedNodes: 1 },
       state: makeState({ nodes_connected_dht: ["node-1"] as any }),
     });
     await new Promise((r) => setTimeout(r, 0));
@@ -165,7 +165,7 @@ describe("FledgerState", () => {
     // effect runs once immediately
     expect(calls).toEqual([false]);
 
-    s.push({ update: "ConnectSignal", state: makeState() });
+    s.push({ update: { ConnectSignal: true }, state: makeState() });
     await new Promise((r) => setTimeout(r, 0));
 
     expect(calls).toEqual([false, true]);
@@ -184,7 +184,7 @@ describe("FledgerState", () => {
     expect(lengths).toEqual([0]);
 
     s.push({
-      update: "ConnectedNodes",
+      update: { ConnectedNodes: 2 },
       state: makeState({ nodes_connected_dht: ["n1", "n2"] as any }),
     });
     await new Promise((r) => setTimeout(r, 0));
